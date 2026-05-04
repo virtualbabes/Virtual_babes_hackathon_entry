@@ -52,6 +52,7 @@ type TournamentState struct {
 	IsBuyInMode  bool              `json:"is_buy_in_mode"`
 	OpenTime     time.Time         `json:"open_time"`
 }
+
 // WalletLinkInfo stores the primary AVM wallet and its linked non-AVM wallets.
 type WalletLinkInfo struct {
 	PrimaryAVMWallet string         `json:"primary_avm_wallet"`
@@ -91,29 +92,29 @@ type ActiveBuff struct {
 }
 
 type Player struct {
-	ID              string             `json:"id"`
-	Wallet          string             `json:"wallet"` // The connected blockchain address
-	Decks           [4][]Card          `json:"decks"`  // 4 saved deck slots
-	ActiveDeck      int                `json:"active_deck"`
-	Ready           bool               `json:"ready"`
-	Reputation      int                `json:"reputation"`
-	WantedLevel     int                `json:"wanted_level"`
-	GloatMessage    string             `json:"gloat_message"`
-	AvatarURL       string             `json:"avatar_url"`
-	Buffs           []ActiveBuff       `json:"buffs"`
-	AvatarBanNotice string             `json:"avatar_ban_notice"`
-	Mojo            int                `json:"mojo"`          // Social standing for Club unlocks
-	SocialRank      string             `json:"social_rank"`   // e.g., "Nobody", "Regular", "Icon"
-	JobRole         string             `json:"job_role"`      // Manager, Security, Clerk, Freelancer
-	EmployerClubID  string             `json:"employer_club_id"`   // The club currently paying this user
+	ID              string       `json:"id"`
+	Wallet          string       `json:"wallet"` // The connected blockchain address
+	Decks           [4][]Card    `json:"decks"`  // 4 saved deck slots
+	ActiveDeck      int          `json:"active_deck"`
+	Ready           bool         `json:"ready"`
+	Reputation      int          `json:"reputation"`
+	WantedLevel     int          `json:"wanted_level"`
+	GloatMessage    string       `json:"gloat_message"`
+	AvatarURL       string       `json:"avatar_url"`
+	Buffs           []ActiveBuff `json:"buffs"`
+	AvatarBanNotice string       `json:"avatar_ban_notice"`
+	Mojo            int          `json:"mojo"`             // Social standing for Club unlocks
+	SocialRank      string       `json:"social_rank"`      // e.g., "Nobody", "Regular", "Icon"
+	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
+	EmployerClubID  string       `json:"employer_club_id"` // The club currently paying this user
 	// EmployerClubID string             `json:"employer_club_id"` // The club currently paying this user
-	JailedCards     map[int]string     `json:"jailed_cards"` // CardID -> ClubID (cards currently in jail)
-	KidnappedCards  map[int]string     `json:"kidnapped_cards"` // CardID -> VictimWallet (cards player has kidnapped)
-	HeldHostageCards map[int]string    `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
-	FavoriteCardID  int       `json:"favorite_card_id"` // Added for Collective Intelligence
-	RumorCount      int       `json:"rumor_count"`      // Number of rumors spread by this player
-	Portfolio       map[string]float64 `json:"portfolio"`
-	Playstyle       PlaystyleTendencies `json:"playstyle"`
+	JailedCards      map[int]string      `json:"jailed_cards"`       // CardID -> ClubID (cards currently in jail)
+	KidnappedCards   map[int]string      `json:"kidnapped_cards"`    // CardID -> VictimWallet (cards player has kidnapped)
+	HeldHostageCards map[int]string      `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
+	FavoriteCardID   int                 `json:"favorite_card_id"`   // Added for Collective Intelligence
+	RumorCount       int                 `json:"rumor_count"`        // Number of rumors spread by this player
+	Portfolio        map[string]float64  `json:"portfolio"`
+	Playstyle        PlaystyleTendencies `json:"playstyle"`
 }
 
 // Engine acts as the supreme state machine for the entire App
@@ -1571,6 +1572,7 @@ func SyncOpponentWanted(this js.Value, args []js.Value) interface{} {
 	Game.mutex.Unlock()
 	return true
 }
+
 // PerformAIMove implements the AI's decision-making logic.
 func PerformAIMove() {
 	Game.mutex.Lock()
@@ -1679,110 +1681,85 @@ func PerformAIMove() {
 
 // GetGameState sends a secure snapshot of the vault to the JavaScript UI
 func GetGameState(this js.Value, args []js.Value) interface{} {
-	// Define a snapshot structure for efficient serialization
 	Game.mutex.RLock()
 	defer Game.mutex.RUnlock()
-	snapshot := struct {
-		Phase           string             `json:"phase"`
-		Turn            int                `json:"turn"`
-		Rewards         map[uint64]float64 `json:"rewards"`
-		Rules           map[string]bool    `json:"rules"`
-		P1Avatar        string             `json:"p1_avatar"`
-		P2Avatar        string             `json:"p2_avatar"`
-		P1Gloat         string             `json:"p1_gloat"`
-		P2Gloat         string             `json:"p2_gloat"`
-		P1AvatarNotice  string             `json:"p1_avatar_notice"`
-		Board           [9]*Card           `json:"board"`
-		BoardMoods      [9]string          `json:"board_moods"`
-		Deck            []Card             `json:"deck"`
-		Inventory       []Card             `json:"inventory"`
-		Reputation      int                `json:"reputation"`
-		Mojo            int                `json:"mojo"`
-		SocialRank      string             `json:"social_rank"`
-		JobRole         string             `json:"job_role"`
-		EmployerID      string             `json:"employer_id"`
-		WantedLevel     int                `json:"wanted_level"`
-		ActiveSlot      int                `json:"active_deck"`
-		Multiplayer     bool               `json:"multiplayer"`
-		P2ID            string             `json:"p2_id"`
-		Playstyle       PlaystyleTendencies `json:"playstyle"`
-		JailedCards     map[int]string     `json:"jailed_cards"`
-		KidnappedCards  map[int]string     `json:"kidnapped_cards"` // Added for UI display
-		HeldHostageCards map[int]string    `json:"held_hostage_cards"` // Added for UI display
-		Scores          [2]int             `json:"scores"`
-		Winner          int                `json:"winner"`
-		Faucet          float64            `json:"faucet"`
-		Maintenance     bool               `json:"maintenance"`
-		TestingMode     bool               `json:"testing_mode"`
-		IsAdmin         bool               `json:"is_admin"`
-		AIScore         int                `json:"ai_score"`
-		ServerLoad      int                `json:"server_load"`
-		SpecialFanfare  string             `json:"special_fanfare"`
-		DeckRating      string             `json:"deck_rating"`
-		VaultLow        bool               `json:"vault_low"`
-		Latency         int                `json:"latency"`
-		NetworkHealth   string             `json:"network_health"`
-		MasterVolume    float64            `json:"master_volume"`
-		MusicVolume     float64            `json:"music_volume"`
-		SfxVolume       float64            `json:"sfx_volume"`
-		ServerLoadColor string             `json:"server_load_color"`
-		ApiBase         string             `json:"api_base"` // API Base URL
-		Network         string             `json:"network"`
-		Portfolio       map[string]float64 `json:"portfolio"`
-		FavoriteCardID  int                `json:"favorite_card_id"`
-		RumorCount      int                `json:"rumor_count"`
-	}{
-		Phase:           Game.Phase,
-		Turn:            Game.Turn,
-		Rewards:         Game.Rewards,
-		Rules:           Game.Rules,
-		P1Avatar:        Game.Players[0].AvatarURL,
-		P2Avatar:        Game.Players[1].AvatarURL,
-		P1Gloat:         Game.Players[0].GloatMessage,
-		P2Gloat:         Game.Players[1].GloatMessage,
-		P1AvatarNotice:  Game.Players[0].AvatarBanNotice,
-		Board:           Game.Board,
-		BoardMoods:      Game.BoardMoods,
-		Deck:            Game.Players[Game.Turn].Decks[Game.Players[Game.Turn].ActiveDeck],
-		Inventory:       Game.Inventory,
-		Reputation:      Game.Players[0].Reputation,
-		Mojo:            Game.Players[0].Mojo,
-		SocialRank:      Game.Players[0].SocialRank,
-		JobRole:         Game.Players[0].JobRole,
-		EmployerID:      Game.Players[0].EmployerClubID, // Corrected field name
-		WantedLevel:     Game.Players[0].WantedLevel,
-		ActiveSlot:      Game.Players[0].ActiveDeck,
-		Multiplayer:     Game.Multiplayer,
-		P2ID:            Game.Players[1].ID,
-		Playstyle:       Game.Players[0].Playstyle,
-		JailedCards:     Game.Players[0].JailedCards,
-		KidnappedCards:  Game.Players[0].KidnappedCards,
-		HeldHostageCards: Game.Players[0].HeldHostageCards,
-		Scores:          Game.Scores,
-		Winner:          Game.Winner,
-		Faucet:          Game.Faucet,
-		Maintenance:     Game.Maintenance,
-		TestingMode:     Game.TestingMode,
-		IsAdmin:         Game.IsAdmin,
-		AIScore:         Game.AIScore,
-		ServerLoad:      Game.ServerLoad,
-		SpecialFanfare:  Game.SpecialFanfare,
-		DeckRating:      calculateDeckRating(Game.Players[0].Decks[Game.Players[0].ActiveDeck]),
-		VaultLow:        Game.VaultLow,
-		Latency:         Game.Latency,
-		NetworkHealth:   Game.NetworkHealth,
-		MasterVolume:    Game.MasterVolume,
-		MusicVolume:     Game.MusicVolume,
-		SfxVolume:       Game.SfxVolume,
-		ServerLoadColor: calculateLoadColor(Game.ServerLoad),
-		ApiBase:         Game.ApiBase,
-		Network:         Game.Network,
-		FavoriteCardID:  Game.Players[0].FavoriteCardID,
-		Portfolio:       Game.Players[0].Portfolio,
-		RumorCount:      Game.Players[0].RumorCount,
+
+	filter := "all"
+	if len(args) > 0 && args[0].Type() == js.TypeString {
+		filter = args[0].String()
 	}
 
-	stateJSON, err := json.Marshal(snapshot)
+	state := make(map[string]interface{})
+
+	// Profile & Stats
+	if filter == "all" || filter == "profile" {
+		state["reputation"] = Game.Players[0].Reputation
+		state["mojo"] = Game.Players[0].Mojo
+		state["social_rank"] = Game.Players[0].SocialRank
+		state["job_role"] = Game.Players[0].JobRole
+		state["employer_id"] = Game.Players[0].EmployerClubID
+		state["wanted_level"] = Game.Players[0].WantedLevel
+		state["jailed_cards"] = Game.Players[0].JailedCards
+		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
+		state["held_hostage_cards"] = Game.Players[0].HeldHostageCards
+		state["rumor_count"] = Game.Players[0].RumorCount
+		state["playstyle"] = Game.Players[0].Playstyle
+		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
+	}
+
+	// Combat State
+	if filter == "all" || filter == "combat" {
+		state["phase"] = Game.Phase
+		state["turn"] = Game.Turn
+		state["board"] = Game.Board
+		state["board_moods"] = Game.BoardMoods
+		state["scores"] = Game.Scores
+		state["winner"] = Game.Winner
+		state["ai_score"] = Game.AIScore
+		state["p1_avatar"] = Game.Players[0].AvatarURL
+		state["p2_avatar"] = Game.Players[1].AvatarURL
+		state["p1_gloat"] = Game.Players[0].GloatMessage
+		state["p2_gloat"] = Game.Players[1].GloatMessage
+		state["p1_avatar_notice"] = Game.Players[0].AvatarBanNotice
+		state["p2_id"] = Game.Players[1].ID
+		state["multiplayer"] = Game.Multiplayer
+		state["special_fanfare"] = Game.SpecialFanfare
+		state["rules"] = Game.Rules
+	}
+
+	// Economy
+	if filter == "all" || filter == "economy" {
+		state["rewards"] = Game.Rewards
+		state["faucet"] = Game.Faucet
+		state["vault_low"] = Game.VaultLow
+		state["portfolio"] = Game.Players[0].Portfolio
+	}
+
+	// Player Assets
+	if filter == "all" || filter == "inventory" {
+		state["deck"] = Game.Players[Game.Turn].Decks[Game.Players[Game.Turn].ActiveDeck]
+		state["inventory"] = Game.Inventory
+		state["active_deck"] = Game.Players[0].ActiveDeck
+		state["deck_rating"] = calculateDeckRating(Game.Players[0].Decks[Game.Players[0].ActiveDeck])
+	}
+
+	// System / Meta
+	if filter == "all" || filter == "meta" {
+		state["maintenance"] = Game.Maintenance
+		state["testing_mode"] = Game.TestingMode
+		state["is_admin"] = Game.IsAdmin
+		state["server_load"] = Game.ServerLoad
+		state["latency"] = Game.Latency
+		state["network_health"] = Game.NetworkHealth
+		state["api_base"] = Game.ApiBase
+		state["network"] = Game.Network
+		state["server_load_color"] = calculateLoadColor(Game.ServerLoad)
+		state["master_volume"] = Game.MasterVolume
+		state["music_volume"] = Game.MusicVolume
+		state["sfx_volume"] = Game.SfxVolume
+	}
+
+	stateJSON, err := json.Marshal(state)
 	if err != nil {
 		fmt.Printf("[ENGINE ERROR] State serialization failed: %v\n", err)
 		return nil
@@ -1809,14 +1786,25 @@ func checkWinCondition() {
 		p1Score, p2Score := 0, 0
 		for _, card := range Game.Board {
 			if card != nil {
-				if card.Owner == 0 { p1Score++ } else { p2Score++ }
+				if card.Owner == 0 {
+					p1Score++
+				} else {
+					p2Score++
+				}
 			}
 		}
 		Game.Scores = [2]int{p1Score, p2Score}
 		Game.Phase = "Finished"
-		if p1Score > p2Score { Game.Winner = 0 } else if p2Score > p1Score { Game.Winner = 1 } else { Game.Winner = 2 }
+		if p1Score > p2Score {
+			Game.Winner = 0
+		} else if p2Score > p1Score {
+			Game.Winner = 1
+		} else {
+			Game.Winner = 2
+		}
 	}
 }
+
 // -----------------------------------------------------------------------------
 // 7. BROWSER BRIDGES & AUDIO
 // -----------------------------------------------------------------------------

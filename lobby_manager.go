@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"os"
 	"sort"
+	"strconv"
 	"strings" // For Solana verification
 	"time"
 
@@ -98,11 +99,11 @@ func (l *Lobby) run() {
 		case <-ticker.C:
 			l.cleanupNonces()
 			l.processAuctions()
-			l.processPlaystyleDecay() // New: Decay playstyle tendencies
-			l.processRumors() // New: Check for expired rumors
-			l.processLoans() // New: Check for defaulted loans
-			l.processMojoDecay()  // New: Penalize stagnant clubs
-			l.processInsuranceRecovery() // New: Check for expired kidnappings
+			l.processPlaystyleDecay()      // New: Decay playstyle tendencies
+			l.processRumors()              // New: Check for expired rumors
+			l.processLoans()               // New: Check for defaulted loans
+			l.processMojoDecay()           // New: Penalize stagnant clubs
+			l.processInsuranceRecovery()   // New: Check for expired kidnappings
 			go l.observeGlobalSentiments() // Pillar 3: Aggregate meta trends
 		case <-matchmakingTicker.C:
 			l.processMatchmaking()
@@ -119,10 +120,10 @@ func (l *Lobby) run() {
 			go l.savePersistentCardCache()
 			go l.saveRegisteredTxIDs()
 			go l.saveLinkedWallets()
-		case <-vaultCheckTicker.C:
-			// TODO: Implement checkVaultBalanceOnChain and checkNativeVaultBalanceOnChain
-			// go l.checkVaultBalanceOnChain()
-			// go l.checkNativeVaultBalanceOnChain()
+		case <-vaultCheckTicker.C: // Periodically check on-chain vault balance
+			// The checkNativeVaultBalanceOnChain function is implemented in oracle_service.go
+			// It updates l.faucetBalance based on the native asset balance of the vault address.
+			go l.checkNativeVaultBalanceOnChain()
 		case client := <-l.register:
 			l.mutex.Lock()
 			l.clients[client.id] = client
@@ -147,7 +148,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.mutex.Lock()
 		l.wallets[env.FromID] = data.Wallet
 		l.ensurePlayerStatsMapsInitialized(data.Wallet) // Ensure maps are initialized
-		
+
 		// Trigger NPC Welcome Commentary if they have a distinct style
 		go l.generateNPCCommentary(env.FromID, "LOBBY_ENTRY")
 
@@ -179,9 +180,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.broadcast <- msg
 	case "join_queue":
 		var data struct {
-			Deck       []int  `json:"deck"`
-			DeckRating string `json:"deck_rating"`
-			FavoriteCardID int `json:"favorite_card_id"` // Optional: if player explicitly set a favorite
+			Deck           []int  `json:"deck"`
+			DeckRating     string `json:"deck_rating"`
+			FavoriteCardID int    `json:"favorite_card_id"` // Optional: if player explicitly set a favorite
 		}
 		json.Unmarshal(env.Payload, &data)
 		l.mutex.Lock()
@@ -321,7 +322,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		if move.GridIndex >= 0 && move.GridIndex < 9 {
 			match.Board[move.GridIndex] = &ServerCard{ID: move.CardID, Owner: pIdx, Power: move.Power}
 			// serverCheckCaptures now returns captured cards, append them to match state
-			_, flips := l.serverCheckCaptures(match, move.GridIndex, pIdx) 
+			_, flips := l.serverCheckCaptures(match, move.GridIndex, pIdx)
 			match.CapturedCards = append(match.CapturedCards, flips...)
 		}
 		full := true
@@ -412,10 +413,10 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				}
 				notificationText = fmt.Sprintf("💖 %s's Loyalty increased by 10!", targetCard.Name)
 			}
-			l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false) // Update playstyle on item use
-			l.inventory[data.TargetCardID] = targetCard // Update global card cache
+			l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false)                                      // Update playstyle on item use
+			l.inventory[data.TargetCardID] = targetCard                                                                     // Update global card cache
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
-			l.persistentCardCache[data.TargetCardID] = targetCard // Update persistent cache
+			l.persistentCardCache[data.TargetCardID] = targetCard                                                           // Update persistent cache
 
 		case "Elemental", "Tactical": // Mood Catalyst, Grounded Shield, Rule Breaker, Intel Report (affect MatchState)
 			if !inMatch {
@@ -424,7 +425,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			}
 			// Delegate to battle_service for in-match effects
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
-			l.updatePlayerPlaystyleTendencies(wallet, true, [2]int{}, []int{}, false) // Update playstyle on item use in match
+			l.updatePlayerPlaystyleTendencies(wallet, true, [2]int{}, []int{}, false)                                       // Update playstyle on item use in match
 			l.applyItemEffectToMatch(match, env.FromID, data.ItemID, data.TargetCardID, data.TargetGridIndex)
 			notificationText = fmt.Sprintf("✨ %s activated!", item.Name)
 
@@ -453,8 +454,12 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			}
 
 			// Initialize maps if nil
-			if targetClub.ActiveBuffs == nil { targetClub.ActiveBuffs = make(map[string]string) }
-			if targetClub.BuffExpirations == nil { targetClub.BuffExpirations = make(map[string]time.Time) }
+			if targetClub.ActiveBuffs == nil {
+				targetClub.ActiveBuffs = make(map[string]string)
+			}
+			if targetClub.BuffExpirations == nil {
+				targetClub.BuffExpirations = make(map[string]time.Time)
+			}
 
 			// Deploy Trap with 24-hour expiration
 			trapID := fmt.Sprintf("TRAP_%d", time.Now().UnixNano())
@@ -507,7 +512,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		// 2. Fulfillment: Deduct from Club, Grant to Player
 		targetClub.Inventory[data.ItemID]--
-		
+
 		targetClub.LastActivity = time.Now()
 		if stats.Inventory == nil {
 			stats.Inventory = make(map[string]int)
@@ -518,7 +523,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		// 3. Process Revenue (Existing logic)
 		l.distributeShopRevenue(data.TerritoryID, data.Price, data.ItemID)
-		
+
 		l.logAdminAudit("ITEM_PURCHASE", wallet, fmt.Sprintf("Item: %s, Territory: %s", data.ItemID, data.TerritoryID))
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>PURCHASE COMPLETE:</b> %s added to inventory."}`, data.ItemID))})
 
@@ -579,7 +584,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		// Execute Transaction: Deduct from Treasury, add to Shop Stock
 		club.Treasury -= totalCost
-		if club.Inventory == nil { club.Inventory = make(map[string]int) }
+		if club.Inventory == nil {
+			club.Inventory = make(map[string]int)
+		}
 		club.LastActivity = time.Now()
 		club.Inventory[data.ItemID] += data.Quantity
 		l.mutex.Unlock()
@@ -616,7 +623,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		// Standard Formula: (Wins * 10) + (Reputation / 2) + 100
 		basePrice := float64((targetStats.Wins * 10) + (targetStats.Reputation / 2) + 100)
-		
+
 		// Apply active rumor effects
 		for _, rumor := range l.rumors {
 			if rumor.TargetWallet == targetWallet && time.Now().Before(rumor.ExpiresAt) {
@@ -683,7 +690,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		// Base 50% chance + (Player Cunning - Territory Security) / 100
 		successChance := 0.50
 		securityLevel := float64(targetClub.Mojo) / 10.0
-		
+
 		// Employment Layer: Security staff significantly increase heist difficulty
 		for _, role := range targetClub.Staff {
 			if role == "Security" {
@@ -702,8 +709,12 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 
 		// Clamp Success Chance between 5% and 95%
-		if successChance < 0.05 { successChance = 0.05 }
-		if successChance > 0.95 { successChance = 0.95 }
+		if successChance < 0.05 {
+			successChance = 0.05
+		}
+		if successChance > 0.95 {
+			successChance = 0.95
+		}
 
 		roll := rand.Float64()
 		var status string
@@ -718,18 +729,20 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			}
 
 			loot := targetClub.Treasury * 0.10 // Steal 10% of Club Treasury
-			if loot > 500 { loot = 500 } // Cap loot for economy stability
+			if loot > 500 {
+				loot = 500
+			} // Cap loot for economy stability
 			playerStats.Playstyle.RiskTolerance += 0.05 // Increase risk tolerance on successful heist
 			playerStats.HeistAttempts++
 			targetClub.Treasury -= loot
-		targetClub.LastActivity = time.Now()
+			targetClub.LastActivity = time.Now()
 			playerStats.WantedLevel += 5
 			playerStats.Cunning += 1
 
 			go l.unlockAchievement(wallet, "FIRST_HEIST")
 		} else {
 			status = "failure"
-			playerStats.WantedLevel += 15 // Higher infamy for getting caught
+			playerStats.WantedLevel += 15               // Higher infamy for getting caught
 			playerStats.WantedLevel += 15               // Higher infamy for getting caught
 			playerStats.Playstyle.RiskTolerance += 0.10 // Increase risk tolerance on failed heist
 			playerStats.HeistAttempts++
@@ -758,7 +771,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 						playerStats.JailedCards = make(map[int]string)
 					}
 					playerStats.JailedCards[rarestCard.ID] = targetClub.ID
-					
+
 					log.Printf("[HEIST] Guard Dog caught %s! Rarest card %s jailed in Club %s\n", wallet, rarestCard.Name, targetClub.Name)
 					l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>GUARD DOG BUST:</b> You were caught by a Bio-Guard Dog! Your rarest card (%s) has been jailed by %s."}`, rarestCard.Name, targetClub.Name))})
 				}
@@ -769,14 +782,14 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.logAdminAudit("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s", data.TargetClubID, status))
 
 		response, _ := json.Marshal(map[string]interface{}{
-			"status":       status,
-			"wanted_level": playerStats.WantedLevel,
-			"cunning":      playerStats.Cunning,
-			"playstyle":    playerStats.Playstyle,
-			"heist_attempts": playerStats.HeistAttempts,
+			"status":          status,
+			"wanted_level":    playerStats.WantedLevel,
+			"cunning":         playerStats.Cunning,
+			"playstyle":       playerStats.Playstyle,
+			"heist_attempts":  playerStats.HeistAttempts,
 			"kidnap_eligible": canKidnap,
-			"target_club_id": data.TargetClubID,
-			"playstyle": playerStats.Playstyle, // Include updated playstyle
+			"target_club_id":  data.TargetClubID,
+			"playstyle":       playerStats.Playstyle, // Include updated playstyle
 		})
 		l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
 	case "create_club":
@@ -816,16 +829,16 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.mutex.Lock()
 		clubID := fmt.Sprintf("CLUB-%d", time.Now().Unix())
 		newClub := &Club{
-			ID:          clubID,
-			Name:        data.Name,
-			OwnerWallet: wallet,
-			Type:        data.Type,
-			Territories: []string{data.TerritoryID},
-			Commission:  0.05,
-			Staff:       make(map[string]string),
-			Members:     map[string]time.Time{strings.ToLower(wallet): time.Now()},
-			CreatedAt:   time.Now(),
-			Jail:        make(map[int]ServerCard), // Initialize Jail
+			ID:           clubID,
+			Name:         data.Name,
+			OwnerWallet:  wallet,
+			Type:         data.Type,
+			Territories:  []string{data.TerritoryID},
+			Commission:   0.05,
+			Staff:        make(map[string]string),
+			Members:      map[string]time.Time{strings.ToLower(wallet): time.Now()},
+			CreatedAt:    time.Now(),
+			Jail:         make(map[int]ServerCard), // Initialize Jail
 			LastActivity: time.Now(),
 		}
 		newClub.Staff[strings.ToLower(wallet)] = "CEO" // Owner defaults to CEO
@@ -1028,9 +1041,11 @@ func (l *Lobby) getClientIDFromWallet(wallet string) string {
 func (l *Lobby) checkRegionalStatus(clubID string) bool {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	
+
 	club, exists := l.clubs[clubID]
-	if !exists { return false }
+	if !exists {
+		return false
+	}
 
 	// Rule: 2 or more territories = Region
 	if len(club.Territories) >= 2 {
@@ -1061,41 +1076,6 @@ func (l *Lobby) cleanupNonces() {
 	for txid, ts := range l.registeredTxIDs {
 		if now.Sub(ts) > 30*24*time.Hour {
 			delete(l.registeredTxIDs, txid)
-		}
-	}
-}
-
-// refreshRegionalRoles scans all clubs and promotes owners of 2+ territories to Regional Governor.
-func (l *Lobby) refreshRegionalRoles() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	for _, club := range l.clubs {
-		ownerStats, exists := l.leaderboard[strings.ToLower(club.OwnerWallet)]
-		if !exists {
-			continue
-		}
-
-		// Promotion Logic: 2+ Territories = Governor
-		if len(club.Territories) >= 2 {
-			if ownerStats.SocialRank != "Regional Governor" {
-				ownerStats.SocialRank = "Regional Governor"
-				club.RegionName = fmt.Sprintf("The %s Protectorate", club.Name)
-				l.leaderboard[strings.ToLower(club.OwnerWallet)] = ownerStats
-				
-				l.logAdminAudit("RANK_PROMOTION", club.OwnerWallet, "Promoted to Regional Governor")
-				
-				// Notify the new Governor
-				notification, _ := json.Marshal(map[string]string{
-					"text": fmt.Sprintf("👑 <b>PROMOTION:</b> You are now the Regional Governor of %s!", club.RegionName),
-				})
-				l.sendToClient(l.getClientIDFromWallet(club.OwnerWallet), Envelope{Type: "admin_notification", Payload: notification})
-			}
-		} else if ownerStats.SocialRank == "Regional Governor" {
-			// Demotion if they lose territories
-			ownerStats.SocialRank = "Club CEO"
-			club.RegionName = ""
-			l.leaderboard[strings.ToLower(club.OwnerWallet)] = ownerStats
 		}
 	}
 }
@@ -1163,24 +1143,24 @@ func (l *Lobby) handleBroadcast(message []byte) {
 
 func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	type playerInfo struct {
-		ID             string    `json:"id"`
-		IsAdmin        bool      `json:"is_admin"`
-		AvatarURL      string    `json:"avatar_url"`
-		Gloat          string    `json:"gloat"`
-		AvatarNotice   string    `json:"avatar_notice"`
-		BanExpires     time.Time `json:"ban_expires"`
-		HasMardonBadge bool      `json:"has_mardon_badge"`
-		Wins           int       `json:"wins"`
-		Reputation     int       `json:"reputation"`
-		JailedCards    map[int]string `json:"jailed_cards"` // Added for UI display
-		SocialRank     string    `json:"social_rank"` // Added for UI display
-		KidnappedCards map[int]string `json:"kidnapped_cards"` // Added for UI display
+		ID               string         `json:"id"`
+		IsAdmin          bool           `json:"is_admin"`
+		AvatarURL        string         `json:"avatar_url"`
+		Gloat            string         `json:"gloat"`
+		AvatarNotice     string         `json:"avatar_notice"`
+		BanExpires       time.Time      `json:"ban_expires"`
+		HasMardonBadge   bool           `json:"has_mardon_badge"`
+		Wins             int            `json:"wins"`
+		Reputation       int            `json:"reputation"`
+		JailedCards      map[int]string `json:"jailed_cards"`       // Added for UI display
+		SocialRank       string         `json:"social_rank"`        // Added for UI display
+		KidnappedCards   map[int]string `json:"kidnapped_cards"`    // Added for UI display
 		HeldHostageCards map[int]string `json:"held_hostage_cards"` // Added for UI display
-		Achievements   []string  `json:"achievements"` // Added for UI display
+		Achievements     []string       `json:"achievements"`       // Added for UI display
 		// JobRole and EmployerID are already present in the playerInfo struct
-		RumorCount     int       `json:"rumor_count"` // Added for UI display
-		JobRole        string    `json:"job_role"`    // Manager, Security, Clerk
-		EmployerID     string    `json:"employer_id"`
+		RumorCount int    `json:"rumor_count"` // Added for UI display
+		JobRole    string `json:"job_role"`    // Manager, Security, Clerk
+		EmployerID string `json:"employer_id"`
 	}
 	var players []playerInfo
 	for _, client := range l.clients {
@@ -1380,7 +1360,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 
 	match := &MatchState{
 		P1ID: id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
-		Rules:         map[string]bool{"Open": true}, // Default rules
+		Rules:         map[string]bool{"Open": true},             // Default rules
 		P1WantedLevel: l.leaderboard[l.wallets[id1]].WantedLevel, // Wanted levels from leaderboard
 		P2WantedLevel: l.leaderboard[l.wallets[id2]].WantedLevel,
 		TerritoryID:   l.assignMatchTerritory(), // Assign a territory to the match
@@ -1420,7 +1400,6 @@ func (l *Lobby) assignMatchTerritory() string {
 	}
 	return territories[rand.Intn(len(territories))]
 }
-
 
 // isWalletConnected checks if the given wallet address is currently associated with an active connection.
 func (l *Lobby) isWalletConnected(wallet string) bool {
@@ -1559,142 +1538,6 @@ func (l *Lobby) addOrUpdateLinkedWallet(primaryAVM, linkedAddr, linkedChain stri
 	l.saveLinkedWallets() // Save immediately on change
 }
 
-// distributeCourthouseFineToClubs distributes a portion of the fine equally among all active clubs.
-func (l *Lobby) distributeCourthouseFineToClubs(amount float64) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	if len(l.clubs) == 0 {
-		log.Printf("[COURTHOUSE] No active clubs to distribute fine to. Amount %.2f $VBV not distributed.\n", amount)
-		return
-	}
-
-	// 1. Prioritize Regional Tax: Governors take 15% total off the top
-	var governors []*Club
-	for _, club := range l.clubs {
-		if len(club.Territories) >= 2 {
-			governors = append(governors, club)
-		}
-	}
-
-	regionalTaxPool := 0.0
-	remainingPool := amount
-
-	if len(governors) > 0 {
-		regionalTaxPool = amount * 0.15
-		remainingPool = amount - regionalTaxPool
-		taxPerGovernor := regionalTaxPool / float64(len(governors))
-		
-		for _, govClub := range governors {
-			govClub.Treasury += taxPerGovernor
-			log.Printf("[REVENUE] Regional Governor %s received %.2f $VBV Tax\n", govClub.Name, taxPerGovernor)
-		}
-	}
-
-	// 2. Standard distribution for the remaining pool
-	sharePerClub := remainingPool / float64(len(l.clubs))
-	for _, club := range l.clubs {
-		club.Treasury += sharePerClub
-	}
-	l.logAdminAudit("COURTHOUSE_FINE_DISTRIBUTION", "SERVER", fmt.Sprintf("Distributed %.2f $VBV (Tax: %.2f) among %d clubs.", amount, regionalTaxPool, len(l.clubs)))
-}
-
-// processLoans checks for defaulted loans and handles collateral liquidation.
-func (l *Lobby) processLoans() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	now := time.Now()
-
-	for id, loan := range l.loans {
-		if loan.Status == "active" && now.After(loan.DueAt) {
-			loan.Status = "defaulted"
-
-			// Residual Value: 15% of the loan amount is returned as Market Tokens
-			tokenReward := uint64(float64(loan.LoanAmount) * 0.15)
-
-			borrowerStats, exists := l.leaderboard[loan.BorrowerWallet]
-			if exists {
-				borrowerStats.MarketTokens += tokenReward
-				borrowerStats.Reputation -= 50
-				if borrowerStats.Reputation < 0 { borrowerStats.Reputation = 0 }
-				l.leaderboard[loan.BorrowerWallet] = borrowerStats
-
-				l.sendToClient(l.getClientIDFromWallet(loan.BorrowerWallet), Envelope{
-					Type:    "admin_notification",
-					Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>LOAN DEFAULTED:</b> Collateral moved to Black Market. You received %d Market Tokens as equity."}`, tokenReward)),
-				})
-			}
-
-		// Update playstyle on loan default (with proper arguments)
-		l.updatePlayerPlaystyleTendencies(loan.BorrowerWallet, false, [2]int{}, []int{}, false)
-			l.logAdminAudit("LOAN_LIQUIDATED", loan.BorrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
-			delete(l.loans, id)
-		}
-	}
-	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
-}
-
-// observeGlobalSentiments aggregates playstyle data to identify meta-trends.
-func (l *Lobby) observeGlobalSentiments() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	var totalAgg, totalRisk float64
-	ruleCounts := make(map[string]float64)
-	count := float64(len(l.leaderboard))
-	if count == 0 { return }
-
-	for _, s := range l.leaderboard {
-		totalAgg += s.Playstyle.Aggressiveness
-		totalRisk += s.Playstyle.RiskTolerance
-		for rule, weight := range s.Playstyle.PreferredRules {
-			ruleCounts[rule] += weight
-		}
-	}
-
-	l.globalSentiment = GlobalSentiment{
-		AvgAggressiveness: totalAgg / count,
-		AvgRiskTolerance:  totalRisk / count,
-		DominantRules:     ruleCounts,
-		UpdatedAt:         time.Now(),
-	}
-	log.Printf("[INTELLIGENCE] Meta-Sentiment Updated. Avg Agg: %.2f, Avg Risk: %.2f\n", l.globalSentiment.AvgAggressiveness, l.globalSentiment.AvgRiskTolerance)
-}
-
-// generateNPCCommentary picks an NPC to comment on a player's style via chat.
-func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
-	l.mutex.RLock()
-	wallet, ok := l.wallets[clientID]
-	stats, exists := l.leaderboard[wallet]
-	global := l.globalSentiment
-	l.mutex.RUnlock()
-
-	if !ok || !exists || time.Since(global.UpdatedAt) > 1*time.Hour { return }
-
-	npcName := "The Architect"
-	message := ""
-
-	// Narrative Logic: Contrast player style with global meta
-	if trigger == "LOBBY_ENTRY" {
-		if stats.Playstyle.RiskTolerance > global.AvgRiskTolerance*1.5 {
-			message = fmt.Sprintf("Back for more, %s? Your reckless placements are becoming legendary. The house always watches.", clientID)
-		} else if stats.Playstyle.PreferredRules["Plus"] > 1.5 {
-			npcName = "Jackpot Jessica"
-			message = "I see a 'Plus' specialist has entered the room. Mind the corners, honey."
-		}
-	} else if trigger == "MATCH_START" {
-		if stats.Playstyle.Aggressiveness > 0.8 {
-			message = "Direct confrontation seems to be your only trick. Let's see if it holds."
-		}
-	}
-
-	if message != "" {
-		time.Sleep(1 * time.Second) // Small delay for immersion
-		payload, _ := json.Marshal(map[string]string{"text": message})
-		l.broadcast <- jsonListEnvelope("chat", payload) // Broadcast to all for "living lobby" feel
-	}
-}
-
 // updatePlayerPlaystyleTendencies calculates and updates a player's observed playstyle, including rule and card preferences.
 func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool) {
 	l.mutex.Lock()
@@ -1704,27 +1547,35 @@ func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bo
 	if !exists {
 		return
 	}
-	
+
 	// Pillar 3: EMA (Exponential Moving Average) Logic
 	// Alpha = 0.2 (Recent matches represent 20% of the tendency)
 	const alpha = 0.2
 
 	// Initialize and Decay
-	if stats.Playstyle.PreferredRules == nil { stats.Playstyle.PreferredRules = make(map[string]float64) }
-	if stats.Playstyle.PreferredCardMoods == nil { stats.Playstyle.PreferredCardMoods = make(map[string]float64) }
+	if stats.Playstyle.PreferredRules == nil {
+		stats.Playstyle.PreferredRules = make(map[string]float64)
+	}
+	if stats.Playstyle.PreferredCardMoods == nil {
+		stats.Playstyle.PreferredCardMoods = make(map[string]float64)
+	}
 
 	// 1. Aggressiveness (Direct captures vs Rule-based)
 	// For now, we use a scoring heuristic based on victory margins
 	matchAgg := 0.5
 	if scores[0] > scores[1] {
 		margin := scores[0] - scores[1]
-		if margin >= 4 { matchAgg = 0.9 } // Crushing victory
+		if margin >= 4 {
+			matchAgg = 0.9
+		} // Crushing victory
 	}
 	stats.Playstyle.Aggressiveness = (matchAgg * alpha) + (stats.Playstyle.Aggressiveness * (1 - alpha))
 
 	// 2. Risk Tolerance (Based on Wanted Level and Heist success)
 	matchRisk := float64(stats.WantedLevel) / 20.0
-	if matchRisk > 1 { matchRisk = 1 }
+	if matchRisk > 1 {
+		matchRisk = 1
+	}
 	stats.Playstyle.RiskTolerance = (matchRisk * alpha) + (stats.Playstyle.RiskTolerance * (1 - alpha))
 
 	// Preferred Rules (if in match context)
@@ -1756,9 +1607,14 @@ func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bo
 		for mood := range stats.Playstyle.PreferredCardMoods {
 			found := false
 			for _, cardID := range deck {
-				if card, exists := l.inventory[cardID]; exists && card.Mood == mood { found = true; break }
+				if card, exists := l.inventory[cardID]; exists && card.Mood == mood {
+					found = true
+					break
+				}
 			}
-			if !found { stats.Playstyle.PreferredCardMoods[mood] *= 0.9 }
+			if !found {
+				stats.Playstyle.PreferredCardMoods[mood] *= 0.9
+			}
 		}
 	}
 
@@ -1863,7 +1719,9 @@ func (l *Lobby) processMojoDecay() {
 		if now.Sub(club.LastActivity) > stagnationThreshold {
 			decayAmount := 5 // Flat decay
 			club.Mojo -= decayAmount
-			if club.Mojo < 0 { club.Mojo = 0 }
+			if club.Mojo < 0 {
+				club.Mojo = 0
+			}
 
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
 			// We don't update LastActivity here, so it continues to decay every tick until activity occurs.

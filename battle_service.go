@@ -121,11 +121,15 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 
 			// Basic Capture (Direct Comparison)
 			if neighbor.Owner != pIdx && pPower > nPower {
+				originalOwnerWallet := l.wallets[match.P1ID] // Default to P1's wallet
+				if neighbor.Owner == 1 {
+					originalOwnerWallet = l.wallets[match.P2ID]
+				} // If neighbor was P2's card
 				neighbor.Owner = pIdx
 				totalFlips++
 				capturedCards = append(capturedCards, CapturedCardInfo{
-					CardID:            neighbor.ID,
-					OriginalOwnerWallet: l.wallets[match.P1ID], // Assuming P1 is always original owner for simplicity, refine if needed
+					CardID:                neighbor.ID,
+					OriginalOwnerWallet:   originalOwnerWallet,
 					CapturingPlayerWallet: l.wallets[playerID],
 				})
 			}
@@ -137,11 +141,15 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 		if len(indices) >= 2 {
 			for _, idx := range indices {
 				if match.Board[idx].Owner != pIdx {
+					originalOwnerWallet := l.wallets[match.P1ID]
+					if match.Board[idx].Owner == 1 {
+						originalOwnerWallet = l.wallets[match.P2ID]
+					}
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
-						CardID:            match.Board[idx].ID,
-						OriginalOwnerWallet: l.wallets[match.P1ID], // Assuming P1 is always original owner for simplicity, refine if needed
+						CardID:                match.Board[idx].ID,
+						OriginalOwnerWallet:   originalOwnerWallet,
 						CapturingPlayerWallet: l.wallets[playerID],
 					})
 					comboQueue = append(comboQueue, idx)
@@ -153,11 +161,15 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 		if len(indices) >= 2 {
 			for _, idx := range indices {
 				if match.Board[idx].Owner != pIdx {
+					originalOwnerWallet := l.wallets[match.P1ID]
+					if match.Board[idx].Owner == 1 {
+						originalOwnerWallet = l.wallets[match.P2ID]
+					}
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
-						CardID:            match.Board[idx].ID,
-						OriginalOwnerWallet: l.wallets[match.P1ID], // Assuming P1 is always original owner for simplicity, refine if needed
+						CardID:                match.Board[idx].ID,
+						OriginalOwnerWallet:   originalOwnerWallet,
 						CapturingPlayerWallet: l.wallets[playerID],
 					})
 					comboQueue = append(comboQueue, idx)
@@ -183,9 +195,18 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					// Only add to capturedCards if it wasn't already flipped by a direct capture or rule
 					// This prevents double-counting for jailing
 					alreadyCaptured := false
-					for _, cc := range capturedCards { if cc.CardID == neighbor.ID { alreadyCaptured = true; break } }
+					for _, cc := range capturedCards {
+						if cc.CardID == neighbor.ID {
+							alreadyCaptured = true
+							break
+						}
+					}
 					if !alreadyCaptured {
-						capturedCards = append(capturedCards, CapturedCardInfo{CardID: neighbor.ID, OriginalOwnerWallet: l.wallets[match.P1ID], CapturingPlayerWallet: l.wallets[playerID]})
+						originalOwnerWallet := l.wallets[match.P1ID]
+						if neighbor.Owner == 1 {
+							originalOwnerWallet = l.wallets[match.P2ID]
+						}
+						capturedCards = append(capturedCards, CapturedCardInfo{CardID: neighbor.ID, OriginalOwnerWallet: originalOwnerWallet, CapturingPlayerWallet: l.wallets[playerID]})
 					}
 					totalFlips++
 					comboQueue = append(comboQueue, nbIdx)
@@ -281,7 +302,7 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	// Decrement and remove expired item buffs for both players
 	l.processItemBuffExpiration(match)
-	
+
 	// PRISONER RULE: Decide which jailing logic to apply
 	if match.Rules["Fallen_penalty"] && len(match.CapturedCards) > 0 {
 		l.processFallenPenaltyJail(match, match.CapturedCards) // Jail all captured cards if Fallen_penalty is active
@@ -327,7 +348,6 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 		}
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(p1NewDeck), func(i, j int) { p1NewDeck[i], p1NewDeck[j] = p1NewDeck[j], p1NewDeck[i] })
 	rand.Shuffle(len(p2NewDeck), func(i, j int) { p2NewDeck[i], p2NewDeck[j] = p2NewDeck[j], p2NewDeck[i] })
 
@@ -444,7 +464,7 @@ func (l *Lobby) updateLeaderboard(wallet string, isTournamentWin bool, scores [2
 	stats.Wins++
 	stats.DisconnectStreak = 0
 	l.updatePlayerPlaystyleTendencies(wallet, true, scores, deck, isBountyWin) // Update playstyle on win
-	stats.Reputation = l.CalculateReputation(stats) // Ensure reputation is updated
+	stats.Reputation = l.CalculateReputation(stats)                            // Ensure reputation is updated
 	l.leaderboard[wallet] = stats
 }
 
@@ -456,7 +476,7 @@ func (l *Lobby) incrementDNF(wallet string) {
 		stats.BanExpires = time.Now().Add(24 * time.Hour)
 	}
 	l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF (no match context)
-	stats.Reputation = l.CalculateReputation(stats)                             // Update the map with modified stats
+	stats.Reputation = l.CalculateReputation(stats)                            // Update the map with modified stats
 	l.leaderboard[wallet] = stats
 	go l.recordDNFOnChain(wallet)
 }
@@ -626,7 +646,7 @@ func (l *Lobby) applyItemEffectToMatch(match *MatchState, playerID string, itemI
 			if targetGridIndex >= 0 && targetGridIndex < 9 && match.Board[targetGridIndex] != nil {
 				card := match.Board[targetGridIndex]
 				if card.Owner == pIdx {
-					card.Artifact += 50 // Apply as artifact bonus for simplicity in power calculation
+					card.Artifact += 50                         // Apply as artifact bonus for simplicity in power calculation
 					match.ActiveItemBuffs[playerID][itemID] = 3 // Track for 3 matches
 					log.Printf("[BATTLE] Player %s used Mood Catalyst on card %d at grid %d. Artifact +50.\n", playerID, card.ID, targetGridIndex)
 				}

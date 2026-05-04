@@ -446,13 +446,63 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 	for w, s := range data {
 		st := l.leaderboard[w]
 		l.ensurePlayerStatsMapsInitialized(w) // Ensure maps are initialized
-		st.Wins, st.DNFs = s.wins, s.dnfs // Update raw wins/dnfs
+		st.Wins, st.DNFs = s.wins, s.dnfs     // Update raw wins/dnfs
 		st.Reputation = l.CalculateReputation(st)
 		l.leaderboard[w] = st
 	}
 	msg := l.getLobbyUpdateMsgLocked()
 	l.mutex.Unlock()
 	l.broadcast <- msg
+}
+
+// loadOnboardedWalletsFromIndexer reconstructs the historical Sybil protection state.
+// It scans the indexer for past onboarding transactions from the vault address.
+func (l *Lobby) loadOnboardedWalletsFromIndexer() {
+	l.mutex.RLock()
+	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	vaultAddr := l.vaultAddress
+	rewardAsset := l.rewardAssetID
+	l.mutex.RUnlock()
+
+	if !ok || vaultAddr == "" {
+		log.Println("[ORACLE ERROR] Cannot load onboarded wallets: Network config or Vault address missing.")
+		return
+	}
+
+	log.Printf("[ORACLE] Reconstructing onboarding history from %s...\n", voiConfig.IndexerURL)
+
+	// Query ARC-200 transfers sent FROM the vault
+	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
+		voiConfig.IndexerURL, rewardAsset, vaultAddr)
+
+	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	var res struct {
+		Transfers []struct {
+			To       string `json:"to"`
+			Metadata string `json:"metadata"`
+		} `json:"transfers"`
+	}
+
+	if json.NewDecoder(resp.Body).Decode(&res) == nil {
+		l.mutex.Lock()
+		for _, tx := range res.Transfers {
+			if strings.HasPrefix(tx.Metadata, "VBT_ONBOARD:TOKEN") {
+				l.onboardedWallets[tx.To] = true
+			}
+		}
+		l.mutex.Unlock()
+		log.Printf("[ORACLE] Successfully restored %d historical onboarding records.\n", len(l.onboardedWallets))
+	}
 }
 
 func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset string, sender, vaultAddr string) (bool, int64, error) {
@@ -463,29 +513,61 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		return false, 0, fmt.Errorf("network error")
 	}
 
-	url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, 0, err
-	}
-	defer resp.Body.Close()
+	// Branch logic based on Network Type
+	if strings.Contains(strings.ToLower(network), "voi") {
+		// VOI Logic: Custom ARC-200 Indexer
+		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		defer cancel()
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, 0, err
+		}
+		defer resp.Body.Close()
 
-	var res struct {
-		Transfers []struct {
-			From, To, Amount string
-			ContractID       uint64
-			Metadata         string
-			Timestamp        int64
-		} `json:"transfers"`
-	}
-	if json.NewDecoder(resp.Body).Decode(&res) == nil {
-		for _, tx := range res.Transfers {
-			amt, _ := strconv.ParseUint(tx.Amount, 10, 64)
-			if tx.From == sender && tx.To == vaultAddr && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == expectedAsset {
-				return true, tx.Timestamp, nil
+		var res struct {
+			Transfers []struct {
+				From, To, Amount string
+				ContractID       uint64
+				Timestamp        int64
+			} `json:"transfers"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+			for _, tx := range res.Transfers {
+				amt, _ := strconv.ParseUint(tx.Amount, 10, 64)
+				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == expectedAsset {
+					return true, tx.Timestamp, nil
+				}
+			}
+		}
+	} else {
+		// ALGORAND Logic: Standard Indexer Transaction Endpoint
+		url := fmt.Sprintf("%s/v2/transactions/%s", netConfig.IndexerURL, txid)
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		defer cancel()
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return false, 0, err
+		}
+		defer resp.Body.Close()
+
+		var res struct {
+			Transaction struct {
+				AssetTransfer struct {
+					Receiver string `json:"receiver"`
+					Amount   uint64 `json:"amount"`
+					AssetID  uint64 `json:"asset-id"`
+				} `json:"asset-transfer-transaction"`
+				Sender    string `json:"sender"`
+				RoundTime int64  `json:"round-time"`
+			} `json:"transaction"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+			t := res.Transaction
+			if strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == expectedAsset {
+				return true, t.RoundTime, nil
 			}
 		}
 	}

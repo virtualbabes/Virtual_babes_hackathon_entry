@@ -39,29 +39,29 @@ type HoldingBonus struct {
 
 // Club represents a player-owned organization with specialized shops.
 type Club struct {
-	ID          string               `json:"id"`
-	Name        string               `json:"name"`
-	OwnerWallet string               `json:"owner_wallet"`
-	Type        string               `json:"type"`      // Elemental, Tactical, Vitality
-	Territories []string             `json:"territories"` // Supports multiple districts
-	RegionName  string               `json:"region_name,omitempty"`
-	Treasury    float64              `json:"treasury"`
-	Commission  float64              `json:"commission_rate"` // e.g., 0.05 for 5%
-	Inventory   map[string]int       `json:"inventory"`       // ItemID -> Quantity
-	Staff       map[string]string    `json:"staff"`           // Wallet -> Role (Manager, Security, Clerk)
-	ActiveBuffs map[string]string    `json:"active_buffs"`
+	ID              string               `json:"id"`
+	Name            string               `json:"name"`
+	OwnerWallet     string               `json:"owner_wallet"`
+	Type            string               `json:"type"`        // Elemental, Tactical, Vitality
+	Territories     []string             `json:"territories"` // Supports multiple districts
+	RegionName      string               `json:"region_name,omitempty"`
+	Treasury        float64              `json:"treasury"`
+	Commission      float64              `json:"commission_rate"` // e.g., 0.05 for 5%
+	Inventory       map[string]int       `json:"inventory"`       // ItemID -> Quantity
+	Staff           map[string]string    `json:"staff"`           // Wallet -> Role (Manager, Security, Clerk)
+	ActiveBuffs     map[string]string    `json:"active_buffs"`
 	BuffExpirations map[string]time.Time `json:"buff_expirations"` // Key -> Expiration Timestamp
-	Members     map[string]time.Time `json:"members"`   // Wallet -> Join Timestamp
-	Mojo        int                  `json:"club_mojo"` // Unlocks higher tier items
-	Jail        map[int]ServerCard   `json:"jail"`      // CardID -> ServerCard (captured cards)
-	LastActivity time.Time           `json:"last_activity"` // For Mojo decay tracking
-	CreatedAt   time.Time            `json:"created_at"`
+	Members         map[string]time.Time `json:"members"`          // Wallet -> Join Timestamp
+	Mojo            int                  `json:"club_mojo"`        // Unlocks higher tier items
+	Jail            map[int]ServerCard   `json:"jail"`             // CardID -> ServerCard (captured cards)
+	LastActivity    time.Time            `json:"last_activity"`    // For Mojo decay tracking
+	CreatedAt       time.Time            `json:"created_at"`
 }
 
 // UseItemData defines the payload for the "use_item" WebSocket message.
 type UseItemData struct {
-	ItemID        string `json:"item_id"`
-	TargetCardID  int    `json:"target_card_id,omitempty"`  // For card-specific buffs (e.g., Stim, Pledge)
+	ItemID          string `json:"item_id"`
+	TargetCardID    int    `json:"target_card_id,omitempty"`    // For card-specific buffs (e.g., Stim, Pledge)
 	TargetGridIndex int    `json:"target_grid_index,omitempty"` // For board-specific buffs (e.g., Mood Catalyst)
 }
 
@@ -165,17 +165,17 @@ type MatchState struct {
 	P2WantedLevel     int
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
-	TerritoryID       string                    `json:"territory_id,omitempty"` // The territory where the match is played
+	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played
 	ActiveItemBuffs   map[string]map[string]int // PlayerID -> ItemID -> MatchesRemaining
 	IsBountyMatch     bool
 }
 
 // CapturedCardInfo tracks details of a card that was flipped during a match.
 type CapturedCardInfo struct {
-	CardID            int
-	OriginalOwnerWallet string // Wallet of the player who originally owned the card
+	CardID                int
+	OriginalOwnerWallet   string // Wallet of the player who originally owned the card
 	CapturingPlayerWallet string // Wallet of the player who captured the card
-	GridIndex         int
+	GridIndex             int
 }
 
 // MatchHistory stores the result of a completed game for reward verification.
@@ -192,50 +192,50 @@ type MatchHistory struct {
 
 // PlayerStats tracks the performance and reliability of a player.
 type PlayerStats struct {
-	Wins             int                `json:"wins"`
-	DNFs             int                `json:"dnfs"`
-	DisconnectStreak int                `json:"disconnect_streak"`
-	BanExpires       time.Time          `json:"ban_expires"`
-	GloatBannedUntil time.Time          `json:"gloat_banned_until"`
-	Reputation       int                `json:"reputation"`
-	Mojo             int                `json:"mojo"`          // Social standing for Club unlocks
-	SocialRank       string             `json:"social_rank"`   // e.g., "Nobody", "Regular", "Icon"
-	JobRole          string             `json:"job_role"`      // Manager, Security, Clerk, Freelancer
-	EmployerClubID   string             `json:"employer_id"`   // The club currently paying this user
-	Salary           uint64             `json:"salary"`        // Micro-units of $VBV per payment cycle
-	LastSalaryPayment time.Time         `json:"last_salary_payment"` // Timestamp of last payment
-	Inventory        map[string]int     `json:"inventory"`     // ItemID -> Quantity
-	MarketTokens     uint64             `json:"market_tokens"` // Equity from liquidated loans
-	Relationships    map[string]int     `json:"relationships"` // Character Name -> Score (0-100)
-	BestRating       string             `json:"best_rating"`
-	Achievements     []string           `json:"achievements"` // List of unlocked IDs
-	Portfolio        map[string]float64 `json:"portfolio"`    // EntityID -> Shares
-	WantedLevel      int                `json:"wanted_level"` // Risk factor for heists
-	HeistAttempts    int                `json:"heist_attempts"` // Number of times player attempted a heist
-	Cunning          int                `json:"cunning"`      // Success modifier for criminal actions
-	Nurturing        int                `json:"nurturing"`    // Success modifier for garden/donations
-	JailedCards      map[int]string     `json:"jailed_cards"` // CardID -> ClubID (cards currently in jail)
+	Wins              int                `json:"wins"`
+	DNFs              int                `json:"dnfs"`
+	DisconnectStreak  int                `json:"disconnect_streak"`
+	BanExpires        time.Time          `json:"ban_expires"`
+	GloatBannedUntil  time.Time          `json:"gloat_banned_until"`
+	Reputation        int                `json:"reputation"`
+	Mojo              int                `json:"mojo"`                // Social standing for Club unlocks
+	SocialRank        string             `json:"social_rank"`         // e.g., "Nobody", "Regular", "Icon"
+	JobRole           string             `json:"job_role"`            // Manager, Security, Clerk, Freelancer
+	EmployerClubID    string             `json:"employer_id"`         // The club currently paying this user
+	Salary            uint64             `json:"salary"`              // Micro-units of $VBV per payment cycle
+	LastSalaryPayment time.Time          `json:"last_salary_payment"` // Timestamp of last payment
+	Inventory         map[string]int     `json:"inventory"`           // ItemID -> Quantity
+	MarketTokens      uint64             `json:"market_tokens"`       // Equity from liquidated loans
+	Relationships     map[string]int     `json:"relationships"`       // Character Name -> Score (0-100)
+	BestRating        string             `json:"best_rating"`
+	Achievements      []string           `json:"achievements"`   // List of unlocked IDs
+	Portfolio         map[string]float64 `json:"portfolio"`      // EntityID -> Shares
+	WantedLevel       int                `json:"wanted_level"`   // Risk factor for heists
+	HeistAttempts     int                `json:"heist_attempts"` // Number of times player attempted a heist
+	Cunning           int                `json:"cunning"`        // Success modifier for criminal actions
+	Nurturing         int                `json:"nurturing"`      // Success modifier for garden/donations
+	JailedCards       map[int]string     `json:"jailed_cards"`   // CardID -> ClubID (cards currently in jail)
 	// New fields for Kidnap Gambit
-	FavoriteCardID   int                `json:"favorite_card_id"`   // The card ID the player has designated as their favorite
-	KidnappedCards   map[int]string     `json:"kidnapped_cards"` // CardID -> VictimWallet (cards player has kidnapped)
-	HeldHostageCards map[int]string     `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
+	FavoriteCardID   int            `json:"favorite_card_id"`   // The card ID the player has designated as their favorite
+	KidnappedCards   map[int]string `json:"kidnapped_cards"`    // CardID -> VictimWallet (cards player has kidnapped)
+	HeldHostageCards map[int]string `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
 	// New fields for Collective NPC Intelligence
-	RumorCount       int                `json:"rumor_count"`      // Number of rumors spread by this player
-	Aggressiveness   float64            `json:"aggressiveness"`   // 0-1 scale of aggressive play
-	RiskTolerance    float64            `json:"risk_tolerance"`   // 0-1 scale of risk-taking
-	PreferredRules   map[string]int     `json:"preferred_rules"`  // Rule name -> usage count
-	Moods            map[string]int     `json:"moods"`           // Mood -> count (e.g., "aggressive", "defensive")
-	Playstyle        PlaystyleTendencies `json:"playstyle"`    // Observed playstyle tendencies
+	RumorCount     int                 `json:"rumor_count"`     // Number of rumors spread by this player
+	Aggressiveness float64             `json:"aggressiveness"`  // 0-1 scale of aggressive play
+	RiskTolerance  float64             `json:"risk_tolerance"`  // 0-1 scale of risk-taking
+	PreferredRules map[string]int      `json:"preferred_rules"` // Rule name -> usage count
+	Moods          map[string]int      `json:"moods"`           // Mood -> count (e.g., "aggressive", "defensive")
+	Playstyle      PlaystyleTendencies `json:"playstyle"`       // Observed playstyle tendencies
 }
 
 // PlaystyleTendencies captures observed player behaviors for Collective Intelligence.
 type PlaystyleTendencies struct {
-	Aggressiveness     float64            `json:"aggressiveness"`    // 0.0 - 1.0, higher means more aggressive
-	RiskTolerance      float64            `json:"risk_tolerance"`    // 0.0 - 1.0, higher means more risky
-	PreferredRules     map[string]float64 `json:"preferred_rules"`   // RuleName -> Weighted Preference Score
+	Aggressiveness     float64            `json:"aggressiveness"`       // 0.0 - 1.0, higher means more aggressive
+	RiskTolerance      float64            `json:"risk_tolerance"`       // 0.0 - 1.0, higher means more risky
+	PreferredRules     map[string]float64 `json:"preferred_rules"`      // RuleName -> Weighted Preference Score
 	PreferredCardMoods map[string]float64 `json:"preferred_card_moods"` // Mood -> Weighted Preference Score
-	FavoriteCardID     int                `json:"favorite_card_id"`  // The card ID set as favorite
-	PreferredItems     map[string]float64 `json:"preferred_items"`   // ItemID -> Weighted Usage Score
+	FavoriteCardID     int                `json:"favorite_card_id"`     // The card ID set as favorite
+	PreferredItems     map[string]float64 `json:"preferred_items"`      // ItemID -> Weighted Usage Score
 }
 
 // CardBundle represents a set of items listed together in an auction.
@@ -258,24 +258,24 @@ type Auction struct {
 
 // Loan represents a collateralized loan from the Second-Hand Store.
 type Loan struct {
-	ID              string     `json:"id"`
-	BorrowerWallet  string     `json:"borrower_wallet"`
+	ID               string     `json:"id"`
+	BorrowerWallet   string     `json:"borrower_wallet"`
 	CollateralBundle CardBundle `json:"collateral_bundle"`
-	LoanAmount      uint64     `json:"loan_amount"`      // Micro-units of $VBV
-	RepaymentAmount uint64     `json:"repayment_amount"` // LoanAmount + Interest
-	DueAt           time.Time  `json:"due_at"`
-	Status          string     `json:"status"` // "active", "repaid", "defaulted"
-	TerritoryID     string     `json:"territory_id"` // For commission distribution (Second-Hand Store)
+	LoanAmount       uint64     `json:"loan_amount"`      // Micro-units of $VBV
+	RepaymentAmount  uint64     `json:"repayment_amount"` // LoanAmount + Interest
+	DueAt            time.Time  `json:"due_at"`
+	Status           string     `json:"status"`       // "active", "repaid", "defaulted"
+	TerritoryID      string     `json:"territory_id"` // For commission distribution (Second-Hand Store)
 }
 
 // Rumor represents an active rumor affecting an entity's share price.
 type Rumor struct {
-	ID            string    `json:"id"`
+	ID             string    `json:"id"`
 	SpreaderWallet string    `json:"spreader_wallet"`
-	TargetWallet  string    `json:"target_wallet"`
-	Type          string    `json:"type"`      // "positive", "negative"
-	Strength      float64   `json:"strength"`  // Multiplier (e.g., 1.1 for +10%, 0.9 for -10%)
-	ExpiresAt     time.Time `json:"expires_at"`
+	TargetWallet   string    `json:"target_wallet"`
+	Type           string    `json:"type"`     // "positive", "negative"
+	Strength       float64   `json:"strength"` // Multiplier (e.g., 1.1 for +10%, 0.9 for -10%)
+	ExpiresAt      time.Time `json:"expires_at"`
 }
 
 // KidnapState tracks the details of an active kidnapping for recovery logic.
@@ -392,6 +392,7 @@ type Lobby struct {
 	register             chan *Client
 	unregister           chan *Client
 	broadcast            chan []byte
+	onboardedWallets     map[string]bool // Tracks wallets that have received an onboarding pack
 	onboardingSemaphore  chan struct{}
 	mutex                sync.RWMutex
 }

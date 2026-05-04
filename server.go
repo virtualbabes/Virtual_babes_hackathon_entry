@@ -80,6 +80,7 @@ func newLobby() (*Lobby, error) {
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
 		broadcast:            make(chan []byte),
+		onboardedWallets:     make(map[string]bool), // Initialize the new map
 		onboardingSemaphore:  make(chan struct{}, 5), // Limit concurrent bridge operations
 		vaultAddress:         os.Getenv("VAULT_ADDRESS"),
 		maxFaucetCapacity:    10000.0,
@@ -99,6 +100,7 @@ func newLobby() (*Lobby, error) {
 	l.loadNetworkConfigs()
 	l.loadRegisteredTxIDs()
 	l.loadLinkedWallets()
+	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
 
 	// Load Persistent Card Cache
 	if data, err := os.ReadFile(cardCacheFileName); err == nil {
@@ -338,7 +340,7 @@ func main() {
 	})
 
 	http.HandleFunc("/api/leaderboard", lobby.handleLeaderboard)
-	http.HandleFunc("/api/reward", lobby.handleReward)
+	http.HandleFunc("/api/reward", lobby.handleReward) // Now in faucet_service.go
 	http.HandleFunc("/api/status", lobby.handlePublicStatus)
 	http.HandleFunc("/api/health", lobby.handleHealthCheck)
 	http.HandleFunc("/api/card-stats", lobby.handleCardStats)
@@ -362,7 +364,7 @@ func main() {
 	http.HandleFunc("/api/black-market/buy", lobby.handleBuyBlackMarket)
 	http.HandleFunc("/api/black-market/sell-tokens", lobby.handleSellMarketTokens)
 
-	// Bridge / Onboarding (Handlers defined in bridge_service.go)
+	// Onboarding (Handlers defined in onboarding_service.go)
 	http.HandleFunc("/api/bridge/onboard", lobby.handleVoiOnboarding)
 
 	// Tournament Management (Handlers defined in tournament_manager.go)
