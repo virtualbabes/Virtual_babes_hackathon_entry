@@ -16,6 +16,7 @@
 - Implemented `loadOnboardedWalletsFromIndexer` to restore Sybil protection state on startup.
 - Refactored `handleHirePlayer` and `handleSetSalary` from `career.go` to `employment_service.go`.
 - Audited `employment_service.go`: Verified mutex coverage and hardened wallet string normalization.
+- Implemented real-time $VBV pool monitoring via `checkVaultBalanceOnChain`.
 - Updated `package.json` to include WASM and Server build pipelines.
 - Audited `app.js`: Resolved WebSocket watchdog race conditions and fixed ReferenceErrors in API handlers.
 

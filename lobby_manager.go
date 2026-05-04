@@ -120,9 +120,8 @@ func (l *Lobby) run() {
 			go l.savePersistentCardCache()
 			go l.saveRegisteredTxIDs()
 			go l.saveLinkedWallets()
-		case <-vaultCheckTicker.C: // Periodically check on-chain vault balance
-			// The checkNativeVaultBalanceOnChain function is implemented in oracle_service.go
-			// It updates l.faucetBalance based on the native asset balance of the vault address.
+		case <-vaultCheckTicker.C:
+			go l.checkVaultBalanceOnChain() // Monitor $VBV Reward Pool
 			go l.checkNativeVaultBalanceOnChain()
 		case client := <-l.register:
 			l.mutex.Lock()

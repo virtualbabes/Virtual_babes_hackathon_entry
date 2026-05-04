@@ -3,7 +3,7 @@
 ## Critical Launch Readiness
 - [ ] Securely wire `FAUCET_MNEMONIC` and `ADMIN_WALLETS` for Mainnet.
 - [x] Verify Mainnet Node/Indexer stability in `networks.json`.
-- [ ] Implement `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
+- [x] Implement `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
 - [ ] Perform 16-player tournament stress tests.
 
 ## Technical Debt & Refactoring
