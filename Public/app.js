@@ -1382,7 +1382,7 @@ function handleServerMessage(msg) {
                 currentLatency = Date.now() - lastPingTime;
                 lastPingTime = null;
                 if (window.SyncLatency) window.SyncLatency(currentLatency);
-                syncUI();
+                syncUI("meta");
             }
             break;
         case "matchmaking_status":
@@ -1392,7 +1392,7 @@ function handleServerMessage(msg) {
             console.log("[WS] Tournament update received:", msg.payload);
             if (window.SyncTournament) window.SyncTournament(msg.payload);
             handleTournamentUI(msg.payload);
-            syncUI();
+            syncUI("meta");
             break;
         case "tournament_round_transition":
             console.log("[WS] Tournament round transition received:", msg.payload.round);
@@ -1493,10 +1493,11 @@ function handleServerMessage(msg) {
                 document.getElementById("season-countdown-widget").classList.remove("hidden");
                 startSeasonTimer();
             }
+            syncUI("all");
             break;
         case "portfolio_update":
             if (window.SyncPortfolio) window.SyncPortfolio(msg.payload);
-            syncUI();
+            syncUI("economy");
             renderRumorBoard(); // Ensure rumor board is updated after any state change
             break;
         case "heist_result":
@@ -1517,7 +1518,7 @@ function handleServerMessage(msg) {
                 window.SyncOpponentDeck(1, msg.payload.deck);
                 sendMatchSync(msg.from_id);
                 window.StartMatch(true);
-                syncUI();
+                syncUI("combat");
             } else if (action === "decline") {
                 alert(`Challenge declined by ${msg.from_id}.`);
             } else if (action === "sync_back") {
@@ -1529,7 +1530,7 @@ function handleServerMessage(msg) {
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(0, msg.payload.deck);
                 window.StartMatch(true);
-                syncUI();
+                syncUI("combat");
             }
             break;
         case "match_start":
@@ -1601,7 +1602,7 @@ function handleServerMessage(msg) {
                     success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
                 }
                 if (!success) console.warn("[WS] Move sync failed.");
-                syncUI();
+                syncUI("combat");
             }
             break;
         case "chat":
@@ -1610,25 +1611,25 @@ function handleServerMessage(msg) {
             // Handle automatic match invalidation on opponent disconnect
             if (msg.from_id === "SERVER" && msg.payload.text.includes("Match invalidated")) {
                 window.ResetGame();
-                syncUI();
+                syncUI("combat");
                 showToast("⚠️ Match terminated: Opponent left.", "error");
             }
             break;
         case "vault_update":
             console.log("[WS] Vault balance update received:", msg.payload.balance);
             window.SyncVaultBalance(msg.payload.balance);
-            syncUI();
+            syncUI("economy");
             break;
         case "rules_update":
             console.log("[WS] Global rules update received:", msg.payload);
             window.SyncRules(msg.payload);
             showToast("⚙️ Global Game Rules Updated by Admin", "info");
-            syncUI();
+            syncUI("combat");
             break;
         case "rewards_update":
             console.log("[WS] Reward stack update received:", msg.payload);
             window.SyncRewards(msg.payload);
-            syncUI();
+            syncUI("economy");
             break;
         case "maintenance_update":
             console.log("[WS] Maintenance update received:", msg.payload);
@@ -1753,6 +1754,7 @@ function updatePlayerList(players) {
 }
 
 function updateMarketTicker(players) {
+    const spacing = 60;
     let tickerContainer = document.getElementById("market-ticker");
     if (!tickerContainer) {
         tickerContainer = document.createElement("div");
@@ -1807,7 +1809,19 @@ function updateMarketTicker(players) {
         });
     });
 
-    tickerItems = newItems;
+    // PERFORMANCE OPTIMIZATION: Pre-calculate widths and measure text only when data changes
+    const canvas = document.getElementById("market-ticker-canvas");
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    if (ctx) {
+        ctx.font = "bold 12px 'Rajdhani', sans-serif";
+        tickerItems = newItems.map(item => {
+            const str = `${item.symbol}${item.badge ? ' ' + item.badge : ''} ${item.val} ${item.trend}`;
+            item.width = ctx.measureText(str).width + spacing;
+            return item;
+        });
+    } else {
+        tickerItems = newItems;
+    }
 
     if (!tickerAnimId) {
         startTickerAnimation();
@@ -1832,14 +1846,12 @@ function startTickerAnimation() {
         ctx.font = "bold 12px 'Rajdhani', sans-serif";
         ctx.textBaseline = "middle";
 
-        const spacing = 60;
-        let totalContentWidth = 0;
-        const itemWidths = tickerItems.map(item => {
-            const str = `${item.symbol}${item.badge ? ' ' + item.badge : ''} ${item.val} ${item.trend}`;
-            const w = ctx.measureText(str).width + spacing;
-            totalContentWidth += w;
-            return w;
-        });
+        // Optimized total width calculation using cached widths
+        const totalContentWidth = tickerItems.reduce((sum, item) => sum + (item.width || 0), 0);
+        if (totalContentWidth <= 0) {
+            tickerAnimId = requestAnimationFrame(animate);
+            return;
+        }
 
         tickerOffset += 0.8; // Scrolling speed
         if (tickerOffset >= totalContentWidth) tickerOffset = 0;
@@ -1848,7 +1860,7 @@ function startTickerAnimation() {
         while (x < width) {
             for (let i = 0; i < tickerItems.length; i++) {
                 const item = tickerItems[i];
-                const itemWidth = itemWidths[i];
+                const itemWidth = item.width || 100; // Fallback
 
                 if (x + itemWidth > 0 && x < width) {
                     let curX = x;
@@ -2523,7 +2535,7 @@ function proceedToWarRoom() {
     window.ResetGame();
     window.SetBoardState(spectatorMatchState);
     window.ForceActive();
-    syncUI();
+    syncUI("all");
 }
 
 function sendChallenge(targetId) {
@@ -2553,7 +2565,7 @@ function triggerToggleNetwork() {
 function selectCard(id) {
     activeCardId = id;
     if (window.PlaySelectSound) window.PlaySelectSound();
-    syncUI(); // Re-render to show the selected card glowing
+    syncUI("inventory"); // Re-render to show the selected card glowing
 }
 
 function clickGrid(index) {
@@ -2590,7 +2602,7 @@ function clickGrid(index) {
             socket.send(JSON.stringify(envelope));
         }
         activeCardId = null; 
-        syncUI();
+        syncUI("combat");
     }
 }
 
@@ -2612,7 +2624,7 @@ function closeDeckManager() {
             payload: { best_rating: rating }
         }));
     }
-    syncUI();
+    syncUI("all");
 }
 
 function renderDeckManager() {
@@ -2703,50 +2715,58 @@ dropZone.ondrop = (e) => {
 };
 
 // 4. THE RENDER LOOP (The Camera fetching Go State)
-async function syncUI() {
+async function syncUI(scope = "all") {
     if (!window.GetGameState) return; // Ensure Go function exists
-    const state = window.GetGameState();
+    const state = window.GetGameState(scope);
     
     // --- Update Dynamic Environment ---
-    updateDynamicArenaFloor(state);
+    if (state.phase !== undefined || state.multiplayer !== undefined || state.tournament !== undefined) {
+        updateDynamicArenaFloor(state);
+    }
 
     // Update Deck Rating in UI
-    document.getElementById("deck-rating-display").innerText = state.deck_rating;
+    if (state.deck_rating !== undefined) {
+        document.getElementById("deck-rating-display").innerText = state.deck_rating;
+    }
 
     // Update Mojo Display
     const mojoEl = document.getElementById("mojo-display"); // Assuming this element exists in index.html
-    if (mojoEl) mojoEl.innerHTML = `MOJO: ${state.mojo || 0} [${state.social_rank || 'Nobody'}] <span style="font-size: 0.7em; opacity: 0.7; margin-left: 10px;">RUMORS: ${state.rumor_count || 0}</span>`;
+    if (mojoEl && state.mojo !== undefined) mojoEl.innerHTML = `MOJO: ${state.mojo || 0} [${state.social_rank || 'Nobody'}] <span style="font-size: 0.7em; opacity: 0.7; margin-left: 10px;">RUMORS: ${state.rumor_count || 0}</span>`;
 
     // 0. Resolve missing reward symbols concurrently to prevent UI flickering
-    const rewardIds = Object.keys(state.rewards || {});
-    const missingSymbols = rewardIds.filter(id => !assetCache[id]);
-    if (missingSymbols.length > 0) {
-        await Promise.all(missingSymbols.map(id => resolveAssetSymbol(id)));
+    if (state.rewards) {
+        const rewardIds = Object.keys(state.rewards || {});
+        const missingSymbols = rewardIds.filter(id => !assetCache[id]);
+        if (missingSymbols.length > 0) {
+            await Promise.all(missingSymbols.map(id => resolveAssetSymbol(id)));
+        }
     }
     
     // --- Update Dashboard ---
     // Overlay Management
-    hideAllOverlays();
-    const mainContainer = document.getElementById("main-game-container");
-    mainContainer.classList.add('hidden'); // Hide main game by default
+    if (state.phase !== undefined || state.show_leaderboard !== undefined) {
+        hideAllOverlays();
+        const mainContainer = document.getElementById("main-game-container");
+        mainContainer.classList.add('hidden'); // Hide main game by default
 
-    if (state.show_leaderboard) {
-        document.getElementById("leaderboard-overlay").classList.remove("hidden");
-    } else if (state.phase === "TournamentLobby") {
-        document.getElementById("tournament-overlay").classList.remove("hidden");
-        // Populate bracket visualization if data exists
-        if (state.tournament) {
-            await renderTournamentBracket(state.tournament);
+        if (state.show_leaderboard) {
+            document.getElementById("leaderboard-overlay").classList.remove("hidden");
+        } else if (state.phase === "TournamentLobby") {
+            document.getElementById("tournament-overlay").classList.remove("hidden");
+            // Populate bracket visualization if data exists
+            if (state.tournament) {
+                await renderTournamentBracket(state.tournament);
+            }
+        } else if (state.phase === "Setup" && userAddress) {
+            document.getElementById("setup-overlay").classList.remove("hidden");
+        } else if (!userAddress) {
+            // If no wallet connected, show wallet selector
+            document.getElementById("wallet-selector-overlay").classList.remove("hidden");
+            renderRumorBoard(); // Ensure rumor board is rendered even if no wallet is connected
+        } else {
+            // Default to showing main game container if no specific overlay is needed
+            mainContainer.classList.remove('hidden');
         }
-    } else if (state.phase === "Setup" && userAddress) {
-        document.getElementById("setup-overlay").classList.remove("hidden");
-    } else if (!userAddress) {
-        // If no wallet connected, show wallet selector
-        document.getElementById("wallet-selector-overlay").classList.remove("hidden");
-        renderRumorBoard(); // Ensure rumor board is rendered even if no wallet is connected
-    } else {
-        // Default to showing main game container if no specific overlay is needed
-        mainContainer.classList.remove('hidden');
     }
 
     // --- Narrative Intelligence Hook & AI Indicator ---
@@ -2775,7 +2795,7 @@ async function syncUI() {
     }
 
     // --- Winner Overlay: Character-Aware Feedback ---
-    if (state.phase === "Finished") {
+    if (state.phase === "Finished" && state.winner !== undefined) {
         const overlay = document.getElementById("winner-overlay");
         const winText = document.getElementById("winner-text");
         const scoreText = document.getElementById("score-text");
@@ -2786,7 +2806,8 @@ async function syncUI() {
             let title = "MATCH OVER";
             let gloat = "";
             
-            const isWinner = state.winner === myPlayerIndex;
+            const localPIdx = state.local_player_index !== undefined ? state.local_player_index : myPlayerIndex;
+            const isWinner = state.winner === localPIdx;
             const isDraw = state.winner === 2;
 
             if (isDraw) {
@@ -2796,13 +2817,13 @@ async function syncUI() {
             } else if (isWinner) {
                 title = "VICTORY";
                 winText.style.color = "var(--neon-green)";
-                const winnerGloat = (myPlayerIndex === 0) ? state.p1_gloat : state.p2_gloat;
+                const winnerGloat = (localPIdx === 0) ? state.p1_gloat : state.p2_gloat;
                 const defaultGloat = state.multiplayer ? "Victory achieved in combat." : "The Arena recognizes your dominance.";
                 gloat = (state.multiplayer && winnerGloat) ? winnerGloat : defaultGloat;
             } else {
                 title = "DEFEAT";
                 winText.style.color = "#ff4b4b";
-                const opponentGloat = (myPlayerIndex === 0) ? state.p2_gloat : state.p1_gloat;
+                const opponentGloat = (localPIdx === 0) ? state.p2_gloat : state.p1_gloat;
 
                 if (state.multiplayer) {
                     const rawGloat = opponentGloat || "Your opponent has prevailed.";

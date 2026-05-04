@@ -1705,6 +1705,10 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["rumor_count"] = Game.Players[0].RumorCount
 		state["playstyle"] = Game.Players[0].Playstyle
 		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
+		state["cunning"] = Game.Players[0].Cunning
+		state["nurturing"] = Game.Players[0].Nurturing
+		state["jailed_cards"] = Game.Players[0].JailedCards
+		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
 	}
 
 	// Combat State
@@ -1725,6 +1729,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["multiplayer"] = Game.Multiplayer
 		state["special_fanfare"] = Game.SpecialFanfare
 		state["rules"] = Game.Rules
+		state["local_player_index"] = Game.LocalPlayerIndex
 	}
 
 	// Economy
@@ -1748,6 +1753,8 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["maintenance"] = Game.Maintenance
 		state["testing_mode"] = Game.TestingMode
 		state["is_admin"] = Game.IsAdmin
+		state["show_leaderboard"] = Game.ShowLeaderboard
+		state["tournament"] = Game.Tournament
 		state["server_load"] = Game.ServerLoad
 		state["latency"] = Game.Latency
 		state["network_health"] = Game.NetworkHealth

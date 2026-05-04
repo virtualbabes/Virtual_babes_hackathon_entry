@@ -2,14 +2,14 @@
 
 ## Critical Launch Readiness
 - [ ] Securely wire `FAUCET_MNEMONIC` and `ADMIN_WALLETS` for Mainnet.
-- [ ] Verify Mainnet Node/Indexer stability in `networks.json`.
+- [x] Verify Mainnet Node/Indexer stability in `networks.json`.
 - [ ] Implement `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
 - [ ] Perform 16-player tournament stress tests.
 
 ## Technical Debt & Refactoring
 - [x] Decompose `lobby_manager.go` into domain-specific service files.
 - [x] Audit `club_service.go` for concurrency issues (Treasury/Inventory).
-- [x] Implement partial state sync in WASM `GetGameState` to reduce serialization overhead.
+- [x] Implement partial state sync in WASM `GetGameState` (Go & JS).
 - [x] Refactor `handleUseItem` logic to `item_service.go`.
 - [x] Audit `battle_service.go` for potential race conditions during high-concurrency matches.
 - [x] Validate and harden `verifyBuyInTransaction` logic for Voi/Algorand indexers.
@@ -23,3 +23,4 @@
 - [x] Implement historical onboarding recovery in `oracle_service.go`.
 - [x] Refactor Career API handlers to `employment_service.go`.
 - [x] Audit `employment_service.go` for concurrency and case-consistency.
+- [x] Optimize Market Ticker canvas rendering in `app.js`.

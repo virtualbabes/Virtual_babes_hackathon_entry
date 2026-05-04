@@ -23,5 +23,5 @@
 
 ## Phase 2: Performance Optimization
 - Refactored `handleVoiOnboarding` logic from `bridge_service.go` to `onboarding_service.go`.
-1. Complete: Implemented partial state synchronization in `GetGameState` (WASM) to reduce serialization overhead.
-2. Optimize the Market Ticker canvas rendering in `app.js`.
+1. Complete: Implemented partial state synchronization in `GetGameState` (Go & JS) to reduce serialization overhead.
+2. Complete: Optimized Market Ticker canvas rendering with text measurement caching and viewport culling.
