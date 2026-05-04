@@ -23,4 +23,6 @@
 - [x] Implement historical onboarding recovery in `oracle_service.go`.
 - [x] Refactor Career API handlers to `employment_service.go`.
 - [x] Audit `employment_service.go` for concurrency and case-consistency.
+- [x] Update `package.json` with Go and WASM build scripts.
+- [x] Audit `app.js` for memory leaks and handler stability.
 - [x] Optimize Market Ticker canvas rendering in `app.js`.

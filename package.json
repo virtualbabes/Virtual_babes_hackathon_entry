@@ -5,7 +5,12 @@
   "main": "server.go",
   "scripts": {
     "sass:build": "node-sass Public/src/scss/main.scss Public/styles.css --output-style compressed",
-    "sass:watch": "node-sass Public/src/scss/main.scss Public/styles.css --watch --recursive"
+    "sass:watch": "node-sass Public/src/scss/main.scss Public/styles.css --watch --recursive",
+    "wasm:build": "GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go",
+    "wasm:init": "cp \"$(go env GOROOT)/misc/wasm/wasm_exec.js\" Public/",
+    "server:build": "CGO_ENABLED=0 go build -ldflags=\"-w -s\" -o server-bin server.go",
+    "build": "npm run wasm:build && npm run sass:build && npm run server:build",
+    "start": "go run server.go"
   },
   "keywords": [],
   "author": "slapkarnts",

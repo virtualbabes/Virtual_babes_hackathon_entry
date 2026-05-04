@@ -1089,14 +1089,14 @@ async function addXChainWallet() {
                 payload: {
                     primary_avm_wallet: userAddress,
                     linked_address: address,
-                    linked_chain: newWallet.chain,
+                    linked_chain: newWalletInfo.chain,
                     signature: signature,
                     nonce: nonce
                 }
             }));
 
             // Prevent duplicates
-            if (!linkedWallets.find(w => w.address === newWalletInfo.address)) {
+            if (!linkedWallets.find(w => w.address.toLowerCase() === newWalletInfo.address.toLowerCase())) {
                 linkedWallets.push(newWalletInfo);
                 localStorage.setItem("vbabes_linked_wallets", JSON.stringify(linkedWallets));
                 showToast(`🔗 Requested link for ${newWalletInfo.chain} wallet...`, "info");
@@ -1368,6 +1368,7 @@ function initWebSocket() {
 
     socket.onclose = () => {
         console.warn("[WS] Disconnected. Retrying...");
+        if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
         // Only attempt immediate reconnect if not due to identity sync timeout already handling it
         if (identitySyncTimeout && reconnectAttempts < 3) {
             setTimeout(initWebSocket, 3000);
@@ -2541,14 +2542,15 @@ function proceedToWarRoom() {
 function sendChallenge(targetId) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
+    const state = window.GetGameState();
     const envelope = {
         type: "challenge",
         from_id: myClientId, // Ensure from_id is set for server
         to_id: targetId,
         payload: { 
             action: "invite",
-            avatar: state.p1_avatar,
-            gloat: state.p1_gloat,
+            avatar: state.p1_avatar || "",
+            gloat: state.p1_gloat || "",
             deck: state.deck.map(c => c.id)
         }
     };
@@ -4324,6 +4326,8 @@ function setupCropEvents() {
     const confirmBtn = document.getElementById("confirm-avatar-btn");
     
     if (!frame || !img || !slider || !confirmBtn) return;
+    if (isCropInitialized) return; // Prevent duplicate global listeners
+    isCropInitialized = true;
 
     let isDragging = false;
     let startX, startY;
@@ -4365,6 +4369,7 @@ function setupCropEvents() {
     };
 
     frame.onmousedown = (e) => {
+        if (e.button !== 0) return; // Only primary mouse button
         isDragging = true;
         startX = e.clientX - cropState.x;
         startY = e.clientY - cropState.y;
@@ -4403,8 +4408,8 @@ function setupCropEvents() {
             const gloat = document.getElementById("gloat-message-input").value.trim();
             localStorage.setItem("vbabes_gloat_msg", gloat);
 
-            // Call the Go WASM engine to set the avatar and progress to Lobby phase
-            window.SetAvatar(currentAvatarUrl, gloat, "", 0); // Reset notice locally on choice, favorite card ID is 0 for now
+            const state = window.GetGameState();
+            window.SetAvatar(currentAvatarUrl, gloat, "", state.favorite_card_id || 0);
 
             // Synchronize profile metadata with the server for lobby visibility and moderation
             if (socket && socket.readyState === WebSocket.OPEN) {
