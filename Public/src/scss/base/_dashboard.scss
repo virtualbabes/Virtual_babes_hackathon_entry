@@ -1,0 +1,29 @@
+// Public/src/scss/components/_dashboard.scss
+@import '../base/variables';
+
+.rank-badge {
+    font-weight: bold;
+}
+
+.tier-label {
+    font-size: 0.7em;
+    text-transform: uppercase;
+}
+
+.rating-badge {
+    margin-left: 5px;
+    background: rgba(0, 242, 254, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.stats-separator {
+    opacity: 0.4;
+    margin: 0 8px;
+}
+
+.report-alert {
+    background-color: rgba(255, 75, 75, 0.1);
+    border: 1px solid #ff4b4b;
+}

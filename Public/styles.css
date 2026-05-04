@@ -1,0 +1,13 @@
+/* =========================================================
+   VOICONOMY VIBRANT STYLES (Glassmorphism & Neon)
+   ========================================================= */
+/* This file is the compiled output of Public/src/scss/main.scss */
+
+body {
+    /* The body background and font styles are now managed by SCSS */
+    /* The background-image property will be set dynamically by app.js */
+    min-height: 100vh; /* Ensure full viewport height */
+    display: flex; /* Use flexbox for main layout */
+    flex-direction: column; /* Stack content vertically */
+    align-items: center; /* Center content horizontally */
+}

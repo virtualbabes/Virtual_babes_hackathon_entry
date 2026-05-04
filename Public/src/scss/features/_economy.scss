@@ -1,0 +1,24 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\features\_economy.scss
+@import '../base/variables';
+@import '../themes/neon-glass';
+
+/* High-Finance & Market Layer */
+
+// Market Ticker (Live performance prices)
+
+// Art Gallery (Auctions & Consignments)
+.auction-gallery {
+    &__item-bundle {
+        @include neon-glass-panel;
+        border-color: $color-neon-cyan;
+    }
+}
+
+// Second-Hand Store (Loans & Collateral)
+
+// Black Market (Gated Underworld Economy)
+.black-market {
+    // High-cunning requirement visuals
+    border-color: $color-error-red;
+    box-shadow: 0 0 15px rgba($color-error-red, 0.4);
+}

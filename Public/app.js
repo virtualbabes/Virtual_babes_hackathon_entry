@@ -1,0 +1,4838 @@
+import { collectiveIntelligence } from './collective-intelligence.js';
+let activeCardId = null; // Tracks the card you clicked in your hand
+let aiThinking = false; // To track if AI is currently performing a move
+let lastBoardState = Array(9).fill(null); // Track state to detect captures
+let socket = null;
+let currentChallengerId = null; // Stores the ID of the player who sent the current challenge
+let reconnectAttempts = 0; // Tracks WebSocket reconnection attempts for identity sync
+let nonceResolver = null;
+let currentOpponentId = null;   // The player we are currently battling
+let walletProvider = null;      // Current active provider (nautilus, kibisis, etc.)
+let myClientId = null;
+let currentTournamentPage = 1;
+const tournamentLimit = 10;
+let totalTournaments = 0;
+let spectatorMatchState = null; // Stores P1/P2 mapping for spectators
+let lastTournamentData = null;  // Cache for Go WASM synchronization
+let isVerified = false;         // Global verification status
+let seasonEnd = null;
+let seasonTimerInterval = null;
+let identitySyncTimeout = null;
+let lastTauntPhase = null;      // Tracks narrative state to prevent duplicate taunts
+let lastTauntTurn = null;
+let activeRumors = []; // Global array to hold active rumors
+
+// --- Ticker State ---
+let tickerItems = [];
+let tickerOffset = 0;
+let tickerAnimId = null;
+
+// Global Audio Controls
+let masterVolume = 0.5;
+let sfxVolume = 0.5;
+let musicVolume = 0.5;
+
+let myPlayerIndex = 0;          // 0 for P1, 1 for P2
+let userAddress = null;
+let currentAvatarUrl = null;
+let cropState = { zoom: 1.0, x: 0, y: 0 }; // Shared state for aspect-ratio aware cropping
+let inMatchmakingQueue = false;
+let matchHistorySaved = false;
+let cachedAdminHeaders = null;
+let availableNetworks = {};
+let globalClubs = {};
+let lastLobbyPlayers = []; // Cache for portfolio valuation
+let adminFocusNetwork = ""; // Renamed to clarify its purpose
+let payoutAddress = localStorage.getItem("vbabes_payout_address") || null;
+let linkedWallets = JSON.parse(localStorage.getItem("vbabes_linked_wallets") || "[]");
+let ignoredReporters = new Set(JSON.parse(localStorage.getItem("vbabes_ignored_reporters") || "[]"));
+
+// --- Global Deployment Configuration ---
+const CONFIG = (() => {
+    const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const backendHost = window.location.host; // Dynamically uses current host (localhost:8082 or Render URL)
+    return {
+        IS_LOCAL: isLocal,
+        BACKEND_URL: backendHost,
+        API_BASE: (window.location.protocol === "https:" ? "https://" : "http://") + backendHost,
+        // Production CDN: Link to the Public folder in the deploy branch
+        ASSET_URL: isLocal ? "/" : "https://raw.githubusercontent.com/slapkarnts/VOiconomy-faucet/deploy/Public/",
+        WC_PROJECT_ID: 'your_walletconnect_project_id', // Matches .env.example placeholder
+        VOI_CHAIN_ID: 'algorand:wGHE2Pwd1-YdV4EuJFy9u6C24-L-2B05',
+        ALGO_CHAIN_ID: 'algorand:mainnet-v1.0',
+        VAULT_ADDRESS: null,                      // Dynamic: Synced from server on connect
+        VBV_ASSET_ID: null,                       // Dynamic: Synced from server on connect
+        AVOI_ASSET_ID: null                       // Dynamic: Synced from server on connect
+    };
+})();
+
+let signClient = null; // WalletConnect State
+let wcModal = null;    // WalletConnect Modal State
+
+let lastPingTime = null;
+let currentLatency = null;
+
+// --- Asset Symbol Resolution ---
+const assetCache = {
+    "40227315": "$VBV" // Pre-seed default $VBV
+};
+const envoiCache = {};
+let tooltipEl = null;
+
+function getCachedEnvoiName(address) {
+    if (!address || address === "TBD" || address === "BYE") return address || "TBD";
+    return envoiCache[address] || (address.substring(0, 6) + "..." + address.substring(address.length - 4));
+}
+
+async function resolveAssetSymbol(assetId) {
+    if (assetCache[assetId]) return assetCache[assetId];
+    
+    const state = window.GetGameState();
+    
+    // Use the active network's indexer URL from the server's availableNetworks
+    // This assumes the assetId is from the currently active network.
+    // For cross-chain assets, this needs to be more sophisticated (e.g., pass network with assetId).
+    const currentNetworkConfig = Object.values(availableNetworks).find(
+        n => n.network_name.includes(state.network) // Match "VOI" with "Voi Mainnet"
+    );
+    const baseUrl = currentNetworkConfig ? currentNetworkConfig.indexer_url : "";
+
+    // Fallback if no specific indexer URL is found or network is unknown
+
+    if (!baseUrl) {
+        assetCache[assetId] = `$${assetId}`;
+        return assetCache[assetId];
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/collections?contractId=${assetId}`);
+        if (response.status === 404) {
+            // Asset not found on indexer (common for new/mock assets)
+            assetCache[assetId] = `$${assetId}`;
+            return assetCache[assetId];
+        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        if (data.collection && data.collection.length > 0) {
+            const col = data.collection[0];
+            let symbol = "";
+
+            // 1. Explicitly check for 'Symbol' or 'UnitName' in metadata
+            if (col.firstToken?.metadata) {
+                try {
+                    const tokenMeta = JSON.parse(col.firstToken.metadata);
+                    symbol = tokenMeta.symbol || tokenMeta.unitName || "";
+                } catch (e) { /* metadata not JSON, ignore */ }
+            }
+
+            // 2. Fallback to name-based heuristic if no explicit symbol
+            if (!symbol) {
+                let name = col.firstToken?.metadata?.name || col.name || "";
+            
+                symbol = name.toUpperCase();
+                if (symbol.length > 6) {
+                    const words = name.split(' ');
+                    if (words.length > 1) {
+                        symbol = words.map(w => w[0]).join('').toUpperCase();
+                    } else {
+                        symbol = name.substring(0, 4).toUpperCase();
+                    }
+                }
+            }
+            
+            if (!symbol.startsWith('$')) symbol = '$' + symbol;
+            assetCache[assetId] = symbol;
+            return symbol;
+        }
+    } catch (err) {
+        console.warn(`[API] Asset ${assetId} resolution failed:`, err);
+    }
+    
+    // Robust Fallback: Cache the ID as a symbol to prevent repeated failed requests
+    assetCache[assetId] = `$${assetId}`;
+    return assetCache[assetId];
+}
+
+function getAssetSymbol(assetId) {
+    return assetCache[assetId] || `$${assetId}`;
+}
+
+// Helper to get network config from the global availableNetworks map
+function getNetworkConfig(networkShortName) {
+    if (networkShortName === "VOI") {
+        return availableNetworks["Voi Mainnet"];
+    } else if (networkShortName === "ALGO") {
+        return availableNetworks["Algorand Mainnet"];
+    }
+    return null;
+}
+
+// --- WalletConnect Initialization ---
+async function initWalletConnect() {
+    if (!CONFIG.WC_PROJECT_ID || CONFIG.WC_PROJECT_ID === 'YOUR_WALLETCONNECT_PROJECT_ID') {
+        console.warn("[WC] WalletConnect Project ID not configured.");
+        return;
+    }
+
+    try {
+        // The UMD build of sign-client exports globally as SignClient
+        const SignClient = window.SignClient;
+        if (!SignClient) return;
+
+        const WalletConnectModal = window.WalletConnectModal;
+        if (WalletConnectModal) {
+            wcModal = new WalletConnectModal.WalletConnectModal({
+                projectId: CONFIG.WC_PROJECT_ID,
+                chains: [CONFIG.VOI_CHAIN_ID, CONFIG.ALGO_CHAIN_ID]
+            });
+        }
+
+        signClient = await SignClient.init({
+            projectId: CONFIG.WC_PROJECT_ID,
+            metadata: {
+                name: "Virtualbabes Arena",
+                description: "The premier NFT Seduction battleground on Voi.",
+                url: window.location.origin,
+                icons: [(CONFIG.IS_LOCAL ? window.location.origin : "") + CONFIG.ASSET_URL + "Assets/logo.png"],
+            },
+        });
+
+        // Handle session events
+        signClient.on("session_event", ({ event }) => { console.log("[WC] Event:", event); });
+        signClient.on("session_update", ({ topic, params }) => { console.log("[WC] Session Updated:", params); });
+        signClient.on("session_delete", () => { 
+            console.log("[WC] Session Deleted");
+            disconnectUserWallet();
+        });
+
+        // Restore existing session
+        const sessions = signClient.session.getAll();
+        if (sessions.length > 0) {
+            const session = sessions[0];
+            const account = session.namespaces.algorand.accounts[0];
+            const addr = account.split(":")[2];
+            walletProvider = 'walletconnect';
+            console.log("[WC] Session Restored:", addr);
+            updateWalletUI(addr);
+        }
+
+        console.log("[WC] Initialization Complete.");
+    } catch (err) {
+        console.error("[WC] Initialization Failed:", err);
+        showToast("WalletConnect failed to initialize.", "error");
+    }
+}
+
+// 1. Initialize Go WASM Engine
+window.onload = async () => {
+    const go = new Go();
+    try {
+        const response = await fetch("main.wasm");
+        const buffer = await response.arrayBuffer();
+        const obj = await WebAssembly.instantiate(buffer, go.importObject);
+        
+        // Initialize volume sliders
+        document.getElementById("master-volume").value = masterVolume;
+        document.getElementById("music-volume").value = musicVolume;
+        document.getElementById("sfx-volume").value = sfxVolume;
+        go.run(obj.instance);
+        if (window.SetApiBase) window.SetApiBase(CONFIG.API_BASE);
+        if (window.SetAssetBase) {
+            window.SetAssetBase(CONFIG.ASSET_URL);
+            // Set specific CSS variables for background textures as CSS url() doesn't support concatenation
+            const base = CONFIG.ASSET_URL;
+            document.documentElement.style.setProperty('--bg-arena-floor', `url(${base}Assets/Textures/arena_floor.png)`);
+            document.documentElement.style.setProperty('--bg-glass-texture', `url(${base}Assets/Textures/glass_texture.webp)`);
+        }
+        document.getElementById("engine-status").innerHTML = "<span class='status-active'>ACTIVE</span>";
+        buildEmptyBoard();
+        initWebSocket();
+        initWalletConnect(); // Initialize WC alongside WS
+        renderMatchHistory();
+        fetchLeaderboard();
+        setupCropEvents();
+
+        updatePayoutUI();
+        // Check for soft-reload resume
+        if (localStorage.getItem("vbabes_soft_reload") === "true") {
+            const lastWallet = localStorage.getItem("vbabes_last_wallet");
+            const lastProvider = localStorage.getItem("vbabes_last_provider");
+            localStorage.removeItem("vbabes_soft_reload");
+            if (lastWallet && lastProvider) {
+                setTimeout(() => connectWith(lastProvider), 500); // Small delay for WASM stability
+            }
+        }
+    } catch (err) {
+        console.error("WASM Load Fail:", err);
+        document.getElementById("engine-status").innerHTML = "<span style='color: #ff0844;'>OFFLINE</span>";
+    }
+    syncUI(); // Initial UI sync after WASM loads
+};
+
+// 2. Hall of Fame Rendering
+async function fetchLeaderboard() {
+    let data = [];
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/leaderboard`);
+        if (!response.ok) throw new Error("API Unreachable");
+        data = await response.json();
+        localStorage.setItem("vbabes_leaderboard_cache", JSON.stringify(data));
+    } catch (err) {
+        console.warn("[LEADERBOARD] API offline, loading from local cache...");
+        data = JSON.parse(localStorage.getItem("vbabes_leaderboard_cache") || "[]");
+        if (data.length > 0) showToast("📡 Using cached rankings (Offline Mode)", "info");
+    }
+    
+    const top10Container = document.getElementById("hof-top-10");
+    const scrollerContainer = document.getElementById("hof-scrolling-content");
+    const sideDisplay = document.getElementById("leaderboard-display");
+
+    top10Container.innerHTML = "";
+    scrollerContainer.innerHTML = "";
+    sideDisplay.innerHTML = "";
+
+    for (let i = 0; i < data.length; i++) {
+        const entry = data[i];
+        const envoiName = await resolveEnvoiName(entry.wallet);
+        const tierData = window.GetTierInfo(entry.reputation);
+        
+        const row = document.createElement("div");
+        row.className = "leaderboard-row";
+        row.style.borderLeftColor = tierData.color;
+        
+        row.innerHTML = `
+            <span class="rank-badge" style="color: ${tierData.color}">#${i+1}</span>
+            <span class="player-name">${envoiName} <small class="tier-label" style="color: ${tierData.color}">[${tierData.tier.toUpperCase()}]</small></span>
+            <span class="player-stats">
+                <b class="text-neon-green">${entry.wins}</b> Wins 
+                <b class="text-neon-cyan rating-badge">${entry.best_rating || '[Z]'}</b>
+                <span class="stats-separator">|</span> ${entry.reputation} REP
+            </span>
+        `;
+
+        if (i < 10) {
+            top10Container.appendChild(row);
+        } else {
+            scrollerContainer.appendChild(row);
+        }
+    }
+
+    // Adjust scroller animation duration based on count
+    // 11 seconds (Still) + (count * 0.5s for scroll)
+    const scrollCount = Math.max(0, data.length - 10);
+    const duration = 11 + (scrollCount * 0.5);
+    scrollerContainer.style.animation = `hof-recursive-scroll ${duration}s linear infinite`;
+}
+
+async function renderSideLeaderboard() {
+    const display = document.getElementById("leaderboard-display");
+    try {
+        let data = [];
+        try {
+            const response = await fetch(`${CONFIG.API_BASE}/api/leaderboard`);
+            if (!response.ok) throw new Error("API Unreachable");
+            data = await response.json();
+            localStorage.setItem("vbabes_leaderboard_cache", JSON.stringify(data));
+        } catch (err) {
+            // Fallback to cache silently for side display unless it's empty
+            data = JSON.parse(localStorage.getItem("vbabes_leaderboard_cache") || "[]");
+        }
+        
+        
+        display.innerHTML = "";
+        if (data.length === 0) {
+            display.innerHTML = '<div class="chat-msg system">No legends yet.</div>';
+            return;
+        }
+
+        for (let i = 0; i < data.length; i++) {
+            const entry = data[i];
+            const envoiName = await resolveEnvoiName(entry.wallet);
+
+            // Reputation Tier Logic
+            const rep = entry.reputation;
+            let tier = "Iron";
+            let tierColor = "#888"; // Gray
+            if (rep >= 1000) { tier = "Diamond"; tierColor = "#b9f2ff"; }
+            else if (rep >= 600) { tier = "Gold"; tierColor = "#ffd700"; }
+            else if (rep >= 300) { tier = "Silver"; tierColor = "#c0c0c0"; }
+            else if (rep >= 100) { tier = "Bronze"; tierColor = "#cd7f32"; }
+
+            // Mardon Badge Logic (50+ Wins, 0 Disconnect Streak)
+            const mardonBadge = (entry.wins >= 50 && entry.disconnect_streak === 0) ? `<span title="Mardon Badge: Elite Reliability (50+ Wins, 0 Streak)" style="color: var(--neon-green); margin-left: 5px; cursor: help;">🎖️</span>` : '';
+
+            // Ban & Streak UI Logic
+            const banDate = new Date(entry.ban_expires);
+            const isBanned = banDate > Date.now();
+            let banInfo = '';
+            if (isBanned) {
+                const diff = banDate - Date.now();
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                banInfo = `<span title="Banned: ${hours}h ${minutes}m remaining" style="color: #ff4b4b; margin-left: 5px; cursor: help;">🔒</span>`;
+            }
+
+            const streakWarning = entry.disconnect_streak >= 2 ? `<span title="Disconnect Streak: ${entry.disconnect_streak}" style="color: #ff4b4b; margin-left: 5px; cursor: help;">🚩</span>` : '';
+            
+            const div = document.createElement("div");
+            div.className = "chat-msg";
+            const rankColor = i === 0 ? "var(--neon-cyan)" : (i < 3 ? "var(--neon-purple)" : "white");
+            
+            div.innerHTML = `
+                <b style="color: ${rankColor}">#${i+1}</b> 
+                ${streakWarning}${banInfo}${mardonBadge}
+                <span style="color: ${tierColor}; font-size: 0.75em; font-weight: bold; margin-right: 5px;">[${tier}]</span>
+                <span style="color: var(--neon-cyan)">${envoiName}</span> 
+                <span style="float: right; opacity: 0.8;"><b>${entry.wins}W</b> <small style="color: var(--neon-cyan); font-weight: bold;">${entry.best_rating || '[Z]'}</small> | ${rep}R</span>
+            `;
+            display.appendChild(div);
+        }
+    } catch (err) {
+        console.error("Leaderboard fetch failed", err);
+    }
+}
+
+async function resolveEnvoiName(address) {
+    if (envoiCache[address]) return envoiCache[address];
+    if (address === "BYE" || address === "TBD") return address;
+
+    const state = window.GetGameState();
+    const networkConfig = getNetworkConfig(state.network);
+    const baseUrl = networkConfig ? networkConfig.indexer_url : "";
+    const truncated = address.substring(0, 6) + "..." + address.substring(address.length - 4);
+    if (!baseUrl) {
+        envoiCache[address] = truncated;
+        return truncated;
+    }
+
+    try {
+        const response = await fetch(`${baseUrl}/tokens?owner=${address}`);
+        if (response.status === 404) {
+            envoiCache[address] = truncated;
+            return truncated;
+        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        
+        const suffix = state.network === "VOI" ? ".voi" : ".algo";
+        const envoiToken = data.tokens?.find(t => {
+            if (!t.metadata) return false;
+            try {
+                const meta = JSON.parse(t.metadata);
+                return meta.name?.toLowerCase().endsWith(suffix);
+            } catch(e) { return false; }
+        });
+        
+        if (envoiToken) {
+            const meta = JSON.parse(envoiToken.metadata);
+            envoiCache[address] = meta.name;
+            return meta.name;
+        }
+    } catch (err) {
+        console.warn(`[API] Name resolution failed for ${address}:`, err);
+    }
+    
+    envoiCache[address] = truncated; // Negative cache: prevent repeated failed fetches
+    return truncated;
+}
+
+// --- Overlay Management Functions ---
+function hideAllOverlays() {
+    document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+}
+let userNFTs = []; // Local cache for filtering
+
+async function handleWalletAction() {
+    if (userAddress) {
+        await disconnectUserWallet();
+    } else {
+        await connectUserWallet();
+    }
+}
+
+// Wallet Selector
+function closeWalletSelector() {
+    document.getElementById("wallet-selector-overlay").classList.add("hidden");
+    showMainGameContainer(); // Show main game if no other overlay is active
+}
+// This function is called by the "Connect Wallet" button
+async function connectUserWallet() {
+    document.getElementById("wallet-selector-overlay").classList.remove("hidden");
+}
+
+async function connectWith(provider) {
+    // Guard: Ensure CONFIG has been populated by the WebSocket identity message
+    if (CONFIG.VAULT_ADDRESS === null) {
+        showToast("⚠️ Arena configuration not yet synced. Please wait a moment.", "warning");
+        return;
+    }
+
+    closeWalletSelector();
+    showToast(`Connecting to ${provider}...`, "info");
+    
+    try {
+        let address = null;
+        if (provider === 'nautilus') {
+            if (!window.algo) throw new Error("Nautilus not installed");
+            const accounts = await window.algo.enable();
+            address = accounts[0];
+            walletProvider = 'nautilus';
+        } else if (provider === 'kibisis') {
+            if (!window.kibisis) throw new Error("Kibisis not installed");
+            const accounts = await window.kibisis.enable();
+            address = accounts[0];
+            walletProvider = 'kibisis';
+        } else if (provider === 'walletconnect') {
+            if (!signClient || !wcModal) throw new Error("WalletConnect not initialized");
+
+            const { uri, approval } = await signClient.connect({
+                optionalNamespaces: {
+                    algorand: {
+                        methods: ["algo_signTxn", "algo_signMessage"],
+                        chains: [CONFIG.VOI_CHAIN_ID, CONFIG.ALGO_CHAIN_ID],
+                        events: ["chainChanged", "accountsChanged"],
+                    },
+                    eip155: {
+                        methods: ["eth_signTransaction", "eth_sendTransaction", "personal_sign"],
+                        chains: ["eip155:1", "eip155:137"], // ETH & Polygon
+                        events: ["chainChanged", "accountsChanged"],
+                    }
+                },
+            });
+            if (uri) {
+                wcModal.openModal({ uri });
+                const session = await approval();
+                wcModal.closeModal();
+                
+                // Extract address from namespaces: algorand:caip2_chain_id:address
+                const account = session.namespaces.algorand.accounts[0];
+                address = account.split(":")[2];
+                walletProvider = 'walletconnect';
+            }
+        }
+
+        if (address) {
+            const result = window.connectWallet(address);
+            if (result.status === "success") {
+                updateWalletUI(result.address);
+                showToast("Wallet Connected!", "success");
+                closeWalletSelector(); // Close selector after successful connection
+            }
+        }
+    } catch (err) {
+        console.error("Connection failed", err);
+        showToast(err.message, "error");
+    }
+}
+
+function updateWalletUI(address) {
+    userAddress = address;
+    const btn = document.getElementById("wallet-btn");
+    if (address) {
+        btn.innerText = address.substring(0, 8) + "...";
+        btn.classList.add("outline");
+
+        // Register wallet with the Live Lobby server
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                type: "register_wallet",
+                payload: { wallet: address }
+            }));
+        }
+
+        // BRIDGE LOGIC: If on Algorand, ensure the user is "birthed" into Voi
+        const state = window.GetGameState();
+        if (state.network === "ALGO") {
+            checkVoiReadiness(address);
+        }
+
+        // If we are in the Setup phase, fetch the player's NFT collection for avatar selection
+        if (state.phase === "Setup") {
+            fetchUserNFTs(address);
+        }
+    } else {
+        btn.innerText = "Connect Wallet";
+        btn.classList.remove("outline");
+    }
+    syncUI();
+    showMainGameContainer(); // Ensure main game is visible after wallet action
+}
+
+async function checkVoiReadiness(address) {
+    console.log("[BRIDGE] Checking Voi readiness for Algorand wallet...");
+    setTransactionStatus("Checking Voi onboarding status...", "info");
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/bridge/onboard`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: address })
+        });
+        if (response.ok && response.status !== 204) {
+            const data = await response.json();
+            let message = `🌉 ${data.message}`;
+            if (data.txid) {
+                const voiConfig = availableNetworks["Voi Mainnet"];
+                if (voiConfig && voiConfig.explorer_url) {
+                    const explorerLink = `${voiConfig.explorer_url}/tx/${data.txid}`;
+                    message += `<br><a href="${explorerLink}" target="_blank" style="color: var(--neon-green); text-decoration: underline;">View Transaction</a>`;
+                } else {
+                    message += `<br>TxID: ${data.txid.substring(0, 14)}...`;
+                }
+            }
+            showToast(message, "success", 10000);
+        }
+    } catch (err) {
+        console.error("[BRIDGE] Onboarding check failed", err);
+    } finally {
+        setTransactionStatus(null);
+    }
+}
+
+async function adminGloatBan(walletToBan = null, hoursToBan = null) {
+    const wallet = walletToBan || document.getElementById("admin-ban-wallet").value.trim();
+    const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
+    
+    if (!wallet) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/gloat-ban`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet, hours: isNaN(hours) ? 48 : hours })
+        });
+        if (response.ok) {
+            showToast(`🚫 Gloat messaging restricted for ${wallet.substring(0,6)}...`, "success");
+            fetchLastAdminAction();
+        } else {
+            const errText = await response.text();
+            showToast(`❌ Gloat ban failed: ${errText}`, "error");
+        }
+    } catch (err) { showToast("❌ Server connection error", "error"); }
+}
+
+function ignoreReporter(wallet) { // This function was orphaned due to the previous error.
+    if (!wallet) return;
+    ignoredReporters.add(wallet);
+    localStorage.setItem("vbabes_ignored_reporters", JSON.stringify(Array.from(ignoredReporters)));
+    showToast(`🙈 Ignoring reports from ${wallet.substring(0,6)}...`, "info");
+    fetchAdminLogs(); // Re-render to apply filter
+}
+
+async function fetchAdminLogs() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    const filter = document.getElementById("admin-log-filter").value.trim();
+    const startVal = document.getElementById("admin-log-start").value;
+    const endVal = document.getElementById("admin-log-end").value;
+
+    const logDisplay = document.getElementById("admin-logs-display");
+    logDisplay.innerHTML = `<div class="chat-msg system">Fetching logs...</div>`;
+
+    try {
+        let url = `${CONFIG.API_BASE}/api/admin/logs?filter=${encodeURIComponent(filter)}`;
+        if (startVal) {
+            url += `&start_date=${encodeURIComponent(startVal + ":00Z")}`;
+        }
+        if (endVal) {
+            url += `&end_date=${encodeURIComponent(endVal + ":00Z")}`;
+        }
+
+        const response = await fetch(url, { headers });
+        if (!response.ok) throw new Error("Failed to fetch admin logs");
+        const data = await response.json();
+
+        logDisplay.innerHTML = "";
+        if (data.logs && data.logs.length > 0) {
+            data.logs.forEach(logJson => {
+                let logEntry;
+                try {
+                    logEntry = JSON.parse(logJson);
+                } catch (e) {
+                    // Handle raw string logs (e.g., from older entries or malformed)
+                    logDisplay.innerHTML += `<div class="chat-msg system">${logJson.raw || logJson}</div>`;
+                    return;
+                }
+
+                // Extract reporter wallet if possible for ignoring logic
+                let reporterWallet = "";
+                let avatarUrl = "";
+                if (logEntry.action === "REPORT_GLOAT") {
+                    const rMatch = logEntry.details.match(/Reported by (.*?) for/);
+                    if (rMatch) reporterWallet = rMatch[1];
+                    
+                    const aMatch = logEntry.details.match(/\[Avatar: (.*?)\]/);
+                    if (aMatch) avatarUrl = aMatch[1];
+                }
+
+                // Local Filter for Ignored Reporters
+                if (reporterWallet && ignoredReporters.has(reporterWallet)) return;
+
+                const logDiv = document.createElement("div");
+                logDiv.className = "chat-msg";
+                if (logEntry.action === "REPORT_GLOAT") {
+                    logDiv.classList.add("report-alert");
+                }
+
+                let logText = `[${new Date(logEntry.timestamp).toLocaleString()}] <b>${logEntry.action}</b>: ${logEntry.target} - ${logEntry.details}`;
+
+                if (logEntry.action === "REPORT_GLOAT") {
+                    const rawGloat = logEntry.details.split('for offensive gloat: "')[1]?.split('" [Avatar:')[0] || "REDACTED";
+                    logText = `🚨 <b>REPORTED GLOAT</b>: ${logEntry.target} - "${rawGloat}"`;
+                    
+                    logDiv.innerHTML = `${logText} 
+                        <div class="flex-row gap-5 mt-5 justify-end">
+                            <button class="outline admin-action-btn-small text-error" onclick="adminBanWallet('${logEntry.target}', 24)">BAN PLAYER</button>
+                            <button class="outline admin-action-btn-small text-error" onclick="adminGloatBan('${logEntry.target}', 48)">BAN GLOATS</button>
+                            ${avatarUrl ? `<button class="outline admin-action-btn-small" style="border-color: #ffa657; color: #ffa657;" onclick="adminAvatarBan('${avatarUrl}', 720)">BAN AVATAR</button>` : ''}
+                            <button class="outline admin-action-btn-small" style="border-color: #888; color: #888;" onclick="ignoreReporter('${reporterWallet}')">IGNORE REPORTER</button>
+                        </div>`;
+                } else if (logEntry.action.startsWith("SECURITY")) {
+                    logDiv.style.backgroundColor = "rgba(255, 166, 87, 0.1)";
+                    logDiv.style.border = "1px solid #ffa657";
+                    logDiv.innerHTML = logText;
+                } else {
+                    logDiv.innerHTML = logText;
+                }
+                logDisplay.appendChild(logDiv);
+            });
+        } else {
+            logDisplay.innerHTML = `<div class="chat-msg system">No logs found matching filter.</div>`;
+        }
+    } catch (err) {
+        console.error("Failed to fetch admin logs:", err);
+        logDisplay.innerHTML = `<div class="chat-msg system" style="color: #ff4b4b;">Error fetching logs.</div>`;
+    }
+}
+
+// --- Admin Authentication Helper ---
+async function getAdminHeaders() {
+    if (!userAddress) { 
+        showToast("Please connect your admin wallet.", "error");
+        return null;
+    }
+
+    try {
+        setTransactionStatus("Requesting admin nonce...", "info");
+        // Request Nonce from Server via WebSocket (Anti-Replay)
+        const nonce = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Nonce request timed out")), 10000);
+            nonceResolver = (n) => { clearTimeout(timeout); resolve(n); };
+            socket.send(JSON.stringify({ type: "nonce_request" }));
+        });
+
+        const msg = `Virtualbabes Arena Admin Auth:${nonce}`;
+        const msgBytes = new TextEncoder().encode(msg);
+
+        let signature = null;
+        setTransactionStatus("Signing admin session...", "info");
+        const isEVM = userAddress.startsWith("0x");
+
+        if (isEVM) {
+            if (walletProvider === 'walletconnect' && signClient) {
+                const sessions = signClient.session.getAll();
+                const hexMsg = "0x" + Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                signature = await signClient.request({
+                    topic: sessions[0].topic,
+                    chainId: "eip155:1",
+                    request: {
+                        method: "personal_sign",
+                        params: [hexMsg, userAddress]
+                    }
+                });
+            } else {
+                throw new Error("EVM Admin Auth requires WalletConnect.");
+            }
+        } else if (walletProvider === 'nautilus') {
+            const result = await window.algo.signMessage(msgBytes, userAddress);
+            // Nautilus returns the raw Uint8Array signature
+            signature = btoa(String.fromCharCode(...result));
+        } else if (walletProvider === 'walletconnect' && signClient) {
+            const sessions = signClient.session.getAll();
+            const response = await signClient.request({
+                topic: sessions[0].topic,
+                chainId: (window.GetGameState().network === "VOI" ? CONFIG.VOI_CHAIN_ID : CONFIG.ALGO_CHAIN_ID),
+                request: {
+                    method: "algo_signMessage",
+                    params: [userAddress, btoa(String.fromCharCode(...msgBytes))]
+                }
+            });
+            signature = response; // WC response is usually the base64 string
+        } else {
+            throw new Error("Active wallet provider does not support signature authentication.");
+        }
+
+        if (!signature) throw new Error("Signature denied.");
+
+        const headers = {
+            'X-Admin-Wallet': userAddress,
+            'X-Admin-Nonce': nonce,
+            'X-Admin-Signature': signature
+        };
+        
+        cachedAdminHeaders = headers; // Cache for background polling
+        setTransactionStatus(null);
+        return headers;
+    } catch (err) {
+        showToast(`❌ Admin Auth Failed: ${err.message}`, "error");
+        setTransactionStatus(null);
+        return null;
+    }
+}
+
+// --- Admin Action Handlers ---
+async function adminRefillVault() {
+    const amount = parseFloat(document.getElementById("admin-refill-amt").value);
+    if (isNaN(amount)) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/refill-vault`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount })
+        });
+        if (response.ok) showToast("⚡ Vault balance updated successfully", "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Refill failed", "error"); }
+}
+
+function updateAdminRewardList(rewards) {
+    const container = document.getElementById("admin-reward-list");
+    container.innerHTML = "";
+    Object.entries(rewards || {}).forEach(([id, amt]) => {
+        const symbol = getAssetSymbol(id);
+        const div = document.createElement("div");
+        div.className = "player-item";
+        div.style.padding = "5px";
+        div.innerHTML = `<span style="font-size: 11px;">${symbol}: <b>${amt} units</b></span>
+                         <button class="outline" style="padding: 2px 8px; font-size: 9px; border-color: #ff4b4b; color: #ff4b4b;" onclick="adminRemoveReward(${id})">DEL</button>`;
+        container.appendChild(div);
+    });
+}
+
+async function adminAddReward() {
+    const assetId = parseInt(document.getElementById("admin-add-asset").value);
+    const amount = parseFloat(document.getElementById("admin-add-amt").value);
+    if (!assetId || isNaN(amount)) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/reward/add`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ asset_id: assetId, amount: amount })
+        });
+        if (response.ok) showToast("➕ Reward added to stack", "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Action failed", "error"); }
+}
+
+async function adminRemoveReward(assetId) {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/reward/remove`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ asset_id: assetId })
+        });
+        if (response.ok) showToast("➖ Reward removed", "info");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Update failed", "error"); }
+}
+
+async function adminAddNetwork() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    const newNetwork = {
+        network_name: document.getElementById("new-network-name").value.trim(),
+        explorer_url: document.getElementById("new-explorer-url").value.trim(),
+        indexer_url: document.getElementById("new-indexer-url").value.trim(),
+        node_url: document.getElementById("new-node-url").value.trim(),
+        faucet_url: document.getElementById("new-faucet-url").value.trim(),
+        asset_id: parseInt(document.getElementById("new-asset-id").value) || 0,
+        app_id: parseInt(document.getElementById("new-app-id").value) || 0,
+        chain_id: document.getElementById("new-chain-id").value.trim(),
+        power_divisor: parseFloat(document.getElementById("new-power-divisor").value) || 1000000,
+        power_base: parseInt(document.getElementById("new-power-base").value) || 50,
+    };
+
+    // Basic validation
+    if (!newNetwork.network_name || !newNetwork.node_url || !newNetwork.chain_id) {
+        showToast("❌ Network Name, Node URL, and Chain ID are required.", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/network/add`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(newNetwork)
+        });
+        if (response.ok) showToast(`➕ Network '${newNetwork.network_name}' added`, "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Failed to add network", "error"); }
+}
+
+async function adminBroadcast() {
+    const text = document.getElementById("admin-msg-text").value;
+    if (!text) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/system-message`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        if (response.ok) {
+            showToast("📣 System message broadcasted", "success");
+            fetchLastAdminAction();
+            document.getElementById("admin-msg-text").value = "";
+        }
+    } catch (err) { showToast("❌ Broadcast failed", "error"); }
+}
+
+async function adminUpdateRules() {
+    const req = {
+        Open: document.getElementById("rule-open").checked,
+        Power_copy: document.getElementById("rule-same").checked,
+        Power_up: document.getElementById("rule-plus").checked,
+        Elemental_sync: document.getElementById("rule-elemental").checked,
+        Fallen_penalty: document.getElementById("rule-fallen").checked,
+        Artifact_bonus: document.getElementById("rule-artifact").checked
+    };
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/update-rules`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(req)
+        });
+        if (response.ok) showToast("⚙️ Global rules synchronized", "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Rules update failed", "error"); }
+}
+
+async function adminBanWallet(walletToBan = null, hoursToBan = null) {
+    const wallet = walletToBan || document.getElementById("admin-ban-wallet").value.trim();
+    const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
+    if (!wallet) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/ban-player`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet, hours: isNaN(hours) ? 24 : hours })
+        });
+        if (response.ok) {
+            showToast(`🚫 Wallet ${wallet.substring(0,6)}... restricted`, "success");
+            fetchLastAdminAction();
+            if (!walletToBan) { // Only clear input if not called from log
+                document.getElementById("admin-ban-wallet").value = "";
+                document.getElementById("admin-ban-hours").value = "";
+            }
+            fetchLeaderboard(); // Refresh to show the lock icon
+        } else {
+            const errText = await response.text();
+            showToast(`❌ Ban failed: ${errText}`, "error");
+        }
+    } catch (err) { showToast("❌ Server connection error", "error"); }
+}
+
+function adminBanWalletFromLog(wallet) {
+    // Default to 24 hours for a quick ban from logs
+    adminBanWallet(wallet, 24);
+}
+
+async function adminUpdatePowerScaling() {
+    const divisor = parseFloat(document.getElementById("admin-power-divisor").value);
+    const base = parseInt(document.getElementById("admin-power-base").value);
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/update-power`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ divisor, base })
+        });
+        if (response.ok) showToast("⚖️ Power scaling adjusted", "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Power update failed", "error"); }
+}
+
+async function addXChainWallet() {
+    if (!signClient || !wcModal || !userAddress) return;
+    showToast("Opening WalletConnect for X-Chain Link...", "info");
+
+    try {
+        // Allow connection to any chain supported by the current admin config
+        const chainIds = Object.values(availableNetworks).map(n => n.chain_id).filter(id => id);
+        const algoChains = chainIds.filter(id => id.startsWith("algorand:"));
+        const evmChains = chainIds.filter(id => id.startsWith("eip155:"));
+        const solanaChains = chainIds.filter(id => id.startsWith("solana:"));
+        
+        const { uri, approval } = await signClient.connect({
+            optionalNamespaces: {
+                algorand: {
+                    methods: ["algo_signTxn", "algo_signMessage"],
+                    chains: algoChains.length > 0 ? algoChains : [CONFIG.VOI_CHAIN_ID, CONFIG.ALGO_CHAIN_ID],
+                    events: ["accountsChanged"]
+                },
+                eip155: {
+                    methods: ["eth_sendTransaction", "personal_sign"],
+                    chains: evmChains.length > 0 ? evmChains : ["eip155:1", "eip155:137"],
+                    events: ["accountsChanged", "chainChanged"]
+                },
+                solana: {
+                    methods: ["solana_signTransaction", "solana_signMessage"],
+                    chains: solanaChains.length > 0 ? solanaChains : ["solana:5eykt4UsFvXYfy2khQbSsLurFBXY"],
+                    events: ["accountsChanged"]
+                }
+            }
+        });
+
+            if (uri) {
+                wcModal.openModal({ uri });
+                const session = await approval();
+                // The inner try-catch was for a specific check, not the whole block.
+                if (session.namespaces.eip155) { // This check was misplaced
+                    // Approval logic
+                }
+                wcModal.closeModal(); // This should be here
+
+            let namespace = "";
+            let accountStr = "";
+
+            if (session.namespaces.eip155) {
+                namespace = "eip155";
+                accountStr = session.namespaces.eip155.accounts[0];
+            } else if (session.namespaces.solana) {
+                namespace = "solana";
+                accountStr = session.namespaces.solana.accounts[0];
+            } else if (session.namespaces.algorand) {
+                namespace = "algorand";
+                accountStr = session.namespaces.algorand.accounts[0];
+            }
+
+            if (!accountStr) throw new Error("No account returned from session");
+
+            const [ns, chainId, address] = accountStr.split(":");
+            const newWalletInfo = { // Renamed to avoid redeclaration
+                address: address,
+                chain: ns === 'eip155' ? (chainId === '1' ? 'ETH' : (chainId === '137' ? 'POLY' : 'EVM')) : 
+                       (ns === 'solana' ? 'SOL' : (chainId === 'mainnet-v1.0' ? 'ALGO' : 'VOI')),
+                id: `Linked-${Date.now()}`
+            };
+
+            // 1. Request Nonce for Link Verification
+            showToast("Verifying ownership... please sign the request.", "info");
+            const nonce = await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error("Nonce request timed out")), 10000);
+                nonceResolver = (n) => { clearTimeout(timeout); resolve(n); };
+                socket.send(JSON.stringify({ type: "nonce_request" }));
+            });
+
+            // 2. Sign Nonce with the newly linked wallet
+            let signature = null;
+            if (namespace === "eip155") {
+                const hexMsg = "0x" + Array.from(new TextEncoder().encode(nonce)).map(b => b.toString(16).padStart(2, '0')).join('');
+                signature = await signClient.request({
+                    topic: session.topic,
+                    chainId: `eip155:${chainId}`,
+                    request: {
+                        method: "personal_sign",
+                        params: [hexMsg, address]
+                    }
+                });
+            } else if (namespace === "solana") {
+                const result = await signClient.request({
+                    topic: session.topic,
+                    chainId: `solana:${chainId}`,
+                    request: {
+                        method: "solana_signMessage",
+                        params: { message: btoa(nonce), pubkey: address }
+                    }
+                });
+                signature = result.signature; // WC Solana return pattern
+            } else if (namespace === "algorand") {
+                const result = await signClient.request({
+                    topic: session.topic,
+                    chainId: `algorand:${chainId}`,
+                    request: {
+                        method: "algo_signMessage",
+                        params: [address, btoa(nonce)]
+                    }
+                });
+                signature = result;
+            }
+
+            if (!signature) throw new Error("Signature denied or failed");
+
+            // 3. Send Request to Server for persistent linking
+            socket.send(JSON.stringify({
+                type: "link_wallet_request",
+                payload: {
+                    primary_avm_wallet: userAddress,
+                    linked_address: address,
+                    linked_chain: newWallet.chain,
+                    signature: signature,
+                    nonce: nonce
+                }
+            }));
+
+            // Prevent duplicates
+            if (!linkedWallets.find(w => w.address === newWalletInfo.address)) {
+                linkedWallets.push(newWalletInfo);
+                localStorage.setItem("vbabes_linked_wallets", JSON.stringify(linkedWallets));
+                showToast(`🔗 Requested link for ${newWalletInfo.chain} wallet...`, "info");
+                refreshInventory();
+            }
+        }
+
+    } catch (err) {
+        console.error("X-Chain link failed", err);
+    }
+}
+
+function updateLinkedWalletsUI() {
+    const container = document.getElementById("linked-wallets-list");
+    if (!container) return;
+    container.innerHTML = "";
+    linkedWallets.forEach((w, idx) => {
+        const div = document.createElement("div");
+        div.className = "player-item";
+        div.style.padding = "2px 5px";
+        div.style.fontSize = "10px";
+        div.innerHTML = `<span>[${w.chain}] ${w.address.substring(0,6)}...</span>
+                         <button class="outline" style="padding: 0 4px; color: #ff4b4b; border-color: #ff4b4b;" onclick="removeLinkedWallet(${idx})">×</button>`;
+        container.appendChild(div);
+    });
+}
+
+function removeLinkedWallet(index) {
+    linkedWallets.splice(index, 1);
+    localStorage.setItem("vbabes_linked_wallets", JSON.stringify(linkedWallets));
+    refreshInventory();
+}
+
+function openPayoutSettings() {
+    document.getElementById("payout-settings-overlay").classList.remove("hidden");
+    document.getElementById("payout-address-input").value = payoutAddress || "";
+}
+
+function savePayoutAddress() {
+    const addr = document.getElementById("payout-address-input").value.trim();
+    if (addr && addr.length === 58) {
+        payoutAddress = addr;
+        localStorage.setItem("vbabes_payout_address", addr);
+        showToast("✅ Voi payout address updated", "success");
+        updatePayoutUI();
+        hideAllOverlays();
+    } else {
+        showToast("❌ Invalid Voi Address", "error");
+    }
+}
+
+function updatePayoutUI() {
+    const display = document.getElementById("payout-address-display");
+    if (display) {
+        display.innerText = payoutAddress ? (payoutAddress.substring(0, 6) + "..." + payoutAddress.substring(54)) : "Default Wallet";
+    }
+}
+
+function updateAdminNetworkUI() {
+    const select = document.getElementById("admin-network-select");
+    if (!select) return;
+
+    const currentSelection = select.value;
+    select.innerHTML = "";
+    
+    Object.keys(availableNetworks).forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.innerText = name;
+        if (name === adminFocusNetwork && !currentSelection) opt.selected = true;
+        else if (name === currentSelection) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    onAdminNetworkSelectChange();
+}
+
+function onAdminNetworkSelectChange() {
+    const name = document.getElementById("admin-network-select").value;
+    const config = availableNetworks[name];
+    const details = document.getElementById("admin-network-details");
+    if (!details || !config) return;
+
+    details.innerHTML = `
+        <div><b>Node:</b> ${config.node_url}</div>
+        <div><b>Asset ID:</b> ${config.asset_id}</div>
+        <div><b>App ID:</b> ${config.app_id}</div>
+        <div style="color: ${name === adminFocusNetwork ? 'var(--neon-green)' : 'inherit'}"><b>Status:</b> ${name === adminFocusNetwork ? 'ACTIVE' : 'Standby'}</div>
+    `;
+
+    if (config) {
+        document.getElementById("admin-power-divisor").value = config.power_divisor || 1000000;
+        document.getElementById("power-divisor-val").innerText = (config.power_divisor || 1000000).toFixed(1);
+        document.getElementById("admin-power-base").value = config.power_base || 50;
+        document.getElementById("power-base-val").innerText = config.power_base || 50;
+    }
+}
+
+async function adminSetActiveNetwork() {
+    const networkName = document.getElementById("admin-network-select").value;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try { // Renamed endpoint for clarity
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/set-admin-focus-network`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ network_name: networkName })
+        }); // Updated toast message
+        if (response.ok) showToast(`🌐 Admin focus switched to ${networkName}`, "success");
+        fetchLastAdminAction();
+    } catch (err) { showToast("❌ Admin focus switch failed", "error"); }
+}
+async function adminToggleMaintenance(active) {
+    const minsInput = document.getElementById("admin-maint-mins");
+    const minutes = parseInt(minsInput.value) || 0;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/maintenance-mode`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active, minutes })
+        });
+        if (response.ok) {
+            showToast(`🛠️ Maintenance Mode ${active ? 'Activated' : 'Deactivated'}`, "info");
+            fetchLastAdminAction();
+            if (!active) minsInput.value = "";
+        } else {
+            const errText = await response.text();
+            showToast(`❌ Action failed: ${errText}`, "error");
+        }
+    } catch (err) { showToast("❌ Server connection error", "error"); }
+}
+
+async function adminToggleDevMode() {
+    const enabled = document.getElementById("dev-mode-toggle").checked;
+    // Add a safety check when enabling
+    if (enabled && !confirm("⚠️ DEV MODE: This will force a 100% win rate against the bot for reward testing. Enable?")) {
+        document.getElementById("dev-mode-toggle").checked = false;
+        return;
+    }
+    window.SetTestingMode(enabled);
+    showToast(`🛠️ Dev Mode ${enabled ? 'Enabled' : 'Disabled'}`, enabled ? "success" : "info");
+}
+
+async function adminResetStats() {
+    const wallet = document.getElementById("admin-ban-wallet").value.trim();
+    if (!wallet) return;
+    if (!confirm(`⚠️ CRITICAL: You are about to PERMANENTLY WIPE all stats for wallet: ${wallet}. This cannot be undone. Proceed?`)) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/reset-stats`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet })
+        });
+        if (response.ok) {
+            showToast(`✨ Stats wiped for ${wallet.substring(0,6)}...`, "success");
+            fetchLeaderboard();
+            fetchLastAdminAction();
+        } else {
+            const errText = await response.text();
+            showToast(`❌ Reset failed: ${errText}`, "error");
+        }
+    } catch (err) { showToast("❌ Server connection error", "error"); }
+}
+
+let adminLogTicker = null;
+function startAdminLogPolling() {
+    if (adminLogTicker) return;
+    adminLogTicker = setInterval(fetchLastAdminAction, 15000); // Check every 15s for status bar
+}
+
+async function fetchLastAdminAction() { 
+    if (!lastAdminKey && !cachedAdminHeaders) { 
+        document.getElementById("admin-last-action").innerText = "Awaiting first action..."; 
+        return; 
+    } 
+    const headers = lastAdminKey ? { 'X-Admin-Key': lastAdminKey } : cachedAdminHeaders;
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/logs`, {
+            headers: headers
+        });
+        if (response.ok) {
+            const entry = await response.json();
+            if (entry.timestamp) {
+                const time = entry.timestamp.split('T')[1].substring(0, 8);
+                document.getElementById("admin-last-action").innerText = 
+                    `[${time}] ${entry.action}: ${entry.target}`;
+            } else {
+                document.getElementById("admin-last-action").innerText = entry.details || "No logs found";
+            }
+        }
+    } catch (err) {}
+}
+
+async function disconnectUserWallet() {
+    console.log("[WALLET] Disconnecting...");
+    try {
+        if (walletProvider === 'walletconnect' && signClient) {
+            const sessions = signClient.session.getAll();
+            if (sessions.length > 0) {
+                await signClient.disconnect({
+                    topic: sessions[0].topic,
+                    reason: { code: 6000, message: "User disconnected" }
+                });
+            }
+        }
+        walletProvider = null;
+        
+        window.disconnectWallet(); // Reset Go Engine
+        isVerified = false;
+        userAddress = null; // Clear user address
+        updateWalletUI(null);
+    } catch (err) {
+        console.error("Disconnect failed", err);
+    }
+}
+
+window.highlightStartButton = (isReady) => {
+    const btn = document.getElementById("start-btn");
+    if (isReady) {
+        btn.disabled = false;
+        btn.style.boxShadow = "0 0 30px #3fb950";
+        btn.innerText = "BATTLE READY - CLICK TO START!";
+    } else {
+        btn.disabled = true;
+        btn.style.boxShadow = "none";
+        btn.innerText = "Start Battle (Waiting for Ready)";
+    }
+};
+
+// WebSocket Logic
+function initWebSocket() {
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    console.log(`[WS] Connecting to ${protocol}${CONFIG.BACKEND_URL}/ws ...`);
+    socket = new WebSocket(`${protocol}${CONFIG.BACKEND_URL}/ws`);
+
+    socket.onopen = () => {
+        console.log("[WS] Connected to Live Lobby");
+
+        // WATCHDOG: Start 5s timer for identity sync validation.
+        // If identity is not received, attempt reconnection.
+        if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
+        identitySyncTimeout = setTimeout(() => {
+            if (!myClientId) {
+                if (reconnectAttempts < 3) {
+                    reconnectAttempts++;
+                    console.warn(`[WS] Identity sync timeout reached. Attempting reconnect ${reconnectAttempts}/3...`);
+                    showToast(`⚠️ Sync failed. Retrying connection (${reconnectAttempts}/3)...`, "warning", 3000);
+                    socket.close(); // Force close to trigger onclose and re-init
+                } else {
+                    console.error("[WS] Identity sync timeout reached after multiple attempts.");
+                    showToast("⚠️ <b>SYNC FAILURE:</b> Arena configuration not received after multiple attempts. Faucet payouts and tournament registrations may be unavailable. Please refresh.", "error", 0);
+                }
+            }
+        }, 5000);
+    };
+
+    socket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+    };
+
+    socket.onclose = () => {
+        console.warn("[WS] Disconnected. Retrying...");
+        // Only attempt immediate reconnect if not due to identity sync timeout already handling it
+        if (identitySyncTimeout && reconnectAttempts < 3) {
+            setTimeout(initWebSocket, 3000);
+        }
+    };
+}
+
+function handleServerMessage(msg) {
+    switch(msg.type) {
+        case "pong":
+            if (lastPingTime) {
+                currentLatency = Date.now() - lastPingTime;
+                lastPingTime = null;
+                if (window.SyncLatency) window.SyncLatency(currentLatency);
+                syncUI();
+            }
+            break;
+        case "matchmaking_status":
+            handleMatchmakingUpdate(msg.payload);
+            break;
+        case "tournament_update":
+            console.log("[WS] Tournament update received:", msg.payload);
+            if (window.SyncTournament) window.SyncTournament(msg.payload);
+            handleTournamentUI(msg.payload);
+            syncUI();
+            break;
+        case "tournament_round_transition":
+            console.log("[WS] Tournament round transition received:", msg.payload.round);
+            // Trigger frontend animation here
+            showTournamentTransition(msg.payload.round);
+            break;
+        case "nonce_response":
+            if (nonceResolver) {
+                nonceResolver(msg.payload.nonce);
+                nonceResolver = null;
+            }
+            break;
+        case "identity":
+            myClientId = msg.to_id;
+            // Clear watchdog timer on successful sync
+            if (identitySyncTimeout) {
+                clearTimeout(identitySyncTimeout);
+                identitySyncTimeout = null;
+                reconnectAttempts = 0; // Reset attempts on successful sync
+            }
+            // TACTICAL SYNC: Update local CONFIG with authoritative server values
+            if (msg.payload) {
+                if (msg.payload.vault) CONFIG.VAULT_ADDRESS = msg.payload.vault;
+                if (msg.payload.vbv) CONFIG.VBV_ASSET_ID = msg.payload.vbv;
+                if (msg.payload.avoi) CONFIG.AVOI_ASSET_ID = msg.payload.avoi;
+                console.log("[CONFIG] Authoritative environment synced from server.");
+            }
+            break;
+        case "sudden_death_start":
+            console.log("[WS] Sudden Death event received:", msg.payload);
+            // Preserve current player index as ResetGame() in WASM clears it
+            const savedPlayerIndex = myPlayerIndex;
+
+            // 1. Reset engine state (clears board, scores, and current decks)
+            window.ResetGame();
+
+            // 2. Restore local identity and redistribute decks
+            if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(savedPlayerIndex);
+            if (window.SyncOpponentDeck) {
+                window.SyncOpponentDeck(0, msg.payload.p1_deck);
+                window.SyncOpponentDeck(1, msg.payload.p2_deck);
+            }
+
+            // 3. Re-trigger the active phase in multiplayer mode
+            window.StartMatch(true); 
+            showToast(msg.payload.text, "warning", 10000);
+            syncUI();
+            break;
+        case "link_wallet_response":
+            if (msg.payload.status === "success") {
+                showToast(`✅ ${msg.payload.message}`, "success");
+            } else {
+                showToast(`❌ ${msg.payload.message}`, "error");
+                // Remove unverified wallet from local storage and UI
+                if (msg.payload.address) {
+                    linkedWallets = linkedWallets.filter(w => w.address !== msg.payload.address);
+                    localStorage.setItem("vbabes_linked_wallets", JSON.stringify(linkedWallets));
+                    updateLinkedWalletsUI();
+                    refreshInventory();
+                }
+            }
+            break;
+        case "lobby_update":
+            // Update the player list from the nested 'players' array
+            lastLobbyPlayers = msg.payload.players;
+            updatePlayerList(msg.payload.players);
+            updateMarketTicker(msg.payload.players);
+
+            // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
+            const me = msg.payload.players.find(p => p.id === myClientId);
+            if (me && window.SetAvatar) {
+                window.SetAvatar(me.avatar_url, me.gloat, me.avatar_notice);
+            }
+            
+            // Sync maintenance status immediately for late joiners
+            handleMaintenanceUI(msg.payload.maintenance_active, msg.payload.maintenance_time);
+
+            // Sync Tournament UI
+            if (window.SyncTournament) window.SyncTournament(msg.payload.tournament);
+            handleTournamentUI(msg.payload.tournament);
+
+            // Sync economy state for late joiners
+            if (msg.payload.faucet_balance !== undefined) window.SyncVaultBalance(msg.payload.faucet_balance);
+            if (msg.payload.rewards !== undefined) window.SyncRewards(msg.payload.rewards);
+            
+            // Sync Network Config for Admin
+            if (msg.payload.available_networks) {
+                availableNetworks = msg.payload.available_networks;
+                globalClubs = msg.payload.clubs || {};
+                adminFocusNetwork = msg.payload.admin_focus_network; // Renamed
+                updateAdminNetworkUI();
+            }
+            updateActiveRumors(msg.payload.rumors); // Sync all active rumors from lobby update
+
+            if (msg.payload.season_end) {
+                seasonEnd = new Date(msg.payload.season_end);
+                document.getElementById("season-num-display").innerText = msg.payload.season_number;
+                document.getElementById("season-countdown-widget").classList.remove("hidden");
+                startSeasonTimer();
+            }
+            break;
+        case "portfolio_update":
+            if (window.SyncPortfolio) window.SyncPortfolio(msg.payload);
+            syncUI();
+            renderRumorBoard(); // Ensure rumor board is updated after any state change
+            break;
+        case "heist_result":
+            handleHeistResult(msg.payload); // Call the standalone function
+            break;
+        case "challenge": // Corrected structure for the challenge case
+            const action = msg.payload.action;
+            if (action === "invite") {
+                showChallengeNotification(msg.from_id);
+            } else if (action === "accept") {
+                // Challenger side: Receive acceptor's deck and send own deck back
+                console.log("[MATCH] Challenge accepted. Syncing decks...");
+                currentOpponentId = msg.from_id;
+                myPlayerIndex = 0; // Challenger is P1
+                if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
+                window.SyncOpponentDeck(1, msg.payload.deck);
+                sendMatchSync(msg.from_id);
+                window.StartMatch(true);
+                syncUI();
+            } else if (action === "decline") {
+                alert(`Challenge declined by ${msg.from_id}.`);
+            } else if (action === "sync_back") {
+                // Acceptor side: Receive challenger's deck and start
+                currentOpponentId = msg.from_id;
+                myPlayerIndex = 1; // Acceptor is P2
+                if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
+                window.SyncOpponentDeck(0, msg.payload.deck);
+                window.StartMatch(true);
+                syncUI();
+            }
+            break;
+        case "match_start":
+            console.log("[WS] Synchronizing match state...", msg.payload);
+            spectatorMatchState = msg.payload;
+            // Instead of immediate sync, show the Preview Pop-up
+            showMatchPreview(msg.payload);
+            break;
+        case "move":
+            console.log(`[WS] Move received from ${msg.from_id} at grid ${msg.payload.grid_index}`);
+            
+            if (msg.from_id !== myClientId) {
+                let success = false;
+                if (spectatorMatchState) {
+                    // We are a spectator: Determine player index from match state
+                    const pIdx = (msg.from_id === spectatorMatchState.p1_id) ? 0 : 1;
+                    success = window.SyncMove(msg.payload.grid_index, msg.payload.card_id, pIdx);
+                } else {
+                    // We are a player: Standard turn-based placement
+                    success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
+                }
+                if (!success) console.warn("[WS] Move sync failed.");
+                syncUI();
+            }
+            break;
+        case "chat":
+            renderChatMessage(msg.from_id, msg.payload.text);
+            
+            // Handle automatic match invalidation on opponent disconnect
+            if (msg.from_id === "SERVER" && msg.payload.text.includes("Match invalidated")) {
+                window.ResetGame();
+                syncUI();
+                showToast("⚠️ Match terminated: Opponent left.", "error");
+            }
+            break;
+        case "vault_update":
+            console.log("[WS] Vault balance update received:", msg.payload.balance);
+            window.SyncVaultBalance(msg.payload.balance);
+            syncUI();
+            break;
+        case "rules_update":
+            console.log("[WS] Global rules update received:", msg.payload);
+            window.SyncRules(msg.payload);
+            showToast("⚙️ Global Game Rules Updated by Admin", "info");
+            syncUI();
+            break;
+        case "rewards_update":
+            console.log("[WS] Reward stack update received:", msg.payload);
+            window.SyncRewards(msg.payload);
+            syncUI();
+            break;
+        case "match_start":
+            console.log("[WS] Synchronizing match state...", msg.payload);
+            spectatorMatchState = msg.payload;
+            // Instead of immediate sync, show the Preview Pop-up
+            showMatchPreview(msg.payload);
+            break;
+        case "move":
+            console.log(`[WS] Move received from ${msg.from_id} at grid ${msg.payload.grid_index}`);
+            
+            if (msg.from_id !== myClientId) {
+                let success = false;
+                if (spectatorMatchState) {
+                    // We are a spectator: Determine player index from match state
+                    const pIdx = (msg.from_id === spectatorMatchState.p1_id) ? 0 : 1;
+                    success = window.SyncMove(msg.payload.grid_index, msg.payload.card_id, pIdx);
+                } else {
+                    // We are a player: Standard turn-based placement
+                    success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
+                }
+                if (!success) console.warn("[WS] Move sync failed.");
+                syncUI();
+            }
+            break;
+        case "chat":
+            renderChatMessage(msg.from_id, msg.payload.text);
+            
+            // Handle automatic match invalidation on opponent disconnect
+            if (msg.from_id === "SERVER" && msg.payload.text.includes("Match invalidated")) {
+                window.ResetGame();
+                syncUI();
+                showToast("⚠️ Match terminated: Opponent left.", "error");
+            }
+            break;
+        case "vault_update":
+            console.log("[WS] Vault balance update received:", msg.payload.balance);
+            window.SyncVaultBalance(msg.payload.balance);
+            syncUI();
+            break;
+        case "rules_update":
+            console.log("[WS] Global rules update received:", msg.payload);
+            window.SyncRules(msg.payload);
+            showToast("⚙️ Global Game Rules Updated by Admin", "info");
+            syncUI();
+            break;
+        case "rewards_update":
+            console.log("[WS] Reward stack update received:", msg.payload);
+            window.SyncRewards(msg.payload);
+            syncUI();
+            break;
+        case "maintenance_update":
+            console.log("[WS] Maintenance update received:", msg.payload);
+            handleMaintenanceUI(msg.payload.active, msg.payload.timestamp);
+            break;
+        case "admin_notification":
+            showToast(msg.payload.text, "warning", 8000);
+            // Auto-refresh logs if the admin suite is currently open
+            const adminPanel = document.getElementById("admin-control-panel");
+            if (adminPanel && !adminPanel.classList.contains("hidden")) {
+                fetchAdminLogs();
+            }
+            break;
+        case "kidnap_success":
+            showToast("Kidnap successful! Card held hostage.", "success", 5000);
+            break;
+        case "ransom_demand":
+            showKidnapOverlay(msg.payload);
+            break;
+        case "ransom_paid":
+            showToast("Ransom paid. Card released.", "success", 5000);
+            hideAllOverlays();
+            break;
+        case "insurance_recovery":
+            showToast("Insurance recovery: Hostage card released.", "info", 5000);
+            break;
+        case "rumor_update":
+            // The server now sends the full rumor object in the payload
+            if (msg.payload && msg.payload.rumor) {
+                updateActiveRumors(msg.payload.rumor);
+            }
+            break;
+    }
+}
+
+// --- Matchmaking Logic ---
+
+function toggleMatchmakingQueue() {
+    if (!userAddress) { showToast("Connect wallet first", "error"); return; }
+    const state = window.GetGameState();
+    if (state.deck.length < 5) { showToast("Deck must have 5 cards", "error"); return; }
+
+    if (!inMatchmakingQueue) {
+        socket.send(JSON.stringify({
+            type: "join_queue",
+            payload: { 
+                deck: state.deck.map(c => c.id),
+                deck_rating: state.deck_rating
+            }
+        }));
+        const btn = document.getElementById("btn-matchmaking");
+        btn.disabled = true;
+        btn.innerText = "Joining Queue...";
+    } else {
+        socket.send(JSON.stringify({ type: "leave_queue" }));
+        const btn = document.getElementById("btn-matchmaking");
+        btn.disabled = true;
+        btn.innerText = "Leaving Queue...";
+    }
+}
+
+function handleMatchmakingUpdate(data) {
+    const btn = document.getElementById("btn-matchmaking");
+    const status = document.getElementById("queue-status");
+
+    if (data.status === "queued") {
+        inMatchmakingQueue = true;
+        btn.innerText = "Leave Queue";
+        btn.style.background = "var(--neon-purple)";
+        status.innerHTML = `<span class="status-active">SEARCHING FOR OPPONENT...</span>`;
+        showToast("🛰️ Entered global matchmaking pool.", "info");
+        btn.disabled = false; // Re-enable after status update
+    } else if (data.status === "idle") {
+        inMatchmakingQueue = false;
+        btn.innerText = "Join Matchmaking Pool";
+        btn.style.background = "";
+        status.innerText = "Ready for automatic pairing?";
+        btn.disabled = false; // Re-enable after status update
+        showToast("🛰️ Left matchmaking pool.", "info");
+    } else if (data.status === "match_found") {
+        inMatchmakingQueue = false;
+        btn.innerText = "Join Matchmaking Pool";
+        status.innerText = "Ready for automatic pairing?";
+        showToast(`⚔️ MATCH FOUND! Battle vs ${data.opponent.substring(0,8)}...`, "success");
+        window.SetPhase("Active"); // Optional: logic to transition visual state
+        btn.disabled = false; // Re-enable after status update
+    }
+}
+
+function sendPing() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    lastPingTime = Date.now();
+    socket.send(JSON.stringify({ type: "ping" }));
+}
+
+function updatePlayerList(players) {
+    const list = document.getElementById("active-players");
+    list.innerHTML = "";
+    
+    // Check if current user is banned
+    const me = players.find(p => p.id === myClientId);
+    handleLocalBanUI(me ? me.ban_expires : null);
+    const iAmBanned = me && me.ban_expires && new Date(me.ban_expires) > Date.now();
+
+    players.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "player-item";
+        const isMe = p.id === myClientId;
+        
+        const targetBanned = p.ban_expires && new Date(p.ban_expires) > Date.now();
+        const isDisabled = !isMe && (iAmBanned || targetBanned);
+        const adminBadge = p.is_admin ? `<span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.8em; margin-left: 5px;">[ADMIN]</span>` : '';
+        const btnTitle = targetBanned ? "Player Banned" : (iAmBanned ? "You are Banned" : "Challenge");
+
+        li.innerHTML = `<span>${p.id} ${isMe ? '(You)' : ''} ${adminBadge}</span>
+                        <div style="display: flex; gap: 5px;">
+                            ${!isMe ? `<button class="outline" style="padding: 5px 10px; font-size: 10px;" ${isDisabled ? 'disabled' : ''} title="${btnTitle}" onclick="sendChallenge('${p.id}')">Challenge</button>` : ''}
+                            ${!isMe ? `<button class="outline" style="padding: 5px 10px; font-size: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="sendSpectate('${p.id}')">Watch</button>` : ''}
+                        </div>`;
+        list.appendChild(li);
+    });
+}
+
+function updateMarketTicker(players) {
+    let tickerContainer = document.getElementById("market-ticker");
+    if (!tickerContainer) {
+        tickerContainer = document.createElement("div");
+        tickerContainer.id = "market-ticker";
+        tickerContainer.className = "market-ticker-container";
+        // Performance Refactor: Use Canvas instead of DOM string manipulation
+        tickerContainer.innerHTML = `
+            <div class="ticker-label">LIVE MARKET:</div>
+            <canvas id="market-ticker-canvas" style="flex: 1; height: 30px; cursor: default;"></canvas>
+        `;
+        document.body.prepend(tickerContainer);
+
+        const canvas = document.getElementById("market-ticker-canvas");
+        const resize = () => {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 30 * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+        };
+        window.addEventListener('resize', resize);
+        resize();
+    }
+
+    // Sort by Wins -> Reputation to find "Top Performers"
+    const topPerformers = [...players]
+        .sort((a, b) => (b.wins - a.wins) || (b.reputation - a.reputation))
+        .slice(0, 5);
+
+    const newItems = [];
+    
+    // Add Global Market Token
+    newItems.push({
+        symbol: "MKT TOKEN",
+        val: "0.80 $VBV",
+        trend: "▲",
+        color: "#3fb950" // Neon Green
+    });
+
+    topPerformers.forEach(p => {
+        const basePrice = (p.wins * 10) + (p.reputation / 2) + 100;
+        const volatility = (p.id.charCodeAt(p.id.length - 1) % 5);
+        const finalPrice = basePrice + volatility;
+        
+        newItems.push({
+            symbol: getCachedEnvoiName(p.wallet),
+            badge: (p.achievements && p.achievements.length > 0) ? "🏆" : "",
+            val: finalPrice.toFixed(2),
+            trend: (p.wins > 0) ? "▲" : "─",
+            color: (p.wins > 0) ? "#3fb950" : "#888"
+        });
+    });
+
+    tickerItems = newItems;
+
+    if (!tickerAnimId) {
+        startTickerAnimation();
+    }
+}
+
+function startTickerAnimation() {
+    const canvas = document.getElementById("market-ticker-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const animate = () => {
+        if (tickerItems.length === 0) {
+            tickerAnimId = requestAnimationFrame(animate);
+            return;
+        }
+
+        const width = canvas.width / (window.devicePixelRatio || 1);
+        const height = 30;
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.font = "bold 12px 'Rajdhani', sans-serif";
+        ctx.textBaseline = "middle";
+
+        const spacing = 60;
+        let totalContentWidth = 0;
+        const itemWidths = tickerItems.map(item => {
+            const str = `${item.symbol}${item.badge ? ' ' + item.badge : ''} ${item.val} ${item.trend}`;
+            const w = ctx.measureText(str).width + spacing;
+            totalContentWidth += w;
+            return w;
+        });
+
+        tickerOffset += 0.8; // Scrolling speed
+        if (tickerOffset >= totalContentWidth) tickerOffset = 0;
+
+        let x = -tickerOffset;
+        while (x < width) {
+            for (let i = 0; i < tickerItems.length; i++) {
+                const item = tickerItems[i];
+                const itemWidth = itemWidths[i];
+
+                if (x + itemWidth > 0 && x < width) {
+                    let curX = x;
+                    ctx.fillStyle = "#00f2fe"; // Neon Cyan
+                    ctx.fillText(item.symbol, curX, height / 2);
+                    curX += ctx.measureText(item.symbol).width;
+
+                    if (item.badge) {
+                        ctx.fillStyle = "#ffd700"; // Gold
+                        ctx.fillText(" " + item.badge, curX, height / 2);
+                        curX += ctx.measureText(" " + item.badge).width;
+                    }
+
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText(" " + item.val, curX, height / 2);
+                    curX += ctx.measureText(" " + item.val).width;
+
+                    ctx.fillStyle = item.color;
+                    ctx.fillText(" " + item.trend, curX, height / 2);
+                }
+                x += itemWidth;
+            }
+            if (totalContentWidth <= 0) break;
+        }
+
+        tickerAnimId = requestAnimationFrame(animate);
+    };
+    tickerAnimId = requestAnimationFrame(animate);
+}
+
+let banTicker = null;
+function handleLocalBanUI(banExpires) {
+    const container = document.getElementById("local-ban-cooldown");
+    const fill = document.getElementById("ban-progress-fill");
+    const timer = document.getElementById("ban-countdown-timer");
+    
+    if (banTicker) clearInterval(banTicker);
+
+    if (!banExpires || new Date(banExpires) <= Date.now()) {
+        container.classList.add("hidden");
+        return;
+    }
+
+    container.classList.remove("hidden");
+    const expiry = new Date(banExpires).getTime();
+    const totalDuration = 24 * 60 * 60 * 1000; // 24 Hours
+
+    const tick = () => {
+        const now = Date.now();
+        const remaining = expiry - now;
+
+        if (remaining <= 0) {
+            container.classList.add("hidden");
+            clearInterval(banTicker);
+            return;
+        }
+
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        timer.innerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        const progress = ((totalDuration - remaining) / totalDuration) * 100;
+        fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    };
+
+    tick();
+    banTicker = setInterval(tick, 1000);
+}
+
+function startSeasonTimer() {
+    if (seasonTimerInterval) clearInterval(seasonTimerInterval);
+    const timerEl = document.getElementById("season-timer");
+    
+    const update = () => {
+        if (!seasonEnd) return;
+        const now = new Date();
+        const diff = seasonEnd - now;
+        
+        if (diff <= 0) {
+            timerEl.innerText = "ROLLOVER IMMINENT";
+            timerEl.style.color = "var(--neon-green)";
+            return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const mins = Math.floor((diff / 1000 / 60) % 60);
+        
+        timerEl.innerText = `${days}d ${hours}h ${mins}m`;
+    };
+    
+    update();
+    seasonTimerInterval = setInterval(update, 60000); // Check once per minute
+}
+
+let maintenanceTicker = null;
+function handleMaintenanceUI(active, targetTimestamp) {
+    const bar = document.getElementById("maintenance-bar");
+    const timerDisplay = document.getElementById("maintenance-timer");
+
+    if (maintenanceTicker) clearInterval(maintenanceTicker);
+
+    // Notify the Go WASM Engine to enforce maintenance guards
+    if (window.SetMaintenanceState) window.SetMaintenanceState(active);
+
+    if (!active) {
+        bar.classList.add("hidden");
+        return;
+    }
+
+    bar.classList.remove("hidden");
+    const targetTime = new Date(targetTimestamp).getTime();
+
+    const tick = () => {
+        const now = Date.now();
+        const diff = targetTime - now;
+
+        if (diff <= 0) {
+            timerDisplay.innerText = "STARTING NOW";
+            return;
+        }
+
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        timerDisplay.innerText = `${String(mins).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    };
+
+    tick();
+    maintenanceTicker = setInterval(tick, 1000);
+}
+
+function sendChatMessage() {
+    const input = document.getElementById("chat-input");
+    const text = input.value.trim();
+    if (!text || !socket) return;
+
+    const envelope = {
+        type: "chat",
+        payload: { text: text }
+    };
+    socket.send(JSON.stringify(envelope));
+    input.value = "";
+}
+
+// --- Tournament History Logic ---
+function switchHofTab(tab) {
+    document.getElementById("hof-rankings-view").classList.add("hidden");
+    document.getElementById("hof-history-view").classList.add("hidden");
+    document.getElementById("hof-seasons-view").classList.add("hidden");
+    document.getElementById("tab-rankings").classList.remove("active");
+    document.getElementById("tab-history").classList.remove("active");
+    document.getElementById("tab-seasons").classList.remove("active");
+
+    if (tab === 'rankings') {
+        document.getElementById("hof-rankings-view").classList.remove("hidden");
+        document.getElementById("tab-rankings").classList.add("active");
+        fetchLeaderboard();
+    } else if (tab === 'history') {
+        document.getElementById("hof-history-view").classList.remove("hidden");
+        document.getElementById("tab-history").classList.add("active");
+        fetchTournamentHistory(1);
+    } else if (tab === 'seasons') {
+        // Clear previous filter when opening the tab
+        const filterInput = document.getElementById("season-filter-input");
+        if (filterInput) filterInput.value = "";
+        document.getElementById("hof-seasons-view").classList.remove("hidden");
+        document.getElementById("tab-seasons").classList.add("active");
+        fetchSeasonHistory();
+    }
+}
+
+function toggleTournamentDetails(id) {
+    const details = document.getElementById(`details-${id}`);
+    if (!details) return;
+    details.classList.toggle("hidden");
+}
+
+async function fetchTournamentHistory(page = 1, deepVerify = false) {
+    const prevBtn = document.getElementById("prev-tournament-btn");
+    const nextBtn = document.getElementById("next-tournament-btn");
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+
+    const oldPage = currentTournamentPage;
+    currentTournamentPage = page;
+    const list = document.getElementById("tournament-history-list");
+    list.innerHTML = `<div class="chat-msg system">${deepVerify ? 'Executing Deep Reconstruction...' : 'Decrypting archives...'}</div>`;
+    
+    try {
+        const url = `${CONFIG.API_BASE}/api/tournament/history?page=${page}&limit=${tournamentLimit}${deepVerify ? '&deep_verify=true' : ''}`;
+        const response = await fetch(url);
+
+        // Handle Indexer 404/General Failure (Bad Gateway from server)
+        if (response.status === 502) {
+            list.innerHTML = '<div class="chat-msg system" style="color: var(--warning-orange);">⚠️ The Indexer is temporarily unreachable. Historical tournament data cannot be retrieved at this time.</div>';
+            if (document.getElementById("tournament-pagination")) document.getElementById("tournament-pagination").classList.add("hidden");
+            return;
+        }
+
+        if (!response.ok) throw new Error("Server error");
+        
+        const result = await response.json();
+        const history = result.history || [];
+        totalTournaments = result.total || 0;
+        
+        list.innerHTML = "";
+        if (history.length === 0) {
+            list.innerHTML = '<div class="chat-msg system">No recorded events found in the database.</div>';
+            document.getElementById("tournament-pagination").classList.add("hidden");
+            return;
+        }
+
+        document.getElementById("tournament-pagination").classList.remove("hidden");
+        updateTournamentPaginationUI();
+
+        // Batch resolve Envoi names for all participants in the history page
+        const participants = new Set();
+        history.forEach(t => {
+            participants.add(t.winner);
+            t.matches.forEach(m => {
+                if (m.p1) participants.add(m.p1);
+                if (m.p2) participants.add(m.p2);
+            });
+        });
+        await Promise.all(Array.from(participants).filter(p => p && p !== "TBD").map(p => resolveEnvoiName(p)));
+
+        // API is already sorted newest first
+        history.forEach(t => {
+            const div = document.createElement("div");
+            div.className = "glass-panel";
+            div.style.margin = "0";
+            div.style.borderColor = "var(--neon-purple)";
+            
+            const date = new Date(t.timestamp).toLocaleDateString();
+            const time = new Date(t.timestamp).toLocaleTimeString();
+            
+            const verifyBtn = !t.is_verified ? `
+                <div style="margin-top: 10px;">
+                    <button class="outline" style="font-size: 10px; padding: 4px 12px; border-color: #ffa657; color: #ffa657;" 
+                            onclick="event.stopPropagation(); fetchTournamentHistory(${currentTournamentPage}, true);">
+                        🔍 DEEP VERIFY DATA
+                    </button>
+                </div>
+            ` : '';
+
+            div.innerHTML = `
+                <div style="cursor: pointer;" onclick="toggleTournamentDetails('${t.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="font-weight: bold; color: var(--neon-purple); letter-spacing: 1px;">${t.id}</span>
+                        ${window.GetTournamentArchiveBadge ? window.GetTournamentArchiveBadge(t.is_verified, t.links) : ''}
+                    </div>
+                    <span style="color: var(--neon-cyan); font-weight: bold;">POT: ${t.pot.toFixed(1)} $VBV</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px; justify-content: center; margin: 20px 0;">
+                     <div style="text-align: center;">
+                        <div style="font-size: 0.8em; opacity: 0.6; margin-bottom: 5px;">TOURNAMENT CHAMPION</div>
+                        <div style="font-size: 1.5em; font-weight: bold; color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${getCachedEnvoiName(t.winner)}</div>
+                        ${verifyBtn}
+                     </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.8em; opacity: 0.5;">
+                    <span>Matches: ${t.matches.length}</span>
+                    <span>Archived: ${date} ${time}</span>
+                </div>
+                </div>
+                <div id="details-${t.id}" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--glass-border); display: flex; gap: 30px; overflow-x: auto; padding-bottom: 15px; scrollbar-width: thin;">
+                    ${generateBracketHTML(t.matches, -1)}
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    } catch (err) {
+        currentTournamentPage = oldPage;
+        updateTournamentPaginationUI();
+        list.innerHTML = '<div class="chat-msg system" style="color: #ff4b4b;">Database Error: Could not retrieve archives.</div>';
+    }
+}
+
+function filterSeasonHistory() {
+    const input = document.getElementById("season-filter-input");
+    const val = input.value.trim();
+    fetchSeasonHistory(val ? parseInt(val) : null);
+}
+
+async function fetchSeasonHistory(seasonNum = null) {
+    const list = document.getElementById("season-history-list");
+    list.innerHTML = `<div class="chat-msg system">Consulting the Oracle for past epochs...</div>`;
+    
+    try {
+        const url = seasonNum ? `${CONFIG.API_BASE}/api/season/history?season=${seasonNum}` : `${CONFIG.API_BASE}/api/season/history`;
+        const response = await fetch(url);
+        
+        // Handle Indexer 404 (Bad Gateway from server) when reward asset is not found
+        if (response.status === 502) {
+            list.innerHTML = '<div class="chat-msg system" style="color: var(--warning-orange);">⚠️ The Indexer is currently unable to locate the reward asset history. It may be initializing or the asset ID is invalid.</div>';
+            return;
+        }
+
+        if (!response.ok) throw new Error("Server error");
+        
+        const history = await response.json();
+        list.innerHTML = "";
+
+        if (history.length === 0) {
+            const msg = seasonNum ? `No records found for Season ${seasonNum}.` : "The history books are currently empty. Check back after the next rollover!";
+            list.innerHTML = `<div class="chat-msg system">${msg}</div>`;
+            return;
+        }
+
+        for (const s of history) {
+            const div = document.createElement("div");
+            div.className = "glass-panel";
+            div.style.margin = "0";
+            div.style.borderColor = "var(--neon-cyan)";
+            
+            const startDate = new Date(s.start).toLocaleDateString();
+            const endDate = new Date(s.end).toLocaleDateString();
+
+            let winnersHTML = "";
+            for (let i = 0; i < s.top.length; i++) {
+                const entry = s.top[i];
+                const name = await resolveEnvoiName(entry.w);
+                winnersHTML += `
+                    <div class="leaderboard-row season-winner-row">
+                        <span class="rank-badge" style="color: ${i === 0 ? 'var(--neon-green)' : 'inherit'}">#${i+1}</span>
+                        <span class="player-name">${name}</span>
+                        <span class="player-stats"><b>${entry.v}</b> Wins | <small>${entry.r}</small></span>
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <div class="season-card-header">
+                    <span style="font-weight: bold; color: var(--neon-cyan); letter-spacing: 2px;">SEASON ${s.season}</span>
+                    <span style="font-size: 0.8em; opacity: 0.6;">${startDate} — ${endDate}</span>
+                </div>
+                <div class="season-performers-label">TOP PERFORMERS</div>
+                <div class="season-winners-list">
+                    ${winnersHTML}
+                </div>
+            `;
+            list.appendChild(div);
+        }
+    } catch (err) {
+        console.error("[SEASON HISTORY] Fetch failed:", err);
+        list.innerHTML = '<div class="chat-msg system" style="color: #ff4b4b;">Indexer connection failed. Archives are temporarily unavailable.</div>';
+    }
+}
+
+function handleChatKey(e) {
+    if (e.key === 'Enter') sendChatMessage();
+}
+
+function renderChatMessage(sender, text) {
+    const display = document.getElementById("chat-display");
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "chat-msg";
+    
+    if (sender === "SERVER") msgDiv.classList.add("system");
+    
+    msgDiv.innerHTML = `<b>${sender}:</b> ${text}`;
+    display.appendChild(msgDiv);
+    
+    // Auto-scroll to bottom
+    display.scrollTop = display.scrollHeight;
+}
+
+// --- Match History Persistence ---
+async function saveMatchResult(state) {
+    const history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
+    const opponent = currentOpponentId || (state.multiplayer ? "Unknown Human" : "Vbabe Bot");
+    
+    const newEntry = {
+        winner: state.winner,
+        scores: state.scores,
+        opponent: opponent,
+        timestamp: new Date().toLocaleString()
+    };
+
+    history.unshift(newEntry);
+    if (history.length > 10) history.pop(); // Keep last 10 matches
+    localStorage.setItem("vbabes_history", JSON.stringify(history));
+    await renderMatchHistory();
+}
+
+async function renderMatchHistory() {
+    const history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
+    const display = document.getElementById("history-display");
+    if (!display || history.length === 0) return;
+    
+    // Batch resolve names for wallets in local history
+    const wallets = history.map(e => e.opponent).filter(o => o && o.length > 50);
+    await Promise.all(wallets.map(w => resolveEnvoiName(w)));
+    
+    display.innerHTML = "";
+    history.forEach(entry => {
+        const div = document.createElement("div");
+        div.className = "chat-msg";
+        const colors = ["var(--neon-green)", "#ff4b4b", "var(--neon-cyan)"]; // Win, Loss, Draw
+        const labels = ["WIN", "LOSS", "DRAW"];
+        const color = colors[entry.winner] || "white";
+        const label = labels[entry.winner] || "END";
+
+        const opponentDisplay = getCachedEnvoiName(entry.opponent);
+
+        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}</span> vs ${opponentDisplay} <br/> 
+                         <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;
+        display.appendChild(div);
+    });
+}
+
+// --- Transaction Feedback (Toast) ---
+function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = message;
+    container.appendChild(toast);
+
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            toast.style.transition = '0.5s';
+            setTimeout(() => toast.remove(), 500);
+        }, duration);
+    }
+}
+
+// Bridge for Go to trigger Payout UI flow
+window.processRewardPayout = async (payloadStr) => {
+    const payload = JSON.parse(payloadStr);
+    showToast("🛰️ Requesting secure nonce from server...", "info");
+
+    try {
+        // 1. Request Nonce from Server via WebSocket (Anti-Replay)
+        const nonce = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Nonce request timed out")), 10000);
+            nonceResolver = (n) => { clearTimeout(timeout); resolve(n); };
+            socket.send(JSON.stringify({ type: "nonce_request" }));
+            setTransactionStatus("Requesting secure nonce...", "info");
+        });
+
+        showToast("🔐 Please sign the verification request in your wallet...", "info");
+
+        // 2. Construct 0-amount "Reverse Sign" Transaction
+        const tx = {
+            from: userAddress,
+            to: userAddress,
+            amount: 0,
+            note: new TextEncoder().encode(nonce),
+            type: 'pay'
+        };
+
+        setTransactionStatus("Signing verification request...", "info");
+        // 3. Request Signature via active provider
+        let signedTx = null;
+        
+        // The payload identifies the winner, but the faucet pays the specified recipient.
+        payload.claimant = payload.recipient; // The authenticated playing address
+        payload.recipient = payoutAddress || payload.recipient; // The Voi payout target
+
+        const isEVM = payload.claimant.startsWith("0x");
+
+        if (isEVM) {
+            if (walletProvider === 'walletconnect' && signClient) {
+                const sessions = signClient.session.getAll();
+                if (sessions.length === 0) throw new Error("No active WalletConnect session found for EVM");
+                
+                // Encode nonce as hex for EVM personal_sign
+                const msgBuffer = new TextEncoder().encode(nonce);
+                const hexMsg = "0x" + Array.from(msgBuffer).map(b => b.toString(16).padStart(2, '0')).join('');
+                
+                const signature = await signClient.request({
+                    topic: sessions[0].topic,
+                    chainId: "eip155:1", // Default to mainnet for verification
+                    request: {
+                        method: "personal_sign",
+                        params: [hexMsg, payload.claimant]
+                    }
+                });
+                if (!signature) throw new Error("Signature denied.");
+                signedTx = new TextEncoder().encode(signature);
+            } else {
+                throw new Error("EVM verification requires WalletConnect.");
+            }
+        } else if (walletProvider === 'nautilus') {
+            const result = await window.algo.signTxn([
+                { txn: algosdk.encodeObj(tx), signers: [payload.claimant] }
+            ]);
+            signedTx = result[0];
+        } else if (walletProvider === 'kibisis') {
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(tx)));
+            const result = await window.kibisis.signTxns([{ txn: txnB64 }]);
+            // Kibisis returns base64 strings
+            signedTx = new Uint8Array(atob(result[0]).split("").map(c => c.charCodeAt(0)));
+        } else if (walletProvider === 'walletconnect' && signClient) {
+            const sessions = signClient.session.getAll();
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(tx)));
+            const response = await signClient.request({
+                topic: sessions[0].topic,
+                chainId: (window.GetGameState().network === "VOI" ? CONFIG.VOI_CHAIN_ID : CONFIG.ALGO_CHAIN_ID),
+                request: {
+                    method: "algo_signTxn",
+                    params: [[{ txn: txnB64, signers: [payload.claimant] }]]
+                }
+            });
+            signedTx = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
+        }
+
+        if (!signedTx) throw new Error("Signature cancelled or provider error");
+
+        payload.signed_tx = signedTx;
+        setTransactionStatus("Submitting proof to Switchboard...", "info");
+        showToast("🛰️ Submitting proof to Switchboard...", "info");
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/reward`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorMsg = await response.text();
+            showToast(`❌ Payout Error: ${errorMsg}`, "error");
+            setTransactionStatus("Payout Failed!", "error");
+            return;
+        }
+
+        const data = await response.json();
+        
+        let successMsg = `✅ Reward Sent! TxID: ${data.txid.substring(0, 14)}...`;
+        if (data.bonus_applied) {
+            successMsg += `<br><span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.85em; text-shadow: 0 0 8px var(--neon-cyan);">[ REPUTATION BONUS ACTIVE ⚡ ]</span>`;
+        }
+        
+        // Handle skipped assets UI
+        if (data.skipped_assets && data.skipped_assets.length > 0) {
+            const symbols = [];
+            for (const id of data.skipped_assets) {
+                // Use resolveAssetSymbol to populate cache then pull symbol
+                const sym = await resolveAssetSymbol(id);
+                symbols.push(sym);
+            }
+            successMsg += `<br><small style="color: #ffa657; font-size: 0.8em; font-style: italic;">⚠️ Some rewards skipped (Low Pool): ${symbols.join(", ")}</small>`;
+        }
+
+        showToast(successMsg, "success", 8000);
+        setTransactionStatus("Reward Sent! Confirming...", "success");
+        updateWalletUI(userAddress);
+        syncUI(); // Trigger UI sync to show updated balance
+    } catch (err) {
+        showToast("⚠️ Payout Failed: " + err.message, "error");
+        setTransactionStatus("Payout Failed!", "error");
+    } finally {
+        setTimeout(() => setTransactionStatus(null), 3000);
+    }
+};
+
+function showChallengeNotification(challengerId) {
+    currentChallengerId = challengerId;
+    const challengeOverlay = document.getElementById("challenge-overlay");
+    const challengeText = document.getElementById("challenge-text");
+
+    challengeText.innerText = `${challengerId}`;
+    challengeOverlay.classList.remove("hidden");
+    // Optionally play a sound or vibrate
+}
+
+function acceptChallenge() {
+    if (!socket || !currentChallengerId) return;
+    const state = window.GetGameState();
+    const envelope = {
+        type: "challenge",
+        to_id: currentChallengerId,
+            from_id: myClientId, // Ensure from_id is set for server
+        payload: { 
+            action: "accept",
+            to_id: currentChallengerId,
+            deck: state.deck.map(c => c.id),
+            avatar: state.p1_avatar,
+            gloat: state.p1_gloat,
+            rules: state.rules
+        }
+    };
+
+    socket.send(JSON.stringify(envelope));
+    document.getElementById("challenge-overlay").classList.add("hidden");
+    currentChallengerId = null;
+}
+
+function sendMatchSync(targetId) {
+    const state = window.GetGameState();
+    const envelope = {
+        type: "challenge",
+        to_id: targetId,
+        from_id: myClientId, // Ensure from_id is set for server
+        payload: { 
+            action: "sync_back", 
+            deck: state.deck.map(c => c.id),
+            avatar: state.p1_avatar,
+            gloat: state.p1_gloat
+        }
+    };
+    socket.send(JSON.stringify(envelope));
+}
+
+function reportGloat(opponentClientId, gloatText) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("Cannot report: Not connected to server.", "error");
+        return;
+    }
+    if (!confirm("Are you sure you want to report this gloat message as offensive?")) {
+        return;
+    }
+
+    const envelope = {
+        type: "report_gloat",
+        payload: {
+            opponent_client_id: opponentClientId,
+            gloat_text: gloatText
+        }
+    };
+    socket.send(JSON.stringify(envelope));
+    showToast("Gloat message reported. Thank you for helping keep the arena clean!", "success");
+}
+
+function declineChallenge() {
+    if (!socket || !currentChallengerId) return;
+
+    const envelope = {
+        type: "challenge",
+        from_id: myClientId, // Ensure from_id is set for server
+        to_id: currentChallengerId,
+        payload: { action: "decline" }
+    };
+
+    socket.send(JSON.stringify(envelope));
+    document.getElementById("challenge-overlay").classList.add("hidden");
+    currentChallengerId = null;
+}
+
+function sendSpectate(targetId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    const envelope = {
+        type: "spectate",
+        from_id: myClientId, // Ensure from_id is set for server
+        payload: { target_id: targetId }
+    };
+    spectatorMatchState = null; // Reset for new spectate session
+
+    socket.send(JSON.stringify(envelope));
+    showToast(`👁️ Requesting access to stream...`, "info");
+}
+
+function showMatchPreview(data) {
+    document.getElementById("preview-p1-id").innerText = data.p1_id;
+    document.getElementById("preview-p1-rating").innerText = data.p1_rating || "[Z]";
+    document.getElementById("preview-p2-id").innerText = data.p2_id;
+    document.getElementById("preview-p2-rating").innerText = data.p2_rating || "[Z]";
+    
+    document.getElementById("match-preview-overlay").classList.remove("hidden");
+}
+
+function proceedToWarRoom() {
+    if (!spectatorMatchState) return;
+    
+    document.getElementById("match-preview-overlay").classList.add("hidden");
+    window.ResetGame();
+    window.SetBoardState(spectatorMatchState);
+    window.ForceActive();
+    syncUI();
+}
+
+function sendChallenge(targetId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    const envelope = {
+        type: "challenge",
+        from_id: myClientId, // Ensure from_id is set for server
+        to_id: targetId,
+        payload: { 
+            action: "invite",
+            avatar: state.p1_avatar,
+            gloat: state.p1_gloat,
+            deck: state.deck.map(c => c.id)
+        }
+    };
+
+    socket.send(JSON.stringify(envelope));
+    alert(`Challenge sent to ${targetId}`);
+}
+
+function triggerToggleNetwork() {
+    window.toggleNetwork();
+    syncUI();
+}
+
+function selectCard(id) {
+    activeCardId = id;
+    if (window.PlaySelectSound) window.PlaySelectSound();
+    syncUI(); // Re-render to show the selected card glowing
+}
+
+function clickGrid(index) {
+    const state = window.GetGameState();
+    
+    // Multiplayer Guard: Only allow move if it's actually our turn
+    if (state.phase === "Active" && state.turn !== myPlayerIndex) {
+        console.warn("It is not your turn!");
+        return;
+    }
+
+    if (activeCardId === null) {
+        return;
+    }
+
+    const selectedCardId = activeCardId;
+
+    // Execute locally
+    const success = window.PlaceCard(index, activeCardId);
+    if (success) {
+        // If in multiplayer, broadcast the move to the opponent
+        if (state.phase === "Active" && currentOpponentId) {
+            // Find card power for server verification
+            const card = state.deck.find(c => c.id === selectedCardId);
+            const envelope = {
+                type: "move",
+                to_id: currentOpponentId,
+                payload: {
+                    grid_index: index,
+                    card_id: selectedCardId,
+                    power: card ? card.power : [0,0,0,0]
+                }
+            };
+            socket.send(JSON.stringify(envelope));
+        }
+        activeCardId = null; 
+        syncUI();
+    }
+}
+
+// --- Deck Manager Logic ---
+function openDeckManager() {
+    document.getElementById("deck-manager-overlay").classList.remove("hidden");
+    renderDeckManager();
+}
+
+function closeDeckManager() {
+    document.getElementById("deck-manager-overlay").classList.add("hidden");
+    
+    // TACTICAL SYNC: Report the highest possible deck rating to the Hall of Fame
+    const state = window.GetGameState();
+    const rating = calculateDeckRating(state.deck);
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            type: "update_rating",
+            payload: { best_rating: rating }
+        }));
+    }
+    syncUI();
+}
+
+function renderDeckManager() {
+    const state = window.GetGameState();
+    const invGrid = document.getElementById("inventory-grid");
+    const deckZone = document.getElementById("deck-drop-zone");
+    const selector = document.getElementById("deck-selector-bar");
+    const deckRatingEl = document.getElementById("deck-stat-summary"); // Target summary area
+    const atkEl = document.getElementById("total-atk");
+    const defEl = document.getElementById("total-def");
+
+    invGrid.innerHTML = "";
+    deckZone.innerHTML = "";
+    selector.innerHTML = "";
+    const isMobile = window.innerWidth <= 768;
+
+    let totalAtk = 0;
+    let totalDef = 0;
+
+    // 1. Render Inventory
+    state.inventory.forEach(card => {
+        const cardEl = document.createElement("div");
+        const isSelected = activeCardId === card.id;
+        cardEl.className = `card-mini ${isSelected ? 'selected-item' : ''}`;
+        cardEl.draggable = true;
+        cardEl.innerHTML = renderCardHTML(card);
+        cardEl.ondragstart = (e) => e.dataTransfer.setData("cardID", card.id);
+        
+        // Mobile Fallback: Tap to select
+        cardEl.onclick = () => {
+            activeCardId = card.id;
+            renderDeckManager();
+            if (window.PlaySelectSound) window.PlaySelectSound();
+        };
+
+        invGrid.appendChild(cardEl);
+    });
+
+    // 2. Render Active Deck
+    state.deck.forEach((card, idx) => {
+        const cardEl = document.createElement("div");
+        cardEl.className = "card-mini";
+        cardEl.style.width = "100%";
+        cardEl.style.height = "60px";
+        cardEl.innerHTML = `<span style="font-size: 10px;">${card.name}</span><button onclick="window.RemoveFromDeck(${idx}); renderDeckManager();" style="float: right; padding: 2px 5px; font-size: 9px;">X</button>`;
+        
+        // Calculate Stats: Attack (Top + Right), Defense (Bottom + Left)
+        totalAtk += (card.power[0] + card.power[1]);
+        totalDef += (card.power[2] + card.power[3]);
+        
+        deckZone.appendChild(cardEl);
+    });
+
+    // Mobile Fallback: Tap zone to place primed card
+    deckZone.onclick = () => {
+        if (activeCardId !== null) {
+            window.AddToDeck(activeCardId);
+            activeCardId = null;
+            renderDeckManager();
+        }
+    };
+
+    atkEl.innerText = totalAtk;
+    defEl.innerText = totalDef;
+
+    // 3. Render Deck Selectors (Unlocks)
+    const thresholds = [0, 250, 600, 1000];
+    for(let i=0; i<4; i++) {
+        const btn = document.createElement("button");
+        const isLocked = state.reputation < thresholds[i];
+        btn.className = `deck-slot-btn ${i === state.active_deck ? 'active' : ''} ${isLocked ? 'locked' : ''}`;
+        btn.innerText = isLocked ? `🔒 ${thresholds[i]} REP` : `Deck ${i+1}`;
+        btn.onclick = () => { if(!isLocked) { window.SelectDeck(i); renderDeckManager(); } };
+        selector.appendChild(btn);
+    }
+}
+
+// Initialize Drag & Drop
+const dropZone = document.getElementById("deck-drop-zone");
+dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); };
+dropZone.ondragleave = () => dropZone.classList.remove("drag-over");
+dropZone.ondrop = (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const id = parseInt(e.dataTransfer.getData("cardID"));
+    window.AddToDeck(id);
+    renderDeckManager();
+};
+
+// 4. THE RENDER LOOP (The Camera fetching Go State)
+async function syncUI() {
+    if (!window.GetGameState) return; // Ensure Go function exists
+    const state = window.GetGameState();
+    
+    // --- Update Dynamic Environment ---
+    updateDynamicArenaFloor(state);
+
+    // Update Deck Rating in UI
+    document.getElementById("deck-rating-display").innerText = state.deck_rating;
+
+    // Update Mojo Display
+    const mojoEl = document.getElementById("mojo-display"); // Assuming this element exists in index.html
+    if (mojoEl) mojoEl.innerHTML = `MOJO: ${state.mojo || 0} [${state.social_rank || 'Nobody'}] <span style="font-size: 0.7em; opacity: 0.7; margin-left: 10px;">RUMORS: ${state.rumor_count || 0}</span>`;
+
+    // 0. Resolve missing reward symbols concurrently to prevent UI flickering
+    const rewardIds = Object.keys(state.rewards || {});
+    const missingSymbols = rewardIds.filter(id => !assetCache[id]);
+    if (missingSymbols.length > 0) {
+        await Promise.all(missingSymbols.map(id => resolveAssetSymbol(id)));
+    }
+    
+    // --- Update Dashboard ---
+    // Overlay Management
+    hideAllOverlays();
+    const mainContainer = document.getElementById("main-game-container");
+    mainContainer.classList.add('hidden'); // Hide main game by default
+
+    if (state.show_leaderboard) {
+        document.getElementById("leaderboard-overlay").classList.remove("hidden");
+    } else if (state.phase === "TournamentLobby") {
+        document.getElementById("tournament-overlay").classList.remove("hidden");
+        // Populate bracket visualization if data exists
+        if (state.tournament) {
+            await renderTournamentBracket(state.tournament);
+        }
+    } else if (state.phase === "Setup" && userAddress) {
+        document.getElementById("setup-overlay").classList.remove("hidden");
+    } else if (!userAddress) {
+        // If no wallet connected, show wallet selector
+        document.getElementById("wallet-selector-overlay").classList.remove("hidden");
+        renderRumorBoard(); // Ensure rumor board is rendered even if no wallet is connected
+    } else {
+        // Default to showing main game container if no specific overlay is needed
+        mainContainer.classList.remove('hidden');
+    }
+
+    // --- Narrative Intelligence Hook & AI Indicator ---
+    if (state.phase === "Active" && !state.multiplayer) {
+        // 1. Show thinking indicator on AI turn
+        if (state.turn === 1) {
+            document.getElementById("ai-thinking-indicator").classList.remove("hidden");
+        } else {
+            document.getElementById("ai-thinking-indicator").classList.add("hidden");
+        }
+
+        // 2. Trigger taunt on phase entry or turn change
+        if (state.phase !== lastTauntPhase || state.turn !== lastTauntTurn) {
+            if (state.playstyle) {
+                const npcName = state.p2_id || "Bot";
+                const taunt = collectiveIntelligence.generatePlaystyleTaunt(npcName, state.playstyle);
+                if (taunt) renderChatMessage("SYSTEM", taunt);
+            }
+            lastTauntPhase = state.phase;
+            lastTauntTurn = state.turn;
+        }
+    } else {
+        document.getElementById("ai-thinking-indicator")?.classList.add("hidden");
+        lastTauntPhase = state.phase;
+        lastTauntTurn = null;
+    }
+
+    // --- Winner Overlay: Character-Aware Feedback ---
+    if (state.phase === "Finished") {
+        const overlay = document.getElementById("winner-overlay");
+        const winText = document.getElementById("winner-text");
+        const scoreText = document.getElementById("score-text");
+
+        if (overlay) overlay.classList.remove("hidden");
+
+        if (winText && scoreText) {
+            let title = "MATCH OVER";
+            let gloat = "";
+            
+            const isWinner = state.winner === myPlayerIndex;
+            const isDraw = state.winner === 2;
+
+            if (isDraw) {
+                title = "DRAW";
+                winText.style.color = "var(--neon-cyan)";
+                gloat = "Perfect balance. Neither side could find the opening.";
+            } else if (isWinner) {
+                title = "VICTORY";
+                winText.style.color = "var(--neon-green)";
+                const winnerGloat = (myPlayerIndex === 0) ? state.p1_gloat : state.p2_gloat;
+                const defaultGloat = state.multiplayer ? "Victory achieved in combat." : "The Arena recognizes your dominance.";
+                gloat = (state.multiplayer && winnerGloat) ? winnerGloat : defaultGloat;
+            } else {
+                title = "DEFEAT";
+                winText.style.color = "#ff4b4b";
+                const opponentGloat = (myPlayerIndex === 0) ? state.p2_gloat : state.p1_gloat;
+
+                if (state.multiplayer) {
+                    const rawGloat = opponentGloat || "Your opponent has prevailed.";
+                    gloat = rawGloat + `<span class="report-gloat-icon" onclick="reportGloat('${currentOpponentId}', '${rawGloat.replace(/'/g, "\\'")}')" title="Report offensive gloat"> 🚨</span>`;
+                } else {
+                    // Archetype gloats based on SpecialFanfare assigned in main.go
+                    switch (state.special_fanfare) {
+                        case "Witch": gloat = "A charming attempt, but your luck has run out! Hexed!"; break;
+                        case "Boss": gloat = "Calculated. Efficient. You were never a variable in my success."; break;
+                        case "Lady": gloat = "Don't look so sad, darling. You simply weren't a match for me."; break;
+                        case "cute": gloat = "Tee-hee! I won! You're still my favorite person to play with though!"; break;
+                        default: gloat = "The Vbabe Bot has outplayed you this time.";
+                    }
+                }
+            }
+
+            winText.innerText = title;
+            scoreText.innerHTML = `${state.scores[0]} - ${state.scores[1]}<br/><span style="font-size: 0.5em; opacity: 0.8; letter-spacing: 2px; display: block; margin-top: 15px; color: #fff; font-family: 'Rajdhani', sans-serif; text-transform: uppercase;">"${gloat}"</span>`;
+        }
+    }
+
+    // Challenge Overlay (if active)
+    if (currentChallengerId) { // This is managed by `showChallengeNotification`
+        document.getElementById("challenge-overlay").classList.remove("hidden");
+    }
+
+    const faucetEl = document.getElementById("faucet-display");
+    const faucetValue = state.faucet.toFixed(2);
+    
+    if (state.faucet < 50) {
+        faucetEl.innerHTML = `${faucetValue} $VBV <span style="font-size: 0.7em; margin-left: 5px;">[ VAULT LOW ]</span>`;
+        faucetEl.classList.add("faucet-depleted");
+    } else {
+        faucetEl.innerText = faucetValue + " $VBV";
+        faucetEl.classList.remove("faucet-depleted");
+    }
+
+    const rewardsDashboard = document.getElementById("rewards-dashboard");
+    let totalValue = 0;
+    let rewardItems = [];
+    Object.entries(state.rewards || {}).forEach(([id, amt]) => {
+        totalValue += amt;
+        const symbol = getAssetSymbol(id);
+        rewardItems.push(`<span style="color: var(--neon-green)">${amt.toFixed(1)}</span> <small>${symbol}</small>`);
+    });
+    const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
+    const rumorCost = 500; // Matches server-side cost
+    const myJailedCards = state.jailed_cards || {};
+    const wantedVal = state.wanted_level || 0;
+    const cunningVal = state.cunning || 0;
+    const jobRole = state.job_role || "";
+    const outlawsInLobby = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
+    const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : '';
+    const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : '';
+    const rumorMillBtn = (playerRewards >= rumorCost) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-green); color: var(--neon-green);" onclick="openRumorMill()">📢 RUMOR MILL</button>` : '';
+    const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : '';
+    const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
+
+    rewardsDashboard.innerHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
+        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '');
+
+    // --- Update Latency ---
+    const latencyEl = document.getElementById("latency-display");
+    if (state.latency > 0) {
+        latencyEl.innerText = `${state.latency} ms (${state.network_health})`;
+        // Use health levels for UI color
+        const colors = {"Excellent": "var(--neon-green)", "Good": "#ffd700", "Poor": "#ffa657", "Critical": "#ff4b4b"};
+        latencyEl.style.color = colors[state.network_health] || "white";
+    } else {
+        latencyEl.innerText = "-- ms";
+    }
+    renderRumorBoard(); // Ensure rumor board is updated
+
+    updateAdminRewardList(state.rewards);
+
+    document.getElementById("network-display").innerText = state.network;
+
+    // --- Update Avatars from WASM URLs ---
+    // Update music toggle button icon
+    const musicToggleBtn = document.getElementById("music-toggle-btn");
+    if (musicToggleBtn) {
+        musicToggleBtn.innerText = state.musicVolume === 0 ? "🔇" : "🎵";
+        musicToggleBtn.title = state.musicVolume === 0 ? "Unmute Music" : "Mute Music";
+    }
+
+    document.getElementById("p1-avatar").style.backgroundImage = `url('${state.p1_avatar}')`;
+    document.getElementById("p2-avatar").style.backgroundImage = `url('${state.p2_avatar}')`;
+
+    // --- Update Avatar Ban Notice ---
+    const noticeEl = document.getElementById("avatar-notice-banner");
+    if (state.p1_avatar_notice) {
+        if (noticeEl) {
+            noticeEl.classList.remove("hidden");
+            noticeEl.innerText = state.p1_avatar_notice;
+        }
+    } else if (noticeEl) {
+        noticeEl.classList.add("hidden");
+    }
+
+    // --- Admin Panel Visibility ---
+    const adminPanel = document.getElementById("admin-control-panel");
+    if (state.is_admin) {
+        adminPanel.classList.remove("hidden");
+        
+        // Sync checkbox states from engine
+        if (state.rules) {
+            document.getElementById("rule-open").checked = state.rules.Open;
+            document.getElementById("rule-same").checked = state.rules.Power_copy;
+            document.getElementById("rule-plus").checked = state.rules.Power_up;
+            document.getElementById("rule-elemental").checked = state.rules.Elemental_sync;
+            document.getElementById("rule-fallen").checked = state.rules.Fallen_penalty;
+            document.getElementById("rule-artifact").checked = state.rules.Artifact_bonus;
+        }
+
+        // Update Power Scaling Sliders
+        if (state.power_divisor) {
+            document.getElementById("admin-power-divisor").value = state.power_divisor;
+            document.getElementById("admin-power-base").value = state.power_base;
+        }
+
+        document.getElementById("dev-mode-toggle").checked = state.testing_mode;
+        if (!adminLogTicker) startAdminLogPolling();
+    } else {
+        if (adminLogTicker) clearInterval(adminLogTicker); // Stop polling if admin panel is closed
+        adminPanel.classList.add("hidden");
+    }
+
+    // --- Logic for Saving History (Moved to after overlay logic) ---
+    if (state.phase === "Active") { matchHistorySaved = false; }
+    else if (state.phase === "Finished" && !matchHistorySaved) { await saveMatchResult(state); matchHistorySaved = true; }
+
+    // --- Update Turn Display ---
+    let turnDisplay = "Lobby";
+    if (state.phase === "Active") turnDisplay = state.turn === 0 ? "Your Turn" : "Bot Thinking...";
+    if (state.phase === "Finished") turnDisplay = "Match Over";
+    document.getElementById("turn-display").innerText = turnDisplay;
+
+    // --- Render 3x3 Board ---
+    const boardContainer = document.getElementById("board-container");
+    boardContainer.innerHTML = "";
+    state.board.forEach((card, index) => {
+        const prevCard = lastBoardState[index];
+        const isCaptured = card && prevCard && card.owner !== prevCard.owner;
+        const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
+
+        const slot = document.createElement("div");
+        slot.className = "grid-slot";
+        slot.onclick = () => clickGrid(index);
+
+        // Apply Mood Visuals
+        if (tileMood !== "Neutral") {
+            slot.classList.add(`mood-${tileMood.toLowerCase()}`);
+        }
+
+        if (card) {
+            const cardDiv = document.createElement("div");
+            cardDiv.className = "playing-card";
+            if (isCaptured) cardDiv.classList.add("flip-capture");
+            
+            cardDiv.innerHTML = renderCardHTML(card);
+            cardDiv.style.borderColor = card.owner === 0 ? "var(--neon-cyan)" : "#ff4b4b"; 
+            
+            // Tooltip Interaction
+            cardDiv.onmouseenter = (e) => {
+                if (tooltipEl && tooltipEl.style.opacity === "1") return;
+                showPowerTooltip(e, card, index, state);
+            };
+            cardDiv.onmousemove = (e) => movePowerTooltip(e);
+            cardDiv.onmouseleave = (e) => {
+                if (e.relatedTarget === tooltipEl) return;
+                hidePowerTooltip();
+            };
+
+            slot.appendChild(cardDiv);
+        } else {
+            slot.innerText = "Slot " + index;
+        }
+        boardContainer.appendChild(slot);
+    });
+
+    // Update local state tracking for next sync
+    lastBoardState = JSON.parse(JSON.stringify(state.board));
+
+    // --- Render Player Hand ---
+    const handContainer = document.getElementById("hand-container");
+    handContainer.innerHTML = "";
+    const placedIds = state.board.filter(c => c !== null).map(c => c.id);
+    state.deck.forEach(card => {
+        if (!placedIds.includes(card.id)) {
+            const cardDiv = document.createElement("div");
+            const isSelected = activeCardId === card.id ? 'selected-card' : '';
+            cardDiv.className = `playing-card hand-card ${isSelected}`;
+            cardDiv.onclick = () => selectCard(card.id);
+            cardDiv.innerHTML = renderCardHTML(card);
+            handContainer.appendChild(cardDiv);
+        }
+    });
+}
+
+// --- Rumor System UI ---
+let rumorTimers = {}; // To store setInterval IDs for each rumor countdown
+
+function updateActiveRumors(rumorsData) {
+    // Clear existing timers
+    for (const id in rumorTimers) {
+        clearInterval(rumorTimers[id]);
+    }
+    rumorTimers = {};
+
+    activeRumors = [];
+    if (rumorsData) {
+        // If rumorsData is an object (from lobby_update), convert to array
+        if (typeof rumorsData === 'object' && !Array.isArray(rumorsData)) {
+            for (const id in rumorsData) {
+                activeRumors.push(rumorsData[id]);
+            }
+        } else if (Array.isArray(rumorsData)) { // If it's already an array
+            activeRumors = rumorsData;
+        } else if (rumorsData.id) { // If it's a single rumor object (from rumor_update)
+            activeRumors.push(rumorsData);
+        }
+    }
+
+    // Filter out expired rumors immediately
+    activeRumors = activeRumors.filter(r => new Date(r.ExpiresAt) > Date.now());
+
+    renderRumorBoard();
+}
+
+async function renderRumorBoard() {
+    let rumorBoard = document.getElementById("rumor-board");
+    if (!rumorBoard) {
+        rumorBoard = document.createElement("div");
+        rumorBoard.id = "rumor-board";
+        rumorBoard.className = "rumor-board-container";
+        // Find a good place to insert it, e.g., before the chat container
+        const chatContainer = document.getElementById("chat-container");
+        if (chatContainer) {
+            chatContainer.parentNode.insertBefore(rumorBoard, chatContainer);
+        } else {
+            document.querySelector('.column.right').prepend(rumorBoard); // Fallback
+        }
+    }
+
+    rumorBoard.innerHTML = "";
+    if (activeRumors.length === 0) {
+        rumorBoard.classList.add("hidden");
+        return;
+    }
+    rumorBoard.classList.remove("hidden");
+
+    rumorBoard.innerHTML += `<div class="rumor-board-title">ACTIVE RUMORS</div>`;
+
+    for (const rumor of activeRumors) {
+        const targetName = await getCachedEnvoiName(rumor.TargetWallet);
+        const rumorEl = document.createElement("div");
+        rumorEl.className = `rumor-item rumor-${rumor.Type}`;
+        rumorEl.innerHTML = `
+            <span class="rumor-text">📣 ${rumor.Type.toUpperCase()}: ${targetName}</span>
+            <span class="rumor-timer" id="rumor-timer-${rumor.ID}"></span>
+        `;
+        rumorBoard.appendChild(rumorEl);
+
+        // Start countdown for this rumor
+        startRumorCountdown(rumor.ID, rumor.ExpiresAt);
+    }
+}
+
+function startRumorCountdown(rumorID, expiresAt) {
+    const timerEl = document.getElementById(`rumor-timer-${rumorID}`);
+    if (!timerEl) return;
+
+    rumorTimers[rumorID] = setInterval(() => {
+        const remaining = new Date(expiresAt).getTime() - Date.now();
+        if (remaining <= 0) {
+            clearInterval(rumorTimers[rumorID]);
+            delete rumorTimers[rumorID];
+            updateActiveRumors(); // Re-render to remove expired rumor
+            return;
+        }
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+// --- Initial UI State ---
+// This will be called once after WASM loads and then by syncUI()
+if (!userAddress) document.getElementById("wallet-selector-overlay").classList.remove("hidden");
+
+function buildEmptyBoard() {
+    const boardContainer = document.getElementById("board-container");
+    boardContainer.innerHTML = "";
+    for(let i=0; i<9; i++) {
+        boardContainer.innerHTML += `<div class="grid-slot" onclick="clickGrid(${i})">Slot ${i}</div>`;
+    }
+}
+
+function renderCardHTML(card) {
+    const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : '';
+    const debuffBadge = (card.artifact && card.artifact < 0) ? `<div class="debuff-badge">PRISONER ${card.artifact}</div>` : '';
+    return `
+        ${rarityBadge}
+        ${debuffBadge}
+        <div class="power-grid">
+            <div style="grid-area: top">${window.GetLevelLabelForDisplay(card.power[0])}</div>
+            <div style="grid-area: left">${window.GetLevelLabelForDisplay(card.power[3])}</div>
+            <div style="grid-area: right">${window.GetLevelLabelForDisplay(card.power[1])}</div>
+            <div style="grid-area: bottom">${window.GetLevelLabelForDisplay(card.power[2])}</div>
+        </div>
+        <div class="card-name">${card.name}</div>
+    `;
+}
+
+function showPowerTooltip(e, card, index, state) {
+    if (!tooltipEl) {
+        tooltipEl = document.createElement("div");
+        tooltipEl.className = "power-tooltip";
+        document.body.appendChild(tooltipEl);
+    }
+
+    const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
+    const moodWeaknesses = { "Volatile": "Serene", "Serene": "Spirited", "Spirited": "Grounded", "Grounded": "Volatile" };
+    
+    let html = `<div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">${card.name.toUpperCase()} DATA</div>`;
+    
+    const sides = ["TOP", "RIGHT", "BOTTOM", "LEFT"];
+    sides.forEach((side, i) => {
+        const base = card.power[i];
+        const art = card.artifact || 0;
+        let moodMod = 0;
+        let moodWeaknessMod = 0;
+        let fatigueMod = card.fatigue > 50 ? -(card.fatigue - 50) : 0;
+        let loyaltyMod = card.loyalty >= 100 ? 25 : 0;
+
+        if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral") {
+            if (card.mood === tileMood) moodMod = 50;
+        }
+
+        const total = base + art + moodMod + fatigueMod + loyaltyMod;
+        if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral" && moodWeaknesses[card.mood] === tileMood) {
+            moodWeaknessMod = -50;
+        }
+        const total = base + art + moodMod + moodWeaknessMod + fatigueMod + loyaltyMod;
+        const grade = window.GetLevelLabelForDisplay(total);
+        
+        const moodColor = moodMod > 0 ? "var(--neon-green)" : (moodMod < 0 ? "#ff4b4b" : "inherit");
+        const artColor = art > 0 ? "var(--neon-cyan)" : (art < 0 ? "#ff4b4b" : "inherit");
+        const wantedPenalty = (state.wanted_level || 0) * 5;
+
+        html += `
+            <div class="tooltip-row">
+                <span style="opacity: 0.7;">${side}:</span>
+                <span>
+                    ${base} 
+                    <span style="color: ${artColor}">${art >= 0 ? '+' : ''}${art}A</span> 
+                    <span style="color: ${moodColor}">${moodMod >= 0 ? '+' : ''}${moodMod}M</span>
+                    ${moodMod !== 0 ? `<span style="color: ${moodColor}">${moodMod >= 0 ? '+' : ''}${moodMod}M</span>` : ''}
+                    ${moodWeaknessMod !== 0 ? `<span style="color: #ff4b4b">${moodWeaknessMod}M</span>` : ''}
+                    ${fatigueMod < 0 ? `<span style="color: #ff4b4b">${fatigueMod}F</span>` : ''}
+                    ${loyaltyMod > 0 ? `<span style="color: var(--neon-cyan)">+${loyaltyMod}L</span>` : ''}
+                    ${wantedPenalty > 0 ? `<span style="color: #ff4b4b">-${wantedPenalty}W</span>` : ''}
+                    = <b style="color: var(--neon-cyan)">${total} (${grade})</b>
+                </span>
+            </div>
+        `;
+    });
+
+    if (state.rules?.Artifact_bonus && card.owner === myPlayerIndex) {
+        html += `
+            <div class="tooltip-quickcast">
+                <button onclick="event.stopPropagation(); showQuickCastMenu(${index})">
+                    ⚡ QUICK-CAST ITEM
+                </button>
+            </div>
+        `;
+    }
+
+    if (card.mood && card.mood !== "Neutral") {
+        html += `<div style="margin-top: 8px; font-size: 10px; opacity: 0.6; text-align: center;">MOOD: ${card.mood.toUpperCase()} vs TILE: ${tileMood.toUpperCase()}</div>`;
+    }
+
+    tooltipEl.innerHTML = html;
+    tooltipEl.style.opacity = "1";
+    tooltipEl.style.pointerEvents = (state.rules?.Artifact_bonus && card.owner === myPlayerIndex) ? "auto" : "none";
+    tooltipEl.onmouseleave = () => hidePowerTooltip();
+    movePowerTooltip(e);
+}
+
+function movePowerTooltip(e) {
+    if (!tooltipEl) return;
+    const padding = 15;
+    let x = e.clientX + padding;
+    let y = e.clientY + padding;
+
+    // Boundary check to keep tooltip on screen
+    if (x + 220 > window.innerWidth) x = e.clientX - 230;
+    if (y + 180 > window.innerHeight) y = e.clientY - 190;
+
+    tooltipEl.style.left = x + "px";
+    tooltipEl.style.top = y + "px";
+}
+
+function hidePowerTooltip() {
+    if (tooltipEl) tooltipEl.style.opacity = "0";
+}
+
+function showQuickCastMenu(gridIndex) {
+    const container = document.querySelector(".tooltip-quickcast");
+    if (!container) return;
+
+    const state = window.GetGameState();
+    // Filter inventory for items that aren't currently in the active deck
+    const deckIds = state.deck.map(c => c.id);
+    const artifacts = state.inventory.filter(c => !deckIds.includes(c.id) && c.artifact > 0);
+    
+    if (artifacts.length === 0) {
+        container.innerHTML = `<span style="color: #ff4b4b; font-size: 11px; font-weight: bold;">NO ITEMS AVAILABLE</span>`;
+        return;
+    }
+
+    let html = `<div class="quickcast-item-list">`;
+    artifacts.forEach(item => {
+        html += `
+            <button class="quickcast-item-btn" onclick="event.stopPropagation(); executeQuickCast(${item.id}, ${gridIndex})">
+                <span>${item.name}</span>
+                <b style="color: inherit;">+${item.artifact}</b>
+            </button>
+        `;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+async function executeQuickCast(itemId, gridIndex) {
+    const state = window.GetGameState();
+    const item = state.inventory.find(c => c.id === itemId);
+    if (!item) return;
+
+    const success = window.ApplyArtifactToBoard(gridIndex, item.artifact);
+
+    if (success) {
+        showToast(`⚡ Used ${item.name} on ${state.board[gridIndex].name}!`, "success");
+        if (state.multiplayer && currentOpponentId) {
+            socket.send(JSON.stringify({
+                type: "use_item",
+                to_id: currentOpponentId,
+                payload: { grid_index: gridIndex, bonus: item.artifact }
+            }));
+        }
+        hidePowerTooltip();
+        syncUI();
+    }
+}
+
+function openClubFoundry() {
+    const overlay = document.createElement("div");
+    overlay.id = "club-foundry-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 450px; text-align: center;">
+            <h2 style="color: var(--neon-purple);">CLUB FOUNDRY</h2>
+            <p style="font-size: 0.9em; opacity: 0.8;">Founding a club costs a fortune (5,000 $VBV).<br>Owners earn commissions from relative buffs sold in their territory.</p>
+            
+            <div class="flex-col gap-10 mt-20">
+                <input type="text" id="foundry-club-name" class="glass-input w-full" placeholder="Enter Club Name (max 20 chars)" maxlength="20">
+                
+                <select id="foundry-shop-type" class="glass-input w-full">
+                    <option value="Elemental">Elemental Forge (Mood Buffs)</option>
+                    <option value="Tactical">Tactical Syndicate (Rule Mastery)</option>
+                    <option value="Vitality">Vitality Lab (Health/Loyalty)</option>
+                </select>
+                
+                <select id="foundry-territory" class="glass-input w-full">
+                    <option value="the_lab">The Lab</option>
+                    <option value="casino">The Casino</option>
+                    <option value="arena_center">The Central Arena</option>
+                </select>
+            </div>
+
+            <div class="mt-20 flex-row justify-center gap-15">
+                <button class="outline" onclick="document.getElementById('club-foundry-overlay').remove()">CANCEL</button>
+                <button id="foundry-submit-btn" onclick="submitClubFoundry()">FOUND CLUB (5,000 $VBV)</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function submitClubFoundry() {
+    const name = document.getElementById("foundry-club-name").value.trim();
+    const type = document.getElementById("foundry-shop-type").value;
+    const territory = document.getElementById("foundry-territory").value;
+    const btn = document.getElementById("foundry-submit-btn");
+
+    if (!name) return showToast("Club name required", "error");
+    if (!userAddress) return showToast("Connect wallet first", "error");
+
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+
+    try {
+        const state = window.GetGameState();
+        const network = state.network;
+        const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+        const amountMicro = 5000 * 1000000;
+
+        showToast("Signing 5,000 $VBV Fortune Burn...", "info");
+
+        let txid = "";
+        // Reusing construction logic from registerForTournament
+        if (network === "VOI") {
+            const methodSelector = new Uint8Array([0x2b, 0x42, 0x6d, 0xec]); // transfer(address,uint256)
+            const recipientAddr = algosdk.decodeAddress(CONFIG.VAULT_ADDRESS).publicKey;
+            const amountArg = new Uint8Array(32);
+            const amountBI = BigInt(amountMicro);
+            for (let i = 0; i < 8; i++) amountArg[31 - i] = Number((amountBI >> BigInt(i * 8)) & 0xffn);
+
+            const txObj = {
+                from: userAddress, type: 'appl', appIndex: parseInt(assetId),
+                appArgs: [methodSelector, recipientAddr, amountArg],
+                note: new TextEncoder().encode(`FOUND_CLUB:${name}`)
+            };
+            
+            if (walletProvider === 'nautilus') {
+                const signed = await window.algo.signTxn([{ txn: algosdk.encodeObj(txObj), signers: [userAddress] }]);
+                const { txId } = await window.algo.sendRawTransaction(signed[0]);
+                txid = txId;
+            }
+            // Additional providers would be handled here as in registerForTournament
+        }
+
+        if (!txid) throw new Error("Transaction cancelled or provider not supported.");
+
+        socket.send(JSON.stringify({
+            type: "create_club",
+            payload: {
+                name: name,
+                type: type,
+                territory_id: territory,
+                txid: txid,
+                network: network
+            }
+        }));
+
+        document.getElementById("club-foundry-overlay").remove();
+    } catch (err) {
+        showToast(`Founding Failed: ${err.message}`, "error");
+        btn.disabled = false;
+        btn.innerText = "FOUND CLUB (5,000 $VBV)";
+    }
+}
+
+function openTerritoryView(territoryId) {
+    const club = Object.values(globalClubs).find(c => c.territory === territoryId);
+    const overlay = document.createElement("div");
+    overlay.id = "territory-view-overlay";
+    overlay.className = "overlay";
+    
+    let header = `<h2>TERRITORY: ${territoryId.replace('_', ' ').toUpperCase()}</h2>`;
+    let body = `<p style="opacity: 0.7;">This territory is currently unclaimed. Found a Club to take control!</p>`;
+
+    if (club) {
+        header = `
+            <h2 style="color: var(--neon-cyan); margin-bottom: 5px;">${club.name}</h2>
+            <div style="font-size: 0.8em; opacity: 0.6; margin-bottom: 15px;">Controlled by: ${club.owner_wallet.substring(0,8)}...</div>
+            <div class="flex-row justify-center gap-15 mb-20">
+                <div class="glass-panel p-10 m-0" style="min-width: 120px;">
+                    <div style="font-size: 0.7em; opacity: 0.5;">TREASURY</div>
+                    <b style="color: var(--neon-green);">${club.treasury.toFixed(2)} $VBV</b>
+                </div>
+                <div class="glass-panel p-10 m-0" style="min-width: 120px;">
+                    <div style="font-size: 0.7em; opacity: 0.5;">MOJO</div>
+                    <b style="color: var(--neon-purple);">${club.club_mojo}</b>
+                </div>
+            </div>
+        `;
+
+        const shopItems = {
+            "Elemental": [
+                { id: "mood_catalyst", name: "Mood Catalyst", price: 100, desc: "+50 Mood Bonus (3 Matches)" },
+                { id: "grounded_shield", name: "Grounded Shield", price: 250, desc: "Immunity to Mood Penalties (5 Matches)" }
+            ],
+            "Tactical": [
+                { id: "rule_breaker", name: "Rule Breaker", price: 150, desc: "Force PLUS trigger (1 Match)" },
+                { id: "intel_report", name: "Intel Report", price: 300, desc: "See Opponent Hand (3 Matches)" }
+            ],
+            "Vitality": [
+                { id: "stamina_stim", name: "Stamina Stim", price: 100, desc: "-20 Fatigue Immediately" },
+                { id: "loyalty_pledge", name: "Loyalty Pledge", price: 500, desc: "+10 Loyalty Immediately" }
+            ]
+        };
+
+        const items = shopItems[club.type] || [];
+        body = `
+            <div class="flex-col gap-10">
+                ${items.map(item => `
+                    <div class="glass-panel p-15 m-0 flex-row justify-between align-center">
+                        <div style="text-align: left;">
+                            <b style="color: var(--neon-cyan);">${item.name}</b>
+                            <div style="font-size: 0.8em; opacity: 0.6;">${item.desc}</div>
+                        </div>
+                        <button class="outline" style="min-width: 100px; padding: 8px;" onclick="buyClubItem('${club.id}', '${item.id}', ${item.price}, '${territoryId}')">
+                            ${item.price} $VBV
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 500px; text-align: center;">
+            ${header}
+            ${body}
+            <div class="mt-20">
+                <button class="outline" onclick="document.getElementById('territory-view-overlay').remove()">CLOSE MAP</button>
+                ${!club ? `<button onclick="document.getElementById('territory-view-overlay').remove(); openClubFoundry()">FOUND CLUB</button>` : ''}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function buyClubItem(clubId, itemId, price, territoryId) {
+    if (!userAddress) return showToast("Connect wallet first", "error");
+    
+    try {
+        const state = window.GetGameState();
+        showToast(`Purchasing ${itemId} for ${price} $VBV...`, "info");
+        
+        // In a full implementation, this would involve an ARC-200/ASA transfer to the Club Owner's address
+        // For now, we simulate the economic signal to the server
+        socket.send(JSON.stringify({
+            type: "purchase_item",
+            payload: {
+                item_id: itemId,
+                territory_id: territoryId,
+                price: price * 1000000 // Convert to micro-units
+            }
+        }));
+
+        // If it's a Vitality item, apply it immediately to the local engine
+        if (itemId === "stamina_stim") {
+            showToast("⚡ Fatigue reduced! Your cards are feeling refreshed.", "success");
+        }
+
+        document.getElementById("territory-view-overlay")?.remove();
+    } catch (err) {
+        showToast(`Purchase Failed: ${err.message}`, "error");
+    }
+}
+
+function openWorldMap() {
+    const overlay = document.createElement("div");
+    overlay.id = "world-map-overlay";
+    overlay.className = "overlay";
+    
+    // Mapping 0-8 to territory names for the grid
+    const territoryMap = [
+        { id: "the_lab", name: "The Lab", icon: "🧪" },
+        { id: "north_district", name: "North Gate", icon: "⛩️" },
+        { id: "the_archive", name: "The Archive", icon: "📜" },
+        { id: "west_port", name: "West Port", icon: "⚓" },
+        { id: "arena_center", name: "Arena Center", icon: "⚔️" },
+        { id: "east_gate", name: "East Gate", icon: "🏯" },
+        { id: "south_slums", name: "The Slums", icon: "🏚️" },
+        { id: "casino", name: "The Casino", icon: "🎰" },
+        { id: "data_haven", name: "Data Haven", icon: "💾" }
+    ];
+
+    let tilesHTML = "";
+    territoryMap.forEach(t => {
+        const club = Object.values(globalClubs).find(c => c.territory === t.id);
+        const isOwned = !!club; // Check if any club owns this territory
+        const isGovernorControlled = isOwned && club.region_name; // Check if the owning club is a Governor
+
+        let tileClasses = "map-tile-3d";
+        if (isOwned) tileClasses += " owned";
+        if (isGovernorControlled) tileClasses += " governor-controlled"; // Add new class for Governor
+        
+        tilesHTML += `
+            <div class="${tileClasses}" onclick="event.stopPropagation(); document.getElementById('world-map-overlay').remove(); openTerritoryView('${t.id}')">
+                <div class="tile-label">
+                    <div style="font-size: 24px; margin-bottom: 5px;">${t.icon}</div>
+                    <div>${t.name.toUpperCase()}</div>
+                    ${isOwned ? `<div style="color: var(--neon-purple); margin-top: 5px; font-size: 8px;">[ ${club.name} ]</div>` : '<div style="opacity: 0.4; margin-top: 5px; font-size: 8px;">UNCLAIMED</div>'}
+                    ${isGovernorControlled ? `<div style="color: var(--neon-cyan); font-size: 7px; font-weight: bold; margin-top: 2px;">GOVERNOR</div>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 80%; max-width: 900px; text-align: center; background: rgba(0,0,0,0.8);">
+            <h1 style="font-size: 2em; margin-bottom: 10px;">NEON TOPOGRAPHY</h1>
+            <p style="opacity: 0.6; font-size: 0.9em;">Tactical ownership map of the Arena. Select a district to visit shops or found a Club.</p>
+            
+            <div class="map-perspective-container">
+                <div class="map-grid-3d">
+                    ${tilesHTML}
+                </div>
+            </div>
+
+            <div class="flex-row justify-center gap-20 mt-20">
+                <div class="flex-row gap-5"><div style="width: 12px; height: 12px; background: rgba(0, 242, 254, 0.1); border: 1px solid var(--glass-border);"></div> <span style="font-size: 10px;">NEUTRAL</span></div>
+                <div class="flex-row gap-5"><div style="width: 12px; height: 12px; background: rgba(155, 81, 224, 0.2); border: 1px solid var(--neon-purple);"></div> <span style="font-size: 10px;">CLUB CONTROLLED</span></div>
+            </div>
+
+            <button class="outline mt-20" onclick="document.getElementById('world-map-overlay').remove()">RETURN TO LOBBY</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+function openCourthouse() {
+    const state = window.GetGameState();
+    const wanted = state.wanted_level || 0;
+    if (wanted <= 0) return;
+
+    const fine = wanted * 100;
+    const overlay = document.createElement("div");
+    overlay.id = "courthouse-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel courthouse-panel">
+            <h2 class="text-error" style="letter-spacing: 3px;">ARENA COURTHOUSE</h2>
+            <p style="font-size: 0.9em; opacity: 0.8;">The High Council has flagged you for criminal activities.<br>Infamy Status: <b>LEVEL ${wanted}</b></p>
+            
+            <div class="glass-panel fine-display-box">
+                <div style="font-size: 0.75em; opacity: 0.7;">REHABILITATION FINE</div>
+                <b class="fine-amount">${fine} $VBV</b>
+                <div style="font-size: 0.7em; opacity: 0.5; margin-top: 5px;">(100 $VBV per Wanted point)</div>
+            </div>
+
+            <p style="font-size: 0.8em; opacity: 0.6; padding: 0 20px;">Settling your debt to society will clear your Wanted Level and restore your cards to peak combat performance.</p>
+
+            <div class="mt-20 flex-row justify-center gap-15">
+                <button class="outline" onclick="document.getElementById('courthouse-overlay').remove()">LURK IN SHADOWS</button>
+                <button id="courthouse-pay-btn" style="background: linear-gradient(45deg, #ff4b4b, #ff0844);" onclick="submitCourthouseFine()">PAY FINE & CLEAR NAME</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function submitCourthouseFine() {
+    const state = window.GetGameState();
+    const wanted = state.wanted_level || 0;
+    if (wanted <= 0) return;
+
+    const btn = document.getElementById("courthouse-pay-btn");
+    const amountMicro = wanted * 100 * 1000000;
+    const network = state.network;
+    const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+
+    btn.disabled = true;
+    btn.innerText = "PROCESSING...";
+
+    try {
+        showToast(`⚖️ Signing ${wanted * 100} $VBV Fine...`, "info");
+        let txid = "";
+        let txObj = null;
+
+        if (network === "VOI") {
+            const methodSelector = new Uint8Array([0x2b, 0x42, 0x6d, 0xec]); // transfer(address,uint256)
+            const recipientAddr = algosdk.decodeAddress(CONFIG.VAULT_ADDRESS).publicKey;
+            const amountArg = new Uint8Array(32);
+            const amountBI = BigInt(amountMicro);
+            for (let i = 0; i < 8; i++) amountArg[31 - i] = Number((amountBI >> BigInt(i * 8)) & 0xffn);
+
+            txObj = {
+                from: userAddress, type: 'appl', appIndex: parseInt(assetId),
+                appArgs: [methodSelector, recipientAddr, amountArg],
+                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
+            };
+        } else {
+            txObj = {
+                from: userAddress, to: CONFIG.VAULT_ADDRESS, type: 'axfer',
+                assetIndex: parseInt(assetId), amount: amountMicro,
+                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
+            };
+        }
+
+        if (walletProvider === 'nautilus') {
+            const signed = await window.algo.signTxn([{ txn: algosdk.encodeObj(txObj), signers: [userAddress] }]);
+            const { txId } = await window.algo.sendRawTransaction(signed[0]);
+            txid = txId;
+        } else if (walletProvider === 'kibisis') {
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
+            const signed = await window.kibisis.signTxns([{ txn: txnB64 }]);
+            const { txId } = await window.kibisis.pushTxns(signed);
+            txid = txId;
+        } else if (walletProvider === 'walletconnect' && signClient) {
+            const sessions = signClient.session.getAll();
+            const chainId = network === "VOI" ? CONFIG.VOI_CHAIN_ID : CONFIG.ALGO_CHAIN_ID;
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
+            const response = await signClient.request({
+                topic: sessions[0].topic, chainId: chainId,
+                request: { method: "algo_signTxn", params: [[{ txn: txnB64, signers: [userAddress] }]] }
+            });
+            const signedTxnBytes = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
+            const netCfg = getNetworkConfig(network);
+            const client = new algosdk.Algodv2("", netCfg.node_url, "");
+            const { txId } = await client.sendRawTransaction(signedTxnBytes).do();
+            txid = txId;
+        }
+
+        if (!txid) throw new Error("Transaction cancelled or failed.");
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/courthouse/reset`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: userAddress, txid: txid, network: network })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`⚖️ ${result.message}`, "success");
+            document.getElementById("courthouse-overlay")?.remove();
+            if (window.SyncOpponentWanted) window.SyncOpponentWanted(myPlayerIndex, 0);
+            syncUI();
+        } else {
+            const err = await response.text();
+            showToast(`❌ Courthouse Error: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast(`Fine Payment Failed: ${err.message}`, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "PAY FINE & CLEAR NAME";
+    }
+}
+
+async function openPortfolioView(initialTab = 'portfolio') {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    const myJailedCards = state.jailed_cards || {};
+    overlay.id = "portfolio-view-overlay";
+    overlay.className = "overlay";
+    
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 500px; text-align: center;">
+            <h2 style="color: var(--neon-cyan);">ENTITY PORTFOLIO</h2>
+            <div class="flex-row justify-center gap-10 mt-10 mb-20">
+                <button id="tab-holdings" class="tab-btn ${initialTab === 'portfolio' ? 'active' : ''}" onclick="switchPortfolioTab('portfolio')">📈 HOLDINGS</button>
+                <button id="tab-jailed" class="tab-btn ${initialTab === 'jailed' ? 'active' : ''}" onclick="switchPortfolioTab('jailed')">⛓️ JAILED (${Object.keys(myJailedCards).length})</button>
+            </div>
+            
+            <div id="portfolio-content-area" class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                <!-- Content injected by switchPortfolioTab -->
+            </div>
+
+            <button class="outline mt-20 w-full" onclick="document.getElementById('portfolio-view-overlay').remove()">CLOSE</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    switchPortfolioTab(initialTab);
+}
+
+async function switchPortfolioTab(tab) {
+    const container = document.getElementById("portfolio-content-area");
+    const holdingsBtn = document.getElementById("tab-holdings");
+    const jailedBtn = document.getElementById("tab-jailed");
+    const state = window.GetGameState();
+
+    holdingsBtn.classList.toggle("active", tab === 'portfolio');
+    jailedBtn.classList.toggle("active", tab === 'jailed');
+    container.innerHTML = `<div style="padding: 20px; opacity: 0.5;">Loading details...</div>`;
+
+    if (tab === 'portfolio') {
+        const portfolio = state.portfolio || {};
+        const entries = Object.entries(portfolio);
+        let html = "";
+        let totalMarketValue = 0;
+
+        if (entries.length === 0) {
+            html = `<div style="padding: 40px; opacity: 0.5;">No active investments found.</div>`;
+        } else {
+            entries.forEach(([id, amount]) => {
+                if (amount <= 0) return;
+                const p = lastLobbyPlayers.find(pl => pl.id === id);
+                const price = p ? ((p.wins * 10) + (p.reputation / 2) + 100) : 100;
+                const marketValue = amount * price;
+                totalMarketValue += marketValue;
+                html += `
+                    <div class="player-item" style="padding: 15px;">
+                        <div style="text-align: left;">
+                            <b style="color: var(--neon-cyan);">${id}</b>
+                            <div style="font-size: 0.75em; opacity: 0.6;">Holding: ${amount.toFixed(2)} Shares</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: var(--neon-green); font-weight: bold;">${marketValue.toFixed(2)} $VBV</div>
+                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" 
+                                    onclick="tradeShares('${id}', 'sell', ${amount})">SELL ALL</button>
+                        </div>
+                    </div>`;
+            });
+            html += `
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--glass-border); text-align: right;">
+                    <small style="opacity: 0.5;">EST. LIQUIDITY VALUE</small><br>
+                    <b style="color: var(--neon-green); font-size: 1.2em;">${totalMarketValue.toFixed(2)} $VBV</b>
+                </div>`;
+        }
+        container.innerHTML = html;
+    } else {
+        const jailed = state.jailed_cards || {};
+        const cardIds = Object.keys(jailed);
+        if (cardIds.length === 0) {
+            container.innerHTML = `<div style="padding: 40px; opacity: 0.5;">No cards currently in custody.</div>`;
+            return;
+        }
+
+        let html = "";
+        for (const cardId of cardIds) {
+            const clubId = jailed[cardId];
+            const club = globalClubs[clubId] || { name: "Underworld Entity" };
+            html += `
+                <div class="player-item" style="padding: 15px; border-color: #ff4b4b;">
+                    <div style="text-align: left;">
+                        <b style="color: #ff4b4b;">ID: #${cardId}</b>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Held by: ${club.name}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="outline" style="font-size: 10px; padding: 6px 12px; border-color: var(--neon-green); color: var(--neon-green);" 
+                                onclick="initiateBail(${cardId}, '${clubId}')">PAY BAIL (200 $VBV)</button>
+                    </div>
+                </div>`;
+        }
+        container.innerHTML = html;
+    }
+}
+
+async function initiateBail(cardId, clubId) {
+    if (!userAddress) return;
+    if (!confirm(`Are you sure you want to pay 200 $VBV to release Card #${cardId}?`)) return;
+
+    try {
+        const state = window.GetGameState();
+        const network = state.network;
+        const bailAmountMicro = 200 * 1000000;
+        const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+
+        showToast(`⚖️ Signing Bail Payment for Card #${cardId}...`, "info");
+        
+        let txid = "";
+        // Construction logic mirroring courthouse fine
+        if (network === "VOI") {
+            const methodSelector = new Uint8Array([0x2b, 0x42, 0x6d, 0xec]); 
+            const recipientAddr = algosdk.decodeAddress(CONFIG.VAULT_ADDRESS).publicKey;
+            const amountArg = new Uint8Array(32);
+            const amountBI = BigInt(bailAmountMicro);
+            for (let i = 0; i < 8; i++) amountArg[31 - i] = Number((amountBI >> BigInt(i * 8)) & 0xffn);
+
+            const txObj = {
+                from: userAddress, type: 'appl', appIndex: parseInt(assetId),
+                appArgs: [methodSelector, recipientAddr, amountArg],
+                note: new TextEncoder().encode(`BAIL_PAYMENT:${cardId}`)
+            };
+            
+            if (walletProvider === 'nautilus') {
+                const signed = await window.algo.signTxn([{ txn: algosdk.encodeObj(txObj), signers: [userAddress] }]);
+                const { txId } = await window.algo.sendRawTransaction(signed[0]);
+                txid = txId;
+            } else if (walletProvider === 'walletconnect') {
+                const sessions = signClient.session.getAll();
+                const response = await signClient.request({
+                    topic: sessions[0].topic, chainId: CONFIG.VOI_CHAIN_ID,
+                    request: { method: "algo_signTxn", params: [[{ txn: btoa(String.fromCharCode(...algosdk.encodeObj(txObj))), signers: [userAddress] }]] }
+                });
+                const signedTxnBytes = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
+                const netCfg = availableNetworks["Voi Mainnet"];
+                const client = new algosdk.Algodv2("", netCfg.node_url, "");
+                const { txId: broadcastId } = await client.sendRawTransaction(signedTxnBytes).do();
+                txid = broadcastId;
+            }
+        }
+
+        if (!txid) throw new Error("Transaction verification failed.");
+
+        socket.send(JSON.stringify({
+            type: "bail_card",
+            payload: {
+                card_id: parseInt(cardId),
+                club_id: clubId,
+                txid: txid,
+                network: network
+            }
+        }));
+
+        document.getElementById("portfolio-view-overlay")?.remove();
+    } catch (err) {
+        showToast(`Bail Request Failed: ${err.message}`, "error");
+    }
+    
+    document.body.appendChild(overlay);
+}
+
+function openSecuritySentry() {
+    const state = window.GetGameState();
+    const club = globalClubs[state.employer_id];
+    if (!club) return;
+
+    const overlay = document.createElement("div");
+    overlay.id = "security-sentry-overlay";
+    overlay.className = "overlay";
+
+    // Heuristic: Traps are items with "tripwire", "sentry", or "dog" in ID
+    const availableTraps = [
+        { id: "tripwire", name: "Laser Tripwire", desc: "+10% Heist Failure" },
+        { id: "sentry_turret", name: "Sentry Turret", desc: "+25% Heist Failure" },
+        { id: "guard_dog", name: "Bio-Guard Dog", desc: "Forces Jail on Failure" }
+    ];
+
+    const activeTraps = Object.entries(club.active_buffs || {})
+        .filter(([key]) => key.startsWith("TRAP_"));
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 550px; text-align: center; border-color: var(--neon-cyan);">
+            <h2 style="color: var(--neon-cyan); letter-spacing: 2px;">🛡️ SECURITY SENTRY: ${club.name.toUpperCase()}</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Deploy tactical hardware to protect the Treasury from heisters.</p>
+            
+            <div style="text-align: left; margin-bottom: 20px;">
+                <small style="color: var(--neon-cyan); font-weight: bold; opacity: 0.5;">ACTIVE DEFENSES (${activeTraps.length}/3)</small>
+                <div class="flex-col gap-5 mt-5">
+                    ${activeTraps.length === 0 ? '<div style="opacity: 0.3; font-style: italic;">No active traps detected.</div>' : 
+                      activeTraps.map(([id, type]) => `
+                        <div class="player-item" style="padding: 8px 12px; border-color: var(--neon-green);">
+                            <span>🛰️ ${type.toUpperCase()}</span>
+                            <span style="color: var(--neon-green); font-size: 10px;">ONLINE</span>
+                        </div>
+                      `).join('')}
+                </div>
+            </div>
+
+            <div style="text-align: left;">
+                <small style="color: var(--neon-cyan); font-weight: bold; opacity: 0.5;">AVAILABLE HARDWARE</small>
+                <div class="flex-col gap-10 mt-5">
+                    ${availableTraps.map(trap => {
+                        const count = state.inventory[trap.id] || 0;
+                        return `
+                            <div class="glass-panel p-10 m-0 flex-row justify-between align-center">
+                                <div>
+                                    <b>${trap.name}</b>
+                                    <div style="font-size: 0.75em; opacity: 0.6;">${trap.desc}</div>
+                                </div>
+                                <div class="flex-row align-center gap-10">
+                                    <span style="font-size: 11px; opacity: 0.8;">Owned: ${count}</span>
+                                    <button class="outline" style="font-size: 10px; padding: 5px 15px;" 
+                                            ${count === 0 || activeTraps.length >= 3 ? 'disabled' : ''} 
+                                            onclick="deployTrap('${trap.id}')">DEPLOY</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <button class="outline mt-20 w-full" onclick="document.getElementById('security-sentry-overlay').remove()">CLOSE TERMINAL</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function deployTrap(trapId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    
+    showToast(`🛰️ Deploying ${trapId.replace('_', ' ')}...`, "info");
+    socket.send(JSON.stringify({
+        type: "use_item",
+        payload: {
+            item_id: trapId
+        }
+    }));
+    document.getElementById("security-sentry-overlay")?.remove();
+}
+
+async function openBountyBoard() {
+    const state = window.GetGameState();
+    const myWanted = state.wanted_level || 0;
+    const isHunter = myWanted <= 2;
+    
+    const overlay = document.createElement("div");
+    overlay.id = "bounty-board-overlay";
+    overlay.className = "overlay";
+    
+    const outlaws = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
+    
+    let targetsHtml = "";
+    if (outlaws.length === 0) {
+        targetsHtml = `<div style="padding: 40px; opacity: 0.5;">No active bounties in this sector.</div>`;
+    } else {
+        // Pre-resolve envoi names
+        const wallets = outlaws.map(p => p.wallet);
+        await Promise.all(wallets.map(w => resolveEnvoiName(w)));
+
+        outlaws.forEach(p => {
+            const name = getCachedEnvoiName(p.wallet);
+            const bounty = p.wanted_level * 50;
+            const isMe = p.id === myClientId;
+            
+            targetsHtml += `
+                <div class="player-item" style="padding: 15px; border-color: #ffd700;">
+                    <div style="text-align: left;">
+                        <b style="color: #ffd700;">${name}</b>
+                        <div style="font-size: 0.75em; opacity: 0.6;">WANTED LEVEL: ${p.wanted_level}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: var(--neon-green); font-weight: bold;">${bounty} $VBV</div>
+                        ${isHunter && !isMe ? `<button class="outline" style="font-size: 10px; padding: 6px 12px; border-color: #ffd700; color: #ffd700;" onclick="document.getElementById('bounty-board-overlay').remove(); sendChallenge('${p.id}')">HUNT TARGET</button>` : ''}
+                        ${isMe ? `<span style="font-size: 10px; color: #ff4b4b;">YOU ARE THE TARGET</span>` : ''}
+                    </div>
+                </div>`;
+        });
+    }
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 500px; text-align: center; border-color: #ffd700;">
+            <h2 style="color: #ffd700; letter-spacing: 3px;">🎯 BOUNTY BOARD</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">High-infamy outlaws currently in the lobby. Hunters (Wanted ≤ 2) earn 50 $VBV per Wanted point on victory.</p>
+            <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${targetsHtml}</div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('bounty-board-overlay').remove()">CLOSE BOARD</button>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+async function openBlackMarket() {
+    const state = window.GetGameState();
+    const wanted = state.wanted_level || 0;
+    const cunning = state.cunning || 0;
+
+    if (wanted < 5 || cunning < 10) {
+        showToast("❌ Access Denied: Black Market requires Wanted Level 5+ and Cunning 10+.", "error");
+        return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.id = "black-market-overlay";
+    overlay.className = "overlay";
+
+    let html = `
+        <div class="glass-panel" style="width: 600px; text-align: center; border-color: #ff4b4b;">
+            <h2 style="color: #ff4b4b; letter-spacing: 3px;">BLACK MARKET</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Liquidated assets from defaulted loans. High risk, high reward.</p>
+            <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+    `;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/black-market?wallet=${userAddress}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+        const blackMarketItems = await response.json();
+
+        if (blackMarketItems.length === 0) {
+            html += `<div style="padding: 40px; opacity: 0.5;">No hot items currently available. Check back later.</div>`;
+        } else {
+            // Pre-resolve envoi names for all borrowers
+            const borrowerWallets = new Set(blackMarketItems.map(item => item.borrower_wallet));
+            await Promise.all(Array.from(borrowerWallets).map(w => resolveEnvoiName(w)));
+
+            for (const item of blackMarketItems) {
+                const cardName = item.collateral_bundle.card_id ? `CARD-${item.collateral_bundle.card_id}` : 'N/A';
+                const weaponName = item.collateral_bundle.weapon_id || 'N/A';
+                const faceplateName = item.collateral_bundle.faceplate_id || 'N/A';
+                const borrowerName = getCachedEnvoiName(item.borrower_wallet);
+
+                // Scavenger price is 75% of the original repayment amount
+                const scavengePrice = (item.repayment_amount * 0.75) / 1000000; // Convert micro-units to VBV
+
+                html += `
+                    <div class="player-item" style="padding: 15px; border-color: #ff4b4b;">
+                        <div style="text-align: left;">
+                            <b style="color: var(--neon-cyan);">Collateral from ${borrowerName}</b>
+                            <div style="font-size: 0.75em; opacity: 0.6;">
+                                Card: ${cardName} <br>
+                                Weapon: ${weaponName} <br>
+                                Faceplate: ${faceplateName}
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: var(--neon-green); font-weight: bold;">${scavengePrice.toFixed(2)} $VBV</div>
+                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" 
+                                    onclick="buyBlackMarketItem('${item.id}', ${scavengePrice})">BUY (RISKY)</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    } catch (err) {
+        showToast(`❌ Black Market Access Failed: ${err.message}`, "error");
+        html += `<div style="padding: 40px; opacity: 0.5; color: #ff4b4b;">Error loading Black Market: ${err.message}</div>`;
+    }
+
+    html += `
+            </div>
+            <button class="outline mt-20" onclick="document.getElementById('black-market-overlay').remove()">CLOSE</button>
+        </div>
+    `;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+}
+
+async function buyBlackMarketItem(loanId, price) {
+    if (!userAddress) return showToast("Connect wallet first", "error");
+    if (!confirm(`Are you sure you want to buy this item for ${price.toFixed(2)} $VBV? This will increase your Wanted Level.`)) return;
+
+    try {
+        const state = window.GetGameState();
+        const network = state.network;
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/black-market/buy`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: userAddress, loan_id: loanId, network: network })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`🏴‍☠️ ${result.message}`, "success");
+            document.getElementById("black-market-overlay")?.remove();
+            syncUI();
+        } else {
+            const err = await response.text();
+            showToast(`❌ Black Market Purchase Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast(`Purchase Failed: ${err.message}`, "error");
+    }
+}
+
+async function openRumorMill() {
+    const state = window.GetGameState();
+    const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
+    const rumorCost = 500; // Matches server-side cost
+
+    if (playerRewards < rumorCost) {
+        showToast(`❌ Insufficient $VBV. Spreading a rumor costs ${rumorCost} $VBV.`, "error");
+        return;
+    }
+
+    const overlay = document.createElement("div");
+    overlay.id = "rumor-mill-overlay";
+    overlay.className = "overlay";
+
+    let targetsHtml = '';
+    if (lastLobbyPlayers.length === 0) {
+        targetsHtml = `<div style="padding: 20px; opacity: 0.5;">No other players in the lobby to spread rumors about.</div>`;
+    } else {
+        // Filter out self
+        const otherPlayers = lastLobbyPlayers.filter(p => p.id !== myClientId);
+        if (otherPlayers.length === 0) {
+            targetsHtml = `<div style="padding: 20px; opacity: 0.5;">No other players in the lobby to spread rumors about.</div>`;
+        } else {
+            // Pre-resolve envoi names for all targets
+            const targetWallets = new Set(otherPlayers.map(p => p.wallet));
+            await Promise.all(Array.from(targetWallets).map(w => resolveEnvoiName(w)));
+
+            targetsHtml = otherPlayers.map(p => {
+                const targetName = getCachedEnvoiName(p.wallet);
+                return `
+                    <div class="player-item" style="padding: 10px; border-color: var(--glass-border);">
+                        <div style="text-align: left;">
+                            <b style="color: var(--neon-cyan);">${targetName}</b>
+                            <div style="font-size: 0.75em; opacity: 0.6;">${p.reputation} REP | ${p.wins} WINS</div>
+                        </div>
+                        <div class="flex-row gap-5">
+                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: var(--neon-green); color: var(--neon-green);" 
+                                    onclick="spreadRumor('${p.wallet}', 'positive', 1.1, 60)">+ POSITIVE</button>
+                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" 
+                                    onclick="spreadRumor('${p.wallet}', 'negative', 0.9, 60)">- NEGATIVE</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 600px; text-align: center;">
+            <h2 style="color: var(--neon-green); letter-spacing: 3px;">RUMOR MILL</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Influence market sentiment. Cost: <b style="color: var(--neon-green);">${rumorCost} $VBV</b></p>
+            <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                ${targetsHtml}
+            </div>
+            <button class="outline mt-20" onclick="document.getElementById('rumor-mill-overlay').remove()">CLOSE</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+async function spreadRumor(targetWallet, type, strength, durationMinutes) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return showToast("❌ Not connected to server.", "error");
+    if (!userAddress) return showToast("❌ Connect wallet first.", "error");
+
+    const rumorCost = 500; // Matches server-side cost
+    const state = window.GetGameState();
+    const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
+
+    if (playerRewards < rumorCost) {
+        showToast(`❌ Insufficient $VBV. Spreading a rumor costs ${rumorCost} $VBV.`, "error");
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to spread a ${type} rumor about ${getCachedEnvoiName(targetWallet)} for ${rumorCost} $VBV?`)) return;
+
+    try {
+        showToast(`📢 Spreading ${type} rumor about ${getCachedEnvoiName(targetWallet)}...`, "info");
+        
+        socket.send(JSON.stringify({
+            type: "spread_rumor",
+            payload: {
+                target_wallet: targetWallet,
+                type: type,
+                strength: strength,
+                duration_minutes: durationMinutes
+            }
+        }));
+        
+        document.getElementById("rumor-mill-overlay")?.remove();
+    } catch (err) {
+        showToast(`❌ Failed to spread rumor: ${err.message}`, "error");
+    }
+}
+
+function tradeShares(entityId, action, amount) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    
+    socket.send(JSON.stringify({
+        type: "trade_shares",
+        payload: {
+            entity_id: entityId,
+            action: action,
+            amount: amount
+        }
+    }));
+    
+    document.getElementById("portfolio-view-overlay")?.remove();
+}
+
+// Function to show the main game container and hide other overlays
+function showMainGameContainer() {
+    document.getElementById("main-game-container").classList.remove("hidden");
+}
+
+// Placeholder for setupCropEvents - assuming it's defined elsewhere or will be moved here
+// --- Avatar Setup & Cropping Logic ---
+
+async function refreshInventory() {
+    if (!userAddress) return;
+    
+    const grid = document.getElementById("avatar-grid");
+    const loader = document.getElementById("setup-loader");
+    if (loader) loader.classList.remove("hidden");
+
+    userNFTs = []; // Clear for aggregate fetch
+    const state = window.GetGameState();
+    
+    // 1. Compile list of wallets to scan.
+    // The primary userAddress is assumed to be on the currently selected game network.
+    const primaryNetworkShortName = state.network; // e.g., "VOI" or "ALGO"
+    const sources = [{ address: userAddress, chain: primaryNetworkShortName }];
+    linkedWallets.forEach(w => sources.push(w));
+
+    // 2. Fetch from all sources in parallel
+    await Promise.all(sources.map(async (src) => {
+        try {
+            // Use Indexer URL from admin availableNetworks if available, otherwise fallback
+            const networkConfig = getNetworkConfig(src.chain); // Use helper for consistency
+            const baseUrl = networkConfig ? networkConfig.indexer_url : "";
+
+            if (!baseUrl) {
+                console.warn(`[FETCH] No indexer URL found for network ${src.chain}. Skipping NFT fetch for ${src.address}.`);
+                return; // Skip if no base URL
+            }
+
+            if (src.chain === "SOL") {
+                // Solana DAS API specific fetch via POST to NodeURL
+                const solRes = await fetch(baseUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getAssetsByOwner", params: { ownerAddress: src.address, page: 1, limit: 50 }})
+                });
+                const solData = await solRes.json();
+                if (solData.result && solData.result.items) userNFTs = [...userNFTs, ...solData.result.items];
+                return;
+            }
+
+            const response = await fetch(`${baseUrl}/tokens?owner=${src.address}`);
+            if (!response.ok) {
+                console.warn(`[FETCH] Indexer returned error for ${src.address}: ${response.status}`);
+                return;
+            }
+
+            const data = await response.json();
+            if (data.tokens) userNFTs = [...userNFTs, ...data.tokens];
+        } catch (err) { console.warn(`[FETCH] Source ${src.address} failed:`, err); }
+    }));
+
+    renderAvatarGrid(userNFTs);
+    updateLinkedWalletsUI();
+    if (loader) loader.classList.add("hidden");
+}
+
+function renderAvatarGrid(nfts) {
+    const grid = document.getElementById("avatar-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    
+    nfts.forEach(nft => {
+        let meta = {};
+        try { meta = JSON.parse(nft.metadata || "{}"); } catch(e) {}
+        const url = meta.image || "";
+        if (!url) return;
+        
+        const item = document.createElement("div");
+        item.className = "avatar-item";
+        item.style.backgroundImage = `url(${url})`;
+        item.onclick = () => selectAvatar(url);
+        grid.appendChild(item);
+    });
+}
+
+function applyAvatarFilters() {
+    const search = document.getElementById("avatar-search").value.toLowerCase();
+    const sort = document.getElementById("avatar-sort").value;
+    
+    let filtered = userNFTs.filter(nft => {
+        let meta = {};
+        try { meta = JSON.parse(nft.metadata || "{}"); } catch(e) {}
+        return (meta.name || "").toLowerCase().includes(search);
+    });
+    
+    if (sort === "oldest") {
+        filtered.sort((a, b) => a.mintRound - b.mintRound);
+    } else if (sort === "newest") {
+        filtered.sort((a, b) => b.mintRound - a.mintRound);
+    }
+    
+    renderAvatarGrid(filtered);
+}
+
+// --- Arena Background Controller ---
+function updateDynamicArenaFloor(state) {
+    let texture = "var(--texture-solo)"; // Default AI/Solo
+
+    if (state.phase === "Active" || state.phase === "TournamentLobby") {
+        if (state.multiplayer) {
+            if (state.tournament && state.tournament.active) {
+                const currentRound = state.tournament.current_round;
+                const participants = state.tournament.participants ? state.tournament.participants.length : 8;
+                const maxRounds = Math.log2(participants); // 8 = 3 rounds, 16 = 4 rounds
+
+                if (currentRound === maxRounds) {
+                    texture = "var(--texture-final)";
+                } else if (currentRound === maxRounds - 1) {
+                    texture = "var(--texture-semi)";
+                } else {
+                    texture = "var(--texture-tournament)";
+                }
+            } else {
+                // Standard 2 Player Match (Challenge)
+                texture = "var(--texture-challenge)";
+            }
+        }
+    }
+
+    // Apply to body background
+    document.body.style.backgroundImage = `${texture}, radial-gradient(circle at top center, #1a0b2e, var(--bg-dark), #000000)`;
+}
+
+function selectAvatar(url) {
+    const preview = document.getElementById("avatar-preview-section");
+    const img = document.getElementById("crop-image");
+    if (!preview || !img) return;
+    
+    currentAvatarUrl = url;
+    img.src = url;
+    
+    // Pre-populate gloat from cache
+    const cachedGloat = localStorage.getItem("vbabes_gloat_msg") || "";
+    document.getElementById("gloat-message-input").value = cachedGloat;
+
+    preview.classList.remove("hidden");
+    // Calibration is handled by the img.onload listener in setupCropEvents
+}
+
+function setupCropEvents() {
+    const frame = document.getElementById("crop-frame");
+    const img = document.getElementById("crop-image");
+    const slider = document.getElementById("zoom-slider");
+    const zoomVal = document.getElementById("zoom-val");
+    const confirmBtn = document.getElementById("confirm-avatar-btn");
+    
+    if (!frame || !img || !slider || !confirmBtn) return;
+
+    let isDragging = false;
+    let startX, startY;
+
+    const updateTransform = () => {
+        img.style.transform = `translate(${cropState.x}px, ${cropState.y}px) scale(${cropState.zoom})`;
+    };
+
+    // ASPECT RATIO & INITIAL CALIBRATION: Ensure image covers the 220px circle frame
+    img.onload = () => {
+        const frameSize = 220; // Diameter of the circle
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+
+        // Calculate minimal scale to completely fill the frame (CSS 'cover' behavior)
+        const scaleW = frameSize / w;
+        const scaleH = frameSize / h;
+        const baseScale = Math.max(scaleW, scaleH);
+
+        // Initialize state variables for pan/zoom logic
+        cropState.zoom = baseScale;
+        cropState.x = (frameSize - (w * baseScale)) / 2;
+        cropState.y = (frameSize - (h * baseScale)) / 2;
+
+        // Sync UI Sliders
+        slider.min = baseScale.toFixed(2);
+        slider.max = (baseScale * 4).toFixed(2);
+        slider.value = baseScale;
+        if (zoomVal) zoomVal.innerText = "1.0x";
+        
+        updateTransform();
+    };
+
+    slider.oninput = () => {
+        cropState.zoom = parseFloat(slider.value);
+        const relZoom = cropState.zoom / parseFloat(slider.min);
+        if (zoomVal) zoomVal.innerText = relZoom.toFixed(1) + "x";
+        updateTransform();
+    };
+
+    frame.onmousedown = (e) => {
+        isDragging = true;
+        startX = e.clientX - cropState.x;
+        startY = e.clientY - cropState.y;
+        frame.style.cursor = "grabbing";
+    };
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        cropState.x = e.clientX - startX;
+        cropState.y = e.clientY - startY;
+        updateTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        if (frame) frame.style.cursor = "grab";
+    });
+
+    // Mobile Touch Support
+    frame.ontouchstart = (e) => {
+        isDragging = true;
+        startX = e.touches[0].clientX - cropState.x;
+        startY = e.touches[0].clientY - cropState.y;
+    };
+    frame.ontouchmove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        cropState.x = e.touches[0].clientX - startX;
+        cropState.y = e.touches[0].clientY - startY;
+        updateTransform();
+    };
+    frame.ontouchend = () => isDragging = false;
+
+    confirmBtn.onclick = () => {
+        if (window.SetAvatar && currentAvatarUrl) {
+            const gloat = document.getElementById("gloat-message-input").value.trim();
+            localStorage.setItem("vbabes_gloat_msg", gloat);
+
+            // Call the Go WASM engine to set the avatar and progress to Lobby phase
+            window.SetAvatar(currentAvatarUrl, gloat, "", 0); // Reset notice locally on choice, favorite card ID is 0 for now
+
+            // Synchronize profile metadata with the server for lobby visibility and moderation
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "register_avatar",
+                    payload: { 
+                        url: currentAvatarUrl,
+                        gloat: gloat
+                    }
+                }));
+            }
+
+            showToast("Avatar verified. Entering Arena.", "success");
+        }
+    };
+    
+    // Export to window for access from index.html attributes
+    window.applyAvatarFilters = applyAvatarFilters;
+}
+
+function generateBracketHTML(matches, activeRound = -1) {
+    if (!matches || matches.length === 0) {
+        const msg = activeRound === -1 ? "Match data pending blockchain verification or unavailable." : "Matches will be generated once tournament starts...";
+        return `<div style="color: #888; font-style: italic; padding: 10px; text-align: center; width: 100%;">${msg}</div>`;
+    }
+
+    // Group matches by round
+    const rounds = {};
+    matches.forEach(m => {
+        if (!rounds[m.round]) rounds[m.round] = [];
+        rounds[m.round].push(m);
+    });
+
+    const sortedRounds = Object.keys(rounds).sort((a, b) => a - b);
+    
+    let html = "";
+    sortedRounds.forEach(r => {
+        const isCurrentRound = (activeRound == r);
+
+        html += `<div class="bracket-round">`;
+        html += `<div class="bracket-round-title">ROUND ${r}</div>`;
+        rounds[r].forEach(m => {
+            const p1Short = getCachedEnvoiName(m.p1);
+            const p2Short = getCachedEnvoiName(m.p2);
+            
+            let p1Class = "";
+            let p2Class = "";
+            if (m.winner) {
+                if (m.winner === m.p1) {
+                    p1Class = "winner"; p2Class = "loser";
+                } else if (m.winner === m.p2) {
+                    p2Class = "winner"; p1Class = "loser";
+                }
+            }
+            
+            html += `
+                <div class="bracket-match ${isCurrentRound && !m.winner ? 'active' : ''}">
+                    <div class="bracket-player ${p1Class}">${p1Short}</div>
+                    <div class="vs-label">VS</div>
+                    <div class="bracket-player ${p2Class}">${p2Short}</div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    });
+    return html;
+}
+
+function updateTournamentPaginationUI() {
+    const prevBtn = document.getElementById("prev-tournament-btn");
+    const nextBtn = document.getElementById("next-tournament-btn");
+    const info = document.getElementById("tournament-page-info");
+    
+    if (!prevBtn || !nextBtn || !info) return;
+
+    const totalPages = Math.ceil(totalTournaments / tournamentLimit);
+    info.innerText = `Page ${currentTournamentPage} of ${totalPages || 1}`;
+
+    prevBtn.disabled = (currentTournamentPage <= 1);
+    nextBtn.disabled = (currentTournamentPage >= totalPages || totalPages === 0);
+
+    const prevIdx = currentTournamentPage - 1;
+    const nextIdx = currentTournamentPage + 1;
+
+    prevBtn.onclick = () => {
+        fetchTournamentHistory(prevIdx);
+        document.getElementById("hof-history-view").scrollTop = 0;
+    };
+    nextBtn.onclick = () => {
+        fetchTournamentHistory(nextIdx);
+        document.getElementById("hof-history-view").scrollTop = 0;
+    };
+}
+
+// Placeholder for handleTournamentUI - assuming it's defined elsewhere or will be moved here
+function handleTournamentUI(tournamentState) {
+    const banner = document.getElementById("tournament-banner");
+    const statusText = document.getElementById("tournament-status-text");
+    const regBtn = document.getElementById("tournament-reg-btn");
+
+    if (!tournamentState || !tournamentState.active) {
+        if (banner) banner.classList.add("hidden");
+        return;
+    }
+
+    if (banner) banner.classList.remove("hidden");
+    if (statusText) {
+        const network = window.GetGameState()?.network || "VOI";
+        const currency = network === "VOI" ? "$VBV" : "$AVoi";
+
+        if (tournamentState.current_round === 0) {
+            statusText.innerText = `Registration Open! Buy-in: ${tournamentState.buy_in_amount} ${currency}`;
+            
+            // PROACTIVE CHECK: Only show the Join button if critical network config has arrived
+            const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+            if (CONFIG.VAULT_ADDRESS && assetId) {
+                if (regBtn) regBtn.classList.remove("hidden");
+            } else {
+                // If config is missing, inform the user why the button isn't visible yet
+                statusText.innerText += " (Establishing Secure Sync...)";
+                if (regBtn) regBtn.classList.add("hidden");
+            }
+        } else {
+            statusText.innerText = `Tournament Active - Round ${tournamentState.current_round}`;
+            if (regBtn) regBtn.classList.add("hidden");
+        }
+    }
+}
+
+async function renderTournamentBracket(state) {
+    // Prime Envoi names for all bracket participants
+    const participants = new Set();
+    state.matches.forEach(m => {
+        if (m.p1) participants.add(m.p1);
+        if (m.p2) participants.add(m.p2);
+        if (m.winner) participants.add(m.winner);
+    });
+    await Promise.all(Array.from(participants).filter(p => p && p !== "TBD").map(p => resolveEnvoiName(p)));
+
+    const potEl = document.getElementById("tournament-pot-display");
+    if (potEl) potEl.innerText = `POT: ${state.pot.toFixed(1)} $VBV`;
+    
+    const visualization = document.getElementById("bracket-visualization");
+    if (visualization) visualization.innerHTML = generateBracketHTML(state.matches, state.current_round);
+}
+
+async function registerForTournament() {
+    const regBtn = document.getElementById("tournament-reg-btn");
+    if (!userAddress) { showToast("Connect wallet first", "error"); return; }
+    const state = window.GetGameState();
+    if (!state.tournament) return;
+
+    try {
+        const buyInBase = state.tournament.buy_in_amount;
+        const buyInMicro = Math.floor(buyInBase * 1000000);
+        const network = state.network;
+        const currency = network === "VOI" ? "$VBV" : "$AVoi";
+        const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+
+        // HARD GUARD: Block registration if configuration hasn't been synced from the server identity message yet
+        if (!assetId || !CONFIG.VAULT_ADDRESS) {
+            showToast("⚠️ <b>CRITICAL SYNC ERROR:</b> Arena configuration is missing. Registration is impossible at this time. Please try refreshing.", "error", 10000);
+            regBtn.disabled = false;
+            regBtn.innerText = "JOIN EVENT";
+            return;
+        }
+
+        const originalBtnText = regBtn.innerText;
+        regBtn.disabled = true;
+        regBtn.innerText = "Processing...";
+
+        showToast(`✍️ Signing ${buyInBase} ${currency} Buy-in...`, "info");
+
+        let txid = "";
+        let txObj = null;
+
+        // 1. CONSTRUCT TRANSACTION BASED ON NETWORK
+        if (network === "VOI") {
+            // ARC-200 Transfer (Application Call)
+            // Selector for transfer(address,uint256): 0x2b426dec
+            const methodSelector = new Uint8Array([0x2b, 0x42, 0x6d, 0xec]);
+            const recipientAddr = algosdk.decodeAddress(CONFIG.VAULT_ADDRESS).publicKey;
+            
+            // Encode amount as 32-byte uint256 for ARC-200
+            const amountArg = new Uint8Array(32);
+            const amountBI = BigInt(buyInMicro);
+            for (let i = 0; i < 8; i++) {
+                amountArg[31 - i] = Number((amountBI >> BigInt(i * 8)) & 0xffn);
+            }
+
+            txObj = {
+                from: userAddress,
+                type: 'appl',
+                appIndex: assetId,
+                appArgs: [methodSelector, recipientAddr, amountArg],
+                note: new TextEncoder().encode(`ARENA_TOURN_BUYIN:${Date.now()}`)
+            };
+        } else if (network === "ALGO") {
+            // Standard ASA Transfer
+            txObj = {
+                from: userAddress,
+                to: CONFIG.VAULT_ADDRESS,
+                type: 'axfer',
+                assetIndex: assetId,
+                amount: buyInMicro,
+                note: new TextEncoder().encode(`ARENA_TOURN_BUYIN:${Date.now()}`)
+            };
+        }
+
+        if (!txObj) throw new Error(`Unsupported network configuration: ${network}`);
+
+        // 2. SIGN AND BROADCAST BASED ON PROVIDER
+        if (walletProvider === 'nautilus') {
+            const signed = await window.algo.signTxn([{ txn: algosdk.encodeObj(txObj), signers: [userAddress] }]);
+            const { txId: broadcastId } = await window.algo.sendRawTransaction(signed[0]);
+            txid = broadcastId;
+        } else if (walletProvider === 'kibisis') {
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
+            const signed = await window.kibisis.signTxns([{ txn: txnB64 }]);
+            const { txId: broadcastId } = await window.kibisis.pushTxns(signed);
+            txid = broadcastId;
+        } else if (walletProvider === 'walletconnect' && signClient) {
+            const sessions = signClient.session.getAll();
+            if (sessions.length === 0) throw new Error("WalletConnect session not found.");
+            
+            const chainId = network === "VOI" ? CONFIG.VOI_CHAIN_ID : CONFIG.ALGO_CHAIN_ID;
+            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
+            
+            const response = await signClient.request({
+                topic: sessions[0].topic,
+                chainId: chainId,
+                request: {
+                    method: "algo_signTxn",
+                    params: [[{ txn: txnB64, signers: [userAddress] }]]
+                }
+            });
+
+            if (!response || !response[0]) throw new Error("WalletConnect signing failed or was cancelled.");
+            
+            const signedTxnBytes = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
+            const netCfg = getNetworkConfig(network);
+            if (!netCfg || !netCfg.node_url) throw new Error(`Node configuration for ${network} not found. Syncing...`);
+            
+            const client = new algosdk.Algodv2("", netCfg.node_url, "");
+            const { txId: broadcastId } = await client.sendRawTransaction(signedTxnBytes).do();
+            txid = broadcastId;
+        } else {
+            throw new Error("Active wallet provider is not supported for tournament buy-ins.");
+        }
+
+        if (!txid) throw new Error("Transaction failed or was cancelled.");
+
+        showToast(`🛰️ Payout Confirmed: ${txid.substring(0,8)}... Registering with server.`, "info");
+
+        // 2. SUBMIT REGISTRATION TO BACKEND
+        const response = await fetch(`${CONFIG.API_BASE}/api/tournament/register`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet: userAddress,
+                txid: txid,
+                network: network
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`🏆 Registration Finalized! ${result.message}`, "success", 8000);
+            document.getElementById("tournament-reg-btn")?.classList.add("hidden");
+        } else {
+            const err = await response.text();
+            if (response.status === 403) {
+                if (err.includes("Opt-in Required")) {
+                    showToast(`🚫 <b>PROTOCOL BLOCKED</b><br>${err}`, "error", 20000);
+                } else if (err.includes("Wallet already registered")) {
+                    showToast(`🚫 <b>ALREADY REGISTERED:</b> ${err}`, "warning", 10000);
+                    document.getElementById("tournament-reg-btn")?.classList.add("hidden"); // Hide button if already registered
+                } else {
+                    showToast(`❌ Server Sync Failed (403): ${err}. Please contact support with TxID: ${txid}`, "error", 15000);
+                }
+                return;
+            } else if (response.status === 409) { // Handle Conflict specifically
+                showToast(`⚠️ <b>REGISTRATION CONFLICT:</b> ${err}`, "warning", 10000);
+                return;
+            }
+            showToast(`❌ Server Sync Failed: ${err}. Please contact support with TxID: ${txid}`, "error", 15000);
+
+        }
+    } catch (err) {
+        console.error("[TOURNAMENT ERROR]", err);
+        showToast(`⚠️ Payment aborted: ${err.message}`, "error");
+    } finally {
+        regBtn.disabled = false;
+        regBtn.innerText = originalBtnText;
+    }
+}
+
+function openTournamentBracket() {
+    window.SetPhase("TournamentLobby");
+    syncUI();
+}
+
+function closeTournamentBracket() {
+    window.SetPhase("Lobby");
+    syncUI();
+}
+
+function openSettingsOverlay() {
+    document.getElementById("settings-overlay").classList.remove("hidden");
+}
+
+function closeSettingsOverlay() {
+    document.getElementById("settings-overlay").classList.add("hidden");
+}
+
+function setMasterVolume(value) {
+    masterVolume = parseFloat(value);
+    window.SetMasterVolume(masterVolume);
+    syncUI();
+}
+
+function setMusicVolume(value) {
+    musicVolume = parseFloat(value);
+    window.SetMusicVolume(musicVolume);
+    syncUI();
+}
+
+function setSfxVolume(value) {
+    sfxVolume = parseFloat(value);
+    window.SetSfxVolume(sfxVolume);
+    syncUI();
+}
+
+function toggleMuteMaster() {
+    masterVolume = masterVolume === 0 ? 0.5 : 0;
+    document.getElementById("master-volume").value = masterVolume;
+    setMasterVolume(masterVolume);
+}
+
+function toggleMuteMusic() {
+    const state = window.GetGameState();
+    let newMusicVolume = state.musicVolume === 0 ? 0.5 : 0; // Toggle between 0 and 0.5
+    window.SetMusicVolume(newMusicVolume); // Update WASM engine
+    document.getElementById("music-volume").value = newMusicVolume; // Update settings slider
+    syncUI(); // Re-sync UI to reflect changes, including the new button
+}
+
+function toggleMuteSfx() {
+    sfxVolume = sfxVolume === 0 ? 0.5 : 0;
+    document.getElementById("sfx-volume").value = sfxVolume;
+    setSfxVolume(sfxVolume);
+}
+
+// Global function to manage transaction status display
+function setTransactionStatus(message, type = 'info') {
+    const statusEl = document.getElementById("transaction-status");
+    if (!statusEl) return;
+
+    if (message) {
+        statusEl.classList.remove("hidden");
+        statusEl.innerHTML = `<span style="color: ${type === 'error' ? '#ff4b4b' : type === 'success' ? 'var(--neon-green)' : 'var(--neon-cyan)'};">${message}</span>`;
+    } else {
+        statusEl.classList.add("hidden");
+        statusEl.innerHTML = "";
+    }
+}
+
+// --- Social Sharing Logic ---
+function shareTournamentVictory() {
+    const state = window.GetGameState();
+    const rating = state.deck_rating || "[Z]";
+    const score = `${state.scores[0]}-${state.scores[1]}`;
+    const arenaUrl = window.location.origin;
+
+    // Construct the text for the tweet
+    const tweetText = `🏆 Just dominated the Virtualbabes Arena!\n\n` +
+                      `⚔️ Victory: ${score}\n` +
+                      `🎴 Deck Rating: ${rating}\n\n` +
+                      `Come challenge me on @Voi_Network! 🚀\n\n` +
+                      `#Virtualbabes #Voi #NFTGaming #Web3`;
+
+    const twitterUrl = `<https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(arenaUrl)}>`;
+    
+    // Open in a new tab
+    window.open(twitterUrl, '_blank');
+    
+    showToast("Opening X Social Share...", "info");
+}
+
+// Placeholder for tournament round transition animation
+function showTournamentTransition(roundNumber) {
+    const overlay = document.getElementById("tournament-transition-overlay"); // Assume an overlay exists
+    if (!overlay) return;
+    
+    overlay.querySelector(".round-number-display").innerText = `ROUND ${roundNumber}`;
+    overlay.classList.remove("hidden");
+
+    // Trigger fanfare sound effect for high-intensity round advancement
+    if (window.PlaySound) {
+        window.PlaySound('Pay_out-in.mp3');
+    }
+
+    setTimeout(() => overlay.classList.add("hidden"), 3000); // Hide after 3 seconds
+}
+
+// Show kidnap overlay with ransom demand
+function showKidnapOverlay(payload) {
+    const overlay = document.getElementById("kidnap-overlay");
+    const content = document.getElementById("kidnap-content");
+    if (!overlay || !content) return;
+
+    content.innerHTML = `
+        <p>Your card <strong>${payload.card_name}</strong> has been kidnapped!</p>
+        <p>Ransom: <span class="ransom-amount">${payload.ransom_amount} $VBV</span></p>
+        <button class="pay-ransom-btn" onclick="payRansom('${payload.kidnap_id}')">Pay Ransom</button>
+        <p class="insurance-timer">Insurance recovery in: <span id="recovery-timer">48:00:00</span></p>
+    `;
+    overlay.classList.remove("hidden");
+
+    // Start countdown timer
+    startRecoveryTimer(payload.expires_at);
+}
+
+// Pay ransom for kidnapped card
+function payRansom(kidnapId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(JSON.stringify({
+        type: "pay_ransom",
+        payload: { kidnap_id: kidnapId }
+    }));
+}
+
+// Start countdown for insurance recovery
+function startRecoveryTimer(expiresAt) {
+    const timerEl = document.getElementById("recovery-timer");
+    if (!timerEl) return;
+
+    const interval = setInterval(() => {
+        const now = Date.now();
+        const remaining = expiresAt - now;
+        if (remaining <= 0) {
+            clearInterval(interval);
+            timerEl.textContent = "00:00:00";
+            return;
+        }
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}

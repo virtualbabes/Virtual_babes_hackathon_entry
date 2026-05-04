@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtualbabes Arena | NFT Seduction</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎴</text></svg>">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- WASM and Wallet SDKs -->
+    <script src="wasm_exec.js"></script>
+    
+    <!-- Essential Polyfills for Blockchain SDKs (Required for transaction encoding) -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <script>window.Buffer = window.Buffer || buffer.Buffer;</script>
+
+    <!-- Voi & Algorand SDKs -->
+    <script src="https://unpkg.com/algosdk@2.7.0/dist/browser/algosdk.min.js"></script> 
+
+    <!-- WalletConnect v2 Integration (Pera, Defly, etc.) -->
+    <script src="https://unpkg.com/@walletconnect/sign-client@2.10.6/dist/index.umd.js"></script>
+    <script src="https://unpkg.com/@walletconnect/modal@2.6.2/dist/index.umd.js"></script>
+</head>
+<body>
+
+    <div class="main-game-container" id="main-game-container">
+        <!-- Top Bar: Faucet, Status, Navigation -->
+        <div class="top-bar">
+            <div id="faucet-display" class="faucet-stat">0.00 $VBV</div>
+            <div id="season-countdown-widget" class="hidden season-info flex-col">
+                <span class="font-small-caps letter-spacing-1">SEASON <span id="season-num-display">1</span> ENDS</span>
+                <span id="season-timer" class="font-bold-rajdhani">--:--:--</span>
+            </div>
+            <div id="payout-config-widget" class="glass-panel payout-widget" onclick="openPayoutSettings()">
+                <span class="opacity-6 font-size-0-7em">VOI PAYOUT:</span>
+                <span id="payout-address-display" class="font-mono text-neon-green">Not Set (Default)</span>
+            </div>
+            <div id="turn-display" class="round-title m-0 font-size-1em">LOBBY</div>
+            <div id="transaction-status" class="hidden font-small opacity-6 ml-10"></div>
+            <div id="latency-monitor" class="font-small opacity-6">
+                LATENCY: <span id="latency-display">-- ms</span>
+            </div>
+            <button id="music-toggle-btn" class="outline p-5-10 font-size-10px ml-10 mr-10" onclick="toggleMuteMusic()" aria-label="Toggle Background Music">🎵</button>
+            <div id="wallet-controls">
+                <button id="wallet-btn" onclick="handleWalletAction()">Connect Authority Wallet</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- Column 1: Matchmaking & Social -->
+            <div class="column glass-panel">
+                <h3>Live Lobby</h3>
+                
+                <!-- Matchmaking Controls -->
+                <div id="matchmaking-container" class="matchmaking-box text-center">
+                    <div id="queue-status" class="font-small mb-10 opacity-8">Ready for automatic pairing?</div>
+                    <button id="btn-matchmaking" onclick="toggleMatchmakingQueue()" class="w-full m-0">Join Matchmaking Pool</button>
+                </div>
+
+                <div id="local-ban-cooldown" class="cooldown-container hidden">
+                    <div class="cooldown-header">ARENA RESTRICTION ACTIVE</div>
+                    <div class="cooldown-progress-bg">
+                        <div id="ban-progress-fill" class="cooldown-progress-fill"></div>
+                    </div>
+                    <div id="ban-countdown-timer" class="font-small mt-10">00:00:00</div>
+                </div>
+
+                <div class="player-list-header flex-row justify-between font-small opacity-6 mb-5">
+                    <span>CLIENT ID</span>
+                    <span>ACTION</span>
+                </div>
+                <ul id="active-players" class="player-list"></ul>
+                
+                <div class="chat-container">
+                    <div id="chat-display"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" class="glass-input" placeholder="Type a message..." onkeydown="handleChatKey(event)" aria-label="Chat message">
+                        <button class="chat-send-btn" onclick="sendChatMessage()">SEND</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: The War Room -->
+            <div class="column glass-panel align-center justify-center flex-1-5 w-450 border-neon-cyan">
+                <div id="arena-header" class="arena-header-container">
+                    <h2 id="deck-rating-display" class="deck-rating-label">[Z]</h2>
+                    <div id="rewards-dashboard" class="rewards-info-banner"></div>
+                </div>
+
+                <!-- Opponent Info -->
+                <div id="p2-info" class="flex-row gap-15 mb-10 w-80p justify-end">
+                    <div class="text-right">
+                        <div id="p2-name" class="font-bold font-small">Bot</div>
+                    </div>
+                    <div id="p2-avatar" class="avatar-frame border-error avatar-small"></div>
+                </div>
+
+                <!-- 3x3 Grid -->
+                <div id="board-container" class="battle-board"></div>
+
+                <!-- Player Info -->
+                <div id="p1-info" class="flex-row gap-15 mt-20 w-80p">
+                    <div id="p1-avatar" class="avatar-frame avatar-small"></div>
+                    <div>
+                        <div id="p1-name" class="font-bold font-small">You</div>
+                    <!-- Moderation Notice for Avatars -->
+                    <div id="avatar-notice-banner" class="hidden avatar-notice font-size-0-7em mt-5 p-4-8 line-height-1-2 max-w-200"></div>
+                    </div>
+                </div>
+
+                <div id="ai-thinking-indicator" class="hidden flex-row gap-10 mt-10 text-italic text-neon-cyan">
+                    <div class="thinking-spinner thinking-spinner-small"></div>
+                    <span>Opponent evaluating move...</span>
+                </div>
+            </div>
+
+            <!-- Column 3: Stats & Deck -->
+            <div class="column glass-panel">
+                <div id="tournament-banner" class="hidden tournament-highlight-banner text-center">
+                    <div class="font-bold font-xsmall letter-spacing-2">LIVE TOURNAMENT</div>
+                    <div id="tournament-status-text" class="font-small mb-5 mt-5">Registration Open!</div>
+                    <div class="flex-row justify-center gap-5">
+                        <button id="tournament-reg-btn" class="outline p-5-10 font-size-10px" onclick="registerForTournament()">JOIN EVENT</button>
+                        <button class="outline p-5-10 font-size-10px border-purple text-purple" onclick="openTournamentBracket()">VIEW BRACKET</button>
+                    </div>
+                </div>
+
+                <div id="hand-container" class="player-hand"></div>
+                
+                <div id="action-bar" class="flex-col gap-10 mt-20">
+                    <button id="start-btn" onclick="window.StartMatch(); syncUI();" disabled>Start Battle</button>
+                    <button id="deck-btn" class="outline" onclick="openDeckManager()">Deck Manager</button>
+                    <button id="hof-btn" class="outline border-gold text-gold" onclick="window.ToggleLeaderboard(); syncUI();">Hall of Fame</button>
+                    <button id="settings-btn" class="outline border-grey text-grey" onclick="openSettingsOverlay()">⚙️ Settings</button>
+                </div>
+
+                <div class="glass-panel p-15 mt-15">
+                    <h3 class="mb-10 font-small border-bottom-glass">Recent Battles</h3>
+                    <div id="history-display" class="font-small scroll-y max-h-150"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Selection Overlay -->
+    <div id="wallet-selector-overlay" class="overlay hidden">
+        <div class="glass-panel w-350 text-center">
+            <h2 class="text-neon-cyan">Connect Wallet</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">Select your preferred Voi provider</p>
+            
+            <button class="wallet-option" onclick="connectWith('nautilus')">
+                <img src="https://nautilus.sh/favicon.png" alt="Nautilus">
+                <span>Nautilus Wallet</span>
+            </button>
+            <button class="wallet-option" onclick="connectWith('kibisis')">
+                <img src="https://kibisis.app/favicon.ico" alt="Kibisis">
+                <span>Kibisis Wallet</span>
+            </button>
+            <button class="wallet-option" onclick="connectWith('walletconnect')">
+                <img src="https://walletconnect.com/walletconnect-logo.png" alt="WalletConnect">
+                <span>WalletConnect (Pera, Defly)</span>
+            </button>
+            
+            <button class="outline mt-20 w-full" onclick="closeWalletSelector()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Payout Address Overlay -->
+    <div id="payout-settings-overlay" class="overlay hidden">
+        <div class="glass-panel settings-panel w-400">
+            <h2 class="text-neon-green">Voi Payout Address</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">The faucet pays rewards <b>only on Voi</b>. If you are playing from another chain, specify your Voi wallet here.</p>
+            <input type="text" id="payout-address-input" placeholder="Enter Voi Address..." class="glass-input w-full mb-15" aria-label="Voi payout address">
+            <button onclick="savePayoutAddress()" class="w-full bg-neon-green">Save Payout Target</button>
+            <button class="outline w-full mt-10" onclick="hideAllOverlays()">Use Default Wallet</button>
+            <button class="outline w-full mt-10 border-grey" onclick="hideAllOverlays()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Settings Overlay (Sound Controls) -->
+    <div id="settings-overlay" class="overlay hidden">
+        <div class="glass-panel settings-panel">
+            <h2 style="color: var(--neon-cyan);">Settings</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Adjust your audio experience</p>
+            
+            <div class="volume-control">
+                <label>Master</label>
+                <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.5" oninput="setMasterVolume(this.value)" aria-label="Master volume">
+                <button class="outline" onclick="toggleMuteMaster()">🔇</button>
+            </div>
+            <div class="volume-control">
+                <label>Music</label>
+                <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.5" oninput="setMusicVolume(this.value)" aria-label="Music volume">
+                <button class="outline" onclick="toggleMuteMusic()">🎵</button>
+            </div>
+            <div class="volume-control">
+                <label>SFX</label>
+                <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.5" oninput="setSfxVolume(this.value)" aria-label="Sound effects volume">
+                <button class="outline" onclick="toggleMuteSfx()">🔊</button>
+            </div>
+            <button class="outline" style="margin-top: 20px; width: 100%;" onclick="closeSettingsOverlay()">Close</button>
+        </div>
+    </div>
+
+    <!-- Initial Setup Overlay (Avatar Selection) -->
+    <div id="setup-overlay" class="overlay hidden">
+        <h1 style="font-size: 3em; margin-bottom: 10px;">Select Your Avatar</h1>
+        <p style="opacity: 0.8; margin-bottom: 20px;">Choose an NFT from your collection to enter the Arena.</p>
+        
+        <div id="setup-container" style="display: flex; gap: 40px; align-items: flex-start; justify-content: center; width: 90%; max-width: 1100px;">
+            <!-- Left Side: Selection Grid -->
+            <div class="column glass-panel" style="margin: 0; flex: 1;">
+                <!-- Collection Filter Bar -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="avatar-search" class="glass-input" placeholder="Search by name..." style="flex: 2; font-size: 12px; padding: 8px;" oninput="applyAvatarFilters()" aria-label="Search avatars">
+                    <select id="avatar-sort" class="glass-input" style="flex: 1; font-size: 12px; padding: 8px;" onchange="applyAvatarFilters()" aria-label="Sort avatars">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="rarity">Rarity (Mint)</option>
+                    </select>
+                </div>
+
+                <div id="setup-loader" class="column" style="align-items: center; justify-content: center; height: 300px;">
+                    <div class="thinking-spinner"></div>
+                    <p>Scanning your Voi Collection...</p>
+                </div>
+                <div id="avatar-grid" class="hof-scrolling-content" style="display: grid; grid-template-columns: repeat(auto-fill, 100px); gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px;">
+                    <!-- NFTs loaded here -->
+                </div>
+            </div>
+
+            <!-- Right Side: Preview & Crop -->
+            <div id="avatar-preview-section" class="column glass-panel hidden" style="margin: 0; flex: 1; align-items: center; border-color: var(--neon-cyan);">
+                <h3>Avatar Preview</h3>
+                <div class="avatar-preview-frame" id="crop-frame">
+                    <img id="crop-image" src="" alt="Avatar Preview">
+                </div>
+                <div style="width: 220px; margin-top: 10px;">
+                    <label style="font-size: 10px; opacity: 0.6; display: block; margin-bottom: 5px;">VICTORY GLOAT MESSAGE</label>
+                    <input type="text" id="gloat-message-input" class="glass-input" placeholder="e.g. Too easy!" maxlength="60" style="width: 100%; font-size: 12px; padding: 8px;">
+                </div>
+                <div class="crop-controls" style="width: 100%; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; width: 220px; font-size: 10px; margin-bottom: 5px;">
+                        <label for="zoom-slider">ZOOM</label>
+                        <span id="zoom-val">1.0x</span>
+                    </div>
+                    <input type="range" id="zoom-slider" min="1" max="4" step="0.01" value="1" style="width: 220px;" title="Zoom">
+                    <p style="font-size: 10px; opacity: 0.6; margin-top: 10px;">Drag image in circle to pan</p>
+                </div>
+                <button id="confirm-avatar-btn" style="width: 220px; margin-top: 30px; box-shadow: 0 0 20px var(--neon-cyan);">Confirm & Entry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hall of Fame Overlay -->
+    <div id="leaderboard-overlay" class="overlay hidden">
+        <h1 style="font-size: 3.5em; margin-bottom: 10px;">Hall of Fame</h1>
+        
+        <div class="hof-actions">
+            <button class="outline btn-refresh" onclick="fetchLeaderboard();">🔄 Refresh Rankings</button>
+            <button class="outline btn-return" onclick="window.ToggleLeaderboard(); syncUI();">🔙 Return to Arena</button>
+        </div>
+
+        <div class="hof-tab-bar">
+            <div id="tab-rankings" class="hof-tab active" onclick="switchHofTab('rankings')">🏆 Global Rankings</div>
+            <div id="tab-history" class="hof-tab" onclick="switchHofTab('history')">📜 Tournament Archives</div>
+            <div id="tab-seasons" class="hof-tab" onclick="switchHofTab('seasons')">⏳ Season History</div>
+        </div>
+        
+        <div id="hof-rankings-view" class="hof-container">
+            <!-- Top 10 Pinned -->
+            <div id="hof-top-10" class="hof-static-top"></div>
+            <!-- 11+ Scroller -->
+            <div class="hof-scroller-window">
+                <div id="hof-scrolling-content"></div>
+            </div>
+        </div>
+
+        <div id="hof-history-view" class="hof-container hidden" style="overflow-y: auto;">
+            <div id="tournament-history-list" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Archived tournaments loaded here -->
+            </div>
+        </div>
+
+        <div id="hof-seasons-view" class="hof-container hidden" style="overflow-y: auto;">
+            <!-- Season Filter Bar -->
+            <div class="season-filter-bar">
+                <label style="font-size: 0.8em; opacity: 0.7; letter-spacing: 1px;">FILTER BY EPOCH:</label>
+                <input type="number" id="season-filter-input" class="glass-input" placeholder="All" style="width: 80px; padding: 5px 10px; font-weight: bold; color: var(--neon-cyan);" oninput="filterSeasonHistory()" aria-label="Filter by season number">
+            </div>
+            
+            <div id="season-history-list" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Archived seasons loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Tournament Bracket Overlay -->
+    <div id="tournament-overlay" class="overlay hidden">
+        <h1 style="font-size: 3em; margin-bottom: 10px;">Tournament Bracket</h1>
+        <div id="tournament-pot-display" style="font-size: 1.5em; color: var(--neon-cyan); margin-bottom: 20px;">POT: 0.00 $VBV</div>
+        
+        <div class="hof-actions">
+            <button class="outline btn-return" onclick="closeTournamentBracket()">🔙 Return to Arena</button>
+        </div>
+
+        <div id="bracket-visualization"></div>
+    </div>
+
+    <!-- Match Preview Overlay -->
+    <div id="match-preview-overlay" class="overlay hidden">
+        <h2 style="color: var(--neon-purple); letter-spacing: 4px;">COMBATANTS IDENTIFIED</h2>
+        <div class="preview-vs-container">
+            <div class="preview-side">
+                <div id="preview-p1-id" style="font-size: 0.9em; opacity: 0.7;">P1</div>
+                <div id="preview-p1-rating" class="preview-rating">[Z]</div>
+            </div>
+            <div class="vs-divider">VS</div>
+            <div class="preview-side">
+                <div id="preview-p2-id" style="font-size: 0.9em; opacity: 0.7;">P2</div>
+                <div id="preview-p2-rating" class="preview-rating">[Z]</div>
+            </div>
+        </div>
+        <p id="preview-status-text" style="font-style: italic; margin-bottom: 30px; opacity: 0.8;">Syncing board state...</p>
+        <button id="enter-war-room-btn" class="outline" style="min-width: 250px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="proceedToWarRoom()">ENTER WAR ROOM</button>
+    </div>
+
+    <!-- Deck Manager Overlay -->
+    <div id="deck-manager-overlay" class="overlay hidden">
+        <div class="hof-actions" style="margin-top: 20px;">
+            <button class="outline btn-return" onclick="closeDeckManager()">🔙 Close Manager</button>
+        </div> 
+        <h1 style="font-size: 3em;">Deck Manager</h1>
+        
+        <div class="dashboard" style="height: 70vh; overflow: hidden;">
+            <!-- Left: Global Inventory (Tier List) -->
+            <div class="column glass-panel" style="flex: 2;">
+                <h3>Available Cards (Inventory)</h3>
+                <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, 100px); gap: 10px; overflow-y: auto; padding: 10px;">
+                    <!-- Cards will be rendered here with draggable=true -->
+                </div>
+            </div>
+
+            <!-- Right: Deck Composition -->
+            <div class="column glass-panel" style="flex: 1; border-color: var(--neon-cyan);">
+                <h3>Current Deck (5 Cards)</h3>
+                <button onclick="window.AutoBuildDeck(); renderDeckManager();" style="width: 100%; margin-bottom: 10px; background: var(--neon-purple);">⚡ AUTO-BUILD BEST DECK</button>
+                
+                <!-- X-Chain Management -->
+                <div style="margin-bottom: 15px; border: 1px solid var(--glass-border); padding: 10px; border-radius: 8px; background: rgba(0,242,254,0.05);">
+                    <div style="font-size: 0.7em; opacity: 0.7; margin-bottom: 5px; letter-spacing: 1px;">X-CHAIN NFT SOURCES</div>
+                    <div id="linked-wallets-list" style="margin-bottom: 8px;"></div>
+                    <button class="outline" style="width: 100%; font-size: 11px; padding: 5px;" onclick="addXChainWallet()">➕ LINK X-CHAIN WALLET</button>
+                </div>
+
+                <div id="deck-stat-summary" style="display: flex; justify-content: space-around; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; font-size: 0.9em; border: 1px solid var(--glass-border);">
+                    <div>ATTACK: <b id="total-atk" style="color: var(--neon-cyan);">0</b></div>
+                    <div>DEFENSE: <b id="total-def" style="color: var(--neon-purple);">0</b></div>
+                </div>
+                <div id="deck-drop-zone" style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 15px; border: 2px dashed var(--glass-border); border-radius: 12px;">
+                    <!-- Drop cards here -->
+                </div>
+                <div id="deck-selector-bar" style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
+                    <!-- 4 Deck Slots with Reputation Locks -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Control Panel -->
+    <div id="admin-control-panel" class="overlay hidden">
+        <div class="glass-panel" style="width: 90vw; max-width: 800px; text-align: center;">
+            <h1>Admin Suite</h1>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+                <!-- Power Scaling Controls -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-purple);">
+                    <h2>Power Scaling</h2>
+                    <div style="margin-bottom: 20px; text-align: left;">
+                        <label for="admin-power-divisor">Divisor: <b id="power-divisor-val" style="color: var(--neon-cyan);">1000000.0</b></label>
+                        <input type="range" id="admin-power-divisor" min="100000" max="10000000" step="10000" value="1000000" style="width: 100%;" 
+                               oninput="document.getElementById('power-divisor-val').innerText = parseFloat(this.value).toFixed(1)">
+                        <small style="display: block; opacity: 0.6; font-size: 0.7em; margin-top: 5px;">Higher divisor = Lower resulting card power</small>
+                    </div>
+                    <div style="margin-bottom: 20px; text-align: left;">
+                        <label for="admin-power-base">Base Power: <b id="power-base-val" style="color: var(--neon-cyan);">50</b></label>
+                        <input type="range" id="admin-power-base" min="0" max="200" step="1" value="50" style="width: 100%;" 
+                               oninput="document.getElementById('power-base-val').innerText = this.value">
+                        <small style="display: block; opacity: 0.6; font-size: 0.7em; margin-top: 5px;">Minimum power for cards with no sale history</small>
+                    </div>
+                    <button onclick="adminUpdatePowerScaling()" style="width: 100%; background: var(--neon-purple);">Update Power Scaling</button>
+                </div>
+
+                <!-- System Overrides -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px;">
+                    <h2>Global Rules</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">
+                        <label><input type="checkbox" id="rule-open"> Open</label>
+                        <label><input type="checkbox" id="rule-same"> Same</label>
+                        <label><input type="checkbox" id="rule-plus"> Plus</label>
+                        <button onclick="adminUpdateRules()" style="width: 100%;">Sync Global Rules</button>
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 10px 0;">
+                        <label><input type="checkbox" id="dev-mode-toggle" onclick="adminToggleDevMode()"> Dev Mode (AI Loses)</label>
+                    </div>
+                </div>
+
+                <!-- Network Configuration -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-blue);">
+                    <h2>Network Configuration</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                        <label for="admin-network-select">Active Arena Network:</label>
+                        <select id="admin-network-select" class="glass-input" style="width: 100%; font-size: 0.9em;" onchange="onAdminNetworkSelectChange()">
+                            <!-- Options populated dynamically -->
+                        </select>
+                        <button onclick="adminSetActiveNetwork()" style="width: 100%; background: var(--neon-blue);">Set Active Network</button>
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 10px 0;"> 
+                        <div id="admin-network-details" style="font-size: 0.75em; opacity: 0.8; line-height: 1.4; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;">
+                            <i style="opacity: 0.5;">Select a network to view details...</i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add New Network -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-purple);">
+                    <h2>Add New Network</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                        <label for="new-network-name">Network Name:</label>
+                        <input type="text" id="new-network-name" placeholder="e.g., Ethereum Mainnet" class="glass-input">
+
+                        <label for="new-explorer-url">Explorer URL:</label>
+                        <input type="text" id="new-explorer-url" placeholder="e.g., https://etherscan.io" class="glass-input">
+
+                        <label for="new-indexer-url">Indexer URL:</label>
+                        <input type="text" id="new-indexer-url" placeholder="e.g., https://api.thegraph.com/subgraphs/name/..." class="glass-input">
+
+                        <label for="new-node-url">Node RPC URL:</label>
+                        <input type="text" id="new-node-url" placeholder="e.g., https://mainnet.infura.io/v3/..." class="glass-input">
+
+                        <label for="new-faucet-url">Faucet URL (Optional):</label>
+                        <input type="text" id="new-faucet-url" placeholder="e.g., https://faucet.example.com" class="glass-input">
+
+                        <label for="new-asset-id">Default Asset ID (e.g., VBV):</label>
+                        <input type="number" id="new-asset-id" placeholder="e.g., 40227315" class="glass-input">
+
+                        <label for="new-app-id">Default App/Contract ID (e.g., Collection):</label>
+                        <input type="number" id="new-app-id" placeholder="e.g., 7900471" class="glass-input">
+
+                        <label for="new-chain-id">WalletConnect Chain ID (CAIP-2):</label>
+                        <input type="text" id="new-chain-id" placeholder="e.g., eip155:1" class="glass-input">
+
+                        <label for="new-power-divisor">Power Divisor:</label>
+                        <input type="number" id="new-power-divisor" value="1000000" step="10000" class="glass-input">
+
+                        <label for="new-power-base">Power Base:</label>
+                        <input type="number" id="new-power-base" value="50" class="glass-input">
+
+                        <button onclick="adminAddNetwork()" style="width: 100%; background: var(--neon-purple);">Add Network to Registry</button>
+                    </div>
+                </div>
+
+                <!-- Moderation & Management -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: #ff4b4b;">
+                    <h2>Moderation</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                        <label for="admin-ban-wallet">Target Wallet Address:</label>
+                        <input type="text" id="admin-ban-wallet" class="glass-input" placeholder="voi1..." style="width: 100%; font-size: 0.9em;">
+                        <label for="admin-ban-hours">Ban Duration (Hours):</label>
+                        <input type="number" id="admin-ban-hours" class="glass-input" placeholder="24" style="width: 100%; font-size: 0.9em;">
+                        <button onclick="adminBanWallet()" style="width: 100%; background: #ff4b4b;">Ban Player</button>
+                        
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        
+                        <label for="admin-ban-avatar-url">Target NFT Image URL:</label>
+                        <input type="text" id="admin-ban-avatar-url" class="glass-input" placeholder="https://..." style="width: 100%; font-size: 0.9em;">
+                        <button onclick="adminAvatarBan(document.getElementById('admin-ban-avatar-url').value)" style="width: 100%; background: #ffa657;">Ban Avatar Asset</button>
+
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        
+                        <label for="admin-reset-wallet">Reset History for Wallet:</label>
+                        <input type="text" id="admin-reset-wallet" class="glass-input" placeholder="voi1..." style="width: 100%; font-size: 0.9em;">
+                        <button onclick="adminResetStats()" class="outline" style="width: 100%; border-color: #ff4b4b; color: #ff4b4b;">Reset Stats</button>
+                    </div>
+                </div>
+
+                <!-- System & Economy -->
+                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-green);">
+                    <h2>System & Economy</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                        <label for="admin-msg-text">Broadcast Announcement:</label>
+                        <input type="text" id="admin-msg-text" class="glass-input" placeholder="Enter message..." style="width: 100%; font-size: 0.9em;">
+                        <button onclick="adminBroadcast()" style="width: 100%;">Broadcast Message</button>
+                        
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        
+                        <label for="admin-refill-amt">Update Faucet Balance:</label>
+                        <input type="number" id="admin-refill-amt" class="glass-input" placeholder="Amount ($VBV)..." style="width: 100%; font-size: 0.9em;">
+                        <button onclick="adminRefillVault()" style="width: 100%; background: var(--neon-green);">Refill Vault</button>
+
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+
+                        <label for="admin-maint-mins">Maintenance Countdown (Mins):</label>
+                        <input type="number" id="admin-maint-mins" class="glass-input" placeholder="10" style="width: 100%; font-size: 0.9em;">
+                        <div style="display: flex; gap: 5px;">
+                            <button onclick="adminToggleMaintenance(true)" style="flex: 1; background: #ffa657;">Start</button>
+                            <button onclick="adminToggleMaintenance(false)" class="outline" style="flex: 1; border-color: #ffa657; color: #ffa657;">Stop</button>
+                        </div>
+                        
+                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <label>Reward Stack Management:</label>
+                        <div id="admin-reward-list" style="margin-bottom: 5px; max-height: 100px; overflow-y: auto;"></div>
+                        <input type="number" id="admin-add-asset" class="glass-input" placeholder="Asset ID" style="width: 100%; padding: 8px; margin-bottom: 5px; font-size: 12px;">
+                        <input type="number" id="admin-add-amt" class="glass-input" placeholder="Amount" style="width: 100%; padding: 8px; margin-bottom: 5px; font-size: 12px;">
+                        <button onclick="adminAddReward()" style="width: 100%; font-size: 11px;">Add Reward Asset</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Admin Logs -->
+            <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-cyan);">
+                <h2>Admin Logs</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="admin-log-filter" class="glass-input" placeholder="Filter logs (e.g., SECURITY)" style="flex: 1; min-width: 200px;">
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <label style="font-size: 0.7em; opacity: 0.7;">START:</label>
+                        <input type="datetime-local" id="admin-log-start" class="glass-input" style="font-size: 0.8em; padding: 5px;">
+                    </div>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <label style="font-size: 0.7em; opacity: 0.7;">END:</label>
+                        <input type="datetime-local" id="admin-log-end" class="glass-input" style="font-size: 0.8em; padding: 5px;">
+                    </div>
+                    <button onclick="fetchAdminLogs()" class="outline" style="padding: 5px 10px; font-size: 11px;">Apply Filters</button>
+                </div>
+                <div id="admin-logs-display" style="max-height: 300px; overflow-y: auto; text-align: left; font-size: 0.8em; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"></div>
+                <button onclick="fetchAdminLogs()" style="width: 100%; margin-top: 10px;">Refresh Logs</button>
+            </div>
+            <div style="margin-top: 20px; font-size: 0.8em; opacity: 0.7;">Last Admin Action: <span id="admin-last-action">Awaiting first action...</span></div>
+            <button class="outline" onclick="hideAllOverlays()" style="margin-top: 20px;">Close Admin Panel</button>
+        </div>
+    </div>
+
+    <!-- Global Maintenance Bar -->
+    <div id="maintenance-bar" class="hidden" style="width: 100%; background: rgba(255, 166, 87, 0.2); border-bottom: 1px solid #ffa657; padding: 10px 0; text-align: center; color: #ffa657; font-weight: bold; letter-spacing: 1px; z-index: 1500; position: relative;">
+        ⚠️ ARENA MAINTENANCE IN: <span id="maintenance-timer">00:00</span>
+    </div>
+
+    <!-- Tournament Transition Overlay -->
+    <div id="tournament-transition-overlay" class="overlay hidden" style="z-index: 5000; background: rgba(0,0,0,0.9);">
+        <div class="text-center">
+            <h1 style="font-size: 3em; margin-bottom: 0; animation: transition-glow-pulse 2s infinite;">BRACKET ADVANCEMENT</h1>
+            <div class="round-number-display" style="font-size: 5em; font-family: 'Orbitron', sans-serif; color: var(--neon-cyan); text-shadow: 0 0 30px var(--neon-cyan);">ROUND 1</div>
+            <p style="letter-spacing: 5px; opacity: 0.7; color: var(--neon-purple); font-weight: bold;">PREPARE FOR COMBAT</p>
+        </div>
+    </div>
+
+    <!-- Kidnap Gambit Overlay -->
+    <div id="kidnap-overlay" class="overlay hidden kidnap-overlay">
+        <h2 style="color: var(--error-red);">Kidnap Gambit</h2>
+        <div id="kidnap-content">
+            <!-- Dynamic content filled by JS -->
+        </div>
+        <button class="outline" onclick="hideAllOverlays()">Close</button>
+    </div>
+
+    <!-- Main Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

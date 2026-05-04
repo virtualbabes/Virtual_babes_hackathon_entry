@@ -1,0 +1,150 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\components\_cards.scss
+@import '../base/variables';
+
+.playing-card {
+    width: 100%; height: 100%;
+    background: #1a1a1a;
+    border: 2px solid $color-neon-cyan;
+    border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: 5px; box-sizing: border-box;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+    position: relative;
+}
+
+.card-name { font-size: 11px; font-weight: bold; text-align: center; background: rgba(0,0,0,0.6); width: 100%; padding: 2px 0; border-radius: 4px; }
+
+.power-grid {
+    display: grid;
+    grid-template-areas: ". top ." "left . right" ". bottom .";
+    font-size: 16px; font-weight: bold; color: #fff;
+    text-shadow: 1px 1px 2px black, 0 0 5px $color-neon-cyan;
+    width: 80%; height: 60%;
+    align-items: center; justify-items: center;
+}
+
+.playing-card {
+    &.hand-card {
+        cursor: pointer;
+        transition: 0.2s;
+        &:hover { transform: translateY(-10px); }
+    }
+}
+.selected-card {
+    box-shadow: 0 0 20px $color-neon-cyan;
+    border-color: white;
+    transform: translateY(-15px);
+}
+
+/* Prisoner / Fallen Penalty Badge */
+.debuff-badge {
+    position: absolute;
+    bottom: 30px;
+    left: 5px;
+    background: rgba(255, 75, 75, 0.8);
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #ff4b4b;
+    box-shadow: 0 0 10px rgba(255, 75, 75, 0.4);
+    z-index: 10;
+    pointer-events: none;
+    font-family: $font-body;
+}
+
+/* Rarity Badge */
+.rarity-badge {
+    position: absolute; top: 5px; right: 5px;
+    background: linear-gradient(135deg, gold, #ffae00);
+    color: black; font-size: 9px; font-weight: bold;
+    padding: 2px 5px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.5);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+    z-index: 10; pointer-events: none;
+    font-family: 'Arial Black', sans-serif;
+}
+
+/* Deck Manager */
+.deck-slot-btn {
+    padding: 8px 12px; font-size: 11px; border: 1px solid $glass-border-color; 
+    background: rgba(0,0,0,0.5); border-radius: 6px; cursor: pointer; color: #888;
+}
+.deck-slot-btn.active { border-color: $color-neon-cyan; color: $color-neon-cyan; box-shadow: 0 0 10px $color-neon-cyan; }
+.deck-slot-btn.locked { opacity: 0.4; cursor: not-allowed; }
+
+.card-mini {
+    width: 90px; height: 120px; background: #111; border: 1px solid $glass-border-color;
+    border-radius: 8px; cursor: grab; position: relative;
+}
+.card-mini:active { cursor: grabbing; }
+
+#deck-drop-zone.drag-over { background: rgba($color-neon-cyan, 0.1); border-color: $color-neon-cyan; }
+
+/* Mobile Responsive Overrides */
+@media (max-width: 768px) {
+    /* Optimize Card Display for small screens */
+    .playing-card { padding: 5px; }
+    .power-grid { font-size: 14px; }
+
+    /* Deck Manager Layout Shift */
+    .card-mini { flex: 0 0 100px; height: 140px; }
+}
+
+/* --- Rumor Board Styles --- */
+.rumor-board-container {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    border: 1px solid $glass-border-color;
+    max-height: 200px; /* Limit height */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rumor-board-title {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: $color-neon-purple;
+    text-align: center;
+    margin-bottom: 5px;
+    letter-spacing: 1px;
+}
+
+.rumor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba($color-neon-cyan, 0.05);
+    border: 1px solid rgba($color-neon-cyan, 0.2);
+}
+
+/* Specific rumor types for color coding */
+.rumor-positive { border-color: $color-neon-green; background: rgba($color-neon-green, 0.05); }
+.rumor-positive .rumor-text { color: $color-neon-green; }
+.rumor-negative { border-color: $color-error-red; background: rgba($color-error-red, 0.05); }
+.rumor-negative .rumor-text { color: $color-error-red; }
+
+.rumor-text {
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.rumor-timer {
+    font-size: 0.8em;
+    color: #888;
+    margin-left: 10px;
+}
+
+/* Touch-specific visual feedback */
+.selected-item {
+    border: 2px solid $color-neon-cyan !important;
+    box-shadow: 0 0 15px $color-neon-cyan;
+    transform: scale(1.05);
+}

@@ -1,0 +1,100 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\utilities\_spacing.scss
+
+.flex-row { display: flex; align-items: center; }
+.flex-col { display: flex; flex-direction: column; } // Existing
+.justify-between { justify-content: space-between; } // Existing
+.justify-center { justify-content: center; } // Existing
+.justify-end { justify-content: flex-end; } // Existing
+.align-center { align-items: center; } // Existing
+.w-full { width: 100%; } // Existing
+.w-80p { width: 80%; } // Existing
+.m-0 { margin: 0 !important; } // Existing
+.mt-5 { margin-top: 5px; } // New
+.mt-10 { margin-top: 10px; } // Existing
+.mt-20 { margin-top: 20px; } // Existing
+.mt-30 { margin-top: 30px; } // New
+.mb-5 { margin-bottom: 5px; } // Existing
+.mb-10 { margin-bottom: 10px; } // Existing
+.mb-15 { margin-bottom: 15px; } // Existing
+.mb-20 { margin-bottom: 20px; } // Existing
+.mb-30 { margin-bottom: 30px; } // New
+.ml-10 { margin-left: 10px; } // Existing
+.ml-15 { margin-left: 15px; } // Existing
+.mr-10 { margin-right: 10px; } // New
+.p-4-8 { padding: 4px 8px; } // New
+.p-5-10 { padding: 5px 10px; } // New
+.p-8 { padding: 8px; } // New
+.p-10 { padding: 10px; } // Existing
+.p-15 { padding: 15px; } // Existing
+.p-20 { padding: 20px; } // New
+.p-40 { padding: 40px; } // New
+.pr-5 { padding-right: 5px; } // New
+.pb-10 { padding-bottom: 10px; } // New
+.gap-5 { gap: 5px; } // Existing
+.gap-10 { gap: 10px; } // Existing
+.gap-15 { gap: 15px; } // Existing
+.gap-40 { gap: 40px; } // Existing
+.text-center { text-align: center; } // Existing
+.text-right { text-align: right; } // Existing
+.text-italic { font-style: italic; } // Existing
+.opacity-6 { opacity: 0.6; } // Existing
+.opacity-7 { opacity: 0.7; } // Existing
+.opacity-8 { opacity: 0.8; } // Existing
+.opacity-9 { opacity: 0.9; } // Existing
+.font-small { font-size: 0.8em; } // Existing
+.font-xsmall { font-size: 0.7em; } // Existing
+.font-bold { font-weight: bold; } // Existing
+.no-shadow { box-shadow: none !important; } // Existing
+
+.hidden { display: none !important; } // Existing
+
+// New Widths
+.w-220 { width: 220px; }
+.w-350 { width: 350px; }
+.w-400 { width: 400px; }
+.w-450 { width: 450px; } // New
+.w-500 { width: 500px; }
+.w-550 { width: 550px; }
+.w-600 { width: 600px; }
+
+// New Max-Widths
+.max-w-200 { max-width: 200px; }
+.max-w-800 { max-width: 800px; }
+.max-w-900 { max-width: 900px; }
+.max-w-1100 { max-width: 1100px; }
+
+// New Flex Properties
+.flex-1-5 { flex: 1.5; }
+
+// New Line Height
+.line-height-1-2 { line-height: 1.2; }
+
+// New Max-Heights
+.max-h-150 { max-height: 150px; }
+.max-h-300 { max-height: 300px; }
+.max-h-400 { max-height: 400px; }
+.max-h-50vh { max-height: 50vh; }
+
+// New Borders
+.border-neon-cyan { border-color: var(--neon-cyan) !important; }
+.border-warning { border-color: #ffa657 !important; }
+.border-gold { border-color: #ffd700 !important; }
+.border-grey { border-color: #888 !important; }
+.border-purple { border-color: var(--neon-purple) !important; } // New
+.border-bottom-glass { border-bottom: 1px solid var(--glass-border); } // New
+.border-dashed { border-style: dashed !important; }
+
+// New Backgrounds
+.bg-neon-green { background: var(--neon-green); } // New
+.bg-warning-dim { background: rgba(255, 166, 87, 0.1); }
+.bg-black-80 { background: rgba(0, 0, 0, 0.8); }
+.bg-black-90 { background: rgba(0, 0, 0, 0.9); }
+
+// New Shadows
+.glow-cyan { box-shadow: 0 0 20px var(--neon-cyan); }
+
+// Avatar Size (from app.js inline)
+.avatar-small { width: 50px; height: 50px; } // New
+
+// Thinking Spinner Small (from app.js inline)
+.thinking-spinner-small { width: 20px; height: 20px; border-width: 3px; margin: 0; } // New

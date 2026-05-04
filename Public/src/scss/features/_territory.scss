@@ -1,0 +1,41 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\features\_territory.scss
+@import '../base/variables';
+@import '../themes/neon-glass';
+
+/* Territory & Regional Dominance */
+
+// Neon Topography (3D World Map)
+.map-perspective-container {
+    perspective: 1500px;
+}
+
+.map-grid-3d {
+    // Transform logic from styles.css
+}
+
+// Club Foundry (Branding)
+.club-foundry {
+    @include neon-glass-panel;
+    border-color: $color-neon-purple;
+}
+
+// Regional Governor Status
+.regional-governor {
+    // Visual indicators for players controlling 2+ districts
+    background: linear-gradient(45deg, rgba($color-neon-purple, 0.2), rgba($color-neon-cyan, 0.2));
+    border: 2px solid $color-neon-purple;
+}
+
+// New style for Governor-controlled map tiles
+.map-tile-3d.governor-controlled {
+    border-color: $color-neon-cyan; // Distinct border color
+    box-shadow: 0 0 25px rgba($color-neon-cyan, 0.6), inset 0 0 10px rgba($color-neon-cyan, 0.4); // Stronger glow
+    background: linear-gradient(45deg, rgba($color-neon-cyan, 0.1), rgba($color-neon-blue, 0.1)); // Subtle gradient
+    transform: translateZ(25px) scale(1.02); // Slightly elevated and larger
+    z-index: 10; // Ensure it's on top
+}
+
+.map-tile-3d.governor-controlled:hover {
+    transform: translateZ(35px) scale(1.05); // Even more elevated on hover
+    box-shadow: 0 0 40px rgba($color-neon-cyan, 0.8), inset 0 0 15px rgba($color-neon-cyan, 0.6);
+}

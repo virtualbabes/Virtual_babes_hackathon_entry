@@ -1,0 +1,28 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\base\_reset.scss
+
+body {
+    margin: 0;
+}
+
+h1, h2, h3 {
+    margin-top: 0;
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: 4px;
+    transition: 0.3s;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan);
+}

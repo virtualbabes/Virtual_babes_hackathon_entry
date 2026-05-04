@@ -1,0 +1,94 @@
+----------------------------------------------------------------------------------------------------
+NFT Seduction: Faucet & Tournament Platform
+----------------------------------------------------------------------------------------------------
+
+**Current Development Status:**
+- Stage: Production-Ready Beta. All core systems are implemented, security-hardened, and UI-unified.
+- The Go server serves static frontend assets from `./Public`. The runtime expects the generated artifact `Public/main.wasm` and `Public/wasm_exec.js` alongside HTML/CSS/JS.
+- `Public/main.wasm` is a generated artifact, intentionally excluded from Git via `.gitignore`, and must be generated before runtime.
+- `Public/main.wasm` must be compiled before the app can run in-browser or before building/deploying the Docker image.
+- Final launch readiness requires Mainnet secret wiring and final end-to-end playtesting on a staging environment.
+
+**Build / Runtime Notes:**
+- Backend build: `CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server-bin server.go`
+- WASM frontend build: `GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go`
+- The server uses `./Public` as the static asset root; ensure compiled WASM and frontend files are placed there.
+- WARNING: `Public/main.wasm` must exist before building or deploying the Docker image. Without it, the browser app will fail to load.
+
+**Project Goal:**
+To evolve the classic tactical card battler into a high-stakes Social Economic Simulation. The platform rewards not just combat skill, but strategic investment, political maneuvering within Card Clubs, and the management of "Social Standing" (Reputation and Mojo). It operates on both Voi and Algorand networks, ensuring secure transactions and persistent data storage via indexer receipts.
+
+**Core Features:**
+
+1.  **Engaging NFT Seduction Gameplay:**
+    *   Classic NFT Seduction rules with "Same," "Plus," and "Combo" mechanics.
+    *   Dynamic AI (PvE) with adjustable difficulty and "thinking" simulations.
+    *   Player-vs-Player (PvP) matchmaking with reputation-based heuristics.
+    *   NFT-based cards with rarity, power ratings, visual tiers, and Elemental Moods.
+
+2.  **The Industrial & Trust Layer (Social Hierarchy):**
+    *   **Club Founding & Governance:** Establish clubs, own territories, and expand into Regions.
+    *   **Employment & Careers:** Owners hire players as Managers, Security, or Clerks with daily salaries paid from Club Treasuries.
+    *   **Courthouse Rerouting:** Fines are no longer burned but distributed as revenue to active Club Treasuries.
+
+3.  **High-Finance & Market Layer:**
+    *   **Entity Market:** Trade shares in players and NPCs using $VBV reward balances.
+    *   **Rumor Mill:** Spread rumors to manipulate market sentiment and share prices via multipliers.
+    *   **Black Market:** Buy liquidated collateral from defaulted loans at a discount (carrying "Stolen" tags).
+    *   **Dynamic Ticker:** Real-time market data reflecting performance, rumors, and achievements.
+
+4.  **Criminality & Intelligence:**
+    *   **Heists & Security:** Loot Club Treasuries, countered by deployable hardware (Sentry Turrets, Guard Dogs, Tripwires).
+    *   **Kidnap Gambit:** High-stakes captures of opponent cards for $VBV ransom or wait for Insurance Recovery.
+    *   **Bounty Board:** Hunters track high-infamy "Outlaws" for specialized VBV bounties.
+
+5.  **Decentralized Economy & Faucet System:**
+    *   **Multi-Chain Support:** Operates on Voi Mainnet (primary) and Algorand Mainnet (secondary for $AVoi buy-ins).
+    *   **$VBV Token Rewards:** Players earn $VBV (ARC-200) for victories, dispensed via a secure server-side faucet.
+    *   **NFT Value Integration:** In-game card power ratings are dynamically derived from on-chain NFT metadata (mint round, sales history, rarity).
+    *   **Balanced Faucet Vault:** Designed to prevent depletion through careful reward mechanics and future dynamic scaling.
+
+6.  **Rewarding Tournament System:**
+    *   Automated, bracket-based tournaments (8 or 16 players).
+    *   Buy-in mechanics (with $VBV or $AVoi) for prize pool contribution.
+    *   "Elite Privilege" free passes for top-ranked players.
+    *   Rank-based tiered payouts for Top 5 finishers.
+    *   **On-Chain Archiving:** Tournament results are permanently recorded on the blockchain as linked transaction notes for verifiable history.
+
+7.  **Secure & Verifiable Transactions:**
+    *   **Faucet Payouts (Server-Side):** All $VBV/VOI dispensing transactions from the faucet's vault are constructed, signed, and broadcasted securely by the backend (`server.go`). The faucet's private keys (mnemonic) are **never exposed to the client**. Client-side requests for rewards use a "reverse sign" nonce verification pattern, where the user proves intent without handling the actual fund transfer.
+    *   **Tournament Buy-ins (Client-Side & Verified):** Users initiate buy-in transactions from their own wallets to the faucet's vault. The `server.go` backend then **on-chain verifies** these transactions via indexers to confirm payment before registering the participant.
+    *   **On-Chain Data for Persistence:** All critical game state (leaderboards, match history, tournament archives, DNF penalties) is reconstructed by reading authenticated data and receipts directly from blockchain indexers.
+    *   **Historical Sybil Protection:** Onboarding starter packs are protected by Indexer-based historical checks to prevent repeated claims per wallet identity.
+
+8.  **User Experience & Infrastructure:**
+    *   Responsive UI with WalletConnect v2, Nautilus, and Kibisis wallet integration.
+    *   Go WASM engine for core game logic, ensuring deterministic gameplay and portability.
+    *   Real-time lobby updates, chat, matchmaking, and live spectating via WebSockets.
+    *   Admin controls for managing rewards, rules, maintenance, and player bans.
+    *   Asset opt-in checks to prevent failed reward payouts.
+
+9.  **Deep RPG Mechanics:**
+    *   **The Fatigue/Loyalty Loop:** Manage card persistence; overused cards lose power, while soul-bonded cards gain bonuses.
+    *   **Elemental Synthesis:** Tactical depth via card Moods interacting with Tile Moods on the battle board.
+    *   **Social Flex:** Integrated X/Twitter sharing for match results and achievement broadcasts.
+
+**Architectural Highlights:**
+
+*   **Go Backend (`server.go`):** Manages real-time lobby state, matchmaking, admin APIs, secure faucet operations, and blockchain interactions (signing and broadcasting faucet-controlled transactions, querying indexers).
+*   **Go WASM Engine (`main.go`):** Encapsulates core game logic (NFT Seduction rules, AI, card evaluation), providing a deterministic and performant gameplay experience within the browser. Exposes a JS bridge for UI interactions.
+*   **Frontend (`Public/app.js`, `Public/index.html`, `Public/styles.css`):** Handles UI rendering, wallet connections, user input, and communicates with the backend via WebSockets and REST APIs.
+
+**Current Status:**
+The repository is in a production-ready beta state. Security primitives, cross-chain inventory, and automated tournament brackets are fully functional. The UI is unified under a cohesive glassmorphism theme.
+
+**Near-Term Focus:**
+- Securely wire FAUCET_MNEMONIC and ADMIN_WALLETS for Mainnet launch.
+- Finalize WC_PROJECT_ID configuration.
+- Verify Mainnet Node/Indexer stability in networks.json.
+- Perform 16-player tournament stress tests.
+
+**Future Development:**
+Future plans include enhanced monitoring, automated backups, mobile UX refinement, social sharing, dynamic faucet scaling, leaderboard seasons, and cross-chain expansion with ARC-200 staking and additional network support.
+
+----------------------------------------------------------------------------------------------------

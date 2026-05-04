@@ -1,0 +1,39 @@
+name: Build and Deploy WASM Frontend
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23' # Matches your go.mod
+
+      - name: Compile WASM
+        run: |
+          # Required pre-launch step: ensure Public/main.wasm is generated before deploying.
+          GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go
+
+      - name: Deploy to Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: deploy
+          publish_dir: .
+          # We keep the Assets and Public_assets directories in the deployment
+          exclude_assets: '.github,server.go,go.mod,go.sum,Dockerfile,.env.example,ToDo.md,App_Flow.md,A.I_memory.md,deploy-wasm.yml'
+
+      - name: Trigger Render Deployment
+        if: success()
+        run: |
+          # This step is optional if Render is configured to auto-deploy on branch changes.
+          # If auto-deploy is off, use a Deploy Hook:
+          # curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          echo "WASM Compiled and pushed to 'deploy' branch."

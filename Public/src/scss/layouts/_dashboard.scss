@@ -1,0 +1,196 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\layouts\_dashboard.scss
+@import '../base/variables';
+
+.dashboard {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    flex-grow: 1; /* Allow it to take available vertical space */
+    width: 100%; /* Ensure it spans full width */
+    max-width: 1400px;
+}
+
+.column { flex: 1; min-width: 320px; max-width: 450px; display: flex; flex-direction: column; }
+
+/* Live Lobby Player List */
+.player-list { list-style: none; padding: 0; margin-top: 10px; }
+.player-item { 
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.3);
+    border-radius: 8px; border: 1px solid $glass-border-color;
+}
+
+/* Lobby Chat Styles */
+.chat-container {
+    display: flex; flex-direction: column; height: 300px;
+    margin-top: 15px; background: rgba(0,0,0,0.2);
+    border-radius: 12px; border: 1px solid $glass-border-color;
+    overflow: hidden;
+}
+#chat-display {
+    flex: 1; overflow-y: auto; padding: 10px;
+    display: flex; flex-direction: column; gap: 5px;
+    font-size: 0.85em;
+}
+.chat-msg { padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); }
+.chat-msg b { color: $color-neon-cyan; }
+.chat-msg.system { color: #8b949e; font-style: italic; background: transparent; }
+
+.chat-input-area { 
+    display: flex; 
+    border-top: 1px solid $glass-border-color; 
+    padding: 8px;
+    background: rgba(0,0,0,0.3);
+}
+
+/* --- Shared Glass Input Styles --- */
+.glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $glass-border-color;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    outline: none;
+    transition: 0.3s;
+    font-family: $font-body;
+    box-sizing: border-box;
+}
+
+/* Custom arrow for glass selects */
+select.glass-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: calc(100% - 12px) center;
+    padding-right: 35px;
+}
+
+.glass-input option { background: #141824; color: white; }
+
+.glass-input:focus {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: $color-neon-cyan;
+    box-shadow: 0 0 10px rgba($color-neon-cyan, 0.2);
+}
+
+#chat-input {
+    flex: 1;
+    border-color: transparent;
+    font-size: 0.9em;
+}
+
+.chat-send-btn { margin-left: 8px; border-radius: 6px; background: $color-neon-purple; padding: 5px 15px; cursor: pointer; border: none; color: white; }
+
+/* 3x3 Battle Grid */
+.battle-board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(80px, 110px));
+    grid-template-rows: repeat(3, 1fr); /* Ensure rows take equal space */
+    aspect-ratio: 1 / 1; /* Force a square aspect ratio for the entire board */
+    gap: clamp(8px, 2vw, 15px);
+    justify-content: center;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.grid-slot {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px dashed rgba($color-neon-cyan, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+    transition: 0.3s;
+    cursor: pointer;
+    position: relative;
+}
+
+.grid-slot:hover { border-color: $color-neon-cyan; background: rgba($color-neon-cyan, 0.1); box-shadow: inset 0 0 15px rgba($color-neon-cyan, 0.2); }
+.status-active { color: $color-neon-green; text-shadow: 0 0 10px $color-neon-green; font-weight: bold; }
+
+/* Mood-Specific Tile Styles */
+.mood-volatile { border-color: #ff0844 !important; background: rgba(255, 8, 68, 0.05); }
+.mood-volatile::before { content: '🔥'; }
+
+.mood-serene { border-color: $color-neon-blue !important; background: rgba(79, 172, 254, 0.05); }
+.mood-serene::before { content: '💧'; }
+
+.mood-spirited { border-color: $color-warning-orange !important; background: rgba(255, 166, 87, 0.05); }
+.mood-spirited::before { content: '⚡'; }
+
+.mood-grounded { border-color: $color-neon-green !important; background: rgba(63, 185, 80, 0.05); }
+.mood-grounded::before { content: '🌿'; }
+
+.grid-slot::before {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    font-size: 1.2em;
+    opacity: 0.4;
+    z-index: 1;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.grid-slot:hover::before { opacity: 0.8; }
+
+/* Player Hand Area */
+.player-hand { display: flex; justify-content: center; gap: 10px; margin-top: 20px; height: 150px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------
+   MOBILE RESPONSIVE OVERRIDES (Phase 8)
+   --------------------------------------------------------- */
+@media (max-width: 768px) {
+    /* 1. Force the 3x3 grid to maintain shape and fill width */
+    .battle-board, #board-container {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 8px;
+        width: 95vw;
+        height: 95vw; /* Maintain 1:1 Aspect Ratio */
+        max-width: 500px;
+        max-height: 500px;
+        margin: 0 auto;
+    }
+
+    /* 3. Deck Manager Layout Shift */
+    #deck-manager-overlay .glass-panel {
+        flex-direction: column;
+        width: 98vw;
+        height: 90vh;
+        overflow-y: auto;
+        padding: 15px;
+    }
+
+    #inventory-grid {
+        display: flex;
+        overflow-x: auto; /* Horizontal scroll for cards on mobile */
+        padding-bottom: 15px;
+        height: 180px;
+        gap: 10px;
+    }
+
+    /* 4. Tap Target Improvements */
+    button, .deck-slot-btn, .outline { min-height: 44px; margin-bottom: 10px; }
+
+    /* Season History & Hall of Fame Mobile (< 480px) */
+    .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
+    .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
+    
+    .season-filter-bar { padding: 10px; gap: 5px; }
+    #season-filter-input { width: 60px; font-size: 0.8em; }
+
+    .season-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    .season-card-header span:last-child { font-size: 0.7em; }
+    
+    .season-winner-row { padding: 6px 10px; }
+    .season-winner-row .player-name { font-size: 0.85em; }
+    .season-winner-row .player-stats { font-size: 0.75em; }
+}

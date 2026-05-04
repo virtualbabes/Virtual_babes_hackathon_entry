@@ -1,0 +1,36 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\base\_typography.scss
+@import 'variables';
+
+h1, h2, h3, .bracket-round-title, .preview-vs-container { 
+    font-family: $font-heading;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h1 { 
+    background: linear-gradient(to right, $color-neon-cyan, $color-neon-purple);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 20px rgba($color-neon-cyan, 0.3);
+}
+
+// Text Color Utilities
+.text-neon-green { color: $color-neon-green; }
+.text-neon-cyan { color: $color-neon-cyan; }
+.text-error { color: $color-error-red; }
+
+// Letter Spacing Utilities
+.letter-spacing-1 { letter-spacing: 1px; }
+.letter-spacing-2 { letter-spacing: 2px; }
+.letter-spacing-3 { letter-spacing: 3px; }
+.letter-spacing-4 { letter-spacing: 4px; }
+.letter-spacing-5 { letter-spacing: 5px; }
+
+// Font Style & Size Utilities
+.font-small-caps { font-size: 0.6em; opacity: 0.6; }
+.font-bold-rajdhani { font-weight: bold; font-family: 'Rajdhani', sans-serif; }
+.font-mono { font-family: monospace; }
+.font-size-1em { font-size: 1em; }
+.font-size-0-9em { font-size: 0.9em; }
+.font-size-0-7em { font-size: 0.7em; }

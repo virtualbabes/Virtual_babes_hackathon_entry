@@ -1,0 +1,18 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\layouts\_main-layout.scss
+@import '../base/variables';
+
+.main-game-container { display: flex; flex-direction: column; flex-grow: 1; width: 100%; max-width: 1400px; }
+
+.top-bar { /* This is now inside main-game-container */
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    flex-shrink: 0; /* Prevent it from shrinking */
+    border-bottom: 1px solid $glass-border-color;
+    background: rgba(0,0,0,0.4);
+    padding: 10px 0;
+}
+
+/* Global Maintenance Bar */
+#maintenance-bar { width: 100%; background: rgba(255, 166, 87, 0.2); border-bottom: 1px solid #ffa657; padding: 10px 0; text-align: center; color: #ffa657; font-weight: bold; letter-spacing: 1px; z-index: 1500; position: relative; }

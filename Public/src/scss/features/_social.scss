@@ -1,0 +1,24 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\features\_social.scss
+@import '../base/variables';
+
+/* Social hierarchy & Employment Layer */
+
+// Achievement Badges (Trophies)
+.trophy-badge {
+    // Dynamic glows based on achievement tier
+}
+
+// Career Path Indicators
+.job-role {
+    font-weight: bold;
+    text-transform: uppercase;
+    
+    &--manager { color: $color-neon-cyan; }
+    &--security { color: $color-warning-orange; }
+    &--clerk { color: $color-neon-green; }
+}
+
+// Entity Portfolio
+.portfolio-view {
+    // Styles for the trade shares interface and valuation history
+}

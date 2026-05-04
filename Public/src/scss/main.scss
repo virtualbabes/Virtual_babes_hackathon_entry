@@ -1,0 +1,30 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\main.scss
+
+// Base styles and variables
+@import 'base/variables';
+@import 'base/reset';
+@import 'base/typography';
+
+// Theming and core aesthetics
+@import 'themes/neon-glass';
+
+// Layouts (will be added later)
+@import 'layouts/main-layout';
+@import 'components/dashboard'; // Added for leaderboard and chat styles
+@import 'layouts/dashboard';
+
+// Components (will be added later)
+@import 'components/buttons';
+@import 'components/cards';
+@import 'components/overlays';
+
+// Utilities
+@import 'utilities/spacing'; // Now using the correct path
+@import 'utilities/animations'; // Now using the correct path
+
+// Features (will be added later)
+@import 'features/economy';
+@import 'features/social';
+@import 'features/criminality'; // Placeholder for future use
+@import 'features/territory';
+@import 'features/shops'; // Placeholder for future use

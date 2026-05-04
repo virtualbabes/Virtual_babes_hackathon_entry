@@ -1,0 +1,16 @@
+{
+  "name": "voiconomy-faucet",
+  "version": "1.0.0",
+  "description": "Virtualbabes Arena: The Multi-Chain NFT Seduction Faucet & Tournament Platform",
+  "main": "server.go",
+  "scripts": {
+    "sass:build": "node-sass Public/src/scss/main.scss Public/styles.css --output-style compressed",
+    "sass:watch": "node-sass Public/src/scss/main.scss Public/styles.css --watch --recursive"
+  },
+  "keywords": [],
+  "author": "slapkarnts",
+  "license": "ISC",
+  "devDependencies": {
+    "node-sass": "^9.0.0"
+  }
+}

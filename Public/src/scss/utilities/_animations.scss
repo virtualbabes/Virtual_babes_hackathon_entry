@@ -1,0 +1,41 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\utilities\_animations.scss
+@import '../base/variables';
+
+@keyframes card-flip-anim {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(90deg); filter: brightness(2); }
+    100% { transform: rotateY(0deg); }
+}
+.flip-capture {
+    animation: card-flip-anim 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure board slots have perspective for 3D effects */
+.grid-slot { perspective: 1000px; }
+
+@keyframes pulse-red {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+@keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+@keyframes match-pulse {
+    0% { box-shadow: 0 0 10px rgba($color-neon-cyan, 0.4); border-color: rgba($color-neon-cyan, 0.5); }
+    50% { box-shadow: 0 0 25px $color-neon-cyan; border-color: $color-neon-cyan; }
+    100% { box-shadow: 0 0 10px rgba($color-neon-cyan, 0.4); border-color: rgba($color-neon-cyan, 0.5); }
+}
+
+@keyframes transition-glow-pulse {
+    0%, 100% { text-shadow: 0 0 10px $color-neon-purple, 0 0 20px $color-neon-purple; }
+    50% { text-shadow: 0 0 20px $color-neon-cyan, 0 0 40px $color-neon-cyan; }
+}
+
+@keyframes slide-up-fade {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}

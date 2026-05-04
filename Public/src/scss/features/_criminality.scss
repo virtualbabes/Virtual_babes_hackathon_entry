@@ -1,0 +1,62 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\features\_criminality.scss
+@import '../base/variables';
+
+/* Criminality & Intelligence Layer */
+
+// Wanted Level Indicator
+.wanted-level {
+    color: $color-error-red;
+    font-weight: bold;
+    text-shadow: 0 0 5px $color-error-red;
+}
+
+// Heist Success Chance
+.heist-chance {
+    color: $color-warning-orange;
+    font-size: 0.9em;
+}
+
+// Kidnap Gambit Overlay
+.kidnap-overlay {
+    @include neon-glass-panel;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: $z-index-modal;
+    max-width: 400px;
+    padding: 20px;
+    border-color: $color-error-red;
+}
+
+.hostage-card {
+    border: 2px solid $color-error-red;
+    background: rgba($color-error-red, 0.1);
+    box-shadow: 0 0 10px rgba($color-error-red, 0.5);
+}
+
+.ransom-prompt {
+    .ransom-amount {
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+    .pay-ransom-btn {
+        background: $color-error-red;
+        &:hover {
+            background: darken($color-error-red, 10%);
+        }
+    }
+}
+
+// Insurance Recovery Timer
+.insurance-timer {
+    color: $color-warning-orange;
+    font-size: 0.8em;
+}
+
+// Collective NPC Taunts
+.npc-taunt {
+    color: $color-neon-purple;
+    font-style: italic;
+    animation: pulse-red 2s infinite;
+}

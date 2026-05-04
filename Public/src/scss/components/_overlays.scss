@@ -1,0 +1,548 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\components\_overlays.scss
+@import '../base/variables';
+@import '../themes/neon-glass';
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: $z-index-modal;
+    transition: opacity 0.3s ease;
+}
+
+.overlay.hidden {
+    opacity: 0;
+    pointer-events: none; /* Make it unclickable when hidden */
+}
+
+/* ---------------------------------------------------------
+   SETTINGS OVERLAY (Sound Controls)
+   --------------------------------------------------------- */
+.settings-panel {
+    width: 400px;
+    text-align: center;
+}
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.volume-control label {
+    width: 80px;
+    text-align: right;
+    font-weight: bold;
+    color: $color-neon-cyan;
+}
+.volume-control input[type="range"] {
+    flex-grow: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px; border-radius: 5px; background: rgba($color-neon-cyan, 0.2); outline: none;
+}
+
+/* AI Thinking Indicator specific styles */
+#ai-thinking-indicator p {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: $color-neon-cyan;
+    text-shadow: 0 0 10px $color-neon-cyan;
+}
+
+.thinking-spinner {
+    border: 8px solid rgba($color-neon-cyan, 0.2);
+    border-top: 8px solid $color-neon-cyan;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Winner Overlay specific styles */
+.winner-content {
+    text-align: center;
+    padding: 40px;
+    min-width: 300px;
+    border-color: $color-neon-green; /* Default for P1 win / Draw */
+    box-shadow: 0 8px 32px 0 rgba($color-neon-cyan, 0.6);
+}
+
+#winner-text {
+    font-size: 2.5em;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+}
+
+#score-text {
+    font-size: 1.8em;
+    color: $color-text-main;
+    margin-bottom: 30px;
+}
+
+/* ---------------------------------------------------------
+   TOAST NOTIFICATIONS (Transaction Status)
+   --------------------------------------------------------- */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: $z-index-toast;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    @include neon-glass-panel;
+    border: 1px solid $color-neon-cyan;
+    padding: 15px 25px;
+    color: white;
+    box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4);
+    animation: slideIn 0.3s ease-out;
+    min-width: 280px;
+    font-size: 0.9em;
+}
+
+.toast.success { border-color: $color-neon-green; box-shadow: 0 0 15px rgba($color-neon-green, 0.4); }
+.toast.error { border-color: $color-error-red; box-shadow: 0 0 15px rgba($color-error-red, 0.4); }
+
+/* ---------------------------------------------------------
+   CINEMATIC LEADERBOARD (Hall of Fame)
+   --------------------------------------------------------- */
+#leaderboard-overlay {
+    z-index: $z-index-leaderboard;
+    padding: 40px;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hof-container {
+    width: 100%;
+    max-width: 900px;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.hof-static-top {
+    flex-shrink: 0;
+    border-bottom: 2px solid $color-neon-cyan;
+    padding-bottom: 15px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px 12px 0 0;
+}
+
+.hof-scroller-window {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+}
+
+#hof-scrolling-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 0;
+}
+
+/* ---------------------------------------------------------
+   TOURNAMENT BRACKET STYLES
+   --------------------------------------------------------- */
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 20px;
+    min-width: 250px;
+}
+
+.bracket-match {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $glass-border-color;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: relative;
+}
+
+.bracket-match.active {
+    border-color: $color-neon-cyan;
+    box-shadow: 0 0 20px $color-neon-cyan;
+    background: rgba($color-neon-cyan, 0.1);
+    animation: match-pulse 2s infinite ease-in-out;
+    z-index: 5;
+}
+
+.bracket-match.active .vs-label {
+    color: $color-neon-cyan;
+    opacity: 1;
+    text-shadow: 0 0 8px $color-neon-cyan;
+    font-weight: bold;
+}
+
+.bracket-player {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    background: rgba(0,0,0,0.2);
+}
+
+.bracket-player.winner { color: $color-neon-green; font-weight: bold; background: rgba($color-neon-green, 0.1); }
+.bracket-player.loser { opacity: 0.5; text-decoration: line-through; }
+.bracket-round-title { text-align: center; font-weight: bold; color: $color-neon-purple; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid $color-neon-purple; }
+
+.vs-label {
+    font-size: 0.7em;
+    opacity: 0.5;
+    text-align: center;
+    margin: 2px 0;
+    font-style: italic;
+}
+
+/* --- Season History Components --- */
+.season-filter-bar {
+    padding: 10px 20px; 
+    display: flex; 
+    gap: 10px; 
+    align-items: center; 
+    border-bottom: 1px solid $glass-border-color; 
+    background: rgba(0,0,0,0.2);
+}
+.season-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid $glass-border-color;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+.season-performers-label {
+    font-size: 0.7em;
+    letter-spacing: 1px;
+    color: $color-neon-purple;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+.season-winners-list {
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.season-winner-row {
+    padding: 8px 15px;
+    margin-bottom: 4px;
+    background: rgba($color-neon-cyan, 0.05);
+}
+
+/* --- Bracket Visualization (Consolidated) --- */
+#bracket-visualization {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    align-items: flex-start;
+    overflow-x: auto;
+    width: 95%;
+    padding: 40px 0;
+}
+
+/* ---------------------------------------------------------
+   MATCH PREVIEW STYLES
+   --------------------------------------------------------- */
+.preview-vs-container {
+    display: flex; align-items: center; justify-content: center;
+    gap: 60px; margin: 40px 0;
+}
+.preview-side {
+    text-align: center; width: 200px;
+}
+.preview-rating {
+    font-size: 3em; font-weight: bold; color: $color-neon-cyan;
+    text-shadow: 0 0 20px rgba($color-neon-cyan, 0.5);
+    margin: 15px 0;
+}
+.vs-divider {
+    font-size: 2em; font-weight: bold; font-style: italic;
+    color: $color-neon-purple;
+    opacity: 0.8;
+    text-shadow: 0 0 10px $color-neon-purple;
+}
+
+.hof-tab-bar {
+    display: flex; gap: 10px; margin-bottom: 20px;
+    border-bottom: 1px solid $glass-border-color; padding-bottom: 10px;
+}
+.hof-tab { opacity: 0.5; cursor: pointer; transition: 0.3s; padding: 5px 15px; border-radius: 4px; }
+.hof-tab.active { opacity: 1; background: rgba($color-neon-cyan, 0.1); color: $color-neon-cyan; border: 1px solid $color-neon-cyan; }
+
+.leaderboard-row:hover { background: rgba($color-neon-cyan, 0.1); }
+
+.rank-badge { font-weight: bold; width: 40px; }
+.player-name { flex: 1; color: $color-neon-cyan; font-family: monospace; }
+.player-stats { opacity: 0.8; font-size: 0.9em; }
+
+.hof-actions {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.btn-refresh { border-color: $color-neon-cyan; color: $color-neon-cyan; }
+.btn-return { border-color: $color-error-red; color: $color-error-red; }
+.hof-actions button {
+    min-width: 180px;
+}
+
+/* Deck Manager Overlay */
+#deck-manager-overlay .glass-panel {
+    flex-direction: column;
+    width: 98vw;
+    height: 90vh;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+/* Wallet Selector Modal */
+.wallet-option {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    margin: 10px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $glass-border-color;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: 0.2s;
+    width: 100%;
+    text-align: left;
+}
+.wallet-option:hover {
+    background: rgba($color-neon-cyan, 0.1);
+    border-color: $color-neon-cyan;
+}
+.wallet-option img {
+    width: 32px; height: 32px; border-radius: 6px;
+}
+
+/* Avatar Setup Preview & Crop */
+.avatar-preview-frame {
+    width: 220px; height: 220px; border-radius: 50%;
+    border: 4px solid $color-neon-cyan;
+    background: #000; overflow: hidden; position: relative;
+    box-shadow: 0 0 30px rgba($color-neon-cyan, 0.5);
+    cursor: grab;
+    margin-bottom: 20px;
+}
+
+.avatar-preview-frame:active { cursor: grabbing; }
+
+.avatar-item {
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    background-size: cover;
+    background-position: center;
+    border: 2px solid $glass-border-color;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.avatar-item:hover {
+    border-color: $color-neon-cyan;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px $color-neon-cyan;
+}
+
+.avatar-item::after {
+    content: 'SELECT';
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: rgba($color-neon-cyan, 0.8);
+    color: black;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    padding: 2px 0;
+    transform: translateY(100%);
+    transition: transform 0.2s ease;
+}
+
+.avatar-item:hover::after {
+    transform: translateY(0);
+}
+
+#avatar-grid {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 5%, black 95%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, black 5%, black 95%, transparent);
+}
+
+/* --- Styled Range Inputs for Setup --- */
+.crop-controls input[type="range"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    height: 8px; border-radius: 5px; background: rgba($color-neon-cyan, 0.2); outline: none;
+    background: transparent;
+}
+
+.crop-controls input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: rgba($color-neon-cyan, 0.2);
+    border-radius: 2px;
+    border: 1px solid $glass-border-color;
+}
+
+.crop-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 18px; width: 18px;
+    border-radius: 50%; background: $color-neon-cyan;
+    cursor: pointer; margin-top: -8px;
+    box-shadow: 0 0 10px $color-neon-cyan;
+}
+
+#crop-image {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+/* ---------------------------------------------------------
+   BAN COOLDOWN VISUALIZER
+   ========================================================= */
+.cooldown-container {
+    margin-bottom: 15px;
+    padding: 15px;
+    border-color: $color-error-red;
+    text-align: center;
+}
+.cooldown-header { color: $color-error-red; font-weight: bold; margin-bottom: 10px; font-size: 0.9em; letter-spacing: 1px; }
+.cooldown-progress-bg {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 75, 75, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 75, 75, 0.2);
+}
+.cooldown-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, $color-error-red, #ff8f8f);
+    box-shadow: 0 0 10px $color-error-red;
+    width: 0%;
+    transition: width 1s linear;
+}
+
+/* ---------------------------------------------------------
+   TOURNAMENT TRANSITION OVERLAY
+   --------------------------------------------------------- */
+#tournament-transition-overlay {
+    transition: opacity 0.5s ease-in-out;
+}
+
+#tournament-transition-overlay .round-number-display {
+    animation: slide-up-fade 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Mobile Responsive Overrides */
+@media (max-width: 768px) {
+    /* Tournament Bracket Responsiveness (< 400px focus) */
+    #bracket-visualization {
+        gap: 15px;
+        padding: 20px 0;
+        justify-content: flex-start; /* Better scroll UX on narrow screens */
+    }
+    .bracket-round {
+        min-width: 160px;
+        gap: 10px;
+    }
+    .bracket-player {
+        font-size: 0.7em;
+        padding: 4px 6px;
+    }
+    .bracket-round-title {
+        font-size: 0.8em;
+        margin-bottom: 10px;
+    }
+    .preview-vs-container {
+        gap: 20px;
+        margin: 20px 0;
+    }
+    .preview-side { width: 120px; }
+    .preview-rating { font-size: 2em; }
+
+    /* Season History & Hall of Fame Mobile (< 480px) */
+    .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
+    .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
+}    .season-winner-row { padding: 6px 10px; }
+    .season-winner-row .player-name { font-size: 0.85em; }
+    .season-winner-row .player-stats { font-size: 0.75em; }
+
+// Modal Panel Header (General)
+.modal-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid $glass-border-color;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+// Courthouse Panel Specific Styles
+.courthouse-panel {
+    width: 450px;
+    text-align: center;
+    border-color: $color-error-red;
+}
+
+.fine-display-box {
+    background: rgba(255, 75, 75, 0.1);
+    border-color: rgba(255, 75, 75, 0.3);
+    padding: 15px;
+    margin: 20px;
+}
+
+.fine-amount {
+    font-size: 1.8em;
+    color: $color-neon-green;
+    display: block;
+}
+
+// Avatar Notice (used in setup overlay)
+.avatar-notice { 
+    border-radius: 4px; 
+    background: rgba(255, 166, 87, 0.1); // bg-warning-dim
+    border: 1px solid #ffa657; // border-warning
+}

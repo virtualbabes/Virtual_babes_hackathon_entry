@@ -1,0 +1,29 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\base\_variables.scss
+
+// Core Neon-Glass Color Palette
+$color-bg-dark: #090a0f;
+$color-neon-cyan: #00f2fe;
+$color-neon-blue: #4facfe;
+$color-neon-purple: #9b51e0;
+$color-neon-green: #3fb950;
+$color-warning-orange: #ffa657;
+$color-error-red: #ff4b4b;
+$color-text-main: #e6e6e6;
+
+// Glassmorphism Properties
+$glass-bg-color: rgba(20, 24, 36, 0.5);
+$glass-border-color: rgba(0, 242, 254, 0.2);
+$glass-blur: 16px;
+$glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+
+// Font Families
+$font-heading: 'Orbitron', sans-serif;
+$font-body: 'Rajdhani', sans-serif;
+
+// Z-index Layers (for overlays, tooltips, etc.)
+$z-index-base: 1;
+$z-index-modal: 1000;
+$z-index-toast: 2000;
+$z-index-leaderboard: 3000;
+$z-index-admin: 4000;
+$z-index-tooltip: 5000;

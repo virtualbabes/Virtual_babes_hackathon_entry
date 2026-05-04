@@ -1,0 +1,44 @@
+// z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\themes\_neon-glass.scss
+
+// Import core variables
+@import '../base/variables';
+
+// Mixin for applying the standard glassmorphism effect
+@mixin neon-glass-panel {
+    background: $glass-bg-color;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+    border: 1px solid $glass-border-color;
+    border-radius: 16px;
+    box-shadow: $glass-shadow;
+}
+
+// Mixin for neon text glow
+@mixin neon-text-glow($color) {
+    background: linear-gradient(to right, $color, darken($color, 15%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 15px rgba($color, 0.4);
+}
+
+// Base styles for the Neon-Glass theme
+body {
+    font-family: $font-body;
+    color: $color-text-main;
+    background-color: $color-bg-dark;
+}
+
+h1, h2, h3 {
+    font-family: $font-heading;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h1 {
+    @include neon-text-glow($color-neon-cyan);
+}
+
+.glass-panel {
+    @include neon-glass-panel;
+}
