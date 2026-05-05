@@ -1,15 +1,15 @@
 ## Developer Branch:
 
-NFT Seduction: Faucet & Tournament Platform
+#### NFT Seduction: Faucet & Tournament Platform ####
 
-VIRTUALBABES ARENA: ARCHITECTURE & CONTEXT MASTER DOCUMENT
+## VIRTUALBABES ARENA: ARCHITECTURE & CONTEXT MASTER DOCUMENT
 Current Development Status: Production-Ready Beta
 All core systems are implemented, security-hardened, and UI-unified. The Go server serves static frontend assets from ./Public. The runtime expects the generated artifact Public/main.wasm and Public/wasm_exec.js alongside HTML/CSS/JS.
 
-Project Goal
+## Project Goal
 To evolve the classic tactical card battler into a high-stakes Social Economic Simulation. The platform rewards not just combat skill, but strategic investment, political maneuvering within Card Clubs, and the management of "Social Standing" (Reputation and Mojo). It operates on both Voi and Algorand networks, ensuring secure transactions and persistent data storage via indexer receipts.
 
-1. OVERALL ARCHITECTURE & TECHNOLOGY STACK
+## 1. OVERALL ARCHITECTURE & TECHNOLOGY STACK
 Virtualbabes Arena is a blockchain-integrated card game platform blending real-time multiplayer mechanics with decentralized economics.
 
 Backend (Go): High-performance server (server.go) using WebSockets for real-time communication, HTTP APIs for RESTful endpoints, and blockchain indexers for on-chain verification. State is managed in-memory and via blockchain persistence (no traditional DB).
@@ -18,7 +18,8 @@ Frontend (JavaScript + SCSS): Responsive UI (app.js, index.html) utilizing Walle
 Blockchain Integration: Primary support for Voi (ARC-200 tokens/NFTs) and Algorand. Uses indexers for metadata, verification, and state reconstruction.
 Security Model: "Switchboard Pattern" (server-side signing for payouts; client-side nonce proofs to prevent replay attacks). Zero client-side private key exposure. All critical game state (leaderboards, match history, tournament archives, DNF penalties) is reconstructed by reading authenticated data and receipts directly from blockchain indexers.
 Deployment: GitHub + Render (hosting), Carrd.co (landing/status), Docker-ready environments.
-2. CORE COMPONENTS BREAKDOWN
+
+## 2. CORE COMPONENTS BREAKDOWN
 Backend Services (*.go) - Orchestrated by lobby_manager.go
 server.go: Central hub. Initializes state, handles WS upgrades, HTTP routes, rate-limiting, and concurrent clients via goroutines/mutexes.
 lobby_manager.go: Real-time state manager (clients, matches, tournaments). Orchestrates updates and enforces rules.
@@ -49,7 +50,8 @@ Frontend Architecture (Public/)
 app.js: UI state, WebSocket connections, WalletConnect integration, audio controls, tournament spectating, and indexer asset resolution. Orchestrates client-side interactions.
 index.html: Entry point. Embeds WASM, sets up SDKs (AlgoSDK, WalletConnect), and defines the base UI structure.
 styles.css / src/scss/: Modular SCSS structure utilizing _variables.scss for neon-cyan/purple palettes, _neon-glass.scss for glassmorphism, and feature-specific styling (_criminality.scss, _territory.scss).
-3. CROSS-CHAIN FUNCTIONALITY & ORACLE SERVICE
+
+## 3. CROSS-CHAIN FUNCTIONALITY & ORACLE SERVICE
 Managed via oracle_service.go and Wallet Linking.
 
 Supported Networks (Dynamic via networks.json)
@@ -60,7 +62,8 @@ Wallet Linking: Non-AVM wallets link to the primary AVM wallet via server-side v
 NFT Discovery: Oracle queries linked wallets across chains (ARC-72, Etherscan, RPCs) to fetch and cache metadata.
 Power Scaling: Base power boosts are applied to cross-chain NFTs to balance gameplay (e.g., ETH +100, SOL +75).
 Transactions: Buy-ins utilize $VBV or $AVoi. No direct cross-chain asset swaps; utility is derived from metadata aggregation.
-4. INTERACTIVE IMMERSIVE SOCIAL LAYERS
+
+## 4. INTERACTIVE IMMERSIVE SOCIAL LAYERS
 Core Features
 Engaging NFT Seduction Gameplay:
 
@@ -122,7 +125,7 @@ Frontend (Public/app.js, Public/index.html, Public/styles.css): Handles UI rende
 Current Status
 The repository is in a production-ready beta state. Security primitives, cross-chain inventory, and automated tournament brackets are fully functional. The UI is unified under a cohesive glassmorphism theme.
 
-Near-Term Focus
+# Near-Term Focus
 Securely wire FAUCET_MNEMONIC and ADMIN_WALLETS for Mainnet launch.
 Finalize WC_PROJECT_ID configuration.
 Verify Mainnet Node/Indexer stability in networks.json.
@@ -130,7 +133,7 @@ Perform 16-player tournament stress tests.
 Expansion Roadmap: Beta vs. Future Simulation
 Transitioning from a Tactical Card Game to a Social Economic Simulation.
 
-Pillar / Aspect	Current Game (Beta)	Expansion Plan (Future)	Key Upgrades
+# Pillar / Aspect	Current Game (Beta)	Expansion Plan (Future)	Key Upgrades
 Vision	Tactical NFT card game with tournaments & basic economy.	Full social simulation: combat + investment + politics + criminality.	Shifts to a "living world" with RPG elements, fatigue, and performative assets.
 1. Industrial/Trust	Basic clubs/territories, governors, shop revenue.	Player employment (Managers/Clerks), regional alliances, Mojo unlocks.	Deepens trust mechanics, service records, and industrial staffing.
 2. High-Finance	Entity market (shares), basic loans/auctions.	Rumor mill (price manipulation), second-hand stores, art galleries.	Introduces risk (defaulted collateral), strategic auctions, and market manipulation.
