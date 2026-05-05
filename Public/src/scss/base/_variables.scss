@@ -9,16 +9,62 @@ $color-neon-green: #3fb950;
 $color-warning-orange: #ffa657;
 $color-error-red: #ff4b4b;
 $color-text-main: #e6e6e6;
+$color-text-secondary: #8b949e;
+$color-text-muted: #6e7681;
+
+// Extended Color Palette
+$color-gold: #ffd700;
+$color-silver: #c0c0c0;
+$color-bronze: #cd7f32;
+$color-accent-pink: #ff0080;
+$color-accent-teal: #00ffff;
+$color-dark-grey: #21262d;
+$color-medium-grey: #30363d;
+$color-light-grey: #484f58;
 
 // Glassmorphism Properties
 $glass-bg-color: rgba(20, 24, 36, 0.5);
 $glass-border-color: rgba(0, 242, 254, 0.2);
 $glass-blur: 16px;
 $glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+$glass-shadow-hover: 0 12px 40px 0 rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.15);
 
 // Font Families
 $font-heading: 'Orbitron', sans-serif;
 $font-body: 'Rajdhani', sans-serif;
+$font-mono: 'Courier New', monospace;
+
+// Typography Scale
+$font-size-xs: 0.7rem;
+$font-size-sm: 0.8rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.2rem;
+$font-size-xl: 1.5rem;
+$font-size-2xl: 2rem;
+$font-size-3xl: 3rem;
+$font-size-4xl: 4rem;
+
+// Spacing Scale
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+$spacing-2xl: 3rem;
+$spacing-3xl: 4rem;
+
+// Border Radius Scale
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+$border-radius-xl: 16px;
+$border-radius-full: 50%;
+
+// Shadows
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
 // Z-index Layers (for overlays, tooltips, etc.)
 $z-index-base: 1;
@@ -27,3 +73,27 @@ $z-index-toast: 2000;
 $z-index-leaderboard: 3000;
 $z-index-admin: 4000;
 $z-index-tooltip: 5000;
+$z-index-transition: 6000;
+
+// Transitions
+$transition-fast: 0.15s ease;
+$transition-base: 0.3s ease;
+$transition-slow: 0.5s ease;
+
+// Breakpoints
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+
+// Grid Settings
+$grid-columns: 12;
+$grid-gutter: 1rem;
+
+// Component Specific Variables
+$avatar-size-small: 40px;
+$avatar-size-medium: 60px;
+$avatar-size-large: 80px;
+$card-width: 100px;
+$card-height: 140px;
+$board-size: 300px;

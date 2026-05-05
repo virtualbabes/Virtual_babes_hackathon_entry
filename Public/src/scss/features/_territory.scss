@@ -2,52 +2,1052 @@
 @import '../base/variables';
 @import '../themes/neon-glass';
 
-/* Territory & Regional Dominance */
-
-// Neon Topography (3D World Map)
-.map-perspective-container {
-    perspective: 1500px;
+// Territory Panel Base
+.territory-panel {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-neon-purple, 0.3);
+    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.05) 0%, transparent 70%);
 }
 
-.map-grid-3d {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 1rem;
-    transform-style: preserve-3d;
-    transform: rotateX(30deg) rotateY(-15deg);
+// Territory Header
+.territory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid rgba($color-neon-purple, 0.2);
 
-    .map-tile,
-    .map-tile-3d {
-        @include neon-glass-panel;
-        height: 100px;
-        transform: translateZ(0);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    .territory-title {
+        font-size: $font-size-xl;
+        font-weight: bold;
+        color: $color-neon-purple;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba($color-neon-purple, 0.5);
+    }
 
-        &:hover {
-            transform: translateZ(20px) scale(1.05);
-            box-shadow: 0 0 20px rgba($color-neon-purple, 0.7);
+    .territory-stats {
+        display: flex;
+        gap: $spacing-lg;
+        font-size: $font-size-sm;
+
+        .stat-item {
+            text-align: center;
+
+            .stat-label {
+                color: $color-text-secondary;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-size: $font-size-xs;
+            }
+
+            .stat-value {
+                font-weight: bold;
+                color: $color-neon-purple;
+                font-family: $font-mono;
+            }
         }
     }
-    /* TODO: Implement styles */
-    // Transform logic from styles.css
+}
+
+// Neon Topography (3D World Map)
+.territory-map {
+    margin-bottom: $spacing-xl;
+
+    .map-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .map-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-cyan;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .map-controls {
+            display: flex;
+            gap: $spacing-sm;
+
+            .map-zoom {
+                display: flex;
+                gap: $spacing-xs;
+
+                button {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: $border-radius-full;
+                    border: 1px solid $glass-border-color;
+                    background: rgba(0, 0, 0, 0.2);
+                    color: $color-text-secondary;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    transition: all $transition-fast;
+
+                    &:hover {
+                        background: rgba($color-neon-cyan, 0.1);
+                        border-color: $color-neon-cyan;
+                        color: $color-neon-cyan;
+                    }
+
+                    &.zoom-in::before { content: '+'; }
+                    &.zoom-out::before { content: '−'; }
+                }
+            }
+
+            .map-view-toggle {
+                @extend .glass-input;
+                padding: $spacing-xs $spacing-sm;
+                font-size: $font-size-sm;
+                min-width: 120px;
+            }
+        }
+    }
+
+    .map-perspective-container {
+        perspective: 1500px;
+        height: 500px;
+        overflow: hidden;
+        border-radius: $border-radius-lg;
+        border: 1px solid $glass-border-color;
+        background: linear-gradient(145deg, rgba(0, 0, 0, 0.9), rgba(20, 20, 20, 0.9));
+    }
+
+    .map-grid-3d {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: $spacing-sm;
+        transform-style: preserve-3d;
+        transform: rotateX(30deg) rotateY(-15deg);
+        height: 100%;
+        padding: $spacing-lg;
+
+        .map-tile,
+        .map-tile-3d {
+            @include neon-glass-panel;
+            height: 100px;
+            transform: translateZ(0);
+            transition: all $transition-fast;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+
+            &::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+                opacity: 0;
+                transition: opacity $transition-fast;
+            }
+
+            &:hover {
+                transform: translateZ(20px) scale(1.05);
+                box-shadow: 0 0 20px rgba($color-neon-purple, 0.7);
+
+                &::before {
+                    opacity: 1;
+                }
+            }
+
+            &.controlled {
+                border-color: rgba($color-neon-cyan, 0.4);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-cyan, 0.1) 0%, transparent 70%);
+                box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4);
+            }
+
+            &.contested {
+                border-color: rgba($color-warning-orange, 0.4);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-warning-orange, 0.1) 0%, transparent 70%);
+                box-shadow: 0 0 15px rgba($color-warning-orange, 0.4);
+                animation: contested-pulse 2s infinite;
+            }
+
+            &.neutral {
+                border-color: rgba($color-text-secondary, 0.2);
+                opacity: 0.7;
+            }
+
+            &.governor-controlled {
+                border-color: $color-neon-cyan;
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-cyan, 0.15) 0%, transparent 70%);
+                box-shadow: 0 0 20px rgba($color-neon-cyan, 0.6);
+            }
+
+            .tile-name {
+                font-size: $font-size-sm;
+                font-weight: bold;
+                color: $color-text-main;
+                text-align: center;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: $spacing-xs;
+            }
+
+            .tile-owner {
+                font-size: $font-size-xs;
+                color: $color-neon-cyan;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .tile-stats {
+                display: flex;
+                gap: $spacing-xs;
+                font-size: $font-size-xs;
+                color: $color-text-secondary;
+
+                .stat {
+                    display: flex;
+                    align-items: center;
+                    gap: $spacing-xs;
+
+                    &::before {
+                        font-size: $font-size-sm;
+                    }
+
+                    &.population::before { content: '👥'; }
+                    &.resources::before { content: '💎'; }
+                    &.defense::before { content: '🛡️'; }
+                }
+            }
+
+            .tile-status {
+                position: absolute;
+                top: $spacing-xs;
+                right: $spacing-xs;
+                width: 20px;
+                height: 20px;
+                border-radius: $border-radius-full;
+                border: 2px solid $glass-border-color;
+
+                &.under-attack {
+                    background: $color-error-red;
+                    box-shadow: 0 0 10px rgba($color-error-red, 0.5);
+                }
+
+                &.developing {
+                    background: $color-neon-green;
+                    box-shadow: 0 0 10px rgba($color-neon-green, 0.5);
+                }
+
+                &.locked {
+                    background: $color-text-muted;
+                }
+            }
+        }
+    }
+}
+
+@keyframes contested-pulse {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba($color-warning-orange, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba($color-warning-orange, 0.8);
+    }
+}
+
+// Territory Districts
+.territory-districts {
+    margin-bottom: $spacing-xl;
+
+    .districts-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .districts-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-blue;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .districts-overview {
+            font-size: $font-size-sm;
+            color: $color-text-secondary;
+
+            .controlled-count {
+                font-weight: bold;
+                color: $color-neon-cyan;
+            }
+        }
+    }
+
+    .districts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: $spacing-lg;
+
+        .district-card {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+            border-color: rgba($color-neon-blue, 0.2);
+            cursor: pointer;
+            transition: all $transition-fast;
+            display: flex;
+            flex-direction: column;
+
+            &:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 8px 25px rgba($color-neon-blue, 0.3);
+                border-color: $color-neon-blue;
+            }
+
+            &.controlled {
+                border-color: rgba($color-neon-cyan, 0.3);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-cyan, 0.05) 0%, transparent 70%);
+            }
+
+            &.contested {
+                border-color: rgba($color-warning-orange, 0.3);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-warning-orange, 0.05) 0%, transparent 70%);
+            }
+
+            .district-header {
+                display: flex;
+                align-items: center;
+                gap: $spacing-md;
+                margin-bottom: $spacing-md;
+
+                .district-icon {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: $border-radius-md;
+                    background: linear-gradient(45deg, rgba($color-neon-blue, 0.2), rgba($color-neon-purple, 0.2));
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: $font-size-xl;
+                    border: 1px solid rgba($color-neon-blue, 0.3);
+                }
+
+                .district-info {
+                    flex: 1;
+
+                    .district-name {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-text-main;
+                        margin-bottom: $spacing-xs;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+
+                    .district-type {
+                        font-size: $font-size-sm;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                }
+
+                .district-status {
+                    font-size: $font-size-sm;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+
+                    &.controlled { color: $color-neon-cyan; }
+                    &.contested { color: $color-warning-orange; }
+                    &.neutral { color: $color-text-secondary; }
+                }
+            }
+
+            .district-stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                gap: $spacing-sm;
+                margin-bottom: $spacing-md;
+                font-size: $font-size-sm;
+
+                .stat {
+                    text-align: center;
+                    padding: $spacing-xs;
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: $border-radius-sm;
+
+                    .stat-label {
+                        color: $color-text-muted;
+                        font-size: $font-size-xs;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .stat-value {
+                        font-weight: bold;
+                        color: $color-neon-cyan;
+                    }
+                }
+            }
+
+            .district-resources {
+                margin-bottom: $spacing-md;
+
+                .resources-list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: $spacing-xs;
+
+                    .resource-item {
+                        display: flex;
+                        align-items: center;
+                        gap: $spacing-xs;
+                        padding: $spacing-xs $spacing-sm;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: $border-radius-sm;
+                        font-size: $font-size-sm;
+                        color: $color-text-main;
+
+                        &::before {
+                            font-size: $font-size-sm;
+                        }
+
+                        &.gold::before { content: '💰'; color: $color-gold; }
+                        &.mana::before { content: '🔮'; color: $color-neon-purple; }
+                        &.population::before { content: '👥'; color: $color-neon-blue; }
+                        &.military::before { content: '⚔️'; color: $color-error-red; }
+                    }
+                }
+            }
+
+            .district-actions {
+                display: flex;
+                gap: $spacing-sm;
+                margin-top: auto;
+
+                .action-btn {
+                    flex: 1;
+                    padding: $spacing-sm $spacing-md;
+                    border-radius: $border-radius-md;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    cursor: pointer;
+                    transition: all $transition-fast;
+
+                    &.claim {
+                        background: linear-gradient(45deg, $color-neon-cyan, $color-neon-blue);
+                        color: $color-bg-dark;
+                        border: none;
+
+                        &:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 4px 15px rgba($color-neon-cyan, 0.3);
+                        }
+                    }
+
+                    &.attack {
+                        background: rgba($color-error-red, 0.1);
+                        border: 1px solid rgba($color-error-red, 0.3);
+                        color: $color-error-red;
+
+                        &:hover {
+                            background: $color-error-red;
+                            color: white;
+                        }
+                    }
+
+                    &.develop {
+                        background: rgba($color-neon-green, 0.1);
+                        border: 1px solid rgba($color-neon-green, 0.3);
+                        color: $color-neon-green;
+
+                        &:hover {
+                            background: $color-neon-green;
+                            color: white;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Club Foundry (Branding)
 .club-foundry {
     @include neon-glass-panel;
+    padding: $spacing-lg;
     border-color: $color-neon-purple;
+    margin-bottom: $spacing-xl;
+
+    .foundry-header {
+        text-align: center;
+        margin-bottom: $spacing-lg;
+
+        .foundry-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-neon-purple;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba($color-neon-purple, 0.5);
+            margin-bottom: $spacing-sm;
+        }
+
+        .foundry-subtitle {
+            color: $color-text-secondary;
+            font-style: italic;
+        }
+    }
+
+    .foundry-content {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: $spacing-lg;
+
+        .foundry-club-info {
+            .club-logo {
+                width: 120px;
+                height: 120px;
+                border-radius: $border-radius-full;
+                background: linear-gradient(45deg, rgba($color-neon-purple, 0.2), rgba($color-neon-cyan, 0.2));
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: $font-size-4xl;
+                border: 3px solid $color-neon-purple;
+                margin: 0 auto $spacing-lg;
+                box-shadow: 0 0 20px rgba($color-neon-purple, 0.5);
+            }
+
+            .club-details {
+                .club-name {
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    color: $color-text-main;
+                    text-align: center;
+                    margin-bottom: $spacing-md;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+
+                .club-stats {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: $spacing-md;
+
+                    .stat-item {
+                        text-align: center;
+                        padding: $spacing-md;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: $border-radius-md;
+
+                        .stat-label {
+                            font-size: $font-size-sm;
+                            color: $color-text-secondary;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                            margin-bottom: $spacing-xs;
+                        }
+
+                        .stat-value {
+                            font-size: $font-size-lg;
+                            font-weight: bold;
+                            color: $color-neon-purple;
+                        }
+                    }
+                }
+            }
+        }
+
+        .foundry-customization {
+            .customization-section {
+                margin-bottom: $spacing-lg;
+
+                .section-title {
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    color: $color-neon-cyan;
+                    margin-bottom: $spacing-md;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+
+                &.colors {
+                    .color-picker {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+                        gap: $spacing-sm;
+
+                        .color-option {
+                            width: 50px;
+                            height: 50px;
+                            border-radius: $border-radius-md;
+                            cursor: pointer;
+                            transition: all $transition-fast;
+                            border: 3px solid transparent;
+
+                            &:hover {
+                                transform: scale(1.1);
+                                box-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+                            }
+
+                            &.selected {
+                                border-color: $color-neon-cyan;
+                                box-shadow: 0 0 20px rgba($color-neon-cyan, 0.7);
+                            }
+                        }
+                    }
+                }
+
+                &.emblems {
+                    .emblem-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                        gap: $spacing-md;
+
+                        .emblem-option {
+                            @include neon-glass-panel;
+                            padding: $spacing-md;
+                            cursor: pointer;
+                            transition: all $transition-fast;
+                            border-color: rgba($color-text-secondary, 0.2);
+
+                            &:hover {
+                                border-color: $color-neon-purple;
+                                transform: translateY(-2px);
+                            }
+
+                            &.selected {
+                                border-color: $color-neon-purple;
+                                background: rgba($color-neon-purple, 0.1);
+                            }
+
+                            .emblem-icon {
+                                font-size: $font-size-2xl;
+                                text-align: center;
+                                margin-bottom: $spacing-xs;
+                            }
+
+                            .emblem-name {
+                                font-size: $font-size-xs;
+                                text-align: center;
+                                text-transform: uppercase;
+                                letter-spacing: 0.5px;
+                            }
+                        }
+                    }
+                }
+
+                &.banners {
+                    .banner-preview {
+                        height: 80px;
+                        @include neon-glass-panel;
+                        padding: $spacing-md;
+                        border-color: rgba($color-neon-purple, 0.2);
+                        margin-bottom: $spacing-md;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-neon-purple;
+                        text-transform: uppercase;
+                        letter-spacing: 2px;
+                    }
+
+                    .banner-options {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: $spacing-sm;
+
+                        .banner-style {
+                            padding: $spacing-sm $spacing-md;
+                            background: rgba(0, 0, 0, 0.2);
+                            border: 1px solid $glass-border-color;
+                            border-radius: $border-radius-sm;
+                            cursor: pointer;
+                            transition: all $transition-fast;
+                            font-size: $font-size-sm;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+
+                            &:hover {
+                                background: rgba($color-neon-purple, 0.1);
+                                border-color: $color-neon-purple;
+                                color: $color-neon-purple;
+                            }
+
+                            &.selected {
+                                background: $color-neon-purple;
+                                color: $color-bg-dark;
+                            }
+                        }
+                    }
+                }
+            }
+
+            .foundry-actions {
+                display: flex;
+                justify-content: center;
+                gap: $spacing-md;
+                margin-top: $spacing-xl;
+
+                .save-btn {
+                    background: linear-gradient(45deg, $color-neon-green, $color-neon-cyan);
+                    color: $color-bg-dark;
+                    border: none;
+                    padding: $spacing-md $spacing-xl;
+                    border-radius: $border-radius-md;
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    cursor: pointer;
+                    transition: all $transition-fast;
+                    box-shadow: 0 4px 15px rgba($color-neon-green, 0.3);
+
+                    &:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
+                    }
+                }
+
+                .reset-btn {
+                    background: rgba($color-text-main, 0.1);
+                    border: 1px solid $glass-border-color;
+                    color: $color-text-main;
+                    padding: $spacing-md $spacing-xl;
+                    border-radius: $border-radius-md;
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    cursor: pointer;
+                    transition: all $transition-fast;
+
+                    &:hover {
+                        background: rgba($color-text-main, 0.2);
+                    }
+                }
+            }
+        }
+    }
 }
 
 // Regional Governor Status
 .regional-governor {
-    // Visual indicators for players controlling 2+ districts
-    background: linear-gradient(45deg, rgba($color-neon-purple, 0.2), rgba($color-neon-cyan, 0.2));
-    border: 2px solid $color-neon-purple;
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-neon-purple, 0.4);
+    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.1) 0%, transparent 70%);
+    box-shadow: 0 0 20px rgba($color-neon-purple, 0.4);
+
+    .governor-header {
+        text-align: center;
+        margin-bottom: $spacing-lg;
+
+        .governor-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-neon-purple;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba($color-neon-purple, 0.5);
+            margin-bottom: $spacing-sm;
+        }
+
+        .governor-badge {
+            display: inline-block;
+            padding: $spacing-sm $spacing-lg;
+            background: linear-gradient(45deg, $color-gold, $color-neon-purple);
+            color: $color-bg-dark;
+            border-radius: $border-radius-md;
+            font-size: $font-size-sm;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba($color-gold, 0.5);
+        }
+    }
+
+    .governor-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: $spacing-lg;
+        margin-bottom: $spacing-lg;
+
+        .governor-stat {
+            text-align: center;
+            padding: $spacing-lg;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: $border-radius-md;
+            border: 1px solid rgba($color-neon-purple, 0.2);
+
+            .stat-icon {
+                font-size: $font-size-2xl;
+                margin-bottom: $spacing-sm;
+                color: $color-neon-purple;
+            }
+
+            .stat-label {
+                font-size: $font-size-sm;
+                color: $color-text-secondary;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: $spacing-xs;
+            }
+
+            .stat-value {
+                font-size: $font-size-xl;
+                font-weight: bold;
+                color: $color-neon-purple;
+                font-family: $font-mono;
+            }
+        }
+    }
+
+    .governor-districts {
+        .districts-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-cyan;
+            margin-bottom: $spacing-md;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .districts-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: $spacing-sm;
+
+            .district-badge {
+                display: flex;
+                align-items: center;
+                gap: $spacing-xs;
+                padding: $spacing-xs $spacing-sm;
+                background: rgba($color-neon-cyan, 0.1);
+                border: 1px solid rgba($color-neon-cyan, 0.3);
+                border-radius: $border-radius-sm;
+                font-size: $font-size-sm;
+                color: $color-neon-cyan;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+
+                &::before {
+                    content: '🏛️';
+                    font-size: $font-size-sm;
+                }
+            }
+        }
+    }
 }
 
-// New style for Governor-controlled map tiles
-.map-tile-3d.governor-controlled {
-    border-color: $color-neon-cyan; // Distinct border color
+// Territory Conflicts & Wars
+.territory-conflicts {
+    .conflicts-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .conflicts-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-error-red;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .conflicts-count {
+            font-size: $font-size-sm;
+            color: $color-text-secondary;
+
+            .active-count {
+                font-weight: bold;
+                color: $color-error-red;
+            }
+        }
+    }
+
+    .conflicts-list {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-md;
+
+        .conflict-item {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+            border-color: rgba($color-error-red, 0.2);
+            display: flex;
+            align-items: center;
+            gap: $spacing-lg;
+
+            .conflict-icon {
+                width: 50px;
+                height: 50px;
+                border-radius: $border-radius-full;
+                background: linear-gradient(45deg, rgba($color-error-red, 0.2), rgba($color-warning-orange, 0.2));
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: $font-size-xl;
+                border: 2px solid rgba($color-error-red, 0.3);
+                flex-shrink: 0;
+            }
+
+            .conflict-info {
+                flex: 1;
+
+                .conflict-title {
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    color: $color-text-main;
+                    margin-bottom: $spacing-xs;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+
+                .conflict-description {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    line-height: 1.4;
+                    margin-bottom: $spacing-sm;
+                }
+
+                .conflict-participants {
+                    display: flex;
+                    gap: $spacing-md;
+                    font-size: $font-size-sm;
+
+                    .participant {
+                        display: flex;
+                        align-items: center;
+                        gap: $spacing-xs;
+
+                        &::before {
+                            font-size: $font-size-sm;
+                        }
+
+                        &.attacker::before { content: '⚔️'; color: $color-error-red; }
+                        &.defender::before { content: '🛡️'; color: $color-neon-cyan; }
+                    }
+                }
+            }
+
+            .conflict-status {
+                text-align: right;
+
+                .status-badge {
+                    display: inline-block;
+                    padding: $spacing-xs $spacing-sm;
+                    border-radius: $border-radius-sm;
+                    font-size: $font-size-xs;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+
+                    &.active {
+                        background: $color-error-red;
+                        color: white;
+                    }
+
+                    &.pending {
+                        background: $color-warning-orange;
+                        color: $color-bg-dark;
+                    }
+
+                    &.resolved {
+                        background: $color-neon-green;
+                        color: white;
+                    }
+                }
+
+                .conflict-timer {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    font-family: $font-mono;
+                    margin-top: $spacing-xs;
+                }
+            }
+        }
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-lg) {
+    .map-grid-3d {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: $spacing-xs;
+    }
+
+    .districts-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .club-foundry .foundry-content {
+        grid-template-columns: 1fr;
+        gap: $spacing-md;
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .territory-panel {
+        padding: $spacing-md;
+    }
+
+    .map-perspective-container {
+        height: 300px;
+    }
+
+    .districts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .district-card .district-header {
+        flex-direction: column;
+        text-align: center;
+        gap: $spacing-md;
+
+        .district-info {
+            order: -1;
+        }
+    }
+
+    .club-foundry .foundry-content .foundry-customization .customization-section.colors .color-picker {
+        grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+    }
+
+    .governor-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .conflict-item {
+        flex-direction: column;
+        text-align: center;
+        gap: $spacing-md;
+
+        .conflict-info {
+            order: -1;
+        }
+
+        .conflict-status {
+            text-align: center;
+        }
+    }
+}
     box-shadow: 0 0 25px rgba($color-neon-cyan, 0.6), inset 0 0 10px rgba($color-neon-cyan, 0.4); // Stronger glow
     background: linear-gradient(45deg, rgba($color-neon-cyan, 0.1), rgba($color-neon-blue, 0.1)); // Subtle gradient
     transform: translateZ(25px) scale(1.02); // Slightly elevated and larger

@@ -2,23 +2,857 @@
 @import '../base/variables';
 @import '../themes/neon-glass';
 
-/* High-Finance & Market Layer */
+// Economy Panel Base
+.economy-panel {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-neon-green, 0.3);
+    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+}
+
+// Economy Header
+.economy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid rgba($color-neon-green, 0.2);
+
+    .economy-title {
+        font-size: $font-size-xl;
+        font-weight: bold;
+        color: $color-neon-green;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba($color-neon-green, 0.5);
+    }
+
+    .economy-stats {
+        display: flex;
+        gap: $spacing-lg;
+        font-size: $font-size-sm;
+
+        .stat-item {
+            text-align: center;
+
+            .stat-label {
+                color: $color-text-secondary;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-size: $font-size-xs;
+            }
+
+            .stat-value {
+                font-weight: bold;
+                color: $color-neon-green;
+                font-family: $font-mono;
+            }
+        }
+    }
+}
 
 // Market Ticker (Live performance prices)
+.market-ticker {
+    @include neon-glass-panel;
+    padding: $spacing-md;
+    border-color: rgba($color-neon-cyan, 0.3);
+    margin-bottom: $spacing-xl;
+    overflow: hidden;
+
+    .ticker-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-md;
+
+        .ticker-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-cyan;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ticker-controls {
+            display: flex;
+            gap: $spacing-sm;
+
+            .ticker-toggle {
+                background: rgba($color-text-main, 0.1);
+                border: 1px solid $glass-border-color;
+                color: $color-text-main;
+                padding: $spacing-xs $spacing-sm;
+                border-radius: $border-radius-sm;
+                font-size: $font-size-xs;
+                cursor: pointer;
+                transition: all $transition-fast;
+
+                &:hover {
+                    background: rgba($color-neon-cyan, 0.1);
+                    border-color: $color-neon-cyan;
+                    color: $color-neon-cyan;
+                }
+
+                &.active {
+                    background: $color-neon-cyan;
+                    color: $color-bg-dark;
+                }
+            }
+        }
+    }
+
+    .ticker-stream {
+        display: flex;
+        overflow: hidden;
+        position: relative;
+
+        .ticker-item {
+            display: flex;
+            align-items: center;
+            gap: $spacing-sm;
+            padding: $spacing-xs $spacing-md;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: $border-radius-sm;
+            margin-right: $spacing-md;
+            white-space: nowrap;
+            animation: ticker-scroll 20s linear infinite;
+
+            .ticker-symbol {
+                font-weight: bold;
+                color: $color-neon-cyan;
+                font-family: $font-mono;
+                font-size: $font-size-sm;
+            }
+
+            .ticker-price {
+                font-weight: bold;
+                font-family: $font-mono;
+                font-size: $font-size-sm;
+
+                &.positive {
+                    color: $color-neon-green;
+                    &::before { content: '▲ '; }
+                }
+
+                &.negative {
+                    color: $color-error-red;
+                    &::before { content: '▼ '; }
+                }
+
+                &.neutral {
+                    color: $color-text-secondary;
+                }
+            }
+
+            .ticker-change {
+                font-size: $font-size-xs;
+                font-family: $font-mono;
+
+                &.positive { color: $color-neon-green; }
+                &.negative { color: $color-error-red; }
+                &.neutral { color: $color-text-secondary; }
+            }
+        }
+    }
+}
+
+@keyframes ticker-scroll {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
 
 // Art Gallery (Auctions & Consignments)
 .auction-gallery {
-    &__item-bundle {
-        @include neon-glass-panel;
-        border-color: $color-neon-cyan;
+    margin-bottom: $spacing-xl;
+
+    .gallery-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .gallery-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-neon-purple;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .gallery-filters {
+            display: flex;
+            gap: $spacing-sm;
+
+            select {
+                @extend .glass-input;
+                padding: $spacing-xs $spacing-sm;
+                font-size: $font-size-sm;
+                min-width: 120px;
+            }
+        }
+    }
+
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: $spacing-lg;
+
+        &__item-bundle {
+            @include neon-glass-panel;
+            border-color: $color-neon-cyan;
+            padding: $spacing-lg;
+            cursor: pointer;
+            transition: all $transition-fast;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+
+            &::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, $color-neon-cyan, $color-neon-purple, $color-neon-cyan);
+                opacity: 0;
+                transition: opacity $transition-fast;
+            }
+
+            &:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 8px 25px rgba($color-neon-cyan, 0.3);
+                border-color: $color-neon-cyan;
+
+                &::before {
+                    opacity: 1;
+                }
+            }
+
+            .item-image {
+                width: 100%;
+                height: 180px;
+                border-radius: $border-radius-md;
+                overflow: hidden;
+                margin-bottom: $spacing-md;
+                border: 1px solid $glass-border-color;
+
+                img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    transition: transform $transition-fast;
+
+                    &:hover {
+                        transform: scale(1.05);
+                    }
+                }
+            }
+
+            .item-info {
+                flex: 1;
+
+                .item-title {
+                    font-size: $font-size-lg;
+                    font-weight: bold;
+                    color: $color-text-main;
+                    margin-bottom: $spacing-sm;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+
+                .item-description {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    line-height: 1.4;
+                    margin-bottom: $spacing-md;
+                }
+
+                .item-stats {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: $spacing-md;
+                    font-size: $font-size-sm;
+
+                    .stat {
+                        text-align: center;
+
+                        .stat-label {
+                            color: $color-text-muted;
+                            font-size: $font-size-xs;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        }
+
+                        .stat-value {
+                            font-weight: bold;
+                            color: $color-neon-cyan;
+                        }
+                    }
+                }
+            }
+
+            .auction-info {
+                border-top: 1px solid rgba($color-text-main, 0.1);
+                padding-top: $spacing-md;
+
+                .current-bid {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: $spacing-sm;
+
+                    .bid-label {
+                        font-size: $font-size-sm;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+
+                    .bid-amount {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-neon-green;
+                        font-family: $font-mono;
+                    }
+                }
+
+                .time-remaining {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+
+                    .time-label {
+                        font-size: $font-size-sm;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+
+                    .time-value {
+                        font-family: $font-mono;
+                        font-size: $font-size-sm;
+                        font-weight: bold;
+                        color: $color-warning-orange;
+                    }
+                }
+            }
+
+            .auction-status {
+                position: absolute;
+                top: $spacing-sm;
+                right: $spacing-sm;
+                background: rgba($color-neon-green, 0.9);
+                color: $color-bg-dark;
+                font-size: $font-size-xs;
+                font-weight: bold;
+                padding: $spacing-xs $spacing-sm;
+                border-radius: $border-radius-sm;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+        }
     }
 }
 
 // Second-Hand Store (Loans & Collateral)
+.second-hand-store {
+    margin-bottom: $spacing-xl;
+
+    .store-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .store-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-neon-blue;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .store-balance {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-green;
+            font-family: $font-mono;
+        }
+    }
+
+    .loan-calculator {
+        @include neon-glass-panel;
+        padding: $spacing-lg;
+        border-color: rgba($color-neon-blue, 0.3);
+        margin-bottom: $spacing-lg;
+
+        .calculator-header {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-neon-blue;
+            margin-bottom: $spacing-lg;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .calculator-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: $spacing-lg;
+
+            .form-group {
+                display: flex;
+                flex-direction: column;
+                gap: $spacing-sm;
+
+                label {
+                    font-weight: bold;
+                    color: $color-text-main;
+                    font-size: $font-size-sm;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+
+                input {
+                    @extend .glass-input;
+                    font-family: $font-mono;
+                    font-size: $font-size-sm;
+                }
+            }
+
+            .calculator-results {
+                grid-column: 1 / -1;
+                display: flex;
+                justify-content: space-around;
+                padding: $spacing-lg;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: $border-radius-md;
+                border: 1px solid $glass-border-color;
+
+                .result-item {
+                    text-align: center;
+
+                    .result-label {
+                        font-size: $font-size-sm;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .result-value {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-neon-green;
+                        font-family: $font-mono;
+                    }
+                }
+            }
+        }
+    }
+
+    .collateral-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: $spacing-lg;
+
+        .collateral-item {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+            border-color: rgba($color-text-secondary, 0.2);
+            cursor: pointer;
+            transition: all $transition-fast;
+
+            &:hover {
+                border-color: $color-neon-blue;
+                transform: translateY(-2px);
+            }
+
+            .item-header {
+                display: flex;
+                align-items: center;
+                gap: $spacing-md;
+                margin-bottom: $spacing-md;
+
+                .item-icon {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: $border-radius-md;
+                    background: linear-gradient(45deg, rgba($color-neon-blue, 0.2), rgba($color-neon-cyan, 0.2));
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: $font-size-xl;
+                    border: 1px solid rgba($color-neon-blue, 0.3);
+                }
+
+                .item-details {
+                    flex: 1;
+
+                    .item-name {
+                        font-weight: bold;
+                        color: $color-text-main;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .item-value {
+                        font-size: $font-size-sm;
+                        color: $color-neon-green;
+                        font-family: $font-mono;
+                        font-weight: bold;
+                    }
+                }
+            }
+
+            .loan-terms {
+                font-size: $font-size-sm;
+                color: $color-text-secondary;
+                line-height: 1.4;
+
+                .term {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-bottom: $spacing-xs;
+
+                    .term-label { opacity: 0.8; }
+                    .term-value { font-weight: bold; color: $color-text-main; }
+                }
+            }
+        }
+    }
+}
 
 // Black Market (Gated Underworld Economy)
 .black-market {
-    // High-cunning requirement visuals
+    @include neon-glass-panel;
     border-color: $color-error-red;
     box-shadow: 0 0 15px rgba($color-error-red, 0.4);
+    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+
+    .market-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+        padding-bottom: $spacing-md;
+        border-bottom: 1px solid rgba($color-error-red, 0.2);
+
+        .market-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-error-red;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba($color-error-red, 0.5);
+        }
+
+        .access-level {
+            display: flex;
+            align-items: center;
+            gap: $spacing-sm;
+            font-size: $font-size-sm;
+            color: $color-error-red;
+            font-weight: bold;
+
+            &::before {
+                content: '🔒';
+                font-size: $font-size-lg;
+            }
+        }
+    }
+
+    .market-notice {
+        background: rgba($color-error-red, 0.1);
+        border: 1px solid rgba($color-error-red, 0.3);
+        border-radius: $border-radius-md;
+        padding: $spacing-lg;
+        margin-bottom: $spacing-lg;
+        text-align: center;
+
+        .notice-icon {
+            font-size: $font-size-2xl;
+            color: $color-error-red;
+            margin-bottom: $spacing-md;
+        }
+
+        .notice-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-error-red;
+            margin-bottom: $spacing-sm;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .notice-text {
+            color: $color-text-secondary;
+            line-height: 1.4;
+        }
+    }
+
+    .market-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: $spacing-lg;
+
+        .market-item {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+            border-color: rgba($color-error-red, 0.2);
+            cursor: pointer;
+            transition: all $transition-fast;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: $spacing-md;
+            position: relative;
+            overflow: hidden;
+
+            &::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, $color-error-red, $color-neon-purple, $color-error-red);
+                opacity: 0;
+                transition: opacity $transition-fast;
+            }
+
+            &:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 8px 25px rgba($color-error-red, 0.3);
+                border-color: $color-error-red;
+
+                &::before {
+                    opacity: 1;
+                }
+            }
+
+            .item-icon {
+                width: 60px;
+                height: 60px;
+                border-radius: $border-radius-full;
+                background: linear-gradient(45deg, rgba($color-error-red, 0.2), rgba($color-neon-purple, 0.2));
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: $font-size-2xl;
+                color: $color-error-red;
+                margin-bottom: $spacing-sm;
+                border: 2px solid rgba($color-error-red, 0.3);
+            }
+
+            .item-title {
+                font-size: $font-size-lg;
+                font-weight: bold;
+                color: $color-text-main;
+                text-align: center;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .item-description {
+                font-size: $font-size-sm;
+                color: $color-text-secondary;
+                text-align: center;
+                line-height: 1.4;
+                flex: 1;
+            }
+
+            .item-price {
+                display: flex;
+                align-items: center;
+                gap: $spacing-xs;
+                font-size: $font-size-lg;
+                font-weight: bold;
+                color: $color-neon-green;
+                font-family: $font-mono;
+
+                &::before {
+                    content: '💰';
+                    font-size: $font-size-sm;
+                }
+            }
+
+            .item-restriction {
+                position: absolute;
+                top: $spacing-sm;
+                right: $spacing-sm;
+                background: rgba($color-warning-orange, 0.9);
+                color: $color-bg-dark;
+                font-size: $font-size-xs;
+                font-weight: bold;
+                padding: $spacing-xs $spacing-sm;
+                border-radius: $border-radius-sm;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+        }
+    }
+}
+
+// Economy Transaction History
+.transaction-history {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-text-secondary, 0.2);
+
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .history-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-text-secondary;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .history-filter {
+            display: flex;
+            gap: $spacing-sm;
+
+            select {
+                @extend .glass-input;
+                padding: $spacing-xs $spacing-sm;
+                font-size: $font-size-sm;
+            }
+        }
+    }
+
+    .history-list {
+        max-height: 300px;
+        overflow-y: auto;
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+            padding: $spacing-md;
+            border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.3);
+            }
+
+            .transaction-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: $border-radius-full;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: $font-size-lg;
+                flex-shrink: 0;
+
+                &.income { background: rgba($color-neon-green, 0.2); color: $color-neon-green; }
+                &.expense { background: rgba($color-error-red, 0.2); color: $color-error-red; }
+                &.transfer { background: rgba($color-neon-cyan, 0.2); color: $color-neon-cyan; }
+            }
+
+            .transaction-content {
+                flex: 1;
+
+                .transaction-description {
+                    font-weight: bold;
+                    color: $color-text-main;
+                    margin-bottom: $spacing-xs;
+                }
+
+                .transaction-details {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    line-height: 1.3;
+                }
+            }
+
+            .transaction-amount {
+                font-weight: bold;
+                font-family: $font-mono;
+                text-align: right;
+                flex-shrink: 0;
+
+                &.positive { color: $color-neon-green; }
+                &.negative { color: $color-error-red; }
+                &.neutral { color: $color-text-secondary; }
+            }
+
+            .transaction-timestamp {
+                font-size: $font-size-xs;
+                color: $color-text-muted;
+                font-family: $font-mono;
+                text-align: right;
+                flex-shrink: 0;
+            }
+        }
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-lg) {
+    .auction-gallery .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    }
+
+    .second-hand-store .collateral-list {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .black-market .market-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .economy-panel {
+        padding: $spacing-md;
+    }
+
+    .market-ticker .ticker-stream .ticker-item {
+        animation: none;
+        margin-right: $spacing-sm;
+    }
+
+    .auction-gallery .gallery-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .second-hand-store .loan-calculator .calculator-form {
+        grid-template-columns: 1fr;
+    }
+
+    .second-hand-store .collateral-list {
+        grid-template-columns: 1fr;
+    }
+
+    .black-market .market-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .transaction-history .transaction-item {
+        flex-direction: column;
+        text-align: center;
+        gap: $spacing-sm;
+
+        .transaction-content {
+            order: -1;
+        }
+
+        .transaction-amount,
+        .transaction-timestamp {
+            text-align: center;
+        }
+    }
 }

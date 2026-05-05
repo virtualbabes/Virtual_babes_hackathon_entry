@@ -1,44 +1,280 @@
 // z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\components\_buttons.scss
 @import '../base/variables';
 
-/* ---------------------------------------------------------
-   GLOWING BUTTONS
-   --------------------------------------------------------- */
+// Base Button Styles
 button {
-    background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    font-family: $font-body;
+    font-size: $font-size-sm;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1px;
-    box-shadow: 0 4px 15px rgba(155, 81, 224, 0.3);
-    margin: 8px 4px;
+    cursor: pointer;
+    transition: all $transition-fast;
+    border: none;
+    border-radius: $border-radius-md;
+    padding: $spacing-md $spacing-lg;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-xs;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+
+    &:focus-visible {
+        outline: 2px solid $color-neon-cyan;
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    &:hover:not(:disabled)::before {
+        left: 100%;
+    }
 }
 
-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
-    background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan);
+// Primary Glowing Buttons
+button:not(.outline):not(.secondary):not(.danger):not(.success) {
+    background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
+    color: white;
+    box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
+
+    &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
+        background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan);
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(1px) scale(0.98);
+        box-shadow: 0 2px 10px rgba($color-neon-cyan, 0.4);
+    }
 }
 
-button:active:not(:disabled) {
-    transform: translateY(1px) scale(0.97);
-    box-shadow: 0 2px 10px rgba($color-neon-cyan, 0.4);
-}
-button:focus-visible {
-    outline: 2px solid $color-neon-cyan;
-    outline-offset: 3px;
-}
-button.outline { background: transparent; border: 2px solid $color-neon-cyan; box-shadow: none; }
-button.outline:hover { background: rgba($color-neon-cyan, 0.1); box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4); }
-button:disabled { background: #21262d; border: 1px solid #30363d; color: #8b949e; box-shadow: none; cursor: not-allowed; transform: none; }
+// Outline Buttons
+button.outline {
+    background: transparent;
+    border: 2px solid $color-neon-cyan;
+    color: $color-neon-cyan;
+    box-shadow: none;
 
+    &:hover:not(:disabled) {
+        background: rgba($color-neon-cyan, 0.1);
+        box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4);
+        transform: translateY(-2px);
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(1px) scale(0.98);
+    }
+}
+
+// Secondary Buttons
+button.secondary {
+    background: rgba($color-text-main, 0.1);
+    border: 1px solid $glass-border-color;
+    color: $color-text-main;
+    box-shadow: none;
+
+    &:hover:not(:disabled) {
+        background: rgba($color-text-main, 0.2);
+        border-color: rgba($color-neon-cyan, 0.3);
+        transform: translateY(-1px);
+    }
+}
+
+// Success Buttons
+button.success {
+    background: linear-gradient(45deg, $color-neon-green, darken($color-neon-green, 10%));
+    color: white;
+    box-shadow: 0 4px 15px rgba($color-neon-green, 0.3);
+
+    &:hover:not(:disabled) {
+        box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
+        background: linear-gradient(45deg, darken($color-neon-green, 10%), $color-neon-green);
+    }
+}
+
+// Danger/Error Buttons
+button.danger {
+    background: linear-gradient(45deg, $color-error-red, darken($color-error-red, 10%));
+    color: white;
+    box-shadow: 0 4px 15px rgba($color-error-red, 0.3);
+
+    &:hover:not(:disabled) {
+        box-shadow: 0 6px 25px rgba($color-error-red, 0.6);
+        background: linear-gradient(45deg, darken($color-error-red, 10%), $color-error-red);
+    }
+}
+
+// Warning Buttons
+button.warning {
+    background: linear-gradient(45deg, $color-warning-orange, darken($color-warning-orange, 10%));
+    color: white;
+    box-shadow: 0 4px 15px rgba($color-warning-orange, 0.3);
+
+    &:hover:not(:disabled) {
+        box-shadow: 0 6px 25px rgba($color-warning-orange, 0.6);
+        background: linear-gradient(45deg, darken($color-warning-orange, 10%), $color-warning-orange);
+    }
+}
+
+// Size Variants
+button.small, .btn-small {
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-xs;
+    min-height: 32px;
+}
+
+button.large, .btn-large {
+    padding: $spacing-lg $spacing-xl;
+    font-size: $font-size-base;
+    min-height: 56px;
+}
+
+button.xlarge, .btn-xlarge {
+    padding: $spacing-xl $spacing-2xl;
+    font-size: $font-size-lg;
+    min-height: 64px;
+}
+
+// Special Admin Button
 .admin-action-btn-small {
-    padding: 2px 8px;
-    font-size: 9px;
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-xs;
+    background: rgba($color-error-red, 0.1);
+    border: 1px solid rgba($color-error-red, 0.3);
+    color: $color-error-red;
+
+    &:hover:not(:disabled) {
+        background: rgba($color-error-red, 0.2);
+        box-shadow: 0 0 10px rgba($color-error-red, 0.3);
+    }
+}
+
+// Wallet Option Buttons
+.wallet-option {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-radius: $border-radius-lg;
+    cursor: pointer;
+    transition: all $transition-fast;
+    border: 1px solid $glass-border-color;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-sm;
+    min-width: 150px;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: $glass-shadow-hover;
+        border-color: $color-neon-cyan;
+    }
+
+    img {
+        width: 40px;
+        height: 40px;
+        border-radius: $border-radius-md;
+    }
+
+    span {
+        font-weight: 600;
+        color: $color-text-main;
+        text-align: center;
+    }
+}
+
+// Icon Buttons
+.btn-icon {
+    padding: $spacing-sm;
+    width: auto;
+    min-width: auto;
+
+    &.small {
+        padding: $spacing-xs;
+    }
+
+    &.large {
+        padding: $spacing-md;
+    }
+}
+
+// Button Groups
+.btn-group {
+    display: flex;
+    gap: $spacing-xs;
+
+    button {
+        flex: 1;
+        border-radius: 0;
+
+        &:first-child {
+            border-radius: $border-radius-md 0 0 $border-radius-md;
+        }
+
+        &:last-child {
+            border-radius: 0 $border-radius-md $border-radius-md 0;
+        }
+
+        &:only-child {
+            border-radius: $border-radius-md;
+        }
+    }
+}
+
+// Loading State
+button.loading {
+    position: relative;
+    color: transparent;
+
+    &::after {
+        content: '';
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        top: 50%;
+        left: 50%;
+        margin-left: -8px;
+        margin-top: -8px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-sm) {
+    button {
+        padding: $spacing-sm $spacing-md;
+        font-size: $font-size-xs;
+        min-height: 44px;
+    }
+
+    button.small, .btn-small {
+        padding: $spacing-xs $spacing-sm;
+        min-height: 36px;
+    }
+
+    button.large, .btn-large {
+        padding: $spacing-md $spacing-lg;
+        min-height: 48px;
+    }
 }

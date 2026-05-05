@@ -1,53 +1,374 @@
 // z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\layouts\_dashboard.scss
 @import '../base/variables';
 
+// Dashboard Container
 .dashboard {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    flex-grow: 1; /* Allow it to take available vertical space */
-    width: 100%; /* Ensure it spans full width */
+    flex-grow: 1;
+    width: 100%;
     max-width: 1400px;
+    gap: $spacing-lg;
+    margin: $spacing-lg 0;
+
+    @media (max-width: $breakpoint-lg) {
+        gap: $spacing-md;
+        margin: $spacing-md 0;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        flex-direction: column;
+        gap: $spacing-sm;
+    }
 }
 
-.column { flex: 1; min-width: 320px; max-width: 450px; display: flex; flex-direction: column; }
+// Column Layout
+.column {
+    flex: 1;
+    min-width: 320px;
+    max-width: 450px;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
 
-/* Live Lobby Player List */
-.player-list { list-style: none; padding: 0; margin-top: 10px; }
-.player-item { 
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px; margin-bottom: 8px; background: rgba(0,0,0,0.3);
-    border-radius: 8px; border: 1px solid $glass-border-color;
+    @media (max-width: $breakpoint-md) {
+        min-width: auto;
+        max-width: none;
+    }
 }
 
-/* Lobby Chat Styles */
+// Glass Panel Base
+.glass-panel {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-radius: $border-radius-xl;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    @media (max-width: $breakpoint-md) {
+        padding: $spacing-md;
+    }
+}
+
+// Live Lobby Player List
+.player-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+}
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: $border-radius-md;
+    border: 1px solid $glass-border-color;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.5);
+        border-color: rgba($color-neon-cyan, 0.3);
+        transform: translateY(-2px);
+    }
+
+    .player-name {
+        font-weight: 600;
+        color: $color-text-main;
+    }
+
+    .player-rating {
+        font-size: $font-size-sm;
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+
+    .player-status {
+        font-size: $font-size-xs;
+        color: $color-text-secondary;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+}
+
+.player-list-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: $font-size-sm;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: $color-text-secondary;
+    margin-bottom: $spacing-sm;
+}
+
+// Lobby Chat Styles
 .chat-container {
-    display: flex; flex-direction: column; height: 300px;
-    margin-top: 15px; background: rgba(0,0,0,0.2);
-    border-radius: 12px; border: 1px solid $glass-border-color;
+    display: flex;
+    flex-direction: column;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: $border-radius-lg;
+    border: 1px solid $glass-border-color;
     overflow: hidden;
+    backdrop-filter: blur($glass-blur);
+
+    @media (max-width: $breakpoint-md) {
+        height: 250px;
+    }
 }
+
 #chat-display {
-    flex: 1; overflow-y: auto; padding: 10px;
-    display: flex; flex-direction: column; gap: 5px;
-    font-size: 0.85em;
-}
-.chat-msg { padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); }
-.chat-msg b { color: $color-neon-cyan; }
-.chat-msg.system { color: #8b949e; font-style: italic; background: transparent; }
-
-.chat-input-area { 
-    display: flex; 
-    border-top: 1px solid $glass-border-color; 
-    padding: 8px;
-    background: rgba(0,0,0,0.3);
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-md;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    font-size: $font-size-sm;
+    scroll-behavior: smooth;
 }
 
-/* --- Shared Glass Input Styles --- */
+.chat-msg {
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $border-radius-sm;
+    background: rgba(255, 255, 255, 0.05);
+    word-wrap: break-word;
+    line-height: 1.4;
+
+    b {
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+
+    &.system {
+        color: $color-text-secondary;
+        font-style: italic;
+        background: transparent;
+        padding: $spacing-xs 0;
+    }
+
+    &.admin {
+        background: rgba($color-warning-orange, 0.1);
+        border-left: 3px solid $color-warning-orange;
+        color: $color-warning-orange;
+    }
+
+    &.error {
+        background: rgba($color-error-red, 0.1);
+        border-left: 3px solid $color-error-red;
+        color: $color-error-red;
+    }
+}
+
+.chat-input-area {
+    display: flex;
+    border-top: 1px solid $glass-border-color;
+    padding: $spacing-sm;
+    background: rgba(0, 0, 0, 0.3);
+    gap: $spacing-sm;
+
+    .chat-send-btn {
+        background: $color-neon-cyan;
+        color: $color-bg-dark;
+        border: none;
+        padding: $spacing-sm $spacing-md;
+        border-radius: $border-radius-md;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+            background: lighten($color-neon-cyan, 10%);
+            box-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+        }
+
+        &:disabled {
+            background: $color-medium-grey;
+            color: $color-text-muted;
+            cursor: not-allowed;
+        }
+    }
+}
+
+// Shared Glass Input Styles
 .glass-input {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid $glass-border-color;
-    color: white;
+    color: $color-text-main;
+    border-radius: $border-radius-md;
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-sm;
+    transition: all $transition-fast;
+    backdrop-filter: blur($glass-blur);
+
+    &:focus {
+        outline: none;
+        border-color: $color-neon-cyan;
+        box-shadow: 0 0 10px rgba($color-neon-cyan, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    &::placeholder {
+        color: $color-text-muted;
+        opacity: 0.7;
+    }
+
+    &.w-full {
+        width: 100%;
+    }
+}
+
+// Matchmaking Container
+.matchmaking-box {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    text-align: center;
+    border-color: rgba($color-neon-cyan, 0.3);
+
+    .queue-status {
+        color: $color-text-secondary;
+        font-size: $font-size-sm;
+        margin-bottom: $spacing-md;
+    }
+}
+
+// Cooldown Container
+.cooldown-container {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    text-align: center;
+    border-color: rgba($color-error-red, 0.3);
+    background: rgba($color-error-red, 0.05);
+
+    .cooldown-header {
+        color: $color-error-red;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: $spacing-md;
+    }
+
+    .cooldown-progress-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba($color-text-main, 0.1);
+        border-radius: $border-radius-sm;
+        overflow: hidden;
+        margin-bottom: $spacing-sm;
+    }
+
+    .cooldown-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, $color-error-red, $color-warning-orange);
+        border-radius: $border-radius-sm;
+        transition: width $transition-base;
+        box-shadow: 0 0 10px rgba($color-error-red, 0.5);
+    }
+
+    .cooldown-timer {
+        font-size: $font-size-lg;
+        font-weight: bold;
+        color: $color-error-red;
+        font-family: $font-mono;
+    }
+}
+
+// Tournament Banner
+.tournament-highlight-banner {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-gold, 0.3);
+    background: linear-gradient(45deg, rgba($color-gold, 0.05), rgba($color-neon-cyan, 0.05));
+
+    .tournament-status-text {
+        color: $color-neon-cyan;
+        font-size: $font-size-base;
+        margin: $spacing-sm 0;
+    }
+}
+
+// Action Bar
+.action-bar {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    gap: $spacing-md;
+
+    button {
+        flex: 1;
+        min-height: 48px;
+    }
+}
+
+// History Display
+.history-display {
+    @include neon-glass-panel;
+    padding: $spacing-md;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: $font-size-sm;
+    background: rgba(0, 0, 0, 0.2);
+
+    .history-item {
+        padding: $spacing-xs 0;
+        border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        .history-timestamp {
+            color: $color-text-secondary;
+            font-size: $font-size-xs;
+        }
+
+        .history-result {
+            font-weight: bold;
+
+            &.win { color: $color-neon-green; }
+            &.loss { color: $color-error-red; }
+            &.draw { color: $color-warning-orange; }
+        }
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-md) {
+    .dashboard {
+        padding: 0 $spacing-sm;
+    }
+
+    .column {
+        gap: $spacing-sm;
+    }
+
+    .glass-panel {
+        padding: $spacing-md;
+    }
+
+    .player-item {
+        padding: $spacing-sm;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $spacing-xs;
+    }
+
+    .chat-input-area {
+        flex-direction: column;
+
+        .chat-send-btn {
+            align-self: stretch;
+        }
+    }
+}
     padding: 10px 15px;
     border-radius: 6px;
     outline: none;

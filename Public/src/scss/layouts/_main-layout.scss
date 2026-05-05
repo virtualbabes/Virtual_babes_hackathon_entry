@@ -1,18 +1,203 @@
 // z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\layouts\_main-layout.scss
 @import '../base/variables';
 
-.main-game-container { display: flex; flex-direction: column; flex-grow: 1; width: 100%; max-width: 1400px; }
-
-.top-bar { /* This is now inside main-game-container */
-    width: 100%;
+// Main Container
+.main-game-container {
     display: flex;
-    justify-content: space-around;
-    align-items: center;
-    flex-shrink: 0; /* Prevent it from shrinking */
-    border-bottom: 1px solid $glass-border-color;
-    background: rgba(0,0,0,0.4);
-    padding: 10px 0;
+    flex-direction: column;
+    flex-grow: 1;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 $spacing-md;
+    min-height: 100vh;
 }
 
-/* Global Maintenance Bar */
-#maintenance-bar { width: 100%; background: rgba(255, 166, 87, 0.2); border-bottom: 1px solid #ffa657; padding: 10px 0; text-align: center; color: #ffa657; font-weight: bold; letter-spacing: 1px; z-index: 1500; position: relative; }
+// Top Bar
+.top-bar {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    border-bottom: 1px solid $glass-border-color;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur($glass-blur);
+    padding: $spacing-md;
+    border-radius: 0 0 $border-radius-lg $border-radius-lg;
+    margin-bottom: $spacing-md;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+
+    @media (max-width: $breakpoint-md) {
+        flex-direction: column;
+        align-items: stretch;
+        padding: $spacing-sm;
+    }
+}
+
+// Status Widgets
+.faucet-stat, .season-info, .payout-widget {
+    @include neon-glass-panel;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $border-radius-md;
+    font-size: $font-size-sm;
+    font-weight: 600;
+    text-align: center;
+    min-width: 120px;
+
+    @media (max-width: $breakpoint-md) {
+        min-width: auto;
+        flex: 1;
+    }
+}
+
+.faucet-stat {
+    color: $color-neon-green;
+    border-color: rgba($color-neon-green, 0.3);
+}
+
+.season-info {
+    color: $color-warning-orange;
+    border-color: rgba($color-warning-orange, 0.3);
+
+    .season-num-display {
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+}
+
+.payout-widget {
+    cursor: pointer;
+    transition: all $transition-fast;
+    border-color: rgba($color-neon-cyan, 0.3);
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: $glass-shadow-hover;
+        border-color: $color-neon-cyan;
+    }
+}
+
+// Round Title
+.round-title {
+    font-size: $font-size-lg;
+    font-weight: bold;
+    color: $color-neon-cyan;
+    text-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+    text-align: center;
+    flex: 1;
+    min-width: 150px;
+
+    @media (max-width: $breakpoint-md) {
+        order: -1;
+        margin-bottom: $spacing-sm;
+    }
+}
+
+// Transaction and Latency Info
+.transaction-status {
+    color: $color-text-secondary;
+    font-size: $font-size-xs;
+    margin-left: $spacing-md;
+}
+
+.latency-monitor {
+    color: $color-text-secondary;
+    font-size: $font-size-xs;
+    margin-left: $spacing-md;
+
+    span {
+        color: $color-neon-green;
+        font-weight: bold;
+    }
+}
+
+// Music Toggle
+#music-toggle-btn {
+    background: rgba($color-neon-cyan, 0.1);
+    border: 1px solid rgba($color-neon-cyan, 0.3);
+    color: $color-neon-cyan;
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $border-radius-md;
+    font-size: $font-size-sm;
+    transition: all $transition-fast;
+
+    &:hover {
+        background: rgba($color-neon-cyan, 0.2);
+        box-shadow: 0 0 10px rgba($color-neon-cyan, 0.3);
+    }
+}
+
+// Wallet Controls
+#wallet-controls {
+    button {
+        background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
+        color: white;
+        padding: $spacing-sm $spacing-lg;
+        border-radius: $border-radius-md;
+        font-weight: bold;
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
+        transition: all $transition-fast;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
+        }
+
+        &:disabled {
+            background: $color-medium-grey;
+            color: $color-text-muted;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+    }
+}
+
+// Global Maintenance Bar
+#maintenance-bar {
+    width: 100%;
+    background: rgba($color-warning-orange, 0.2);
+    border-bottom: 1px solid $color-warning-orange;
+    padding: $spacing-md 0;
+    text-align: center;
+    color: $color-warning-orange;
+    font-weight: bold;
+    letter-spacing: 1px;
+    z-index: $z-index-admin;
+    position: relative;
+    backdrop-filter: blur($glass-blur);
+
+    span {
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-lg) {
+    .main-game-container {
+        padding: 0 $spacing-sm;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .top-bar {
+        padding: $spacing-sm;
+        gap: $spacing-sm;
+    }
+
+    .faucet-stat, .season-info, .payout-widget {
+        padding: $spacing-xs $spacing-sm;
+        font-size: $font-size-xs;
+    }
+
+    .round-title {
+        font-size: $font-size-base;
+    }
+}

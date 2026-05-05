@@ -2,6 +2,7 @@
 @import '../base/variables';
 @import '../themes/neon-glass';
 
+// Base Overlay Styles
 .overlay {
     position: fixed;
     top: 0;
@@ -9,45 +10,1343 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.8);
-    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: $z-index-modal;
-    transition: opacity 0.3s ease;
+    transition: opacity $transition-base ease;
+    padding: $spacing-md;
+
+    &.hidden {
+        opacity: 0;
+        pointer-events: none;
+        visibility: hidden;
+    }
+
+    &.blur-light {
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.6);
+    }
+
+    &.blur-heavy {
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        background: rgba(0, 0, 0, 0.9);
+    }
 }
 
-.overlay.hidden {
-    opacity: 0;
-    pointer-events: none; /* Make it unclickable when hidden */
+// Overlay Content Container
+.overlay-content {
+    @include neon-glass-panel;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    border-radius: $border-radius-xl;
+    position: relative;
+
+    &.small { max-width: 400px; }
+    &.medium { max-width: 600px; }
+    &.large { max-width: 800px; }
+    &.xlarge { max-width: 1000px; }
 }
 
-/* ---------------------------------------------------------
-   SETTINGS OVERLAY (Sound Controls)
-   --------------------------------------------------------- */
+// Overlay Header
+.overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-lg;
+    border-bottom: 1px solid $glass-border-color;
+    margin: -$spacing-lg -$spacing-lg $spacing-lg -$spacing-lg;
+
+    .overlay-title {
+        font-size: $font-size-xl;
+        font-weight: bold;
+        color: $color-neon-cyan;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin: 0;
+    }
+
+    .overlay-close {
+        background: none;
+        border: none;
+        color: $color-text-secondary;
+        font-size: $font-size-xl;
+        cursor: pointer;
+        padding: $spacing-xs;
+        border-radius: $border-radius-full;
+        transition: all $transition-fast;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+            background: rgba($color-error-red, 0.1);
+            color: $color-error-red;
+            transform: scale(1.1);
+        }
+    }
+}
+
+// Overlay Body
+.overlay-body {
+    padding: $spacing-lg;
+    flex: 1;
+    overflow-y: auto;
+}
+
+// Overlay Footer
+.overlay-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-md;
+    padding: $spacing-lg;
+    border-top: 1px solid $glass-border-color;
+    margin: $spacing-lg -$spacing-lg -$spacing-lg -$spacing-lg;
+
+    &.center {
+        justify-content: center;
+    }
+
+    &.space-between {
+        justify-content: space-between;
+    }
+}
+
+// Specific Overlay Types
+
+// Settings Overlay
 .settings-panel {
-    width: 400px;
+    width: 100%;
+    max-width: 400px;
     text-align: center;
+
+    .settings-title {
+        font-size: $font-size-lg;
+        color: $color-neon-cyan;
+        margin-bottom: $spacing-lg;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
 }
+
 .volume-control {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: $spacing-md;
+    margin-bottom: $spacing-lg;
+    padding: $spacing-md;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: $border-radius-md;
+    border: 1px solid $glass-border-color;
+
+    label {
+        width: 80px;
+        text-align: right;
+        font-weight: bold;
+        color: $color-neon-cyan;
+        font-size: $font-size-sm;
+    }
+
+    input[type="range"] {
+        flex-grow: 1;
+        -webkit-appearance: none;
+        appearance: none;
+        height: 8px;
+        border-radius: $border-radius-sm;
+        background: rgba($color-neon-cyan, 0.2);
+        outline: none;
+        transition: background $transition-fast;
+
+        &::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: $color-neon-cyan;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+            transition: all $transition-fast;
+
+            &:hover {
+                transform: scale(1.2);
+                box-shadow: 0 0 15px rgba($color-neon-cyan, 0.8);
+            }
+        }
+
+        &::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: $color-neon-cyan;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+        }
+    }
+
+    button {
+        background: rgba($color-text-main, 0.1);
+        border: 1px solid $glass-border-color;
+        color: $color-text-secondary;
+        padding: $spacing-xs $spacing-sm;
+        border-radius: $border-radius-sm;
+        font-size: $font-size-xs;
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+            background: rgba($color-neon-cyan, 0.1);
+            border-color: $color-neon-cyan;
+            color: $color-neon-cyan;
+        }
+    }
 }
-.volume-control label {
-    width: 80px;
-    text-align: right;
-    font-weight: bold;
-    color: $color-neon-cyan;
+
+// Wallet Selector Overlay
+.wallet-selector-overlay {
+    .wallet-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: $spacing-lg;
+        margin: $spacing-xl 0;
+    }
+
+    .wallet-option {
+        @include neon-glass-panel;
+        padding: $spacing-lg;
+        border-radius: $border-radius-lg;
+        cursor: pointer;
+        transition: all $transition-fast;
+        border: 1px solid $glass-border-color;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $spacing-sm;
+        min-height: 120px;
+
+        &:hover {
+            transform: translateY(-4px);
+            box-shadow: $glass-shadow-hover;
+            border-color: $color-neon-cyan;
+        }
+
+        img {
+            width: 40px;
+            height: 40px;
+            border-radius: $border-radius-md;
+            object-fit: contain;
+        }
+
+        span {
+            font-weight: 600;
+            color: $color-text-main;
+            text-align: center;
+            font-size: $font-size-sm;
+        }
+    }
 }
-.volume-control input[type="range"] {
-    flex-grow: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 8px; border-radius: 5px; background: rgba($color-neon-cyan, 0.2); outline: none;
+
+// Payout Settings Overlay
+.payout-settings-overlay {
+    .payout-form {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-lg;
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: $spacing-sm;
+
+            label {
+                font-weight: bold;
+                color: $color-neon-green;
+                font-size: $font-size-sm;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            input {
+                @extend .glass-input;
+                font-family: $font-mono;
+                font-size: $font-size-sm;
+            }
+        }
+
+        .form-actions {
+            display: flex;
+            gap: $spacing-md;
+            justify-content: center;
+            margin-top: $spacing-lg;
+
+            button {
+                flex: 1;
+                max-width: 200px;
+            }
+        }
+    }
+}
+
+// Deck Manager Overlay
+.deck-manager-overlay {
+    .deck-manager-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .deck-manager-title {
+            font-size: $font-size-xl;
+            color: $color-neon-cyan;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+    }
+
+    .deck-layout {
+        display: flex;
+        gap: $spacing-lg;
+        height: 70vh;
+
+        .inventory-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+
+            .inventory-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: $spacing-sm;
+                overflow-y: auto;
+                padding: $spacing-md;
+                flex: 1;
+            }
+        }
+
+        .deck-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: $spacing-md;
+
+            .deck-controls {
+                display: flex;
+                flex-direction: column;
+                gap: $spacing-sm;
+
+                .auto-build-btn {
+                    background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
+                    color: white;
+                    padding: $spacing-md;
+                    border-radius: $border-radius-md;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
+                    transition: all $transition-fast;
+
+                    &:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
+                    }
+                }
+
+                .x-chain-notice {
+                    @include neon-glass-panel;
+                    padding: $spacing-md;
+                    border-color: rgba($color-neon-cyan, 0.3);
+                    font-size: $font-size-xs;
+
+                    .notice-title {
+                        color: $color-neon-cyan;
+                        font-weight: bold;
+                        margin-bottom: $spacing-xs;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                }
+            }
+
+            .deck-stats {
+                display: flex;
+                justify-content: space-around;
+                padding: $spacing-md;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: $border-radius-md;
+                border: 1px solid $glass-border-color;
+                font-size: $font-size-sm;
+
+                .stat-item {
+                    text-align: center;
+
+                    .stat-label {
+                        color: $color-text-secondary;
+                        font-size: $font-size-xs;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .stat-value {
+                        font-weight: bold;
+                        font-size: $font-size-lg;
+
+                        &.atk { color: $color-neon-cyan; }
+                        &.def { color: $color-neon-purple; }
+                    }
+                }
+            }
+
+            .deck-drop-zone {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: $spacing-md;
+                padding: $spacing-lg;
+                border: 2px dashed $glass-border-color;
+                border-radius: $border-radius-lg;
+                background: rgba(0, 0, 0, 0.2);
+                transition: all $transition-fast;
+
+                &:hover {
+                    border-color: $color-neon-cyan;
+                    background: rgba($color-neon-cyan, 0.05);
+                }
+
+                .drop-placeholder {
+                    text-align: center;
+                    color: $color-text-muted;
+                    font-style: italic;
+                }
+            }
+
+            .deck-selector {
+                display: flex;
+                justify-content: center;
+                gap: $spacing-sm;
+                margin-top: $spacing-md;
+
+                .deck-slot {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: $border-radius-md;
+                    border: 2px solid $glass-border-color;
+                    background: rgba(0, 0, 0, 0.3);
+                    cursor: pointer;
+                    transition: all $transition-fast;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                    color: $color-text-secondary;
+
+                    &:hover {
+                        border-color: $color-neon-cyan;
+                        background: rgba($color-neon-cyan, 0.1);
+                    }
+
+                    &.active {
+                        border-color: $color-neon-cyan;
+                        background: rgba($color-neon-cyan, 0.2);
+                        color: $color-neon-cyan;
+                    }
+
+                    &.locked {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+
+                        &:hover {
+                            border-color: $glass-border-color;
+                            background: rgba(0, 0, 0, 0.3);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Admin Control Panel
+.admin-control-panel {
+    .admin-layout {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: $spacing-lg;
+        margin: $spacing-xl 0;
+
+        .admin-section {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+
+            &.power-scaling {
+                border-color: rgba($color-neon-purple, 0.3);
+            }
+
+            &.rules {
+                border-color: rgba($color-neon-cyan, 0.3);
+            }
+
+            &.network {
+                border-color: rgba($color-neon-blue, 0.3);
+            }
+
+            &.moderation {
+                border-color: rgba($color-error-red, 0.3);
+            }
+
+            &.economy {
+                border-color: rgba($color-neon-green, 0.3);
+            }
+
+            .section-title {
+                font-size: $font-size-lg;
+                font-weight: bold;
+                color: inherit;
+                margin-bottom: $spacing-lg;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .form-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: $spacing-md;
+
+                &.single-column {
+                    grid-template-columns: 1fr;
+                }
+
+                .form-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: $spacing-xs;
+
+                    label {
+                        font-size: $font-size-xs;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        font-weight: 600;
+                    }
+
+                    input, select {
+                        @extend .glass-input;
+                        font-size: $font-size-sm;
+                    }
+
+                    .input-with-button {
+                        display: flex;
+                        gap: $spacing-xs;
+
+                        input {
+                            flex: 1;
+                        }
+
+                        button {
+                            flex-shrink: 0;
+                            padding: $spacing-sm $spacing-md;
+                        }
+                    }
+                }
+            }
+
+            .section-actions {
+                margin-top: $spacing-lg;
+                display: flex;
+                gap: $spacing-sm;
+
+                button {
+                    flex: 1;
+                }
+            }
+        }
+
+        .admin-logs-section {
+            grid-column: 1 / -1;
+
+            .logs-filter-bar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: $spacing-md;
+                margin-bottom: $spacing-lg;
+                padding: $spacing-md;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: $border-radius-md;
+                border: 1px solid $glass-border-color;
+
+                .filter-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: $spacing-xs;
+                    min-width: 150px;
+
+                    label {
+                        font-size: $font-size-xs;
+                        color: $color-text-secondary;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+
+                    input, select {
+                        @extend .glass-input;
+                        font-size: $font-size-xs;
+                        padding: $spacing-xs $spacing-sm;
+                    }
+                }
+            }
+
+            .logs-display {
+                max-height: 300px;
+                overflow-y: auto;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: $border-radius-md;
+                padding: $spacing-md;
+                font-size: $font-size-xs;
+                border: 1px solid $glass-border-color;
+
+                .log-entry {
+                    padding: $spacing-xs 0;
+                    border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+                    &:last-child {
+                        border-bottom: none;
+                    }
+
+                    .log-timestamp {
+                        color: $color-text-muted;
+                        font-family: $font-mono;
+                        font-size: $font-size-xs;
+                    }
+
+                    .log-level {
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        font-size: $font-size-xs;
+
+                        &.error { color: $color-error-red; }
+                        &.warning { color: $color-warning-orange; }
+                        &.info { color: $color-neon-cyan; }
+                        &.success { color: $color-neon-green; }
+                    }
+
+                    .log-message {
+                        margin-left: $spacing-sm;
+                        word-wrap: break-word;
+                    }
+                }
+            }
+        }
+    }
+
+    .admin-footer {
+        margin-top: $spacing-xl;
+        text-align: center;
+        padding: $spacing-md;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: $border-radius-md;
+        border: 1px solid $glass-border-color;
+
+        .last-action {
+            color: $color-text-secondary;
+            font-size: $font-size-sm;
+
+            span {
+                color: $color-neon-cyan;
+                font-weight: bold;
+            }
+        }
+    }
+}
+
+// Tournament Bracket Overlay
+.tournament-overlay {
+    .tournament-header {
+        text-align: center;
+        margin-bottom: $spacing-xl;
+
+        .tournament-pot {
+            font-size: $font-size-2xl;
+            color: $color-neon-cyan;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+            margin: $spacing-md 0;
+        }
+    }
+
+    .bracket-actions {
+        display: flex;
+        justify-content: center;
+        gap: $spacing-md;
+        margin-bottom: $spacing-xl;
+    }
+
+    .bracket-visualization {
+        width: 100%;
+        min-height: 400px;
+        @include neon-glass-panel;
+        padding: $spacing-xl;
+    }
+}
+
+// Match Preview Overlay
+.match-preview-overlay {
+    .preview-container {
+        text-align: center;
+
+        .preview-vs-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: $spacing-xl;
+            margin: $spacing-xl 0;
+
+            .preview-side {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: $spacing-md;
+
+                .preview-id {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    opacity: 0.7;
+                }
+
+                .preview-rating {
+                    font-size: $font-size-2xl;
+                    font-weight: bold;
+                    color: $color-neon-cyan;
+                    text-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+                    font-family: $font-mono;
+                }
+            }
+
+            .vs-divider {
+                font-size: $font-size-xl;
+                font-weight: bold;
+                color: $color-neon-purple;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+            }
+        }
+
+        .preview-status {
+            font-style: italic;
+            margin-bottom: $spacing-xl;
+            opacity: 0.8;
+            color: $color-text-secondary;
+        }
+
+        .enter-button {
+            min-width: 250px;
+            background: linear-gradient(45deg, $color-neon-cyan, $color-neon-blue);
+            border-color: $color-neon-cyan;
+            color: $color-bg-dark;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba($color-neon-cyan, 0.3);
+
+            &:hover {
+                box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
+                transform: translateY(-2px);
+            }
+        }
+    }
+}
+
+// Kidnap Gambit Overlay
+.kidnap-overlay {
+    .kidnap-content {
+        @include neon-glass-panel;
+        padding: $spacing-xl;
+        border-color: rgba($color-error-red, 0.3);
+        max-width: 500px;
+        text-align: center;
+
+        .kidnap-title {
+            color: $color-error-red;
+            font-size: $font-size-xl;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: $spacing-lg;
+        }
+
+        .kidnap-description {
+            color: $color-text-secondary;
+            margin-bottom: $spacing-lg;
+            line-height: 1.6;
+        }
+
+        .ransom-section {
+            background: rgba($color-error-red, 0.05);
+            border: 1px solid rgba($color-error-red, 0.2);
+            border-radius: $border-radius-md;
+            padding: $spacing-lg;
+            margin: $spacing-lg 0;
+
+            .ransom-amount {
+                font-size: $font-size-xl;
+                font-weight: bold;
+                color: $color-neon-cyan;
+                margin-bottom: $spacing-md;
+            }
+
+            .ransom-description {
+                color: $color-text-secondary;
+                font-size: $font-size-sm;
+                margin-bottom: $spacing-lg;
+            }
+
+            .ransom-actions {
+                display: flex;
+                gap: $spacing-md;
+                justify-content: center;
+
+                .pay-ransom-btn {
+                    background: $color-error-red;
+                    border-color: $color-error-red;
+                    color: white;
+
+                    &:hover {
+                        background: darken($color-error-red, 10%);
+                        box-shadow: 0 0 15px rgba($color-error-red, 0.4);
+                    }
+                }
+
+                .release-btn {
+                    background: rgba($color-text-main, 0.1);
+                    border-color: $glass-border-color;
+                    color: $color-text-main;
+
+                    &:hover {
+                        background: rgba($color-text-main, 0.2);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Hall of Fame Overlay
+.hof-overlay {
+    .hof-header {
+        text-align: center;
+        margin-bottom: $spacing-xl;
+
+        .hof-title {
+            font-size: $font-size-3xl;
+            color: $color-gold;
+            text-shadow: 0 0 20px rgba($color-gold, 0.5);
+            margin-bottom: $spacing-md;
+        }
+    }
+
+    .hof-actions {
+        display: flex;
+        justify-content: center;
+        gap: $spacing-md;
+        margin-bottom: $spacing-xl;
+
+        .btn-refresh, .btn-return {
+            background: rgba($color-text-main, 0.1);
+            border: 1px solid $glass-border-color;
+            color: $color-text-main;
+            padding: $spacing-sm $spacing-lg;
+            border-radius: $border-radius-md;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all $transition-fast;
+
+            &:hover {
+                background: rgba($color-neon-cyan, 0.1);
+                border-color: $color-neon-cyan;
+                color: $color-neon-cyan;
+                transform: translateY(-2px);
+            }
+        }
+    }
+
+    .hof-tab-bar {
+        display: flex;
+        justify-content: center;
+        margin-bottom: $spacing-xl;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: $border-radius-lg;
+        padding: $spacing-xs;
+        border: 1px solid $glass-border-color;
+
+        .hof-tab {
+            flex: 1;
+            padding: $spacing-md $spacing-lg;
+            text-align: center;
+            cursor: pointer;
+            transition: all $transition-fast;
+            border-radius: $border-radius-md;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: $color-text-secondary;
+
+            &:hover {
+                background: rgba($color-neon-cyan, 0.1);
+                color: $color-neon-cyan;
+            }
+
+            &.active {
+                background: $color-neon-cyan;
+                color: $color-bg-dark;
+                box-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+            }
+        }
+    }
+
+    .hof-container {
+        @include neon-glass-panel;
+        padding: $spacing-xl;
+        min-height: 400px;
+
+        &.hidden {
+            display: none;
+        }
+    }
+
+    .hof-rankings-view {
+        .hof-top-10 {
+            margin-bottom: $spacing-xl;
+
+            .top-player {
+                display: flex;
+                align-items: center;
+                gap: $spacing-lg;
+                padding: $spacing-lg;
+                background: rgba($color-gold, 0.05);
+                border: 1px solid rgba($color-gold, 0.2);
+                border-radius: $border-radius-lg;
+                margin-bottom: $spacing-md;
+                transition: all $transition-fast;
+
+                &:hover {
+                    background: rgba($color-gold, 0.1);
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 15px rgba($color-gold, 0.2);
+                }
+
+                &.rank-1 {
+                    background: linear-gradient(45deg, rgba($color-gold, 0.1), rgba($color-silver, 0.05));
+                    border-color: $color-gold;
+                }
+
+                &.rank-2 {
+                    background: linear-gradient(45deg, rgba($color-silver, 0.1), rgba($color-bronze, 0.05));
+                    border-color: $color-silver;
+                }
+
+                &.rank-3 {
+                    background: linear-gradient(45deg, rgba($color-bronze, 0.1), rgba($color-text-secondary, 0.05));
+                    border-color: $color-bronze;
+                }
+
+                .rank-number {
+                    font-size: $font-size-2xl;
+                    font-weight: bold;
+                    color: $color-gold;
+                    min-width: 50px;
+                    text-align: center;
+                }
+
+                .player-info {
+                    flex: 1;
+
+                    .player-name {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-text-main;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .player-stats {
+                        display: flex;
+                        gap: $spacing-lg;
+                        font-size: $font-size-sm;
+                        color: $color-text-secondary;
+
+                        .stat {
+                            .stat-label {
+                                text-transform: uppercase;
+                                letter-spacing: 0.5px;
+                                font-size: $font-size-xs;
+                                opacity: 0.7;
+                            }
+
+                            .stat-value {
+                                font-weight: bold;
+                                color: $color-neon-cyan;
+                            }
+                        }
+                    }
+                }
+
+                .player-avatar {
+                    width: 60px;
+                    height: 60px;
+                    border-radius: $border-radius-full;
+                    border: 2px solid $glass-border-color;
+                    overflow: hidden;
+
+                    img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                    }
+                }
+            }
+        }
+
+        .hof-scroller-window {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid $glass-border-color;
+            border-radius: $border-radius-md;
+            background: rgba(0, 0, 0, 0.2);
+
+            .hof-scrolling-content {
+                padding: $spacing-md;
+
+                .ranking-item {
+                    display: flex;
+                    align-items: center;
+                    gap: $spacing-md;
+                    padding: $spacing-sm 0;
+                    border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+                    &:last-child {
+                        border-bottom: none;
+                    }
+
+                    .rank-number {
+                        font-weight: bold;
+                        color: $color-text-secondary;
+                        min-width: 30px;
+                        text-align: center;
+                    }
+
+                    .player-name {
+                        flex: 1;
+                        font-weight: 600;
+                        color: $color-text-main;
+                    }
+
+                    .player-rating {
+                        font-weight: bold;
+                        color: $color-neon-cyan;
+                        font-family: $font-mono;
+                    }
+                }
+            }
+        }
+    }
+
+    .hof-history-view {
+        .tournament-history-list {
+            display: flex;
+            flex-direction: column;
+            gap: $spacing-lg;
+
+            .tournament-item {
+                @include neon-glass-panel;
+                padding: $spacing-lg;
+                border-color: rgba($color-neon-cyan, 0.2);
+
+                .tournament-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: $spacing-md;
+
+                    .tournament-name {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-neon-cyan;
+                    }
+
+                    .tournament-date {
+                        color: $color-text-secondary;
+                        font-size: $font-size-sm;
+                        font-family: $font-mono;
+                    }
+                }
+
+                .tournament-stats {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                    gap: $spacing-md;
+                    margin-bottom: $spacing-md;
+
+                    .stat {
+                        text-align: center;
+
+                        .stat-value {
+                            font-size: $font-size-lg;
+                            font-weight: bold;
+                            color: $color-neon-green;
+                        }
+
+                        .stat-label {
+                            font-size: $font-size-xs;
+                            color: $color-text-secondary;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        }
+                    }
+                }
+
+                .tournament-winner {
+                    text-align: center;
+                    padding: $spacing-md;
+                    background: rgba($color-gold, 0.1);
+                    border-radius: $border-radius-md;
+                    border: 1px solid rgba($color-gold, 0.3);
+
+                    .winner-label {
+                        font-size: $font-size-sm;
+                        color: $color-gold;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        margin-bottom: $spacing-xs;
+                    }
+
+                    .winner-name {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-gold;
+                    }
+                }
+            }
+        }
+    }
+
+    .hof-seasons-view {
+        .season-filter-bar {
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+            margin-bottom: $spacing-xl;
+            padding: $spacing-md;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: $border-radius-md;
+            border: 1px solid $glass-border-color;
+
+            label {
+                color: $color-text-secondary;
+                font-size: $font-size-sm;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            input {
+                @extend .glass-input;
+                width: 80px;
+                padding: $spacing-xs $spacing-sm;
+                font-weight: bold;
+                color: $color-neon-cyan;
+                text-align: center;
+            }
+
+            button {
+                background: $color-neon-cyan;
+                color: $color-bg-dark;
+                border: none;
+                padding: $spacing-xs $spacing-md;
+                border-radius: $border-radius-sm;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                cursor: pointer;
+                transition: all $transition-fast;
+
+                &:hover {
+                    background: lighten($color-neon-cyan, 10%);
+                    box-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+                }
+            }
+        }
+
+        .season-history-list {
+            display: flex;
+            flex-direction: column;
+            gap: $spacing-lg;
+
+            .season-item {
+                @include neon-glass-panel;
+                padding: $spacing-lg;
+
+                .season-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: $spacing-md;
+
+                    .season-name {
+                        font-size: $font-size-lg;
+                        font-weight: bold;
+                        color: $color-neon-purple;
+                    }
+
+                    .season-dates {
+                        color: $color-text-secondary;
+                        font-size: $font-size-sm;
+                        font-family: $font-mono;
+                    }
+                }
+
+                .season-stats {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                    gap: $spacing-md;
+
+                    .stat {
+                        text-align: center;
+                        padding: $spacing-sm;
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: $border-radius-sm;
+
+                        .stat-value {
+                            font-size: $font-size-lg;
+                            font-weight: bold;
+                            color: $color-neon-green;
+                            display: block;
+                        }
+
+                        .stat-label {
+                            font-size: $font-size-xs;
+                            color: $color-text-secondary;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Tournament Transition Overlay
+.tournament-transition-overlay {
+    background: rgba(0, 0, 0, 0.9) !important;
+    z-index: $z-index-transition;
+
+    .transition-content {
+        text-align: center;
+
+        .transition-title {
+            font-size: $font-size-3xl;
+            color: $color-neon-cyan;
+            text-shadow: 0 0 30px $color-neon-cyan;
+            margin-bottom: $spacing-lg;
+            animation: transition-glow-pulse 2s infinite;
+        }
+
+        .round-display {
+            font-size: $font-size-4xl;
+            font-family: $font-heading;
+            color: $color-neon-cyan;
+            text-shadow: 0 0 30px $color-neon-cyan;
+            margin: $spacing-xl 0;
+            font-weight: bold;
+        }
+
+        .transition-subtitle {
+            font-size: $font-size-lg;
+            color: $color-neon-purple;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            opacity: 0.8;
+        }
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-lg) {
+    .overlay {
+        padding: $spacing-sm;
+    }
+
+    .overlay-content {
+        max-width: 95vw;
+        max-height: 95vh;
+    }
+
+    .admin-control-panel .admin-layout {
+        grid-template-columns: 1fr;
+        gap: $spacing-md;
+    }
+
+    .wallet-selector-overlay .wallet-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: $spacing-md;
+    }
+
+    .deck-manager-overlay .deck-layout {
+        flex-direction: column;
+        height: auto;
+
+        .inventory-section, .deck-section {
+            flex: none;
+            height: 300px;
+        }
+    }
+
+    .hof-overlay .hof-tab-bar {
+        flex-direction: column;
+        gap: $spacing-xs;
+    }
+
+    .match-preview-overlay .preview-vs-container {
+        flex-direction: column;
+        gap: $spacing-md;
+
+        .vs-divider {
+            transform: rotate(90deg);
+        }
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .overlay-content {
+        margin: $spacing-sm;
+    }
+
+    .overlay-header, .overlay-body, .overlay-footer {
+        padding: $spacing-md;
+    }
+
+    .admin-control-panel .admin-layout .admin-section .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hof-rankings-view .hof-top-10 .top-player {
+        flex-direction: column;
+        text-align: center;
+        gap: $spacing-md;
+
+        .player-info {
+            order: -1;
+        }
+    }
+}
 }
 
 /* AI Thinking Indicator specific styles */

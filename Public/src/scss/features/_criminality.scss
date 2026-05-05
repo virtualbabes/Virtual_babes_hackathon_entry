@@ -1,16 +1,743 @@
 // z:\Crypto_Draught\VOiconomy-faucet\Public\src\scss\features\_criminality.scss
 @import '../base/variables';
+@import '../themes/neon-glass';
 
-/* Criminality & Intelligence Layer */
+// Criminality Panel Base
+.criminality-panel {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-error-red, 0.3);
+    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+}
 
-// Wanted Level Indicator
+// Criminality Header
+.criminality-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-lg;
+    padding-bottom: $spacing-md;
+    border-bottom: 1px solid rgba($color-error-red, 0.2);
+
+    .criminality-title {
+        font-size: $font-size-xl;
+        font-weight: bold;
+        color: $color-error-red;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        text-shadow: 0 0 10px rgba($color-error-red, 0.5);
+    }
+
+    .criminality-stats {
+        display: flex;
+        gap: $spacing-lg;
+        font-size: $font-size-sm;
+
+        .stat-item {
+            text-align: center;
+
+            .stat-label {
+                color: $color-text-secondary;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                font-size: $font-size-xs;
+            }
+
+            .stat-value {
+                font-weight: bold;
+                color: $color-error-red;
+                font-family: $font-mono;
+            }
+        }
+    }
+}
+
+// Criminality Actions Grid
+.criminality-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: $spacing-lg;
+    margin-bottom: $spacing-xl;
+
+    .criminality-action {
+        @include neon-glass-panel;
+        padding: $spacing-lg;
+        border-color: rgba($color-error-red, 0.2);
+        cursor: pointer;
+        transition: all $transition-fast;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: $spacing-md;
+        min-height: 180px;
+        position: relative;
+        overflow: hidden;
+
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, $color-error-red, $color-neon-purple, $color-error-red);
+            opacity: 0;
+            transition: opacity $transition-fast;
+        }
+
+        &:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba($color-error-red, 0.3);
+            border-color: $color-error-red;
+
+            &::before {
+                opacity: 1;
+            }
+        }
+
+        &.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+
+            &:hover {
+                transform: none;
+                box-shadow: $glass-shadow;
+                border-color: rgba($color-error-red, 0.2);
+            }
+        }
+
+        .action-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: $border-radius-full;
+            background: linear-gradient(45deg, rgba($color-error-red, 0.2), rgba($color-neon-purple, 0.2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: $font-size-2xl;
+            color: $color-error-red;
+            margin-bottom: $spacing-sm;
+            border: 2px solid rgba($color-error-red, 0.3);
+        }
+
+        .action-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-text-main;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .action-description {
+            font-size: $font-size-sm;
+            color: $color-text-secondary;
+            text-align: center;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .action-cost {
+            display: flex;
+            align-items: center;
+            gap: $spacing-xs;
+            font-size: $font-size-sm;
+            font-weight: bold;
+            color: $color-neon-green;
+            font-family: $font-mono;
+
+            &::before {
+                content: '$';
+                color: $color-neon-green;
+            }
+        }
+
+        .action-cooldown {
+            position: absolute;
+            top: $spacing-sm;
+            right: $spacing-sm;
+            background: rgba($color-warning-orange, 0.9);
+            color: $color-bg-dark;
+            font-size: $font-size-xs;
+            font-weight: bold;
+            padding: $spacing-xs $spacing-sm;
+            border-radius: $border-radius-sm;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .action-risk {
+            position: absolute;
+            bottom: $spacing-sm;
+            left: $spacing-sm;
+            display: flex;
+            align-items: center;
+            gap: $spacing-xs;
+            font-size: $font-size-xs;
+            color: $color-error-red;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+
+            &::before {
+                content: '⚠';
+                font-size: $font-size-sm;
+            }
+        }
+    }
+}
+
+// Criminality Target Selection
+.criminality-targets {
+    margin-bottom: $spacing-xl;
+
+    .targets-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .targets-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-error-red;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .targets-filter {
+            display: flex;
+            gap: $spacing-sm;
+
+            select {
+                @extend .glass-input;
+                padding: $spacing-xs $spacing-sm;
+                font-size: $font-size-sm;
+                min-width: 120px;
+            }
+        }
+    }
+
+    .targets-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: $spacing-md;
+        max-height: 300px;
+        overflow-y: auto;
+        padding: $spacing-md;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: $border-radius-md;
+        border: 1px solid rgba($color-error-red, 0.1);
+
+        .target-item {
+            @include neon-glass-panel;
+            padding: $spacing-md;
+            border-color: rgba($color-text-secondary, 0.2);
+            cursor: pointer;
+            transition: all $transition-fast;
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+
+            &:hover {
+                border-color: $color-error-red;
+                background: rgba($color-error-red, 0.05);
+                transform: translateY(-2px);
+            }
+
+            &.selected {
+                border-color: $color-error-red;
+                background: rgba($color-error-red, 0.1);
+                box-shadow: 0 0 15px rgba($color-error-red, 0.3);
+            }
+
+            .target-avatar {
+                width: 50px;
+                height: 50px;
+                border-radius: $border-radius-full;
+                border: 2px solid $glass-border-color;
+                overflow: hidden;
+                flex-shrink: 0;
+
+                img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+            }
+
+            .target-info {
+                flex: 1;
+
+                .target-name {
+                    font-weight: bold;
+                    color: $color-text-main;
+                    margin-bottom: $spacing-xs;
+                }
+
+                .target-details {
+                    display: flex;
+                    gap: $spacing-md;
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+
+                    .detail-item {
+                        display: flex;
+                        align-items: center;
+                        gap: $spacing-xs;
+
+                        &::before {
+                            font-size: $font-size-xs;
+                            opacity: 0.7;
+                        }
+
+                        &.wealth::before { content: '💰'; }
+                        &.level::before { content: '⭐'; }
+                        &.territory::before { content: '🏛️'; }
+                    }
+                }
+            }
+
+            .target-select-btn {
+                background: rgba($color-error-red, 0.1);
+                border: 1px solid rgba($color-error-red, 0.3);
+                color: $color-error-red;
+                padding: $spacing-xs $spacing-sm;
+                border-radius: $border-radius-sm;
+                font-size: $font-size-xs;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                cursor: pointer;
+                transition: all $transition-fast;
+
+                &:hover {
+                    background: $color-error-red;
+                    color: white;
+                }
+            }
+        }
+    }
+}
+
+// Criminality Progress & Results
+.criminality-progress {
+    margin-bottom: $spacing-xl;
+
+    .progress-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-md;
+
+        .progress-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-warning-orange;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-timer {
+            font-family: $font-mono;
+            font-size: $font-size-sm;
+            color: $color-warning-orange;
+            font-weight: bold;
+        }
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: $border-radius-sm;
+        border: 1px solid rgba($color-warning-orange, 0.2);
+        overflow: hidden;
+        margin-bottom: $spacing-md;
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, $color-error-red, $color-warning-orange);
+            border-radius: $border-radius-sm;
+            transition: width $transition-base ease;
+            position: relative;
+
+            &::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                animation: progress-shine 2s infinite;
+            }
+        }
+    }
+
+    .progress-status {
+        text-align: center;
+        font-style: italic;
+        color: $color-text-secondary;
+        font-size: $font-size-sm;
+    }
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+// Criminality Results Display
+.criminality-results {
+    .results-header {
+        text-align: center;
+        margin-bottom: $spacing-lg;
+
+        .results-title {
+            font-size: $font-size-xl;
+            font-weight: bold;
+            color: $color-neon-cyan;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: $spacing-sm;
+        }
+
+        .results-subtitle {
+            color: $color-text-secondary;
+            font-style: italic;
+        }
+    }
+
+    .results-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: $spacing-lg;
+
+        .result-card {
+            @include neon-glass-panel;
+            padding: $spacing-lg;
+            text-align: center;
+            border-color: rgba($color-neon-cyan, 0.2);
+
+            &.success {
+                border-color: rgba($color-neon-green, 0.3);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+            }
+
+            &.failure {
+                border-color: rgba($color-error-red, 0.3);
+                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+            }
+
+            .result-icon {
+                font-size: $font-size-3xl;
+                margin-bottom: $spacing-md;
+
+                &.success { color: $color-neon-green; }
+                &.failure { color: $color-error-red; }
+            }
+
+            .result-title {
+                font-size: $font-size-lg;
+                font-weight: bold;
+                margin-bottom: $spacing-md;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+
+                &.success { color: $color-neon-green; }
+                &.failure { color: $color-error-red; }
+            }
+
+            .result-description {
+                color: $color-text-secondary;
+                line-height: 1.4;
+                margin-bottom: $spacing-lg;
+            }
+
+            .result-rewards {
+                .reward-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: $spacing-sm;
+                    margin-bottom: $spacing-sm;
+                    font-weight: bold;
+                    color: $color-neon-green;
+                    font-family: $font-mono;
+
+                    &::before {
+                        font-size: $font-size-lg;
+                    }
+
+                    &.money::before { content: '💰'; }
+                    &.xp::before { content: '⭐'; }
+                    &.item::before { content: '🎁'; }
+                }
+            }
+
+            .result-consequences {
+                .consequence-item {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: $spacing-sm;
+                    margin-bottom: $spacing-sm;
+                    font-weight: bold;
+                    color: $color-error-red;
+
+                    &::before {
+                        font-size: $font-size-lg;
+                    }
+
+                    &.jail::before { content: '🔒'; }
+                    &.fine::before { content: '💸'; }
+                    &.reputation::before { content: '👎'; }
+                }
+            }
+        }
+    }
+
+    .results-actions {
+        display: flex;
+        justify-content: center;
+        gap: $spacing-md;
+        margin-top: $spacing-xl;
+
+        .continue-btn {
+            background: linear-gradient(45deg, $color-neon-cyan, $color-neon-blue);
+            color: $color-bg-dark;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: $spacing-md $spacing-xl;
+            border-radius: $border-radius-md;
+            box-shadow: 0 4px 15px rgba($color-neon-cyan, 0.3);
+            transition: all $transition-fast;
+
+            &:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
+            }
+        }
+    }
+}
+
+// Criminality History
+.criminality-history {
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-lg;
+
+        .history-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-text-secondary;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .history-filter {
+            display: flex;
+            gap: $spacing-sm;
+
+            select {
+                @extend .glass-input;
+                padding: $spacing-xs $spacing-sm;
+                font-size: $font-size-sm;
+            }
+        }
+    }
+
+    .history-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid rgba($color-text-secondary, 0.1);
+        border-radius: $border-radius-md;
+        background: rgba(0, 0, 0, 0.2);
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: $spacing-md;
+            padding: $spacing-md;
+            border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            &:hover {
+                background: rgba(0, 0, 0, 0.3);
+            }
+
+            .history-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: $border-radius-full;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: $font-size-lg;
+                flex-shrink: 0;
+
+                &.success { background: rgba($color-neon-green, 0.2); color: $color-neon-green; }
+                &.failure { background: rgba($color-error-red, 0.2); color: $color-error-red; }
+                &.pending { background: rgba($color-warning-orange, 0.2); color: $color-warning-orange; }
+            }
+
+            .history-content {
+                flex: 1;
+
+                .history-action {
+                    font-weight: bold;
+                    color: $color-text-main;
+                    margin-bottom: $spacing-xs;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+
+                .history-details {
+                    font-size: $font-size-sm;
+                    color: $color-text-secondary;
+                    line-height: 1.3;
+                }
+
+                .history-outcome {
+                    font-size: $font-size-xs;
+                    font-weight: bold;
+                    margin-top: $spacing-xs;
+
+                    &.success { color: $color-neon-green; }
+                    &.failure { color: $color-error-red; }
+                    &.pending { color: $color-warning-orange; }
+                }
+            }
+
+            .history-timestamp {
+                font-size: $font-size-xs;
+                color: $color-text-muted;
+                font-family: $font-mono;
+                text-align: right;
+                flex-shrink: 0;
+            }
+        }
+    }
+}
+
+// Criminality Risk Assessment
+.criminality-risk {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-warning-orange, 0.3);
+    margin-bottom: $spacing-xl;
+
+    .risk-header {
+        display: flex;
+        align-items: center;
+        gap: $spacing-md;
+        margin-bottom: $spacing-lg;
+
+        .risk-icon {
+            font-size: $font-size-2xl;
+            color: $color-warning-orange;
+        }
+
+        .risk-title {
+            font-size: $font-size-lg;
+            font-weight: bold;
+            color: $color-warning-orange;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    }
+
+    .risk-meter {
+        margin-bottom: $spacing-lg;
+
+        .risk-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: $spacing-sm;
+            font-size: $font-size-sm;
+            color: $color-text-secondary;
+
+            .risk-low { color: $color-neon-green; }
+            .risk-high { color: $color-error-red; }
+        }
+
+        .risk-bar {
+            width: 100%;
+            height: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: $border-radius-sm;
+            border: 1px solid rgba($color-warning-orange, 0.2);
+            overflow: hidden;
+
+            .risk-fill {
+                height: 100%;
+                background: linear-gradient(90deg, $color-neon-green, $color-warning-orange, $color-error-red);
+                border-radius: $border-radius-sm;
+                transition: width $transition-base ease;
+                position: relative;
+
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+                    animation: risk-pulse 3s infinite;
+                }
+            }
+        }
+    }
+
+    .risk-factors {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: $spacing-md;
+
+        .risk-factor {
+            text-align: center;
+            padding: $spacing-sm;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: $border-radius-sm;
+
+            .factor-label {
+                font-size: $font-size-sm;
+                color: $color-text-secondary;
+                margin-bottom: $spacing-xs;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .factor-value {
+                font-size: $font-size-lg;
+                font-weight: bold;
+                color: $color-warning-orange;
+            }
+        }
+    }
+}
+
+@keyframes risk-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+}
+
+// Legacy Criminality Styles (for backward compatibility)
 .wanted-level {
     color: $color-error-red;
     font-weight: bold;
     text-shadow: 0 0 5px $color-error-red;
 }
 
-// Heist Success Chance
 .heist-chance {
     color: $color-warning-orange;
     font-size: 0.9em;
@@ -44,6 +771,46 @@
         background: $color-error-red;
         &:hover {
             background: darken($color-error-red, 10%);
+        }
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-lg) {
+    .criminality-actions {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: $spacing-md;
+    }
+
+    .criminality-targets .targets-list {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+@media (max-width: $breakpoint-md) {
+    .criminality-panel {
+        padding: $spacing-md;
+    }
+
+    .criminality-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .criminality-targets .targets-list {
+        grid-template-columns: 1fr;
+    }
+
+    .criminality-results .results-content {
+        grid-template-columns: 1fr;
+    }
+
+    .criminality-targets .target-item {
+        flex-direction: column;
+        text-align: center;
+        gap: $spacing-sm;
+
+        .target-info {
+            order: -1;
         }
     }
 }
