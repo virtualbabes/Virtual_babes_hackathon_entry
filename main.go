@@ -1811,6 +1811,13 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["p2_id"] = Game.Players[1].ID
 		state["multiplayer"] = Game.Multiplayer
 		state["special_fanfare"] = Game.SpecialFanfare
+		// Expose player-specific stats for accurate client-side power calculations in tooltips
+		state["p1_wanted_level"] = Game.Players[0].WantedLevel
+		state["p1_cunning"] = Game.Players[0].Cunning
+		state["p1_nurturing"] = Game.Players[0].Nurturing
+		state["p2_wanted_level"] = Game.Players[1].WantedLevel
+		state["p2_cunning"] = Game.Players[1].Cunning
+		state["p2_nurturing"] = Game.Players[1].Nurturing
 		state["rules"] = Game.Rules
 		state["local_player_index"] = Game.LocalPlayerIndex
 	}

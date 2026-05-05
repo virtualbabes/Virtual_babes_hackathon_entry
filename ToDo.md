@@ -1,6 +1,7 @@
 # NFT Seduction Tasks
 
 ## Critical Launch Readiness
+- [x] Hardened Card Tooltip: `showPowerTooltip` now accurately reflects all card and player-level modifiers.
 - [x] Hardened Card Visuals: `renderCardHTML` now displays Mood, Artifacts, Fatigue, and Loyalty.
 - [x] Resolved profile synergy: Achievement, Mojo, and Jailed Card state now flows through Go WASM to UI.
 - [x] Audit `updateDynamicArenaFloor` function for correct background texture selection.
@@ -67,3 +68,6 @@
 - [x] Analyze frontend logic and build configuration (app.js, collective-intelligence.js, package.json).
 - [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis.
 - [x] Merge ReadMe.txt into README.md.
+
+## Next steps prompts:
+Check the `PerformAIMove` logic in `main.go` to ensure the bot accounts for card Fatigue and Loyalty modifiers when evaluating the optimal move.

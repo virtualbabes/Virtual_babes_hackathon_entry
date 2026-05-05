@@ -30,8 +30,8 @@
 - [x] Hardened Rumor System: Verified `processRumors` correctly handles deletion of expired entries.
 - [x] Hardened Tournament History: Implemented conditional deep verification based on `deep_verify` parameter.
 - [x] Hardened Tournament Registration: Verified `isElite` check correctly bypasses buy-in transaction verification.
-- [x] Hardened Card Visuals: Enhanced `renderCardHTML` with comprehensive attribute representation.
 - [x] Hardened Kidnap Gambit: Ensured robust card selection logic (favorite vs. rarest) and correct removal from victim's inventory in `handleKidnapRequest`.
+- [x] Hardened Card Tooltip: `showPowerTooltip` now accurately reflects all card and player-level modifiers.
 - [x] Hardened Tournament Kickbacks: Ensured `distributeTournamentKickback` uses accurate blockchain transaction time for club membership.
 - [x] Hardened Insurance Recovery: Ensured `processInsuranceRecovery` correctly returns recovered cards to the victim's inventory.
 - [x] Hardened UI Textures: Implemented dynamic arena floor textures based on game phase and tournament status.
@@ -70,3 +70,7 @@
 4. Complete: Implemented granular node-diffing for `board-container` in `syncUI` to prevent flickering during card flips.
 5. Complete: Displayed Cunning and Nurturing values in the `syncUI` profile overlay with Cyberpunk styling.
 6. Complete: Implemented Club Lease Board overlay with regional prioritization logic.
+
+
+## Next steps prompts:
+Check the `PerformAIMove` logic in `main.go` to ensure the bot accounts for card Fatigue and Loyalty modifiers when evaluating the optimal move.

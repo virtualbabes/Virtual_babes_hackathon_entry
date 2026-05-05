@@ -62,6 +62,7 @@
 - **Tournament History**: Implemented conditional deep verification in `handleTournamentHistory` based on `deep_verify` parameter.
 - **Kidnap Gambit**: Hardened `handleKidnapRequest` with robust card selection (favorite vs. rarest) and explicit removal from victim's inventory.
 - **Tournament Kickback Accuracy**: Ensured `distributeTournamentKickback` uses the precise blockchain transaction time for club membership verification.
+- **Card Tooltip Accuracy**: `showPowerTooltip` now accurately reflects all card and player-level modifiers, including Wanted Level, Cunning, and Nurturing.
 - **Card Visuals**: Enhanced `renderCardHTML` to display Mood icons, Artifact bonuses, Fatigue levels, and Loyalty status on the card face.
 - **Insurance Recovery**: Fixed `processInsuranceRecovery` to correctly return recovered cards to the victim's inventory.
 - **UI Textures**: Implemented dynamic arena floor textures based on game phase and tournament status.

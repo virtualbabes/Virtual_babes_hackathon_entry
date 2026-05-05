@@ -3328,42 +3328,69 @@ function showPowerTooltip(e, card, index, state) {
     let html = `<div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">${card.name.toUpperCase()} DATA</div>`;
     
     const sides = ["TOP", "RIGHT", "BOTTOM", "LEFT"];
-    sides.forEach((side, i) => {
+    
+    // Get player stats for the card owner to calculate player-level modifiers
+    const ownerPlayerIndex = card.owner;
+    const ownerWantedLevel = (ownerPlayerIndex === 0 ? state.p1_wanted_level : state.p2_wanted_level) || 0;
+    const ownerCunning = (ownerPlayerIndex === 0 ? state.p1_cunning : state.p2_cunning) || 0;
+    const ownerNurturing = (ownerPlayerIndex === 0 ? state.p1_nurturing : state.p2_nurturing) || 0;
+
+    // Calculate player-level modifiers once
+    let netWantedPenalty = 0;
+    if (ownerWantedLevel > 0) {
+        const baseWantedPenalty = ownerWantedLevel * 5;
+        const mitigation = ownerCunning * 2;
+        netWantedPenalty = -(baseWantedPenalty - Math.min(mitigation, baseWantedPenalty));
+    }
+
+    sides.forEach((side, sideIndex) => {
         const base = card.power[i];
-        const art = card.artifact || 0;
-        let moodMod = 0;
-        let moodWeaknessMod = 0;
-        let fatigueMod = card.fatigue > 50 ? -(card.fatigue - 50) : 0;
-        let loyaltyMod = card.loyalty >= 100 ? 25 : 0;
-
-        if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral") {
-            if (card.mood === tileMood) moodMod = 50;
-        }
-
-        const total = base + art + moodMod + fatigueMod + loyaltyMod;
-        if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral" && moodWeaknesses[card.mood] === tileMood) {
-            moodWeaknessMod = -50;
-        }
-        const total = base + art + moodMod + moodWeaknessMod + fatigueMod + loyaltyMod;
-        const grade = window.GetLevelLabelForDisplay(total);
+        const artifactBonus = card.artifact || 0;
         
-        const moodColor = moodMod > 0 ? "var(--neon-green)" : (moodMod < 0 ? "#ff4b4b" : "inherit");
-        const artColor = art > 0 ? "var(--neon-cyan)" : (art < 0 ? "#ff4b4b" : "inherit");
-        const wantedPenalty = (state.wanted_level || 0) * 5;
+        let moodModifier = 0;
+        if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral") {
+            if (card.mood === tileMood) {
+                moodModifier = 50; // Match bonus
+            } else if (moodWeaknesses[card.mood] === tileMood) {
+                moodModifier = -50; // Weakness penalty
+            }
+        }
+
+        let netFatiguePenalty = 0;
+        if (card.fatigue > 50) {
+            const baseFatiguePenalty = (card.fatigue - 50);
+            const reduction = ownerNurturing;
+            netFatiguePenalty = -(baseFatiguePenalty - Math.min(reduction, baseFatiguePenalty));
+        }
+
+        const loyaltyBonus = card.loyalty >= 100 ? 25 : 0;
+
+        const totalEffectivePower = base + artifactBonus + moodModifier + netFatiguePenalty + loyaltyBonus + netWantedPenalty;
+        const grade = window.GetLevelLabelForDisplay(totalEffectivePower);
+        
+        // Build the HTML for modifiers
+        let modifiersHtml = '';
+        if (artifactBonus !== 0) {
+            modifiersHtml += `<span style="color: ${artifactBonus > 0 ? 'var(--neon-cyan)' : '#ff4b4b'}">${artifactBonus > 0 ? '+' : ''}${artifactBonus}A</span> `;
+        }
+        if (moodModifier !== 0) {
+            modifiersHtml += `<span style="color: ${moodModifier > 0 ? 'var(--neon-green)' : '#ff4b4b'}">${moodModifier > 0 ? '+' : ''}${moodModifier}M</span> `;
+        }
+        if (netFatiguePenalty !== 0) {
+            modifiersHtml += `<span style="color: #ff4b4b">${netFatiguePenalty}F</span> `;
+        }
+        if (loyaltyBonus !== 0) {
+            modifiersHtml += `<span style="color: var(--neon-cyan)">+${loyaltyBonus}L</span> `;
+        }
+        if (netWantedPenalty !== 0) {
+            modifiersHtml += `<span style="color: #ff4b4b">${netWantedPenalty}W</span> `;
+        }
 
         html += `
             <div class="tooltip-row">
                 <span style="opacity: 0.7;">${side}:</span>
                 <span>
-                    ${base} 
-                    <span style="color: ${artColor}">${art >= 0 ? '+' : ''}${art}A</span> 
-                    <span style="color: ${moodColor}">${moodMod >= 0 ? '+' : ''}${moodMod}M</span>
-                    ${moodMod !== 0 ? `<span style="color: ${moodColor}">${moodMod >= 0 ? '+' : ''}${moodMod}M</span>` : ''}
-                    ${moodWeaknessMod !== 0 ? `<span style="color: #ff4b4b">${moodWeaknessMod}M</span>` : ''}
-                    ${fatigueMod < 0 ? `<span style="color: #ff4b4b">${fatigueMod}F</span>` : ''}
-                    ${loyaltyMod > 0 ? `<span style="color: var(--neon-cyan)">+${loyaltyMod}L</span>` : ''}
-                    ${wantedPenalty > 0 ? `<span style="color: #ff4b4b">-${wantedPenalty}W</span>` : ''}
-                    = <b style="color: var(--neon-cyan)">${total} (${grade})</b>
+                    ${base} ${modifiersHtml}= <b style="color: var(--neon-cyan)">${totalEffectivePower} (${grade})</b>
                 </span>
             </div>
         `;
