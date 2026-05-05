@@ -180,14 +180,14 @@ type CapturedCardInfo struct {
 
 // MatchHistory stores the result of a completed game for reward verification.
 type MatchHistory struct {
-	WinnerID      string    `json:"winner_id"`
-	Opponent      string    `json:"opponent_wallet"`
-	TournamentID  string    `json:"tournament_id"`
-	Scores        [2]int    `json:"scores"`
-	Timestamp     time.Time `json:"timestamp"`
-	WinnerIndex   int       `json:"winner_index"` // 0 for P1, 1 for P2
-	IsBountyMatch bool      `json:"is_bounty_match,omitempty"`
-	BountyReward  float64   `json:"bounty_reward,omitempty"`
+	WinnerID         string    `json:"winner_id"`
+	Opponent         string    `json:"opponent_wallet"`
+	TournamentMatchID string    `json:"tournament_id"`
+	Scores           [2]int    `json:"scores"`
+	Timestamp        time.Time `json:"timestamp"`
+	WinnerIndex      int       `json:"winner_index"` // 0 for P1, 1 for P2
+	IsBountyMatch    bool      `json:"is_bounty_match,omitempty"`
+	BountyReward     float64   `json:"bounty_reward,omitempty"`
 }
 
 // PlayerStats tracks the performance and reliability of a player.
@@ -389,6 +389,7 @@ type Lobby struct {
 	rateLimits           map[string]time.Time
 	httpRateLimits       map[string]*RateBucket
 	tournament           TournamentState
+	globalSentiment      GlobalSentiment
 	register             chan *Client
 	unregister           chan *Client
 	broadcast            chan []byte

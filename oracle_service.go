@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"log"
 	"net/http"
 	"os"
@@ -572,6 +573,44 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		}
 	}
 	return false, 0, nil
+}
+
+// checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
+func (l *Lobby) checkVaultBalanceOnChain() {
+	l.mutex.RLock()
+	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	rewardAppIDStr := l.rewardAssetID
+	vaultAddr := l.vaultAddress
+	l.mutex.RUnlock()
+
+	if !ok || rewardAppIDStr == "" || vaultAddr == "" {
+		return
+	}
+
+	rewardAppID, err := strconv.ParseUint(rewardAppIDStr, 10, 64)
+	if err != nil {
+		return
+	}
+
+	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
+	addrObj, _ := types.DecodeAddress(vaultAddr)
+
+	// ARC-200 Balance is stored in an application box named by the account's public key bytes.
+	boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(context.Background())
+	if err != nil {
+		log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
+		return
+	}
+
+	// ARC-200 balances are 32-byte uint256 values
+	if len(boxResp.Value) >= 32 {
+		bal := new(big.Int).SetBytes(boxResp.Value[:32]).Uint64()
+		l.mutex.Lock()
+		l.faucetBalance = float64(bal) / 1000000.0
+		l.applyDynamicScaling() // Adjust reward amounts based on new liquidity level
+		l.mutex.Unlock()
+		log.Printf("[ORACLE] Vault $VBV Pool Synced: %.2f units.\n", l.faucetBalance)
+	}
 }
 
 func (l *Lobby) checkNativeVaultBalanceOnChain() {

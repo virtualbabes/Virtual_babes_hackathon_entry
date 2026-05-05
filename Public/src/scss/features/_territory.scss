@@ -10,6 +10,25 @@
 }
 
 .map-grid-3d {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 1rem;
+    transform-style: preserve-3d;
+    transform: rotateX(30deg) rotateY(-15deg);
+
+    .map-tile,
+    .map-tile-3d {
+        @include neon-glass-panel;
+        height: 100px;
+        transform: translateZ(0);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+        &:hover {
+            transform: translateZ(20px) scale(1.05);
+            box-shadow: 0 0 20px rgba($color-neon-purple, 0.7);
+        }
+    }
+    /* TODO: Implement styles */
     // Transform logic from styles.css
 }
 

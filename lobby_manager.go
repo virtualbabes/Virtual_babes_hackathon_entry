@@ -788,7 +788,6 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			"heist_attempts":  playerStats.HeistAttempts,
 			"kidnap_eligible": canKidnap,
 			"target_club_id":  data.TargetClubID,
-			"playstyle":       playerStats.Playstyle, // Include updated playstyle
 		})
 		l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
 	case "create_club":
@@ -1019,6 +1018,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.handleKidnapRequest(env)
 	case "pay_ransom":
 		l.handlePayRansom(env)
+	case "release_hostage":
+		l.handleReleaseHostage(env)
 	case "spread_rumor":
 		l.handleSpreadRumor(env)
 	}
@@ -1801,4 +1802,21 @@ func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	}
 	// RumorCount is an int, no map initialization needed
 	l.leaderboard[wallet] = stats
+}
+// refreshRegionalRoles updates governor status for clubs based on territory control.
+func (l *Lobby) refreshRegionalRoles() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	for _, club := range l.clubs {
+		if len(club.Territories) >= 2 {
+			// Set a default region name for governors, or keep existing if set
+			if club.RegionName == "" {
+				club.RegionName = "Governor"
+			}
+		} else {
+			// Remove governor status if they no longer control 2+ territories
+			club.RegionName = ""
+		}
+	}
 }

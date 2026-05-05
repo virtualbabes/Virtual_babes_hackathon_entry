@@ -164,7 +164,7 @@ func (l *Lobby) handleAdminAddReward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.AssetID != "" && req.AssetID != "0" {
-		if optedIn, _ := l.checkAssetOptIn("VOI", l.vaultAddress, req.AssetID); !optedIn {
+		if optedIn, _, err := l.checkAssetOptIn("VOI", l.vaultAddress, req.AssetID); err != nil || !optedIn {
 			http.Error(w, "Vault not opted-in to asset", http.StatusBadRequest)
 			return
 		}

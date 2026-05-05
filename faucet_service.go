@@ -62,6 +62,17 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 		req.Claimant = req.Recipient
 	}
 
+	if strings.EqualFold(req.Network, "VOI") {
+		if _, err := types.DecodeAddress(req.Recipient); err != nil {
+			http.Error(w, "Invalid Voi payout recipient", http.StatusBadRequest)
+			return
+		}
+		if err := l.verifyVoiPayoutOptIn(req.Recipient); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	l.mutex.Lock()
 	history, hasHistory := l.matchHistory[req.ClientID]
 	lastStarted, isProcessing := l.processingRewards[req.ClientID]
@@ -176,6 +187,24 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 }
 
 // dispatchReward constructs and sends the reward transaction(s) on-chain.
+func (l *Lobby) verifyVoiPayoutOptIn(recipient string) error {
+	l.mutex.RLock()
+	assetID := l.availableNetworks["Voi Mainnet"].AssetID
+	l.mutex.RUnlock()
+	if assetID == "" || assetID == "0" {
+		return nil
+	}
+
+	optedIn, _, err := l.checkAssetOptIn("VOI", recipient, assetID)
+	if err != nil {
+		return fmt.Errorf("failed to verify payout recipient opt-in: %w", err)
+	}
+	if !optedIn {
+		return fmt.Errorf("payout recipient is not opted in to VBV on Voi")
+	}
+	return nil
+}
+
 func (l *Lobby) dispatchReward(recipient, network string, history MatchHistory) (string, bool, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]

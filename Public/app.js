@@ -953,6 +953,33 @@ async function adminBanWallet(walletToBan = null, hoursToBan = null) {
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
+async function adminAvatarBan(url = null, hours = null) {
+    const targetUrl = url || document.getElementById("admin-ban-avatar-url").value.trim();
+    if (!targetUrl) return;
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/avatar-ban`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: targetUrl, hours: isNaN(hours) ? 720 : hours })
+        });
+        if (response.ok) {
+            showToast(`🚫 Avatar asset restricted`, "success");
+            fetchLastAdminAction();
+            if (!url) {
+                document.getElementById("admin-ban-avatar-url").value = "";
+            }
+        } else {
+            const errText = await response.text();
+            showToast(`❌ Avatar ban failed: ${errText}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Server connection error", "error");
+    }
+}
+
 function adminBanWalletFromLog(wallet) {
     // Default to 24 hours for a quick ban from logs
     adminBanWallet(wallet, 24);
@@ -2874,6 +2901,8 @@ async function syncUI(scope = "all") {
     const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
     const rumorCost = 500; // Matches server-side cost
     const myJailedCards = state.jailed_cards || {};
+    const myKidnappedCards = state.kidnapped_cards || {};
+    const myHeldHostageCards = state.held_hostage_cards || {};
     const wantedVal = state.wanted_level || 0;
     const cunningVal = state.cunning || 0;
     const jobRole = state.job_role || "";
@@ -2885,7 +2914,8 @@ async function syncUI(scope = "all") {
     const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
 
     rewardsDashboard.innerHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
-        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '');
+        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openTrophyView()">🏆 TROPHIES</button>` +
+        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : '');
 
     // --- Update Latency ---
     const latencyEl = document.getElementById("latency-display");
@@ -3665,6 +3695,8 @@ async function openPortfolioView(initialTab = 'portfolio') {
     const state = window.GetGameState();
     const overlay = document.createElement("div");
     const myJailedCards = state.jailed_cards || {};
+    const myKidnappedCards = state.kidnapped_cards || {};
+    const myHeldHostageCards = state.held_hostage_cards || {};
     overlay.id = "portfolio-view-overlay";
     overlay.className = "overlay";
     
@@ -3674,6 +3706,8 @@ async function openPortfolioView(initialTab = 'portfolio') {
             <div class="flex-row justify-center gap-10 mt-10 mb-20">
                 <button id="tab-holdings" class="tab-btn ${initialTab === 'portfolio' ? 'active' : ''}" onclick="switchPortfolioTab('portfolio')">📈 HOLDINGS</button>
                 <button id="tab-jailed" class="tab-btn ${initialTab === 'jailed' ? 'active' : ''}" onclick="switchPortfolioTab('jailed')">⛓️ JAILED (${Object.keys(myJailedCards).length})</button>
+                <button id="tab-kidnapped" class="tab-btn ${initialTab === 'kidnapped' ? 'active' : ''}" onclick="switchPortfolioTab('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>
+                <button id="tab-hostage" class="tab-btn ${initialTab === 'hostage' ? 'active' : ''}" onclick="switchPortfolioTab('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>
             </div>
             
             <div id="portfolio-content-area" class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
@@ -3692,10 +3726,14 @@ async function switchPortfolioTab(tab) {
     const container = document.getElementById("portfolio-content-area");
     const holdingsBtn = document.getElementById("tab-holdings");
     const jailedBtn = document.getElementById("tab-jailed");
+    const kidnappedBtn = document.getElementById("tab-kidnapped");
+    const hostageBtn = document.getElementById("tab-hostage");
     const state = window.GetGameState();
 
     holdingsBtn.classList.toggle("active", tab === 'portfolio');
     jailedBtn.classList.toggle("active", tab === 'jailed');
+    if (kidnappedBtn) kidnappedBtn.classList.toggle("active", tab === 'kidnapped');
+    if (hostageBtn) hostageBtn.classList.toggle("active", tab === 'hostage');
     container.innerHTML = `<div style="padding: 20px; opacity: 0.5;">Loading details...</div>`;
 
     if (tab === 'portfolio') {
@@ -3733,7 +3771,7 @@ async function switchPortfolioTab(tab) {
                 </div>`;
         }
         container.innerHTML = html;
-    } else {
+    } else if (tab === 'jailed') {
         const jailed = state.jailed_cards || {};
         const cardIds = Object.keys(jailed);
         if (cardIds.length === 0) {
@@ -3758,6 +3796,55 @@ async function switchPortfolioTab(tab) {
                 </div>`;
         }
         container.innerHTML = html;
+    } else if (tab === 'kidnapped') {
+        const kidnapped = state.kidnapped_cards || {};
+        const cardIds = Object.keys(kidnapped);
+        if (cardIds.length === 0) {
+            container.innerHTML = `<div style="padding: 40px; opacity: 0.5;">No kidnapped cards at the moment.</div>`;
+            return;
+        }
+
+        let html = "";
+        for (const cardId of cardIds) {
+            const victimWallet = kidnapped[cardId] || "Unknown";
+            html += `
+                <div class="player-item" style="padding: 15px; border-color: #ffa500;">
+                    <div style="text-align: left;">
+                        <b style="color: #ffa500;">ID: #${cardId}</b>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Victim Wallet: ${victimWallet}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ffd700; color: #ffd700;" onclick="releaseHostage(${cardId})">RELEASE HOSTAGE</button>
+                    </div>
+                </div>`;
+        }
+        container.innerHTML = html;
+    } else if (tab === 'hostage') {
+        const heldHostage = state.held_hostage_cards || {};
+        const cardIds = Object.keys(heldHostage);
+        if (cardIds.length === 0) {
+            container.innerHTML = `<div style="padding: 40px; opacity: 0.5;">No cards currently held hostage.</div>`;
+            return;
+        }
+
+        let html = "";
+        for (const cardId of cardIds) {
+            const perpWallet = heldHostage[cardId] || "Unknown";
+            html += `
+                <div class="player-item" style="padding: 15px; border-color: #ffd700;">
+                    <div style="text-align: left;">
+                        <b style="color: #ffd700;">ID: #${cardId}</b>
+                        <div style="font-size: 0.75em; opacity: 0.6;">Kidnapper: ${perpWallet}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" onclick="payRansom(${cardId}, '${perpWallet}')">PAY RANSOM</button>
+                    </div>
+                </div>`;
+        }
+        html += `<div style="margin-top: 10px; padding: 12px; border: 1px dashed var(--glass-border); color: #ffd700; font-size: 0.85em;">Ransom amount will be requested after you initiate payment.</div>`;
+        container.innerHTML = html;
+    } else {
+        container.innerHTML = `<div style="padding: 40px; opacity: 0.5;">No details available for this tab.</div>`;
     }
 }
 
@@ -4156,9 +4243,56 @@ async function spreadRumor(targetWallet, type, strength, durationMinutes) {
     }
 }
 
+function openTrophyView() {
+    const overlay = document.createElement("div");
+    overlay.id = "trophy-view-overlay";
+    overlay.className = "overlay";
+
+    const state = window.GetGameState() || {};
+    const unlocked = new Set(state.achievements || []);
+    const trophyCatalog = [
+        { id: "FIRST_VICTORY", name: "First Victory", description: "Win your first match.", tier: 1 },
+        { id: "TOURNAMENT_CHAMPION", name: "Tournament Champion", description: "Win a tournament.", tier: 2 },
+        { id: "FIRST_HEIST", name: "First Heist", description: "Complete a successful Club heist.", tier: 1 },
+        { id: "OUTLAW_SLAYER", name: "Outlaw Slayer", description: "Defeat a high-infamy opponent.", tier: 2 },
+        { id: "ARENA_LEGEND", name: "Arena Legend", description: "Achieve legendary status in the arena.", tier: 3 },
+        { id: "REHABILITATED", name: "Rehabilitated", description: "Pay off your courthouse fine and reset wanted level.", tier: 2 },
+        { id: "GOVERNOR", name: "Governor", description: "Control 2+ territories as a club leader.", tier: 3 }
+    ];
+
+    let trophiesHTML = "";
+    trophyCatalog.forEach(trophy => {
+        const hasUnlocked = unlocked.has(trophy.id);
+        const glowClass = `trophy-badge tier-${trophy.tier}` + (hasUnlocked ? "" : " locked");
+        trophiesHTML += `
+            <div class="${glowClass}" style="opacity: ${hasUnlocked ? 1 : 0.35};">
+                <div style="font-size: 2em;">${hasUnlocked ? '🏆' : '🔒'}</div>
+                <div style="font-size: 0.85em; margin-top: 5px;">${trophy.name}</div>
+                <div style="font-size: 0.65em; opacity: 0.7;">${trophy.description}</div>
+            </div>
+        `;
+    });
+
+    if (trophyCatalog.length === 0) {
+        trophiesHTML = `<div style="padding: 40px; opacity: 0.5;">No achievements have been loaded yet.</div>`;
+    }
+
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 600px; text-align: center;">
+            <h2 style="color: var(--neon-cyan);">ACHIEVEMENT TROPHIES</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin: 2rem 0;">
+                ${trophiesHTML}
+            </div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('trophy-view-overlay').remove()">CLOSE</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
 function tradeShares(entityId, action, amount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    
+
     socket.send(JSON.stringify({
         type: "trade_shares",
         payload: {
@@ -4167,7 +4301,7 @@ function tradeShares(entityId, action, amount) {
             amount: amount
         }
     }));
-    
+
     document.getElementById("portfolio-view-overlay")?.remove();
 }
 
@@ -4821,10 +4955,14 @@ function showKidnapOverlay(payload) {
     const content = document.getElementById("kidnap-content");
     if (!overlay || !content) return;
 
+    const ransomValue = payload.ransom || payload.ransom_amount || 0;
+    const perpWallet = payload.perp_wallet || "Unknown";
+
     content.innerHTML = `
         <p>Your card <strong>${payload.card_name}</strong> has been kidnapped!</p>
-        <p>Ransom: <span class="ransom-amount">${payload.ransom_amount} $VBV</span></p>
-        <button class="pay-ransom-btn" onclick="payRansom('${payload.kidnap_id}')">Pay Ransom</button>
+        <p>Ransom: <span class="ransom-amount">${(ransomValue / 1000000).toFixed(2)} $VBV</span></p>
+        <p style="opacity:0.7; font-size:0.9em;">Kidnapper: ${perpWallet}</p>
+        <button class="pay-ransom-btn" onclick="payRansom(${payload.card_id}, '${perpWallet}', ${ransomValue})">Pay Ransom</button>
         <p class="insurance-timer">Insurance recovery in: <span id="recovery-timer">48:00:00</span></p>
     `;
     overlay.classList.remove("hidden");
@@ -4834,12 +4972,37 @@ function showKidnapOverlay(payload) {
 }
 
 // Pay ransom for kidnapped card
-function payRansom(kidnapId) {
+function payRansom(cardId, perpWallet, ransomAmount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (!perpWallet) {
+        showToast("Unable to pay ransom: missing kidnapper wallet.", "error");
+        return;
+    }
+
+    if (!ransomAmount || ransomAmount <= 0) {
+        const amountInput = prompt("Enter the ransom amount in VBV to pay for this hostage card:", "0");
+        if (!amountInput) return;
+        const amountNumber = Number(amountInput);
+        if (isNaN(amountNumber) || amountNumber <= 0) {
+            showToast("Invalid ransom amount entered.", "error");
+            return;
+        }
+        ransomAmount = Math.round(amountNumber * 1000000);
+    }
 
     socket.send(JSON.stringify({
         type: "pay_ransom",
-        payload: { kidnap_id: kidnapId }
+        payload: { card_id: cardId, perp_wallet: perpWallet, ransom_amount: ransomAmount }
+    }));
+}
+
+function releaseHostage(cardId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (!confirm(`Release Card #${cardId} back to its victim?`)) return;
+
+    socket.send(JSON.stringify({
+        type: "release_hostage",
+        payload: { card_id: cardId }
     }));
 }
 

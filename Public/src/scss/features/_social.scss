@@ -5,6 +5,18 @@
 
 // Achievement Badges (Trophies)
 .trophy-badge {
+    @include neon-glass-panel;
+    display: inline-block;
+    padding: 0.5rem;
+    border-radius: 50%;
+    box-shadow: 0 0 15px rgba($color-neon-cyan, 0.6);
+    background: linear-gradient(45deg, rgba($color-neon-cyan, 0.1), rgba($color-neon-purple, 0.1));
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+        box-shadow: 0 0 25px rgba($color-neon-cyan, 0.8);
+    }
+    /* TODO: Implement styles */
     // Dynamic glows based on achievement tier
 }
 
@@ -20,5 +32,22 @@
 
 // Entity Portfolio
 .portfolio-view {
+    @include neon-glass-panel;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba($color-neon-cyan, 0.3);
+    background: rgba($color-neon-blue, 0.1);
+    box-shadow: inset 0 0 10px rgba($color-neon-cyan, 0.2);
+
+    .portfolio-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        border-bottom: 1px solid rgba($color-neon-purple, 0.2);
+    }
+    /* TODO: Implement styles */
     // Styles for the trade shares interface and valuation history
 }

@@ -41,7 +41,7 @@ func (l *Lobby) processLoans() {
 			l.logAdminAudit("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
 
 			// Add the defaulted loan to the black market
-			l.blackMarket = append(l.blackMarket, loan)
+			l.blackMarket = append(l.blackMarket, *loan)
 
 			delete(l.loans, id)
 		}

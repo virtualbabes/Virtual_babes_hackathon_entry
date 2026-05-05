@@ -76,10 +76,12 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 
 	// Broadcast rumor update to all clients for lobby visibility, including the full rumor object
 	rumorJSON, _ := json.Marshal(rumor) // Marshal the created rumor object
-	l.broadcast <- Envelope{
+	envelope := Envelope{
 		Type:    "rumor_update",
 		Payload: json.RawMessage(fmt.Sprintf(`{"rumor":%s}`, string(rumorJSON))),
 	}
+	envelopeBytes, _ := json.Marshal(envelope)
+	l.broadcast <- envelopeBytes
 
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }

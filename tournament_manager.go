@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -229,10 +226,10 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	if len(winners) > 0 { winner = winners[0] }
 	
 	if l.tournament.Pot > 0 && winner != "" {
-		payouts := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
+		// payouts := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
 		// Heuristic to fill Top 5 based on bracket progress
-		top5 := []string{winner}
-		l.mockARC200Dispenser(winner, l.tournament.Pot*payouts[0], 1)
+		// top5 := []string{winner}
+		// l.mockARC200Dispenser(winner, l.tournament.Pot*payouts[0], 1)
 	}
 
 	summary := TournamentSummary{

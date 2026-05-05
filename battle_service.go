@@ -253,10 +253,10 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	match.IsFinished = true
 	history := MatchHistory{
-		Scores:        [2]int{p1, p2},
-		Timestamp:     time.Now(),
-		TournamentID:  match.TournamentMatchID,
-		IsBountyMatch: match.IsBountyMatch,
+		Scores:           [2]int{p1, p2},
+		Timestamp:        time.Now(),
+		TournamentMatchID: match.TournamentMatchID,
+		IsBountyMatch:    match.IsBountyMatch,
 	}
 
 	if p1 > p2 {
@@ -387,8 +387,8 @@ func (l *Lobby) finalizeMatchResult(winnerID string, deck []int, history MatchHi
 			}
 			l.mutex.Unlock()
 		}()
-		if history.TournamentID != "" {
-			l.processTournamentResult(history.TournamentID, wallet)
+		if history.TournamentMatchID != "" {
+			l.processTournamentResult(history.TournamentMatchID, wallet)
 		}
 	}
 }

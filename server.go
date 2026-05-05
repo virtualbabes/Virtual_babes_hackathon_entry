@@ -23,11 +23,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // Adjust for production security
 	},
-
-	InitialBaseReward    uint64
-	SeasonStart          time.Time
-	SeasonNumber         int
-	GlobalSentiment      GlobalSentiment // Pillar 3: Aggregate meta trends
 }
 
 type GlobalSentiment struct {

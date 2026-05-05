@@ -70,8 +70,8 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	// Notify Victim
 	victimClientID := l.getClientIDFromWallet(victimWallet)
 	if victimClientID != "" {
-		msg := fmt.Sprintf(`{"text":"🚨 <b>KIDNAP GAMBIT:</b> %s has kidnapped your card #%d! Ransom demanded: %.2f $VBV.", "card_id": %d, "ransom": %d}`, 
-			perpWallet, targetCardID, float64(data.RansomAmount)/1000000.0, targetCardID, data.RansomAmount)
+		msg := fmt.Sprintf(`{"text":"🚨 <b>KIDNAP GAMBIT:</b> %s has kidnapped your card #%d! Ransom demanded: %.2f $VBV.", "card_id": %d, "perp_wallet": "%s", "ransom": %d}`, 
+			perpWallet, targetCardID, float64(data.RansomAmount)/1000000.0, targetCardID, perpWallet, data.RansomAmount)
 		l.sendToClient(victimClientID, Envelope{Type: "ransom_demand", Payload: json.RawMessage(msg)})
 	}
 
@@ -132,6 +132,57 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>CARD RECLAIMED:</b> Your asset has been returned to your inventory."}`)})
 	
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// handleReleaseHostage allows a kidnapper to release a hostage card back to the victim voluntarily.
+func (l *Lobby) handleReleaseHostage(env *Envelope) {
+	var data struct {
+		CardID int `json:"card_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	perpWallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+
+	perpStats := l.leaderboard[perpWallet]
+	if perpStats.KidnappedCards == nil {
+		return
+	}
+
+	if _, found := perpStats.KidnappedCards[data.CardID]; !found {
+		return
+	}
+
+	kidnapState, active := l.activeKidnappings[data.CardID]
+	if !active || kidnapState.PerpWallet != perpWallet {
+		return
+	}
+
+	victimWallet := kidnapState.VictimWallet
+	victimStats := l.leaderboard[victimWallet]
+	if victimStats.HeldHostageCards == nil || victimStats.HeldHostageCards[data.CardID] != perpWallet {
+		return
+	}
+
+	delete(perpStats.KidnappedCards, data.CardID)
+	l.leaderboard[perpWallet] = perpStats
+	delete(victimStats.HeldHostageCards, data.CardID)
+	l.leaderboard[victimWallet] = victimStats
+	delete(l.activeKidnappings, data.CardID)
+
+	l.logAdminAudit("HOSTAGE_RELEASED", perpWallet, fmt.Sprintf("Card #%d voluntarily released to %s", data.CardID, victimWallet))
+
+	if vCID := l.getClientIDFromWallet(victimWallet); vCID != "" {
+		l.sendToClient(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned by the kidnapper."}`, data.CardID))})
+	}
+	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned to the victim."}`, data.CardID))})
+
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
