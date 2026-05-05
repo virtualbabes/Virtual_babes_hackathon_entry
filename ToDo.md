@@ -2,6 +2,9 @@
 
 ## Critical Launch Readiness
 - [x] Resolved profile synergy: Achievement, Mojo, and Jailed Card state now flows through Go WASM to UI.
+- [x] Audit `processInsuranceRecovery` to ensure recovered cards are returned to victim's inventory.
+- [x] Audit `handleTournamentRegister` to ensure `distributeTournamentKickback` uses accurate `registrationTime`.
+- [x] Review the `handleKidnapRequest` function in `handlers_criminality.go` to ensure that the selection logic for the target card (favorite vs. rarest) is robust and handles edge cases where no cards are found.
 - [x] Audit `handleTournamentHistory` for `deep_verify` parameter to trigger full re-verification.
 - [x] Audit `processRumors` for correct deletion of expired rumors under mutex.
 - [x] Audit `handleTournamentRegister` to ensure `isElite` bypasses buy-in verification.

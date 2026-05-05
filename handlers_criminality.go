@@ -34,16 +34,44 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	if !victimExists { return }
 
 	// Selection Logic: Target the CEO's Favorite Card or their Rarest Card
-	var targetCardID int
+	var cardToKidnap ServerCard
+	cardFound := false
+
+	// 1. Attempt to use FavoriteCardID if set and present in victim's inventory
 	if victimStats.FavoriteCardID != 0 {
-		targetCardID = victimStats.FavoriteCardID
-	} else {
+		cardKey := fmt.Sprintf("CARD-%d", victimStats.FavoriteCardID)
+		if count, hasCard := victimStats.Inventory[cardKey]; hasCard && count > 0 {
+			if c, exists := l.inventory[victimStats.FavoriteCardID]; exists { // Also ensure it exists in global inventory
+				cardToKidnap = c
+				cardFound = true
+			}
+		}
+	}
+
+	// 2. If favorite card not found or not in inventory, fall back to rarest card
+	if !cardFound {
 		rarest, found := l.findRarestCardInInventory(victimWallet)
 		if !found {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: Target has no valuable assets."}`)})
 			return
 		}
-		targetCardID = rarest.ID
+		cardToKidnap = rarest
+		cardFound = true
+	}
+
+	// Final check: If no card was found after all attempts (should ideally not happen if findRarestCardInInventory is robust)
+	if !cardFound {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: No suitable card found for target."}`)})
+		return
+	}
+
+	targetCardID := cardToKidnap.ID
+
+	// Remove the card from the victim's inventory
+	cardKey := fmt.Sprintf("CARD-%d", targetCardID)
+	victimStats.Inventory[cardKey]--
+	if victimStats.Inventory[cardKey] == 0 {
+		delete(victimStats.Inventory, cardKey)
 	}
 
 	// Move the card to Hostage state
@@ -209,6 +237,13 @@ func (l *Lobby) processInsuranceRecovery() {
 		// Automatic Return: No VBV exchange
 		victimStats := l.leaderboard[state.VictimWallet]
 		delete(victimStats.HeldHostageCards, cardID)
+		// CRITICAL FIX: Add the card back to the victim's inventory
+		cardKey := fmt.Sprintf("CARD-%d", cardID)
+		if victimStats.Inventory == nil {
+			victimStats.Inventory = make(map[string]int)
+		}
+		victimStats.Inventory[cardKey]++ // Increment count, assuming it was decremented by 1
+		
 		l.leaderboard[state.VictimWallet] = victimStats
 
 		perpStats := l.leaderboard[state.PerpWallet]

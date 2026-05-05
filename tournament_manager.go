@@ -75,6 +75,8 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		if hof[i].wallet == req.Wallet { isElite = true; break }
 	}
 
+	var actualRegistrationTime time.Time
+
 	if !isElite {
 		if req.TxID == "" {
 			http.Error(w, "TxID required", http.StatusBadRequest)
@@ -96,12 +98,13 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		}
 
 		// verifyBuyInTransaction expects a prefix that matches "Network Mainnet" keys
-		verified, txTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*1000000), buyInAsset, req.Wallet, l.vaultAddress)
+		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*1000000), buyInAsset, req.Wallet, l.vaultAddress)
 		if err != nil || !verified || txTime < openTime.Unix() {
 			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", req.Wallet, verifyNetwork, err)
 			http.Error(w, "Payment verification failed or transaction too old", http.StatusPaymentRequired)
 			return
 		}
+		actualRegistrationTime = time.Unix(txUnixTime, 0)
 	}
 
 	l.mutex.Lock()
@@ -115,7 +118,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 
 	// Process Club Kickback (Tournament Revenue Loop)
 	if !isElite {
-		l.distributeTournamentKickback(req.Wallet, uint64(buyInAmt*1000000), time.Now())
+		l.distributeTournamentKickback(req.Wallet, uint64(buyInAmt*1000000), actualRegistrationTime)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

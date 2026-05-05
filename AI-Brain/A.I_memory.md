@@ -60,6 +60,9 @@
 - **Protocol Hardening**: Refactored `handleGameProtocol` to delegate to service files, fixed deadlocks, and added unhandled message logging.
 - **Rumor Management**: Verified `processRumors` correctly deletes expired entries while holding the mutex.
 - **Tournament History**: Implemented conditional deep verification in `handleTournamentHistory` based on `deep_verify` parameter.
+- **Kidnap Gambit**: Hardened `handleKidnapRequest` with robust card selection (favorite vs. rarest) and explicit removal from victim's inventory.
+- **Tournament Kickback Accuracy**: Ensured `distributeTournamentKickback` uses the precise blockchain transaction time for club membership verification.
+- **Insurance Recovery**: Fixed `processInsuranceRecovery` to correctly return recovered cards to the victim's inventory.
 - **Faceplates**: Cosmestic items now provide functional Mojo/Cunning bonuses via `FaceplateRegistry`. Mojo bonuses boost Reputation.
 
 ## Technical Notes
