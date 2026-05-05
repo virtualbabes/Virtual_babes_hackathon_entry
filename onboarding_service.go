@@ -32,21 +32,32 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	targetWallet := strings.ToLower(req.Wallet)
+
+	// 0. Safety Guard: Block onboarding if Sybil history is not yet restored.
+	l.mutex.RLock()
+	synced := l.SybilSyncComplete
+	l.mutex.RUnlock()
+	if !synced {
+		http.Error(w, "Arena safety protocols are still initializing. Try again in 30 seconds.", http.StatusServiceUnavailable)
+		return
+	}
+
 	// 1. Per-wallet lock: Prevents a single user from making multiple concurrent onboarding requests.
 	l.mutex.Lock()
-	if _, isProcessing := l.processingOnboarding[req.Wallet]; isProcessing {
+	if _, isProcessing := l.processingOnboarding[targetWallet]; isProcessing {
 		l.mutex.Unlock()
-		log.Printf("[BRIDGE] Onboarding already in progress for wallet: %s\n", req.Wallet)
+		log.Printf("[BRIDGE] Onboarding already in progress for wallet: %s\n", targetWallet)
 		http.Error(w, "Onboarding already in progress for this wallet", http.StatusConflict)
 		return
 	}
-	l.processingOnboarding[req.Wallet] = time.Now()
+	l.processingOnboarding[targetWallet] = time.Now()
 	l.mutex.Unlock()
 
 	// Ensure the per-wallet claim is released after logic finishes (even on early exit)
 	defer func() {
 		l.mutex.Lock()
-		delete(l.processingOnboarding, req.Wallet)
+		delete(l.processingOnboarding, targetWallet)
 		l.mutex.Unlock()
 	}()
 
@@ -55,7 +66,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	case l.onboardingSemaphore <- struct{}{}:
 		// Acquired token, proceed
 	case <-time.After(10 * time.Second): // Timeout if waiting too long
-		log.Printf("[BRIDGE] Onboarding dispatch timed out for wallet: %s\n", req.Wallet)
+		log.Printf("[BRIDGE] Onboarding dispatch timed out for wallet: %s\n", targetWallet)
 		http.Error(w, "Server busy, please try again shortly.", http.StatusServiceUnavailable)
 		return
 	}
@@ -65,10 +76,10 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 
 	// NEW: Check if wallet has already been onboarded (historical check)
 	l.mutex.RLock()
-	alreadyOnboarded := l.onboardedWallets[req.Wallet]
+	alreadyOnboarded := l.onboardedWallets[targetWallet]
 	l.mutex.RUnlock()
 	if alreadyOnboarded {
-		log.Printf("[BRIDGE] Wallet %s has already received an onboarding pack.\n", req.Wallet)
+		log.Printf("[BRIDGE] Wallet %s has already received an onboarding pack.\n", targetWallet)
 		http.Error(w, "This wallet has already received an onboarding pack.", http.StatusForbidden)
 		return
 	}
@@ -100,17 +111,21 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	// --- Transaction Dispatch Logic ---
 	// Ensure the VBV is refunded if the transaction fails
 	refundVBV := true // Flag to track if VBV needs refunding
+	isSkip := false   // Distinguish between skip and error
 	defer func() {
 		if refundVBV {
 			l.mutex.Lock()
 			l.faucetBalance += 1.0 // Refund VBV
 			l.mutex.Unlock()
-			log.Printf("[BRIDGE] VBV refunded to vault for %s due to transaction failure.\n", req.Wallet)
+			if !isSkip {
+				log.Printf("[BRIDGE] VBV refunded to vault for %s due to transaction failure.\n", targetWallet)
+			}
 		}
 	}()
 
-	accountInfo, err := client.AccountInformation(req.Wallet).Do(context.Background())
+	accountInfo, err := client.AccountInformation(targetWallet).Do(context.Background())
 	if err == nil && accountInfo.Amount >= 1000000 {
+		isSkip = true
 		w.WriteHeader(http.StatusNoContent) // User already has VOI, skip starter pack
 		return
 	}
@@ -122,7 +137,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	vaultAddr := l.vaultAddress
 
 	sp, _ := client.SuggestedParams().Do(context.Background())
-	txn1, _ := transaction.MakePaymentTxn(vaultAddr, req.Wallet, 1000000, []byte("VBT_ONBOARD:GAS"), "", sp)
+	txn1, _ := transaction.MakePaymentTxn(vaultAddr, targetWallet, 1000000, []byte("VBT_ONBOARD:GAS"), "", sp)
 	rewardAsset, _ := strconv.ParseUint(voiConfig.AssetID, 10, 64)
 	senderAddr, _ := types.DecodeAddress(vaultAddr)
 	txn2, _ := transaction.MakeApplicationNoOpTx(rewardAsset, nil, nil, nil, nil, sp, senderAddr, []byte("VBT_ONBOARD:TOKEN"), types.Digest{}, [32]byte{}, types.Address{})
@@ -134,17 +149,17 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 
 	txid, err := client.SendRawTransaction(append(stx1, stx2...)).Do(context.Background())
 	if err != nil {
-		log.Printf("[BRIDGE ERROR] Onboarding failed for %s: %v\n", req.Wallet, err)
+		log.Printf("[BRIDGE ERROR] Onboarding failed for %s: %v\n", targetWallet, err)
 		http.Error(w, "Bridge delivery failed", http.StatusInternalServerError)
 		return
 	}
 
 	// NEW: Mark wallet as onboarded after successful dispatch
 	l.mutex.Lock()
-	l.onboardedWallets[req.Wallet] = true
+	l.onboardedWallets[targetWallet] = true
 	l.mutex.Unlock()
 
-	l.logAdminAudit("BRIDGE_ONBOARD", req.Wallet, "1 VOI + 1 VBV dispatched")
+	l.logAdminAudit("BRIDGE_ONBOARD", targetWallet, "1 VOI + 1 VBV dispatched")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Voi Starter Pack sent!", "txid": txid})
 	refundVBV = false // Transaction successful

@@ -72,6 +72,11 @@ let wcModal = null;    // WalletConnect Modal State
 let lastPingTime = null;
 let currentLatency = null;
 
+// --- Particle System ---
+let particleCanvas = null;
+let particleCtx = null;
+let particles = [];
+let particleAnimationId = null;
 // --- Asset Symbol Resolution ---
 const assetCache = {
     "40227315": "$VBV" // Pre-seed default $VBV
@@ -252,6 +257,7 @@ window.onload = async () => {
         renderMatchHistory();
         fetchLeaderboard();
         setupCropEvents();
+        initParticleSystem(); // Initialize particle system
 
         updatePayoutUI();
         // Check for soft-reload resume
@@ -581,6 +587,11 @@ async function checkVoiReadiness(address) {
                 }
             }
             showToast(message, "success", 10000);
+        }
+        if (response.status === 503) { // Handle Service Unavailable specifically
+            const errorText = await response.text();
+            showToast(`⚠️ <b>ONBOARDING UNAVAILABLE:</b> ${errorText}`, "warning", 10000);
+            return;
         }
     } catch (err) {
         console.error("[BRIDGE] Onboarding check failed", err);
@@ -1296,6 +1307,33 @@ async function adminResetStats() {
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
+async function adminSimulateTournament() {
+    const size = parseInt(document.getElementById("admin-sim-size").value);
+    const isBuyIn = document.getElementById("admin-sim-buyin").checked;
+    if (isNaN(size) || (size !== 8 && size !== 16)) {
+        showToast("❌ Invalid tournament size (must be 8 or 16)", "error");
+        return;
+    }
+    if (!confirm(`Are you sure you want to simulate a ${size}-player tournament? This will overwrite the current tournament state.`)) {
+        return;
+    }
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-tournament`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ size, is_buy_in: isBuyIn })
+        });
+        if (response.ok) showToast(`🏆 Simulating ${size}-player tournament...`, "success");
+        fetchLastAdminAction();
+    } catch (err) {
+        showToast("❌ Simulation failed", "error");
+    }
+}
+
 let adminLogTicker = null;
 function startAdminLogPolling() {
     if (adminLogTicker) return;
@@ -1491,8 +1529,12 @@ function handleServerMessage(msg) {
 
             // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
             const me = msg.payload.players.find(p => p.id === myClientId);
-            if (me && window.SetAvatar) {
-                window.SetAvatar(me.avatar_url, me.gloat, me.avatar_notice);
+            if (me) {
+                // Fully synchronize player metadata into WASM to ensure real state in syncUI
+                if (window.SyncFullProfile) window.SyncFullProfile(me);
+                if (me.avatar_url && window.SetAvatar) {
+                    window.SetAvatar(me.avatar_url, me.gloat, me.avatar_notice);
+                }
             }
             
             // Sync maintenance status immediately for late joiners
@@ -2746,6 +2788,7 @@ dropZone.ondrop = (e) => {
 // 4. THE RENDER LOOP (The Camera fetching Go State)
 async function syncUI(scope = "all") {
     if (!window.GetGameState) return; // Ensure Go function exists
+    // Partial state sync: only update sections present in the current state snapshot
     const state = window.GetGameState(scope);
     
     // --- Update Dynamic Environment ---
@@ -2879,43 +2922,67 @@ async function syncUI(scope = "all") {
         document.getElementById("challenge-overlay").classList.remove("hidden");
     }
 
-    const faucetEl = document.getElementById("faucet-display");
-    const faucetValue = state.faucet.toFixed(2);
-    
-    if (state.faucet < 50) {
-        faucetEl.innerHTML = `${faucetValue} $VBV <span style="font-size: 0.7em; margin-left: 5px;">[ VAULT LOW ]</span>`;
-        faucetEl.classList.add("faucet-depleted");
-    } else {
-        faucetEl.innerText = faucetValue + " $VBV";
-        faucetEl.classList.remove("faucet-depleted");
+    if (state.faucet !== undefined) {
+        const faucetEl = document.getElementById("faucet-display");
+        const faucetValue = state.faucet.toFixed(2);
+        const currentHTML = faucetEl.innerHTML;
+        let newHTML = "";
+        
+        if (state.faucet < 50) {
+            newHTML = `${faucetValue} $VBV <span style="font-size: 0.7em; margin-left: 5px;">[ VAULT LOW ]</span>`;
+            faucetEl.classList.add("faucet-depleted");
+        } else {
+            newHTML = faucetValue + " $VBV";
+            faucetEl.classList.remove("faucet-depleted");
+        }
+        
+        if (currentHTML !== newHTML) faucetEl.innerHTML = newHTML;
     }
 
-    const rewardsDashboard = document.getElementById("rewards-dashboard");
-    let totalValue = 0;
-    let rewardItems = [];
-    Object.entries(state.rewards || {}).forEach(([id, amt]) => {
-        totalValue += amt;
-        const symbol = getAssetSymbol(id);
-        rewardItems.push(`<span style="color: var(--neon-green)">${amt.toFixed(1)}</span> <small>${symbol}</small>`);
-    });
-    const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
-    const rumorCost = 500; // Matches server-side cost
-    const myJailedCards = state.jailed_cards || {};
-    const myKidnappedCards = state.kidnapped_cards || {};
-    const myHeldHostageCards = state.held_hostage_cards || {};
-    const wantedVal = state.wanted_level || 0;
-    const cunningVal = state.cunning || 0;
-    const jobRole = state.job_role || "";
-    const outlawsInLobby = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
-    const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : '';
-    const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : '';
-    const rumorMillBtn = (playerRewards >= rumorCost) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-green); color: var(--neon-green);" onclick="openRumorMill()">📢 RUMOR MILL</button>` : '';
-    const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : '';
-    const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
+    // --- Update Rewards Dashboard (Economy Scope) ---
+    if (state.rewards !== undefined) {
+        const rewardsDashboard = document.getElementById("rewards-dashboard");
+        if (rewardsDashboard) {
+            let totalValue = 0;
+            let rewardItems = [];
+            Object.entries(state.rewards || {}).forEach(([id, amt]) => {
+                totalValue += amt;
+                const symbol = getAssetSymbol(id);
+                rewardItems.push(`<span style="color: var(--neon-green)">${amt.toFixed(1)}</span> <small>${symbol}</small>`);
+            });
+            const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
+            const rumorCost = 500;
+            const myJailedCards = state.jailed_cards || {};
+            const myKidnappedCards = state.kidnapped_cards || {};
+            const myHeldHostageCards = state.held_hostage_cards || {};
+            const wantedVal = state.wanted_level || 0;
+            const cunningVal = state.cunning || 0;
+            const nurturingVal = state.nurturing || 0; // Get nurturing value
+            const jobRole = state.job_role || "";
+            const outlawsInLobby = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
 
-    rewardsDashboard.innerHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
-        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openTrophyView()">🏆 TROPHIES</button>` +
-        ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : '');
+            const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : '';
+            const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : '';
+            const rumorMillBtn = (playerRewards >= rumorCost) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-green); color: var(--neon-green);" onclick="openRumorMill()">📢 RUMOR MILL</button>` : '';
+            const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : '';
+            const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
+            const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`;
+
+            const newHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
+                ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${cunningVal}</span>` + // Display Cunning
+                ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${nurturingVal}</span>` + // Display Nurturing
+                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openTrophyView()">🏆 TROPHIES (${unlocked.size})</button>` +
+                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + 
+                courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
+                (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + 
+                (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + 
+                (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : '');
+            
+            if (rewardsDashboard.innerHTML !== newHTML) {
+                rewardsDashboard.innerHTML = newHTML;
+            }
+        }
+    }
 
     // --- Update Latency ---
     const latencyEl = document.getElementById("latency-display");
@@ -2994,47 +3061,89 @@ async function syncUI(scope = "all") {
     document.getElementById("turn-display").innerText = turnDisplay;
 
     // --- Render 3x3 Board ---
-    const boardContainer = document.getElementById("board-container");
-    boardContainer.innerHTML = "";
-    state.board.forEach((card, index) => {
-        const prevCard = lastBoardState[index];
-        const isCaptured = card && prevCard && card.owner !== prevCard.owner;
-        const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
+    if (scope === "all" || scope === "combat") {
+        const boardContainer = document.getElementById("board-container");
+        if (boardContainer) {
+            // Initialize grid slots if they don't exist (first render)
+            if (boardContainer.children.length === 0) {
+                for (let i = 0; i < 9; i++) {
+                    const slot = document.createElement("div");
+                    slot.className = "grid-slot";
+                    slot.onclick = () => clickGrid(i);
+                    boardContainer.appendChild(slot);
+                }
+            }
 
-        const slot = document.createElement("div");
-        slot.className = "grid-slot";
-        slot.onclick = () => clickGrid(index);
+            state.board.forEach((card, index) => {
+                const slot = boardContainer.children[index];
+                const prevCard = lastBoardState[index];
+                const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
 
-        // Apply Mood Visuals
-        if (tileMood !== "Neutral") {
-            slot.classList.add(`mood-${tileMood.toLowerCase()}`);
+                // Update Mood Visuals for the slot
+                const moodClass = `mood-${tileMood.toLowerCase()}`;
+                // Remove old mood classes, add new one if not neutral
+                // Resetting className to "grid-slot" first ensures only current mood is applied
+                if (!slot.classList.contains("grid-slot")) { // Avoid unnecessary re-assignment
+                    slot.className = "grid-slot";
+                }
+                if (tileMood !== "Neutral" && !slot.classList.contains(moodClass)) {
+                    slot.classList.add(moodClass);
+                } else if (tileMood === "Neutral" && slot.classList.contains(moodClass)) {
+                    slot.classList.remove(moodClass);
+                }
+
+                // Handle card presence and changes
+                if (card) {
+                    let cardDiv = slot.querySelector(".playing-card");
+                    const isCaptured = card && prevCard && card.owner !== prevCard.owner;
+
+                    if (!cardDiv) {
+                        // Card added to an empty slot
+                        cardDiv = document.createElement("div");
+                        cardDiv.className = "playing-card";
+                        slot.appendChild(cardDiv);
+                    }
+
+                    // Apply flip animation if captured
+                    if (isCaptured) {
+                        cardDiv.classList.add("flip-capture");
+                        // Remove after animation to allow re-triggering
+                        cardDiv.addEventListener('animationend', () => {
+                            cardDiv.classList.remove("flip-capture");
+                        }, { once: true });
+                    }
+
+                    // Update card content and styling
+                    const newCardHTML = renderCardHTML(card);
+                    if (cardDiv.innerHTML !== newCardHTML) { // Only update if content changed
+                        cardDiv.innerHTML = newCardHTML;
+                    }
+                    const newBorderColor = card.owner === 0 ? "var(--neon-cyan)" : "#ff4b4b";
+                    if (cardDiv.style.borderColor !== newBorderColor) { // Only update if color changed
+                        cardDiv.style.borderColor = newBorderColor;
+                    }
+
+                    // Tooltip Interaction (re-attach if cardDiv was new or replaced)
+                    cardDiv.onmouseenter = (e) => {
+                        if (tooltipEl && tooltipEl.style.opacity === "1") return;
+                        showPowerTooltip(e, card, index, state);
+                    };
+                    cardDiv.onmousemove = (e) => movePowerTooltip(e);
+                    cardDiv.onmouseleave = (e) => {
+                        if (e.relatedTarget === tooltipEl) return;
+                        hidePowerTooltip();
+                    };
+
+                } else {
+                    // Slot is empty
+                    const cardDiv = slot.querySelector(".playing-card");
+                    if (cardDiv) {
+                        slot.removeChild(cardDiv);
+                    }
+                }
+            });
         }
-
-        if (card) {
-            const cardDiv = document.createElement("div");
-            cardDiv.className = "playing-card";
-            if (isCaptured) cardDiv.classList.add("flip-capture");
-            
-            cardDiv.innerHTML = renderCardHTML(card);
-            cardDiv.style.borderColor = card.owner === 0 ? "var(--neon-cyan)" : "#ff4b4b"; 
-            
-            // Tooltip Interaction
-            cardDiv.onmouseenter = (e) => {
-                if (tooltipEl && tooltipEl.style.opacity === "1") return;
-                showPowerTooltip(e, card, index, state);
-            };
-            cardDiv.onmousemove = (e) => movePowerTooltip(e);
-            cardDiv.onmouseleave = (e) => {
-                if (e.relatedTarget === tooltipEl) return;
-                hidePowerTooltip();
-            };
-
-            slot.appendChild(cardDiv);
-        } else {
-            slot.innerText = "Slot " + index;
-        }
-        boardContainer.appendChild(slot);
-    });
+    }
 
     // Update local state tracking for next sync
     lastBoardState = JSON.parse(JSON.stringify(state.board));
@@ -3745,16 +3854,22 @@ async function switchPortfolioTab(tab) {
         if (entries.length === 0) {
             html = `<div style="padding: 40px; opacity: 0.5;">No active investments found.</div>`;
         } else {
+            // Batch resolve Envoi names for all portfolio keys (wallets)
+            const walletsToResolve = entries.map(([w]) => w);
+            await Promise.all(walletsToResolve.map(w => resolveEnvoiName(w)));
+
             entries.forEach(([id, amount]) => {
                 if (amount <= 0) return;
-                const p = lastLobbyPlayers.find(pl => pl.id === id);
+                // id is now the persistent wallet address
+                const p = lastLobbyPlayers.find(pl => pl.wallet && pl.wallet.toLowerCase() === id.toLowerCase());
                 const price = p ? ((p.wins * 10) + (p.reputation / 2) + 100) : 100;
                 const marketValue = amount * price;
                 totalMarketValue += marketValue;
+                const displayName = getCachedEnvoiName(id);
                 html += `
                     <div class="player-item" style="padding: 15px;">
                         <div style="text-align: left;">
-                            <b style="color: var(--neon-cyan);">${id}</b>
+                            <b style="color: var(--neon-cyan);">${displayName}</b>
                             <div style="font-size: 0.75em; opacity: 0.6;">Holding: ${amount.toFixed(2)} Shares</div>
                         </div>
                         <div style="text-align: right;">
@@ -4374,13 +4489,17 @@ function renderAvatarGrid(nfts) {
     if (!grid) return;
     grid.innerHTML = "";
     
+    // Filter out banned avatars
     nfts.forEach(nft => {
         let meta = {};
         try { meta = JSON.parse(nft.metadata || "{}"); } catch(e) {}
         const url = meta.image || "";
         if (!url) return;
         
-        const item = document.createElement("div");
+        // Check if this URL is banned
+        const state = window.GetGameState();
+        const isBanned = state.banned_avatars && state.banned_avatars[url];
+        const item = document.createElement("div"); // Create the element regardless
         item.className = "avatar-item";
         item.style.backgroundImage = `url(${url})`;
         item.onclick = () => selectAvatar(url);
@@ -4542,6 +4661,7 @@ function setupCropEvents() {
             const gloat = document.getElementById("gloat-message-input").value.trim();
             localStorage.setItem("vbabes_gloat_msg", gloat);
 
+            // Pass the favorite card ID to the server
             const state = window.GetGameState();
             window.SetAvatar(currentAvatarUrl, gloat, "", state.favorite_card_id || 0);
 
@@ -5025,3 +5145,182 @@ function startRecoveryTimer(expiresAt) {
         timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }, 1000);
 }
+
+// --- Industrial Lease Board Logic ---
+async function openClubLeaseBoard() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "lease-board-overlay";
+    overlay.className = "overlay";
+
+    // Detect priority region from employment
+    const myClub = globalClubs[state.employer_id];
+    const myRegion = myClub ? myClub.region_name : null;
+
+    let html = `
+        <div class="glass-panel" style="width: 700px; text-align: center; border-color: var(--neon-purple);">
+            <h2 style="color: var(--neon-purple); letter-spacing: 2px;">INDUSTRIAL LEASE BOARD</h2>
+            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">
+                Secure high-value tactical assets through the Club rental network.
+                ${myRegion ? `<br><span style="color: var(--neon-cyan);">Priority Access: <b>${myRegion}</b></span>` : ''}
+            </p>
+            <div id="lease-list-container" class="flex-col gap-10" style="max-height: 450px; overflow-y: auto; padding-right: 10px;">
+    `;
+
+    const clubs = Object.values(globalClubs);
+    // Sort: Priority Region first, then Mojo
+    clubs.sort((a, b) => {
+        if (a.region_name === myRegion && b.region_name !== myRegion) return -1;
+        if (b.region_name === myRegion && a.region_name !== myRegion) return 1;
+        return b.club_mojo - a.club_mojo;
+    });
+
+    let found = 0;
+    for (const club of clubs) {
+        if (!club.leases) continue;
+        const available = Object.values(club.leases).filter(l => !l.borrower_wallet);
+        if (available.length === 0) continue;
+
+        html += `
+            <div style="text-align: left; margin-bottom: 5px; margin-top: 15px; border-bottom: 1px solid rgba(155, 81, 224, 0.4);">
+                <small style="color: var(--neon-purple); font-weight: bold; letter-spacing: 1px;">${club.name.toUpperCase()} / ${club.region_name || 'District Sector'}</small>
+            </div>
+        `;
+
+        for (const lease of available) {
+            found++;
+            const lender = getCachedEnvoiName(lease.lender_wallet);
+            html += `
+                <div class="player-item" style="padding: 12px; border-color: var(--glass-border); background: rgba(0,0,0,0.25);">
+                    <div style="text-align: left; flex: 1;">
+                        <b style="color: var(--neon-cyan); font-size: 1.1em;">${lease.card_name}</b>
+                        <div style="font-size: 0.7em; opacity: 0.6;">Lender: ${lender} | Term: ${lease.duration_hours}h</div>
+                    </div>
+                    <div style="text-align: right; display: flex; align-items: center; gap: 15px;">
+                        <div style="color: var(--neon-green); font-weight: bold; font-family: 'Rajdhani', sans-serif;">${lease.price.toFixed(1)} $VBV</div>
+                        <button class="outline" style="min-width: 100px; padding: 8px; border-color: var(--neon-purple); color: var(--neon-purple);" 
+                                onclick="takeLease('${club.id}', '${lease.id}', ${lease.price})">RENT</button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    if (found === 0) {
+        html += `<div style="padding: 60px; opacity: 0.4; font-style: italic;">No tactical assets are currently listed for lease.</div>`;
+    }
+
+    html += `
+            </div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('lease-board-overlay').remove()">DISCONNECT BOARD</button>
+        </div>
+    `;
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+}
+
+async function takeLease(clubId, leaseId, price) {
+    if (!userAddress) return showToast("Connect wallet first", "error");
+    if (!confirm(`Rent this card for ${price} $VBV?\n\nProceeding will commit funds from your victory balance.`)) return;
+    socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } }));
+    document.getElementById("lease-board-overlay")?.remove();
+}
+
+window.openClubLeaseBoard = openClubLeaseBoard;
+window.takeLease = takeLease;
+
+// --- Particle System ---
+function initParticleSystem() {
+    particleCanvas = document.getElementById("particle-canvas");
+    if (!particleCanvas) return;
+
+    particleCtx = particleCanvas.getContext("2d");
+    
+    // Resize canvas to match its parent (battle-board)
+    const battleBoard = document.getElementById("board-container");
+    if (battleBoard) {
+        const rect = battleBoard.getBoundingClientRect();
+        particleCanvas.width = rect.width;
+        particleCanvas.height = rect.height;
+        particleCanvas.style.left = battleBoard.offsetLeft + "px";
+        particleCanvas.style.top = battleBoard.offsetTop + "px";
+    }
+
+    // Start animation loop
+    if (!particleAnimationId) {
+        particleAnimationId = requestAnimationFrame(animateParticles);
+    }
+}
+
+function animateParticles() {
+    if (!particleCtx) return;
+
+    particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+
+        // Update position
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.1; // Gravity
+        p.life--;
+
+        // Fade out
+        p.alpha = p.life / p.initialLife;
+
+        // Draw particle
+        particleCtx.fillStyle = `rgba(${p.color.r}, ${p.color.g}, ${p.color.b}, ${p.alpha})`;
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2);
+        particleCtx.fill();
+
+        if (p.life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+
+    if (particles.length > 0) {
+        particleAnimationId = requestAnimationFrame(animateParticles);
+    } else {
+        particleAnimationId = null; // Stop animation if no particles
+    }
+}
+
+window.triggerCaptureParticles = (gridIndex, owner) => {
+    if (!particleCtx) return;
+
+    const boardContainer = document.getElementById("board-container");
+    const slotSize = boardContainer.offsetWidth / 3; // Assuming 3x3 grid
+    const col = gridIndex % 3;
+    const row = Math.floor(gridIndex / 3);
+
+    const centerX = col * slotSize + slotSize / 2;
+    const centerY = row * slotSize + slotSize / 2;
+
+    let color = { r: 0, g: 242, b: 254 }; // Neon Cyan for P1
+    if (owner === 1) {
+        color = { r: 255, g: 75, b: 75 }; // Error Red for P2
+    }
+
+    for (let i = 0; i < 30; i++) { // 30 particles per capture
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 3 + 1;
+        particles.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: Math.random() * 3 + 1,
+            color: color,
+            life: Math.random() * 60 + 30, // 30-90 frames life
+            initialLife: Math.random() * 60 + 30,
+            alpha: 1
+        });
+    }
+
+    if (!particleAnimationId) {
+        particleAnimationId = requestAnimationFrame(animateParticles);
+    }
+};

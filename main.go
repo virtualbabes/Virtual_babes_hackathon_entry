@@ -107,6 +107,9 @@ type Player struct {
 	SocialRank      string       `json:"social_rank"`      // e.g., "Nobody", "Regular", "Icon"
 	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
 	EmployerClubID  string       `json:"employer_club_id"` // The club currently paying this user
+	Cunning         int          `json:"cunning"`
+	Nurturing       int          `json:"nurturing"`
+	Achievements    []string     `json:"achievements"`
 	// EmployerClubID string             `json:"employer_club_id"` // The club currently paying this user
 	JailedCards      map[int]string      `json:"jailed_cards"`       // CardID -> ClubID (cards currently in jail)
 	KidnappedCards   map[int]string      `json:"kidnapped_cards"`    // CardID -> VictimWallet (cards player has kidnapped)
@@ -230,11 +233,16 @@ func connectWallet(this js.Value, args []js.Value) interface{} {
 		return map[string]interface{}{"status": "error", "message": "No address provided"}
 	}
 	address := args[0].String()
+	
+	Game.mutex.Lock()
 	Game.Players[0].Wallet = address
 	Game.Players[0].ID = address[:6] + "..." + address[len(address)-4:]
-
 	// Transition to Setup Phase for Avatar selection
 	Game.Phase = "Setup"
+	Game.mutex.Unlock()
+
+	// UpdateAmbientMusic and PlaySound use their own internal logic or are safe
+	// but we should ideally ensure Game state is consistent during calls.
 
 	fmt.Printf("[ENGINE] Wallet %s Connected to: %s\n", address, Game.Network)
 	PlaySound("click.mp3") // click.mp3 is lowercase in DIR.md
@@ -243,10 +251,13 @@ func connectWallet(this js.Value, args []js.Value) interface{} {
 }
 
 func disconnectWallet(this js.Value, args []js.Value) interface{} {
+	Game.mutex.Lock()
 	Game.Players[0].Wallet = ""
 	Game.Players[0].ID = "Player 1"
 	Game.IsAdmin = false
 	Game.Players[0].Ready = false
+	Game.mutex.Unlock()
+
 	fmt.Println("[ENGINE] Wallet Disconnected.")
 	PlaySound("click.mp3")
 	UpdateAmbientMusic()
@@ -254,14 +265,17 @@ func disconnectWallet(this js.Value, args []js.Value) interface{} {
 }
 
 func toggleNetwork(this js.Value, args []js.Value) interface{} {
+	Game.mutex.Lock()
 	if Game.Network == "VOI" {
 		Game.Network = "ALGO"
 	} else {
 		Game.Network = "VOI"
 	}
-	fmt.Printf("[ENGINE] Network Switched to: %s\n", Game.Network)
+	network := Game.Network
+	Game.mutex.Unlock()
+	fmt.Printf("[ENGINE] Network Switched to: %s\n", network)
 	PlaySound("click.mp3")
-	return Game.Network
+	return network
 }
 
 // SetAvatar sets the player's profile image and transitions the game to Lobby phase
@@ -514,6 +528,53 @@ func SyncPlayerStats(this js.Value, args []js.Value) interface{} {
 		Game.Players[pIdx].Reputation = rep
 	}
 	Game.mutex.Unlock()
+	return true
+}
+
+// SyncFullProfile ingests a complete player profile from the server to ensure high-fidelity UI rendering.
+func SyncFullProfile(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 { return false }
+	data := args[0]
+
+	Game.mutex.Lock()
+	defer Game.mutex.Unlock()
+
+	p := &Game.Players[0]
+	p.Reputation = data.Get("reputation").Int()
+	p.Mojo = data.Get("mojo").Int()
+	p.SocialRank = data.Get("social_rank").String()
+	p.JobRole = data.Get("job_role").String()
+	p.EmployerClubID = data.Get("employer_id").String()
+	p.WantedLevel = data.Get("wanted_level").Int()
+	p.Cunning = data.Get("cunning").Int()
+	p.Nurturing = data.Get("nurturing").Int()
+	p.RumorCount = data.Get("rumor_count").Int()
+
+	// Sync Jailed Cards map
+	p.JailedCards = make(map[int]string)
+	jsJailed := data.Get("jailed_cards")
+	if jsJailed.Type() == js.TypeObject {
+		keys := js.Global().Get("Object").Call("keys", jsJailed)
+		for i := 0; i < keys.Length(); i++ {
+			k := keys.Index(i).String()
+			id, _ := strconv.Atoi(k)
+			p.JailedCards[id] = jsJailed.Get(k).String()
+		}
+	}
+
+	// Sync Achievements slice
+	p.Achievements = []string{}
+	jsAch := data.Get("achievements")
+	if jsAch.Type() == js.TypeObject && jsAch.Get("length").Truthy() {
+		for i := 0; i < jsAch.Length(); i++ {
+			p.Achievements = append(p.Achievements, jsAch.Index(i).String())
+		}
+	}
+
+	p.KidnappedCards = make(map[int]string) // Reset ephemeral criminal tracking for sync
+	p.HeldHostageCards = make(map[int]string)
+
+	fmt.Printf("[ENGINE] Profile Synergized: %d Achievements, %d REP\n", len(p.Achievements), p.Reputation)
 	return true
 }
 
@@ -1123,12 +1184,22 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 func getEffectivePower(c *Card, sideIdx int, gridIdx int) int {
 	base := c.Power[sideIdx] + c.Artifact
 
-	// Apply Wanted Level Penalty (Must match server calculation)
-	base -= (Game.Players[c.Owner].WantedLevel * 5)
+	player := &Game.Players[c.Owner]
+
+	// Apply Wanted Level Penalty (Mitigated by Cunning)
+	wantedPenalty := (player.WantedLevel * 5)
+	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
+	mitigation := player.Cunning * 2
+	if mitigation > wantedPenalty { mitigation = wantedPenalty }
+	base -= (wantedPenalty - mitigation)
 
 	// Fatigue Penalty: -1 power per point above 50
 	if c.Fatigue > 50 {
-		base -= (c.Fatigue - 50)
+		fatiguePenalty := (c.Fatigue - 50)
+		// Nurturing reduces fatigue impact: 1 power back per Nurturing point
+		reduction := player.Nurturing
+		if reduction > fatiguePenalty { reduction = fatiguePenalty }
+		base -= (fatiguePenalty - reduction)
 	}
 
 	// Loyalty Bonus: +25 power for soul-bonded cards
@@ -1155,6 +1226,18 @@ func getEffectivePower(c *Card, sideIdx int, gridIdx int) int {
 	}
 
 	return base
+}
+
+// triggerCaptureParticlesInternal is the Go-internal call to JS
+func triggerCaptureParticlesInternal(gridIndex int, owner int) {
+	js.Global().Call("triggerCaptureParticles", gridIndex, owner)
+}
+
+// PlayCaptureEffect is the bridge function for js.FuncOf
+func PlayCaptureEffect(this js.Value, args []js.Value) interface{} {
+	if len(args) < 2 { return nil }
+	triggerCaptureParticlesInternal(args[0].Int(), args[1].Int())
+	return nil
 }
 
 // checkCaptures applies the combat logic for a newly placed card
@@ -1286,6 +1369,7 @@ func flipCard(idx int, newOwner int, reason string) bool {
 
 	if Game.Rules["Fallen_penalty"] {
 		c.Artifact -= 20 // Permanent debuff for being captured
+		triggerCaptureParticlesInternal(idx, newOwner) // Trigger particle effect on capture
 	}
 	return true
 }
@@ -1707,8 +1791,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
 		state["cunning"] = Game.Players[0].Cunning
 		state["nurturing"] = Game.Players[0].Nurturing
-		state["jailed_cards"] = Game.Players[0].JailedCards
-		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
+		state["achievements"] = Game.Players[0].Achievements
 	}
 
 	// Combat State
@@ -1982,7 +2065,9 @@ func PlayAmbient(path string) {
 
 func SetAssetBase(this js.Value, args []js.Value) interface{} {
 	if len(args) > 0 {
+		Game.mutex.Lock()
 		Game.AssetBase = args[0].String()
+		Game.mutex.Unlock()
 		fmt.Printf("[ENGINE] Asset Base URL set to: %s\n", Game.AssetBase)
 	}
 	return nil
@@ -1990,7 +2075,9 @@ func SetAssetBase(this js.Value, args []js.Value) interface{} {
 
 func SetApiBase(this js.Value, args []js.Value) interface{} {
 	if len(args) > 0 {
+		Game.mutex.Lock()
 		Game.ApiBase = args[0].String()
+		Game.mutex.Unlock()
 		fmt.Printf("[ENGINE] API Base URL set to: %s\n", Game.ApiBase)
 	}
 	return nil
@@ -1998,6 +2085,10 @@ func SetApiBase(this js.Value, args []js.Value) interface{} {
 
 // resolvePath unifies asset pathing, handling AssetBase and Category folders.
 func (e *Engine) resolvePath(category string, subPath string) string {
+	e.mutex.RLock()
+	base := e.AssetBase
+	e.mutex.RUnlock()
+
 	// category: "Audio", "Images"
 	cleanSub := strings.TrimPrefix(subPath, "Public/Assets/")
 	cleanSub = strings.TrimPrefix(cleanSub, "Assets/")
@@ -2010,7 +2101,7 @@ func (e *Engine) resolvePath(category string, subPath string) string {
 	}
 
 	// Restored case sensitivity: Path must match DIR.md exactly
-	resolved := fmt.Sprintf("%sAssets/%s/%s", e.AssetBase, category, cleanSub)
+	resolved := fmt.Sprintf("%sAssets/%s/%s", base, category, cleanSub)
 	// fmt.Printf("[ENGINE] Path Resolved: %s -> %s\n", subPath, resolved)
 	return resolved
 }
@@ -2071,6 +2162,7 @@ func registerFunctions() {
 	js.Global().Set("SyncOpponentDeck", js.FuncOf(SyncOpponentDeck))
 	js.Global().Set("SyncOpponentProfile", js.FuncOf(SyncOpponentProfile))
 	js.Global().Set("SetPlayerReady", js.FuncOf(SetPlayerReady))
+	js.Global().Set("SyncFullProfile", js.FuncOf(SyncFullProfile))
 	js.Global().Set("SyncPlaystyle", js.FuncOf(SyncPlaystyle))
 	js.Global().Set("SyncOpponentWanted", js.FuncOf(SyncOpponentWanted))
 	js.Global().Set("SyncPortfolio", js.FuncOf(SyncPortfolio))
@@ -2108,6 +2200,7 @@ func registerFunctions() {
 	js.Global().Set("SyncOpponentWanted", js.FuncOf(SyncOpponentWanted))
 	js.Global().Set("ImportARC72Card", js.FuncOf(ImportARC72Card))
 	js.Global().Set("ApplyArtifactToBoard", js.FuncOf(ApplyArtifactToBoard))
+	js.Global().Set("PlayCaptureEffect", js.FuncOf(PlayCaptureEffect))
 }
 
 // GetTournamentArchiveBadge returns a stylized HTML badge based on verification status
@@ -2150,9 +2243,13 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 	tokenID := args[0].Int()
 	networkName := args[1].String() // New argument: network name for the card
 
+	Game.mutex.RLock()
+	apiBase := Game.ApiBase
+	Game.mutex.RUnlock()
+
 	// Make a fetch call to the backend's /api/card-details endpoint
 	go func() {
-		url := fmt.Sprintf("%s/api/card-details?ids=%d&network=%s", Game.ApiBase, tokenID, networkName) // Pass networkName
+		url := fmt.Sprintf("%s/api/card-details?ids=%d&network=%s", apiBase, tokenID, networkName)
 		window := js.Global()
 
 		promise := window.Call("fetch", url)
@@ -2176,39 +2273,17 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 				// Convert JS object to Go struct
 				cardJSON := cardsJS.Index(0)
 				var newCard Card
-
-				// Manually map fields from JS object to Go struct
-				if cardJSON.Get("name").Type() != js.TypeUndefined {
-					newCard.Name = cardJSON.Get("name").String()
-				}
-				if cardJSON.Get("image").Type() != js.TypeUndefined {
-					newCard.Image = cardJSON.Get("image").String()
-				}
+				newCard.ID = cardJSON.Get("id").Int()
+				newCard.Name = cardJSON.Get("name").String()
+				newCard.Image = cardJSON.Get("image").String()
+				newCard.Rarity = cardJSON.Get("rarity").Float()
 
 				// Extract power values with safety checks
-				powerArr := make([]int, 4)
 				jsPower := cardJSON.Get("power")
 				if jsPower.Type() == js.TypeObject && jsPower.Get("length").Int() >= 4 {
 					for i := 0; i < 4; i++ {
-						powerArr[i] = jsPower.Index(i).Int()
+						newCard.Power[i] = jsPower.Index(i).Int()
 					}
-				}
-
-				// Use a temporary map for unmarshaling complex types like Power array
-				jsonBytes, err := json.Marshal(map[string]interface{}{
-					"id":     cardJSON.Get("id").Int(),
-					"name":   newCard.Name,
-					"power":  powerArr,
-					"image":  newCard.Image,
-					"rarity": cardJSON.Get("rarity").Float(),
-				})
-				if err != nil {
-					fmt.Printf("[ENGINE ERROR] Failed to marshal card JSON: %v\n", err)
-					return nil
-				}
-				if err := json.Unmarshal(jsonBytes, &newCard); err != nil {
-					fmt.Printf("[ENGINE ERROR] Failed to unmarshal card into Go struct: %v\n", err)
-					return nil
 				}
 
 				// Set game-state specific defaults

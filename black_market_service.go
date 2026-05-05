@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // handleGetBlackMarket returns liquidated items available for purchase.
 // Gated by Cunning and Wanted Level.
 func (l *Lobby) handleGetBlackMarket(w http.ResponseWriter, r *http.Request) {
-	wallet := r.URL.Query().Get("wallet")
+	wallet := strings.ToLower(r.URL.Query().Get("wallet"))
 
 	l.mutex.RLock()
 	stats, exists := l.leaderboard[wallet]
@@ -37,10 +38,11 @@ func (l *Lobby) handleSellMarketTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	wallet := strings.ToLower(req.Wallet)
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
-	stats, exists := l.leaderboard[req.Wallet]
+	stats, exists := l.leaderboard[wallet]
 	if !exists || stats.MarketTokens < req.Amount {
 		http.Error(w, "Insufficient Market Tokens", http.StatusBadRequest)
 		return
@@ -49,10 +51,11 @@ func (l *Lobby) handleSellMarketTokens(w http.ResponseWriter, r *http.Request) {
 	// Exchange rate: 1 Market Token = 0.8 VBV (Scavenger tax)
 	vbvGainMicro := uint64(float64(req.Amount) * 0.8)
 	stats.MarketTokens -= req.Amount
-	l.rewards[req.Wallet] += vbvGainMicro
-	l.leaderboard[req.Wallet] = stats
+	l.rewards[wallet] += vbvGainMicro
+	l.leaderboard[wallet] = stats
 
-	l.logAdminAudit("TOKEN_LIQUIDATION", req.Wallet, fmt.Sprintf("Sold %d tokens for %.2f $VBV", req.Amount, float64(vbvGainMicro)/1000000.0))
+	l.logAdminAudit("TOKEN_LIQUIDATION", wallet, fmt.Sprintf("Sold %d tokens for %.2f $VBV", req.Amount, float64(vbvGainMicro)/1000000.0))
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "vbv_gained": vbvGainMicro})
 }
@@ -69,6 +72,7 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	wallet := strings.ToLower(req.Wallet)
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -89,14 +93,19 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 	// Scavenger Price: 75% of the original repayment amount
 	scavengePrice := uint64(float64(loan.RepaymentAmount) * 0.75)
 
-	if l.rewards[req.Wallet] < scavengePrice {
+	if l.rewards[wallet] < scavengePrice {
 		http.Error(w, "Insufficient reward balance to scavenge this bundle", http.StatusPaymentRequired)
 		return
 	}
 
 	// Execute scavenge
-	l.rewards[req.Wallet] -= scavengePrice
-	stats := l.leaderboard[req.Wallet]
+	l.rewards[wallet] -= scavengePrice
+	
+	// Recovery: Add scavenge proceeds back to faucet and trigger scaling
+	l.faucetBalance += float64(scavengePrice) / 1000000.0
+	l.applyDynamicScalingLocked() // Prevent deadlock since lock is already held
+
+	stats := l.leaderboard[wallet]
 	if stats.Inventory == nil {
 		stats.Inventory = make(map[string]int)
 	}
@@ -113,10 +122,12 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats.WantedLevel += 5 // Scavenging stolen goods increases infamy
-	l.leaderboard[req.Wallet] = stats
+	stats.Reputation = l.CalculateReputation(stats) // Recalculate after Wanted Level increase
+	l.leaderboard[wallet] = stats
 
 	l.blackMarket = append(l.blackMarket[:idx], l.blackMarket[idx+1:]...)
-	l.logAdminAudit("BLACK_MARKET_BUY", req.Wallet, fmt.Sprintf("Scavenged %s for %.2f $VBV", loan.ID, float64(scavengePrice)/1000000.0))
+	l.logAdminAudit("BLACK_MARKET_BUY", wallet, fmt.Sprintf("Scavenged %s for %.2f $VBV", loan.ID, float64(scavengePrice)/1000000.0))
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Stolen goods acquired. Watch your back."})
 }

@@ -17,21 +17,42 @@ import (
 )
 
 func (l *Lobby) applyDynamicScaling() {
+	// Scaling is based on how full the faucet is relative to its target maximum
 	if l.maxFaucetCapacity <= 0 {
 		return
 	}
 	ratio := l.faucetBalance / l.maxFaucetCapacity
-	if ratio > 1.0 {
-		ratio = 1.0
-	}
-	if ratio < 0.1 {
-		ratio = 0.1
-	}
+	if ratio > 1.0 { ratio = 1.0 }
+	if ratio < 0.1 { ratio = 0.1 }
+
+	// 1. Scale the primary base reward (for internal tracking/legacy logic)
 	l.baseReward = uint64(float64(l.initialBaseReward) * ratio)
-	if _, exists := l.rewards[l.rewardAssetID]; exists {
-		l.rewards[l.rewardAssetID] = l.baseReward
+
+	// 2. Iterate through the entire reward stack and scale based on unscaled initial values
+	for assetID, initialAmt := range l.initialRewards {
+		scaledAmt := uint64(float64(initialAmt) * ratio)
+		l.rewards[assetID] = scaledAmt
 	}
+
+	log.Printf("[ECONOMY] Dynamic Scaling Applied (Ratio: %.2f). Faucet Capacity: %.2f units.\n", ratio, l.faucetBalance)
 }
+
+// saveSeasonMetadataLocked persists the current season state and reward configuration to disk.
+// This function assumes the Lobby mutex is already held.
+func (l *Lobby) saveSeasonMetadataLocked() {
+	data := map[string]interface{}{
+		"start":           l.seasonStart,
+		"num":             l.seasonNumber,
+		"initial_rewards": l.initialRewards,
+	}
+	conf, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Printf("[ECONOMY ERROR] Failed to marshal season metadata: %v\n", err)
+		return
+	}
+	os.WriteFile("season.json", conf, 0644)
+}
+
 func (l *Lobby) sendNoteTx(note string) (string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
@@ -115,6 +136,14 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 				multiplier = 1.5
 			}
 			rep = int(float64(rep) * multiplier)
+		}
+	}
+
+	// 6. Cosmetic Prestige (Faceplates)
+	// High-tier faceplates provide status boosts that manifest as Reputation.
+	if stats.EquippedFaceplate != "" {
+		if fp, exists := FaceplateRegistry[stats.EquippedFaceplate]; exists {
+			rep += (fp.MojoBonus * 10) // 1 Mojo point from cosmetics = 10 Reputation points
 		}
 	}
 

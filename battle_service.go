@@ -23,14 +23,23 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	if c.Owner == 1 {
 		playerID = match.P2ID
 	}
-	wanted := l.leaderboard[l.wallets[playerID]].WantedLevel // Get wanted level from player stats
-	if wanted > 0 {
-		base -= (wanted * 5)
-	}
+	wallet := l.wallets[playerID]
+	stats := l.leaderboard[wallet]
+
+	// Apply Wanted Level Penalty (Mitigated by Cunning)
+	wantedPenalty := (stats.WantedLevel * 5)
+	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
+	mitigation := stats.Cunning * 2
+	if mitigation > wantedPenalty { mitigation = wantedPenalty }
+	base -= (wantedPenalty - mitigation)
 
 	// Fatigue Penalty: -1 power per point above 50
 	if c.Fatigue > 50 {
-		base -= (c.Fatigue - 50)
+		fatiguePenalty := (c.Fatigue - 50)
+		// Nurturing reduces fatigue impact: 1 power back per Nurturing point
+		reduction := stats.Nurturing
+		if reduction > fatiguePenalty { reduction = fatiguePenalty }
+		base -= (fatiguePenalty - reduction)
 	}
 
 	// Loyalty Bonus: +25 flat power for cards with max loyalty

@@ -170,7 +170,7 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Dispatch the reward on-chain
-	txid, bonus, skipped, dispatchErr := l.dispatchReward(req.Recipient, req.Network, history)
+	txid, bonus, skipped, dispatchErr := l.dispatchReward(req.Recipient, req.Claimant, req.Network, history)
 	if dispatchErr != nil {
 		http.Error(w, dispatchErr.Error(), http.StatusInternalServerError)
 		return
@@ -205,11 +205,11 @@ func (l *Lobby) verifyVoiPayoutOptIn(recipient string) error {
 	return nil
 }
 
-func (l *Lobby) dispatchReward(recipient, network string, history MatchHistory) (string, bool, []string, error) {
+func (l *Lobby) dispatchReward(recipient, claimant, network string, history MatchHistory) (string, bool, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	activeRewards := l.rewards
-	stats, hasStats := l.leaderboard[recipient]
+	stats, hasStats := l.leaderboard[claimant] // Reputation bonus applies to the player (claimant)
 	l.mutex.RUnlock()
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
@@ -238,6 +238,20 @@ func (l *Lobby) dispatchReward(recipient, network string, history MatchHistory) 
 			continue
 		}
 		amt := uint64(float64(baseAmt) * multiplier)
+
+		// NEW: Granular Opt-in Verification
+		// Check if the recipient has a balance box/opt-in for this specific asset in the stack.
+		optedIn, _, err := l.checkAssetOptIn("VOI", recipient, appIDStr)
+		if err != nil {
+			log.Printf("[FAUCET] Opt-in check failed for %s on asset %s: %v", recipient, appIDStr, err)
+			skippedAssets = append(skippedAssets, appIDStr)
+			continue
+		}
+		if !optedIn {
+			log.Printf("[FAUCET] Recipient %s not opted-in to asset %s. Skipping to prevent group failure.", recipient, appIDStr)
+			skippedAssets = append(skippedAssets, appIDStr)
+			continue
+		}
 
 		// Check vault's balance for this specific asset
 		boxResponse, err := client.GetApplicationBoxByName(appID, vaultAddrObj[:]).Do(context.Background())

@@ -36,16 +36,19 @@ type GlobalSentiment struct {
 func newLobby() (*Lobby, error) {
 	seasonStart := time.Now()
 	seasonNum := 1
+	var loadedRewards map[string]uint64
 
 	// Load Season Metadata
 	if sData, err := os.ReadFile("season.json"); err == nil {
 		var meta struct {
-			Start time.Time `json:"start"`
-			Num   int       `json:"num"`
+			Start          time.Time         `json:"start"`
+			Num            int               `json:"num"`
+			InitialRewards map[string]uint64 `json:"initial_rewards"`
 		}
 		if json.Unmarshal(sData, &meta) == nil {
 			seasonStart = meta.Start
 			seasonNum = meta.Num
+			loadedRewards = meta.InitialRewards
 		}
 	}
 
@@ -71,12 +74,14 @@ func newLobby() (*Lobby, error) {
 		rumors:               make(map[string]*Rumor),
 		auctions:             make(map[string]*Auction),
 		rewards:              make(map[string]uint64),
+		initialRewards:       make(map[string]uint64),
 		holdingBonuses:       make(map[string][]HoldingBonus),
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
 		broadcast:            make(chan []byte),
 		onboardedWallets:     make(map[string]bool), // Initialize the new map
 		onboardingSemaphore:  make(chan struct{}, 5), // Limit concurrent bridge operations
+		envoiCache:           make(map[string]string),
 		vaultAddress:         os.Getenv("VAULT_ADDRESS"),
 		maxFaucetCapacity:    10000.0,
 		adminFocusNetwork:    "Voi Mainnet",
@@ -91,6 +96,13 @@ func newLobby() (*Lobby, error) {
 
 	l.seasonStart = seasonStart
 	l.seasonNumber = seasonNum
+
+	// Restore unscaled reward targets from disk if they exist
+	if loadedRewards != nil {
+		for k, v := range loadedRewards {
+			l.initialRewards[k] = v
+		}
+	}
 
 	l.loadNetworkConfigs()
 	l.loadRegisteredTxIDs()
@@ -209,12 +221,10 @@ func (l *Lobby) saveNetworkConfigs() {
 	os.WriteFile("networks.json", data, 0644)
 }
 
-// distributeShopRevenue handles payout to club treasuries based on shop turnover.
+// distributeShopRevenueLocked handles payout to club treasuries based on shop turnover.
 // Enforces 5-50% commission for consumable perishables.
-func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, itemID string) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
+// This function assumes the Lobby mutex is already held by the caller.
+func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint64, itemID string) {
 	// Logic heuristic: Identify perishable consumables by ID keywords
 	isPerishable := strings.Contains(itemID, "stim") || strings.Contains(itemID, "catalyst") || strings.Contains(itemID, "pledge")
 
@@ -238,14 +248,22 @@ func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, it
 					rate = 0.50
 				}
 			}
-
 			commission := (float64(amountMicro) / 1000000.0) * rate
 			club.Treasury += commission
 			club.LastActivity = time.Now()
-			log.Printf("[REVENUE] Club %s (%s) earned %.2f $VBV from shop turnover (Item: %s, Rate: %.1f%%)\n",
-				club.Name, club.ID, commission, itemID, rate*100)
+			log.Printf("[REVENUE] Club %s (%s) earned %.2f $VBV from shop turnover (Item: %s, Rate: %.1f%%)\n", club.Name, club.ID, commission, itemID, rate*100)
 		}
 	}
+}
+
+// distributeShopRevenue handles payout to club treasuries based on shop turnover.
+// Enforces 5-50% commission for consumable perishables.
+func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, itemID string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Logic heuristic: Identify perishable consumables by ID keywords
+	l.distributeShopRevenueLocked(territoryID, amountMicro, itemID)
 }
 
 // distributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
@@ -379,6 +397,7 @@ func main() {
 	http.HandleFunc("/api/admin/set-admin-focus-network", lobby.handleSetActiveNetwork)
 	http.HandleFunc("/api/admin/update-power", lobby.handleUpdatePowerScaling)
 	http.HandleFunc("/api/admin/logs", lobby.handleGetAdminLogs)
+	http.HandleFunc("/api/admin/simulate-tournament", lobby.handleSimulateTournament)
 	http.HandleFunc("/api/admin/gloat-ban", lobby.handleGloatBan)
 	http.HandleFunc("/api/admin/avatar-ban", lobby.handleAvatarBan)
 	http.HandleFunc("/api/admin/start-tournament", lobby.handleStartTournament)

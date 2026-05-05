@@ -472,38 +472,121 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 
 	log.Printf("[ORACLE] Reconstructing onboarding history from %s...\n", voiConfig.IndexerURL)
 
-	// Query ARC-200 transfers sent FROM the vault
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
-		voiConfig.IndexerURL, rewardAsset, vaultAddr)
+	// Implementation: Paged scan to ensure completeness
+	limit := 1000
+	offset := 0
+	totalRestored := 0
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	for {
+		url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=%d&offset=%d",
+			voiConfig.IndexerURL, rewardAsset, vaultAddr, limit, offset)
+
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync: %v\n", err)
+			cancel()
+			return // Keep SybilSyncComplete as false
+		}
+
+		var res struct {
+			Transfers []struct {
+				To       string `json:"to"`
+				Metadata string `json:"metadata"`
+			} `json:"transfers"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil || len(res.Transfers) == 0 {
+			resp.Body.Close()
+			cancel()
+			break
+		}
+
+		l.mutex.Lock()
+		for _, tx := range res.Transfers {
+			if strings.HasPrefix(tx.Metadata, "VBT_ONBOARD:TOKEN") {
+				l.onboardedWallets[strings.ToLower(tx.To)] = true
+				totalRestored++
+			}
+		}
+		l.mutex.Unlock()
+
+		resp.Body.Close()
+		cancel()
+		if len(res.Transfers) < limit {
+			break
+		}
+		offset += limit
+	}
+
+	l.mutex.Lock()
+	l.SybilSyncComplete = true
+	l.mutex.Unlock()
+	log.Printf("[ORACLE] Successfully restored %d historical onboarding records.\n", totalRestored)
+}
+
+// ResolveEnvoiName attempts to find a .voi or .algo name for a wallet address.
+// It utilizes a dedicated lock and local cache to minimize indexer traffic and avoid deadlocks.
+func (l *Lobby) ResolveEnvoiName(address string) string {
+	if address == "" || address == "TBD" || address == "BYE" {
+		return address
+	}
+
+	l.envoiMutex.RLock()
+	if name, ok := l.envoiCache[address]; ok {
+		l.envoiMutex.RUnlock()
+		return name
+	}
+	l.envoiMutex.RUnlock()
+
+	// Basic Truncation fallback
+	truncated := address[:6] + "..." + address[len(address)-4:]
+
+	// Optimization: Fetch Indexer URL once under a brief lock to prevent recursive deadlock
+	var baseURL string
+	l.mutex.RLock()
+	if cfg, ok := l.availableNetworks["Voi Mainnet"]; ok {
+		baseURL = cfg.IndexerURL
+	}
+	l.mutex.RUnlock()
+
+	if baseURL == "" {
+		return truncated
+	}
+
+	url := fmt.Sprintf("%s/tokens?owner=%s", baseURL, address)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	var res struct {
-		Transfers []struct {
-			To       string `json:"to"`
-			Metadata string `json:"metadata"`
-		} `json:"transfers"`
-	}
-
-	if json.NewDecoder(resp.Body).Decode(&res) == nil {
-		l.mutex.Lock()
-		for _, tx := range res.Transfers {
-			if strings.HasPrefix(tx.Metadata, "VBT_ONBOARD:TOKEN") {
-				l.onboardedWallets[tx.To] = true
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		var res struct {
+			Tokens []struct {
+				Metadata string `json:"metadata"`
+			} `json:"tokens"`
+		}
+		if json.NewDecoder(resp.Body).Decode(&res) == nil {
+			for _, t := range res.Tokens {
+				var meta struct{ Name string `json:"name"` }
+				if json.Unmarshal([]byte(t.Metadata), &meta) == nil && strings.HasSuffix(strings.ToLower(meta.Name), ".voi") {
+					l.envoiMutex.Lock()
+					l.envoiCache[address] = meta.Name
+					l.envoiMutex.Unlock()
+					return meta.Name
+				}
 			}
 		}
-		l.mutex.Unlock()
-		log.Printf("[ORACLE] Successfully restored %d historical onboarding records.\n", len(l.onboardedWallets))
 	}
+
+	// Negative Cache: Store the truncated fallback to prevent repeated indexer hits for non-.voi wallets
+	l.envoiMutex.Lock()
+	l.envoiCache[address] = truncated
+	l.envoiMutex.Unlock()
+
+	return truncated
 }
 
 func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset string, sender, vaultAddr string) (bool, int64, error) {
@@ -607,7 +690,7 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 		bal := new(big.Int).SetBytes(boxResp.Value[:32]).Uint64()
 		l.mutex.Lock()
 		l.faucetBalance = float64(bal) / 1000000.0
-		l.applyDynamicScaling() // Adjust reward amounts based on new liquidity level
+		l.applyDynamicScalingLocked() // Adjust reward amounts based on new liquidity level
 		l.mutex.Unlock()
 		log.Printf("[ORACLE] Vault $VBV Pool Synced: %.2f units.\n", l.faucetBalance)
 	}

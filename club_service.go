@@ -30,7 +30,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		return
 	}
 
-	// SUCCESS CHANCE CALCULATION
+	// SUCCESS CHANCE CALCULATION: Base 50% chance + (Effective Cunning - Security Level) / 100
 	successChance := 0.50
 	securityLevel := float64(targetClub.Mojo) / 10.0
 
@@ -39,6 +39,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 			securityLevel += 15.0
 		}
 	}
+
+	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
+	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
 	for buffID, itemID := range targetClub.ActiveBuffs {
 		if strings.HasPrefix(buffID, "TRAP_") {
@@ -61,7 +64,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 
 	if roll < successChance {
 		status = "success"
-		if playerStats.Cunning >= 3 && rand.Float64() < 0.25 {
+		if playerStats.GetEffectiveCunning() >= 3 && rand.Float64() < 0.25 {
 			canKidnap = true
 		}
 
@@ -167,6 +170,7 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 		Staff: make(map[string]string), Members: map[string]time.Time{strings.ToLower(wallet): time.Now()},
 		Inventory:       make(map[string]int),
 		ActiveBuffs:     make(map[string]string),
+		Leases:          make(map[string]*Lease),
 		BuffExpirations: make(map[string]time.Time),
 		CreatedAt:       time.Now(), Jail: make(map[int]ServerCard), LastActivity: time.Now(),
 	}
@@ -320,14 +324,27 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 		return
 	}
 
+	// CAPACITY GUARD: Limit total items per club to prevent state bloat (Max 1000 items)
+	const maxClubInventory = 1000
+	currentStock := 0
+	for _, qty := range club.Inventory {
+		currentStock += qty
+	}
+
+	if currentStock+data.Quantity > maxClubInventory {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Restock Failed: Inventory capacity reached (%d/%d)."}`, currentStock, maxClubInventory))})
+		return
+	}
+
+	// Units: Both item.Price and club.Treasury are in base $VBV units.
+	// No micro-unit conversion is needed for internal treasury transfers.
 	totalCost := item.Price * float64(data.Quantity)
 	if club.Treasury < totalCost {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Restock Failed: Insufficient Treasury funds."}`))})
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Restock Failed: Insufficient Treasury funds. Need %.2f $VBV."}`, totalCost))})
 		return
 	}
 
 	club.Treasury -= totalCost
-
 	// Ensure map is initialized even if old data exists
 	if club.Inventory == nil {
 		club.Inventory = make(map[string]int)
@@ -365,11 +382,161 @@ func (l *Lobby) distributeCourthouseFineToClubs(amount float64) {
 		taxPerGovernor := regionalTaxPool / float64(len(governors))
 		for _, govClub := range governors {
 			govClub.Treasury += taxPerGovernor
+			govClub.LastActivity = time.Now() // Revenue counts as activity
 		}
 	}
 
 	sharePerClub := remainingPool / float64(len(l.clubs))
 	for _, club := range l.clubs {
 		club.Treasury += sharePerClub
+		club.LastActivity = time.Now() // Revenue counts as activity
+	}
+}
+
+// handleCreateLease allows a player to put a card up for lease in their club.
+func (l *Lobby) handleCreateLease(env *Envelope) {
+	var data struct {
+		ClubID        string  `json:"club_id"`
+		CardID        int     `json:"card_id"`
+		Price         float64 `json:"price"` // Base VBV
+		DurationHours int     `json:"duration_hours"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+
+	club, exists := l.clubs[data.ClubID]
+	if !exists { return }
+
+	// Verify membership
+	if _, isMember := club.Members[strings.ToLower(wallet)]; !isMember {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Failed: Club membership required."}`)})
+		return
+	}
+
+	stats := l.leaderboard[wallet]
+	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
+	if stats.Inventory[cardKey] <= 0 {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Failed: Card not found in inventory."}`)})
+		return
+	}
+
+	// Escrow: Remove from lender
+	stats.Inventory[cardKey]--
+	l.leaderboard[wallet] = stats
+
+	if club.Leases == nil { club.Leases = make(map[string]*Lease) }
+	leaseID := fmt.Sprintf("LEASE-%d", time.Now().UnixNano())
+	card, _ := l.inventory[data.CardID]
+
+	club.Leases[leaseID] = &Lease{
+		ID: leaseID, LenderWallet: wallet, CardID: data.CardID,
+		CardName: card.Name, Price: data.Price, DurationHours: data.DurationHours,
+		ClubID: data.ClubID,
+	}
+	club.LastActivity = time.Now() // Club is active when a lease is created
+
+	l.logAdminAudit("LEASE_CREATED", wallet, fmt.Sprintf("Club: %s, Card: %d, Price: %.2f", data.ClubID, data.CardID, data.Price))
+	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📜 <b>LEASE ADVERTISED:</b> %s is now available for rent in %s."}`, card.Name, club.Name))})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// handleTakeLease allows a player to rent a card from a club.
+func (l *Lobby) handleTakeLease(env *Envelope) {
+	var data struct {
+		ClubID  string `json:"club_id"`
+		LeaseID string `json:"lease_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil { return }
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	borrowerWallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+
+	club, exists := l.clubs[data.ClubID]
+	if !exists || club.Leases[data.LeaseID] == nil { return }
+
+	lease := club.Leases[data.LeaseID]
+	if lease.Borrower != "" || strings.EqualFold(lease.LenderWallet, borrowerWallet) {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Invalid borrower or already active."}`)})
+		return
+	}
+
+	priceMicro := uint64(lease.Price * 1000000)
+	if l.rewards[borrowerWallet] < priceMicro {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Insufficient funds."}`)})
+		return
+	}
+
+	// Payment distribution: 50% creator, 20% faucet, 20% club, 10% members
+	l.rewards[borrowerWallet] -= priceMicro
+	l.faucetBalance += lease.Price * 0.20
+	club.Treasury += lease.Price * 0.20
+	club.LastActivity = time.Now() // Club is active when a lease is taken
+	l.applyDynamicScaling()
+
+	memberShareTotalMicro := uint64(lease.Price * 0.10 * 1000000)
+	numMembers := uint64(len(club.Members))
+	if numMembers > 0 {
+		perMemberMicro := memberShareTotalMicro / numMembers
+		for m := range club.Members {
+			l.rewards[strings.ToLower(m)] += perMemberMicro
+		}
+
+		// Precision Recovery: Redirect rounding remainder to Club Treasury to ensure no micro-units are lost
+		remainderMicro := memberShareTotalMicro - (perMemberMicro * numMembers)
+		if remainderMicro > 0 {
+			club.Treasury += float64(remainderMicro) / 1000000.0
+		}
+	} else {
+		// Fallback: If no members exist, the entire 10% share defaults to the Club Treasury
+		club.Treasury += lease.Price * 0.10
+	}
+	l.rewards[strings.ToLower(lease.LenderWallet)] += uint64(lease.Price * 0.50 * 1000000)
+
+	// Execute lease
+	lease.Borrower = borrowerWallet
+	lease.ExpiresAt = time.Now().Add(time.Duration(lease.DurationHours) * time.Hour)
+	
+	borrowerStats := l.leaderboard[borrowerWallet]
+	if borrowerStats.Inventory == nil { borrowerStats.Inventory = make(map[string]int) }
+	borrowerStats.Inventory[fmt.Sprintf("CARD-%d", lease.CardID)]++
+	l.leaderboard[borrowerWallet] = borrowerStats
+
+	l.logAdminAudit("LEASE_TAKEN", borrowerWallet, fmt.Sprintf("ID: %s, Price: %.2f", lease.ID, lease.Price))
+	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 <b>LEASE SECURED:</b> You have rented %s."}`, lease.CardName))})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// processLeaseExpirations handles the return of leased cards to their owners.
+func (l *Lobby) processLeaseExpirations() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	now := time.Now()
+	for _, club := range l.clubs {
+		for id, lease := range club.Leases {
+			if lease.Borrower != "" && now.After(lease.ExpiresAt) {
+				bStats := l.leaderboard[lease.Borrower]
+				cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
+				if bStats.Inventory[cardKey] > 0 { bStats.Inventory[cardKey]-- }
+				l.leaderboard[lease.Borrower] = bStats
+
+				lStats := l.leaderboard[lease.LenderWallet]
+				if lStats.Inventory == nil { lStats.Inventory = make(map[string]int) }
+				lStats.Inventory[cardKey]++
+				l.leaderboard[lease.LenderWallet] = lStats
+
+				delete(club.Leases, id)
+				l.logAdminAudit("LEASE_EXPIRED", lease.LenderWallet, fmt.Sprintf("Card %d returned from %s", lease.CardID, lease.Borrower))
+			}
+		}
 	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/algorand/go-algorand-sdk/v2/crypto"
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
@@ -171,6 +173,8 @@ func (l *Lobby) handleAdminAddReward(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mutex.Lock()
 	l.rewards[req.AssetID] = uint64(req.Amount * 1000000)
+	l.initialRewards[req.AssetID] = l.rewards[req.AssetID]
+	l.saveSeasonMetadataLocked() // Ensure persistence
 	l.mutex.Unlock()
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	l.logAdminAudit("ADD_REWARD", fmt.Sprintf("Asset %s", req.AssetID), fmt.Sprintf("Base Amount: %.2f", req.Amount))
@@ -190,6 +194,8 @@ func (l *Lobby) handleAdminRemoveReward(w http.ResponseWriter, r *http.Request) 
 	}
 	l.mutex.Lock()
 	delete(l.rewards, req.AssetID)
+	delete(l.initialRewards, req.AssetID)
+	l.saveSeasonMetadataLocked() // Ensure persistence
 	l.mutex.Unlock()
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	l.logAdminAudit("REMOVE_REWARD", fmt.Sprintf("Asset %s", req.AssetID), "Removed from stack")
@@ -360,26 +366,45 @@ func (l *Lobby) handleAvatarBan(w http.ResponseWriter, r *http.Request) {
 		Hours int    `json:"hours"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.URL == "" {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		http.Error(w, "Invalid request body or missing URL", http.StatusBadRequest)
 		return
 	}
+
+	targetURL := strings.TrimSpace(req.URL)
 	if req.Hours <= 0 {
-		req.Hours = 720
+		req.Hours = 720 // Default 30 days
 	}
+
 	l.mutex.Lock()
-	l.bannedAvatars[req.URL] = time.Now().Add(time.Duration(req.Hours) * time.Hour)
+	expiry := time.Now().Add(time.Duration(req.Hours) * time.Hour)
+	l.bannedAvatars[targetURL] = expiry
+
+	// Immediate Enforcement: Boot anyone currently using this avatar
+	affectedCount := 0
 	for _, client := range l.clients {
-		if client.avatarURL == req.URL {
+		if client.avatarURL == targetURL {
 			client.avatarURL = safeAvatarPool[rand.Intn(len(safeAvatarPool))]
 			client.avatarBanNotice = "Your avatar was restricted by an administrator."
-			l.sendToClient(client.id, Envelope{Type: "admin_notification", FromID: "SERVER", Payload: json.RawMessage(`{"text":"🚨 Active profile image restricted globally."}`)})
+			l.sendToClient(client.id, Envelope{
+				Type:    "admin_notification",
+				FromID:  "SERVER",
+				Payload: json.RawMessage(`{"text":"🚨 <b>MODERATION:</b> Your profile image has been restricted globally."}`),
+			})
+			affectedCount++
 		}
 	}
 	msg := l.getLobbyUpdateMsgLocked()
 	l.mutex.Unlock()
+
 	l.broadcast <- msg
-	l.logAdminAudit("AVATAR_BAN", "URL", req.URL)
-	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success"})
+	l.logAdminAudit("AVATAR_BAN", targetURL, fmt.Sprintf("Duration: %d hours. Affected users: %d", req.Hours, affectedCount))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":         "success",
+		"url":            targetURL,
+		"affected_count": affectedCount,
+	})
 }
 
 func (l *Lobby) handleResetStats(w http.ResponseWriter, r *http.Request) {
@@ -435,7 +460,9 @@ func (l *Lobby) handleUpdateBaseReward(w http.ResponseWriter, r *http.Request) {
 	l.mutex.Lock()
 	l.baseReward = uint64(req.Amount * 1000000)
 	l.initialBaseReward = l.baseReward
+	l.initialRewards[l.rewardAssetID] = l.initialBaseReward
 	l.applyDynamicScaling()
+	l.saveSeasonMetadataLocked() // Ensure persistence
 	l.mutex.Unlock()
 	l.broadcast <- jsonListEnvelope("reward_update", json.RawMessage(fmt.Sprintf(`{"amount": %f}`, req.Amount)))
 	l.logAdminAudit("UPDATE_REWARD", "GLOBAL", fmt.Sprintf("%.2f", req.Amount))
@@ -477,6 +504,9 @@ func (l *Lobby) handleUpdateRewardAsset(w http.ResponseWriter, r *http.Request) 
 	}
 	l.mutex.Lock()
 	l.rewardAssetID = req.AssetID
+	// Migrating the unscaled base value to the new primary asset
+	l.initialRewards[l.rewardAssetID] = l.initialBaseReward
+	l.saveSeasonMetadataLocked() // Ensure persistence
 	l.mutex.Unlock()
 	l.broadcast <- jsonListEnvelope("asset_update", json.RawMessage(fmt.Sprintf(`{"asset_id": "%s"}`, req.AssetID)))
 	l.logAdminAudit("UPDATE_ASSET", "GLOBAL", req.AssetID)
@@ -553,6 +583,7 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(l.tournament)
 }
 
+
 func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 	if !l.checkAdminAuth(w, r) {
 		return
@@ -572,6 +603,29 @@ func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 	l.broadcastTournamentState()
 	l.logAdminAudit("OPEN_REGISTRATION", "GLOBAL", fmt.Sprintf("Buy-in: %.2f", req.BuyIn))
 	json.NewEncoder(w).Encode(l.tournament)
+}
+
+func (l *Lobby) handleSimulateTournament(w http.ResponseWriter, r *http.Request) {
+	if !l.checkAdminAuth(w, r) {
+		return
+	}
+	var req struct {
+		Size    int  `json:"size"`
+		IsBuyIn bool `json:"is_buy_in"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.Size != 8 && req.Size != 16) {
+		http.Error(w, "Invalid size (must be 8 or 16)", http.StatusBadRequest)
+		return
+	}
+
+	go func() {
+		l.simulateTournament(req.Size, req.IsBuyIn)
+		l.logAdminAudit("SIMULATE_TOURNAMENT", "GLOBAL", fmt.Sprintf("Size: %d, Buy-in: %v", req.Size, req.IsBuyIn))
+		l.broadcastToAdmins(fmt.Sprintf("🏆 Tournament simulation (%d players) completed!", req.Size))
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": fmt.Sprintf("Simulating %d-player tournament...", req.Size)})
 }
 
 func (l *Lobby) handleGetAdminLogs(w http.ResponseWriter, r *http.Request) {
@@ -652,18 +706,12 @@ func (l *Lobby) checkAdminAuth(w http.ResponseWriter, r *http.Request) bool {
 		if l.verifyAdminSignature(wallet, nonce, signature) {
 			return true
 		}
+		l.logAdminAudit("AUTH_FAILURE", wallet, "Invalid signature provided for nonce: "+nonce)
 		log.Printf("[SECURITY ALERT] Invalid Admin Signature Attempt from Wallet: %s", wallet)
+	} else {
+		log.Printf("[SECURITY ALERT] Unauthorized Admin Access Attempt (Missing Headers) from IP: %s", r.RemoteAddr)
 	}
 
-	// 2. Try Legacy Key Authentication (Fallback for scripts/tools)
-	adminKey := r.Header.Get("X-Admin-Key")
-	expectedAdminKey := os.Getenv("ADMIN_KEY")
-
-	if expectedAdminKey != "" && subtle.ConstantTimeCompare([]byte(adminKey), []byte(expectedAdminKey)) == 1 {
-		return true
-	}
-
-	log.Printf("[SECURITY ALERT] Unauthorized Admin Access Attempt from IP: %s", r.RemoteAddr)
 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
 	return false
 }
@@ -692,21 +740,43 @@ func (l *Lobby) verifyAdminSignature(wallet, nonce, signatureStr string) bool {
 		return false
 	}
 
-	// 2. Verify the cryptographic signature
-	addr, err := types.DecodeAddress(wallet)
-	if err != nil {
-		return false
-	}
+	// 2. Multi-Chain Verification Logic
+	if strings.HasPrefix(wallet, "0x") {
+		// EVM signature verification (personal_sign)
+		message := fmt.Sprintf("\x19Ethereum Signed Message:\n%dVirtualbabes Arena Admin Auth:%s", 
+			len("Virtualbabes Arena Admin Auth:")+len(nonce), nonce)
+		messageHash := ethcrypto.Keccak256([]byte(message))
 
-	sigBytes, err := base64.StdEncoding.DecodeString(signatureStr)
-	if err != nil {
-		return false
-	}
+		signatureBytes, err := hex.DecodeString(strings.TrimPrefix(signatureStr, "0x"))
+		if err != nil || len(signatureBytes) != 65 {
+			return false
+		}
+		if signatureBytes[64] == 27 || signatureBytes[64] == 28 {
+			signatureBytes[64] -= 27
+		}
 
-	// Hardened message string to prevent signature confusion/replay attacks
-	// Includes the ARC-14 standard prefix required for algo_signMessage verification
-	msg := fmt.Sprintf("Algorand Signed Message:\nVirtualbabes Arena Admin Auth:%s", nonce)
-	return crypto.VerifyBytes(addr[:], []byte(msg), sigBytes)
+		pubKey, err := ethcrypto.SigToPub(messageHash, signatureBytes)
+		if err != nil {
+			return false
+		}
+		recoveredAddress := ethcrypto.PubkeyToAddress(*pubKey).Hex()
+		return strings.EqualFold(recoveredAddress, wallet)
+	} else {
+		// AVM signature verification (ARC-14)
+		addr, err := types.DecodeAddress(wallet)
+		if err != nil {
+			return false
+		}
+
+		sigBytes, err := base64.StdEncoding.DecodeString(signatureStr)
+		if err != nil {
+			return false
+		}
+
+		// Hardened message string to prevent signature confusion/replay attacks
+		msg := fmt.Sprintf("Algorand Signed Message:\nVirtualbabes Arena Admin Auth:%s", nonce)
+		return crypto.VerifyBytes(addr[:], []byte(msg), sigBytes)
+	}
 }
 
 // isAdminWallet checks if a given wallet address is present in the ADMIN_WALLETS env variable.

@@ -104,6 +104,7 @@ func (l *Lobby) run() {
 			l.processLoans()               // New: Check for defaulted loans
 			l.processMojoDecay()           // New: Penalize stagnant clubs
 			l.processInsuranceRecovery()   // New: Check for expired kidnappings
+			l.processLeaseExpirations()    // New: Check for expired card leases
 			go l.observeGlobalSentiments() // Pillar 3: Aggregate meta trends
 		case <-matchmakingTicker.C:
 			l.processMatchmaking()
@@ -146,15 +147,22 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		json.Unmarshal(env.Payload, &data)
 		l.mutex.Lock()
 		l.wallets[env.FromID] = data.Wallet
-		l.ensurePlayerStatsMapsInitialized(data.Wallet) // Ensure maps are initialized
+		l.ensurePlayerStatsMapsInitialized(data.Wallet)
 
 		// Trigger NPC Welcome Commentary if they have a distinct style
 		go l.generateNPCCommentary(env.FromID, "LOBBY_ENTRY")
 
 		stats := l.leaderboard[data.Wallet]
-		l.mutex.Unlock()
+		portfolioPayload, _ := json.Marshal(stats.Portfolio) // Marshal portfolio while lock is held
+
+		// Check admin status and update client while lock is held
+		if l.isAdminWallet(data.Wallet) {
+			if c, ok := l.clients[env.FromID]; ok {
+				c.isAdmin = true
+			}
+		}
+		l.mutex.Unlock() // Release lock after all state modifications
 		go l.syncStatsFromBlockchain(env.FromID, data.Wallet)
-		portfolioPayload, _ := json.Marshal(stats.Portfolio)
 		l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
 		if l.isAdminWallet(data.Wallet) {
 			if c, ok := l.clients[env.FromID]; ok {
@@ -169,9 +177,19 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 		// Also allow setting a favorite card ID here
 		json.Unmarshal(env.Payload, &data)
+
+		targetURL := strings.TrimSpace(data.URL)
 		l.mutex.Lock()
+
+		// Enforce Avatar Ban: check against active bans
+		if expiry, banned := l.bannedAvatars[targetURL]; banned && time.Now().Before(expiry) {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", FromID: "SERVER", Payload: json.RawMessage(`{"text":"❌ <b>AVATAR BLOCKED:</b> This image is restricted by Arena security."}`)})
+			return
+		}
+
 		if c, ok := l.clients[env.FromID]; ok {
-			c.avatarURL = data.URL
+			c.avatarURL = targetURL
 			c.gloat = data.Gloat
 		}
 		msg := l.getLobbyUpdateMsgLocked()
@@ -191,8 +209,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				ClientID: env.FromID, Wallet: wallet, Reputation: l.leaderboard[wallet].Reputation,
 				DeckRating: data.DeckRating, JoinedAt: time.Now(), // FavoriteCardID is not part of QueueEntry
 			})
-			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck}
-			l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, data.Deck, false) // Update playstyle based on deck
+			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck} // Initialize match state
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false) // Update playstyle based on deck
 
 			go l.generateNPCCommentary(env.FromID, "MATCH_START")
 		}
@@ -312,14 +330,26 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 		var move MoveData
-		json.Unmarshal(env.Payload, &move)
+		if err := json.Unmarshal(env.Payload, &move); err != nil {
+			return
+		}
 		pIdx := 0
 		if env.FromID == match.P2ID {
 			pIdx = 1
 		}
 		l.mutex.Lock()
 		if move.GridIndex >= 0 && move.GridIndex < 9 {
-			match.Board[move.GridIndex] = &ServerCard{ID: move.CardID, Owner: pIdx, Power: move.Power}
+			// SECURE SYNC: Fetch card from server authoritative inventory to prevent power spoofing
+			card, exists := l.inventory[move.CardID]
+			if !exists {
+				card = ServerCard{ID: move.CardID, Power: move.Power}
+			}
+
+			match.Board[move.GridIndex] = &ServerCard{
+				ID: move.CardID, Owner: pIdx, Power: card.Power,
+				Artifact: card.Artifact, Fatigue: card.Fatigue,
+				Loyalty: card.Loyalty, Mood: card.Mood,
+			}
 			// serverCheckCaptures now returns captured cards, append them to match state
 			_, flips := l.serverCheckCaptures(match, move.GridIndex, pIdx)
 			match.CapturedCards = append(match.CapturedCards, flips...)
@@ -412,7 +442,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				}
 				notificationText = fmt.Sprintf("💖 %s's Loyalty increased by 10!", targetCard.Name)
 			}
-			l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false)                                      // Update playstyle on item use
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false)                                      // Update playstyle on item use
 			l.inventory[data.TargetCardID] = targetCard                                                                     // Update global card cache
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
 			l.persistentCardCache[data.TargetCardID] = targetCard                                                           // Update persistent cache
@@ -424,7 +454,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			}
 			// Delegate to battle_service for in-match effects
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
-			l.updatePlayerPlaystyleTendencies(wallet, true, [2]int{}, []int{}, false)                                       // Update playstyle on item use in match
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, false)                                       // Update playstyle on item use in match
 			l.applyItemEffectToMatch(match, env.FromID, data.ItemID, data.TargetCardID, data.TargetGridIndex)
 			notificationText = fmt.Sprintf("✨ %s activated!", item.Name)
 
@@ -521,7 +551,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.mutex.Unlock()
 
 		// 3. Process Revenue (Existing logic)
-		l.distributeShopRevenue(data.TerritoryID, data.Price, data.ItemID)
+		l.distributeShopRevenueLocked(data.TerritoryID, data.Price, data.ItemID)
 
 		l.logAdminAudit("ITEM_PURCHASE", wallet, fmt.Sprintf("Item: %s, Territory: %s", data.ItemID, data.TerritoryID))
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>PURCHASE COMPLETE:</b> %s added to inventory."}`, data.ItemID))})
@@ -595,425 +625,24 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		// Global sync to refresh treasury and stock levels in UI
 		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	// DELEGATED TO market_service.go
 	case "trade_shares":
-		var data struct {
-			EntityID string  `json:"entity_id"`
-			Action   string  `json:"action"` // "buy" or "sell"
-			Amount   float64 `json:"amount"` // Number of shares
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			return
-		}
-
-		l.mutex.Lock()
-		wallet, ok := l.wallets[env.FromID]
-		if !ok {
-			l.mutex.Unlock()
-			return
-		}
-
-		// Pricing Logic: Map EntityID (ClientID) to their current stats
-		targetWallet, targetExists := l.wallets[data.EntityID]
-		if !targetExists {
-			l.mutex.Unlock()
-			return
-		}
-		targetStats := l.leaderboard[targetWallet]
-
-		// Standard Formula: (Wins * 10) + (Reputation / 2) + 100
-		basePrice := float64((targetStats.Wins * 10) + (targetStats.Reputation / 2) + 100)
-
-		// Apply active rumor effects
-		for _, rumor := range l.rumors {
-			if rumor.TargetWallet == targetWallet && time.Now().Before(rumor.ExpiresAt) {
-				basePrice *= rumor.Strength
-			}
-		}
-		pricePerShare := basePrice
-		totalValueMicro := uint64(data.Amount * pricePerShare * 1000000)
-
-		stats := l.leaderboard[wallet]
-		if stats.Portfolio == nil {
-			stats.Portfolio = make(map[string]float64)
-		}
-
-		if data.Action == "buy" {
-			if l.rewards[wallet] >= totalValueMicro {
-				l.rewards[wallet] -= totalValueMicro
-				stats.Portfolio[data.EntityID] += data.Amount
-				l.logAdminAudit("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s at %.2f $VBV", data.Amount, data.EntityID, pricePerShare))
-			} else {
-				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance for trade."}`)})
-			}
-		} else if data.Action == "sell" {
-			if stats.Portfolio[data.EntityID] >= data.Amount {
-				stats.Portfolio[data.EntityID] -= data.Amount
-				l.rewards[wallet] += totalValueMicro
-				l.logAdminAudit("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s at %.2f $VBV", data.Amount, data.EntityID, pricePerShare))
-			} else {
-				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares in portfolio."}`)})
-			}
-		}
-
-		l.leaderboard[wallet] = stats
-		l.mutex.Unlock()
-
-		// Push updated portfolio back to client
-		portfolioPayload, _ := json.Marshal(stats.Portfolio)
-		l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
-
-		// Trigger global sync to update UI balances and portfolios
-		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		l.handleTradeShares(env)
+	// DELEGATED TO club_service.go
 	case "heist":
-		var data struct {
-			TargetClubID string `json:"target_club_id"`
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			return
-		}
-		l.mutex.Lock()
-		defer l.mutex.Unlock()
-
-		wallet, ok := l.wallets[env.FromID]
-		if !ok {
-			return
-		}
-
-		playerStats := l.leaderboard[wallet]
-		targetClub, exists := l.clubs[data.TargetClubID]
-		if !exists {
-			return
-		}
-
-		// SUCCESS CHANCE CALCULATION: Proxy legacy real-estate security using Club Mojo
-		// Base 50% chance + (Player Cunning - Territory Security) / 100
-		successChance := 0.50
-		securityLevel := float64(targetClub.Mojo) / 10.0
-
-		// Employment Layer: Security staff significantly increase heist difficulty
-		for _, role := range targetClub.Staff {
-			if role == "Security" {
-				securityLevel += 15.0 // Flat boost per security guard
-			}
-		}
-
-		// NEW: Apply active trap modifiers
-		for buffID, itemID := range targetClub.ActiveBuffs {
-			if strings.HasPrefix(buffID, "TRAP_") { // Only consider active traps
-				if item, exists := GlobalShopRegistry[itemID]; exists {
-					successChance += item.HeistSuccessModifier // Modifiers are negative for traps
-					log.Printf("[HEIST] Trap '%s' (%s) applied. Success chance modified by %.2f. Current: %.2f\n", item.Name, itemID, item.HeistSuccessModifier, successChance)
-				}
-			}
-		}
-
-		// Clamp Success Chance between 5% and 95%
-		if successChance < 0.05 {
-			successChance = 0.05
-		}
-		if successChance > 0.95 {
-			successChance = 0.95
-		}
-
-		roll := rand.Float64()
-		var status string
-		canKidnap := false
-
-		if roll < successChance {
-			status = "success"
-
-			// Pillar 3-A: Kidnap Gambit Eligibility
-			if playerStats.Cunning >= 3 && rand.Float64() < 0.25 {
-				canKidnap = true
-			}
-
-			loot := targetClub.Treasury * 0.10 // Steal 10% of Club Treasury
-			if loot > 500 {
-				loot = 500
-			} // Cap loot for economy stability
-			playerStats.Playstyle.RiskTolerance += 0.05 // Increase risk tolerance on successful heist
-			playerStats.HeistAttempts++
-			targetClub.Treasury -= loot
-			targetClub.LastActivity = time.Now()
-			playerStats.WantedLevel += 5
-			playerStats.Cunning += 1
-
-			go l.unlockAchievement(wallet, "FIRST_HEIST")
-		} else {
-			status = "failure"
-			playerStats.WantedLevel += 15               // Higher infamy for getting caught
-			playerStats.WantedLevel += 15               // Higher infamy for getting caught
-			playerStats.Playstyle.RiskTolerance += 0.10 // Increase risk tolerance on failed heist
-			playerStats.HeistAttempts++
-
-			// GUARD DOG EFFECT: Check if the target club has a Bio-Guard Dog active
-			hasGuardDog := false
-			for _, trapItemID := range targetClub.ActiveBuffs {
-				if trapItemID == "guard_dog" {
-					hasGuardDog = true
-					break
-				}
-			}
-
-			if hasGuardDog {
-				rarestCard, found := l.findRarestCardInInventory(wallet)
-				if found {
-					// Transfer card to Club Jail
-					if targetClub.Jail == nil {
-						targetClub.Jail = make(map[int]ServerCard)
-					}
-					targetClub.Jail[rarestCard.ID] = rarestCard
-
-					// Remove from heister's inventory and record jailing
-					delete(playerStats.Inventory, fmt.Sprintf("CARD-%d", rarestCard.ID))
-					if playerStats.JailedCards == nil {
-						playerStats.JailedCards = make(map[int]string)
-					}
-					playerStats.JailedCards[rarestCard.ID] = targetClub.ID
-
-					log.Printf("[HEIST] Guard Dog caught %s! Rarest card %s jailed in Club %s\n", wallet, rarestCard.Name, targetClub.Name)
-					l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>GUARD DOG BUST:</b> You were caught by a Bio-Guard Dog! Your rarest card (%s) has been jailed by %s."}`, rarestCard.Name, targetClub.Name))})
-				}
-			}
-		}
-
-		l.leaderboard[wallet] = playerStats
-		l.logAdminAudit("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s", data.TargetClubID, status))
-
-		response, _ := json.Marshal(map[string]interface{}{
-			"status":          status,
-			"wanted_level":    playerStats.WantedLevel,
-			"cunning":         playerStats.Cunning,
-			"playstyle":       playerStats.Playstyle,
-			"heist_attempts":  playerStats.HeistAttempts,
-			"kidnap_eligible": canKidnap,
-			"target_club_id":  data.TargetClubID,
-		})
-		l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
+		l.handleHeist(env)
+	// DELEGATED TO club_service.go
 	case "create_club":
-		var data struct {
-			Name        string `json:"name"`
-			Type        string `json:"type"`
-			TerritoryID string `json:"territory_id"`
-			TxID        string `json:"txid"`
-			Network     string `json:"network"`
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			return
-		}
-
-		l.mutex.RLock()
-		wallet, ok := l.wallets[env.FromID]
-		vaultAddr := l.vaultAddress
-		voiConfig := l.availableNetworks["Voi Mainnet"]
-		l.mutex.RUnlock()
-
-		if !ok {
-			return
-		}
-
-		// Verify the 5000 $VBV "Fortune" Burn
-		assetID := voiConfig.AssetID
-		if data.Network == "ALGO" {
-			assetID = l.avoiAssetID
-		}
-
-		verified, _, err := l.verifyBuyInTransaction(data.Network, data.TxID, 5000*1000000, assetID, wallet, vaultAddr)
-		if err != nil || !verified {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Club Foundry Error: Payment verification failed."}`)})
-			return
-		}
-
-		l.mutex.Lock()
-		clubID := fmt.Sprintf("CLUB-%d", time.Now().Unix())
-		newClub := &Club{
-			ID:           clubID,
-			Name:         data.Name,
-			OwnerWallet:  wallet,
-			Type:         data.Type,
-			Territories:  []string{data.TerritoryID},
-			Commission:   0.05,
-			Staff:        make(map[string]string),
-			Members:      map[string]time.Time{strings.ToLower(wallet): time.Now()},
-			CreatedAt:    time.Now(),
-			Jail:         make(map[int]ServerCard), // Initialize Jail
-			LastActivity: time.Now(),
-		}
-		newClub.Staff[strings.ToLower(wallet)] = "CEO" // Owner defaults to CEO
-		l.clubs[clubID] = newClub
-		l.mutex.Unlock()
-
-		l.logAdminAudit("CLUB_CREATED", wallet, fmt.Sprintf("Name: %s, ID: %s", data.Name, clubID))
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🏛️ Club '%s' successfully founded!"}`, data.Name))})
+		l.handleCreateClub(env)
+	// DELEGATED TO club_service.go
 	case "join_club":
-		var data struct {
-			ClubID  string `json:"club_id"`
-			TxID    string `json:"txid"`
-			Network string `json:"network"`
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			return
-		}
-
-		l.mutex.RLock()
-		wallet, ok := l.wallets[env.FromID]
-		vaultAddr := l.vaultAddress
-		voiConfig := l.availableNetworks["Voi Mainnet"]
-		l.mutex.RUnlock()
-
-		if !ok {
-			return
-		}
-
-		// Verify the 500 $VBV Join Fee (500,000,000 micro-units)
-		assetID := voiConfig.AssetID
-		verifyNet := "Voi"
-		if data.Network == "ALGO" {
-			assetID = l.avoiAssetID
-			verifyNet = "Algorand"
-		}
-
-		verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, 500*1000000, assetID, wallet, vaultAddr)
-		if err != nil || !verified {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Club Entry Error: Payment verification failed."}`)})
-			return
-		}
-
-		l.mutex.Lock()
-		if club, exists := l.clubs[data.ClubID]; exists {
-			if club.Members == nil {
-				club.Members = make(map[string]time.Time)
-			}
-			club.Members[strings.ToLower(wallet)] = time.Now()
-			club.Treasury += 250.0 // 50% of fee to Club Treasury
-			club.LastActivity = time.Now()
-			l.mutex.Unlock()
-			l.logAdminAudit("CLUB_JOIN", wallet, fmt.Sprintf("Club: %s", data.ClubID))
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 Welcome to %s!"}`, club.Name))})
-			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
-		} else {
-			l.mutex.Unlock()
-		}
+		l.handleJoinClub(env)
+	// DELEGATED TO employment_service.go
 	case "hire_player":
-		var data struct {
-			ClubID   string `json:"club_id"`
-			TargetID string `json:"target_id"`
-			Role     string `json:"role"` // Manager, Security, Clerk
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			return
-		}
-
-		l.mutex.Lock()
-		defer l.mutex.Unlock()
-
-		ownerWallet, ok := l.wallets[env.FromID]
-		if !ok {
-			return
-		}
-
-		club, exists := l.clubs[data.ClubID]
-		if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Unauthorized or Club not found."}`)})
-			return
-		}
-
-		targetWallet, targetConnected := l.wallets[data.TargetID]
-		if !targetConnected {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Player not found in lobby."}`)})
-			return
-		}
-
-		// Update target player stats (Employment Record)
-		stats := l.leaderboard[targetWallet]
-		stats.JobRole = data.Role
-		stats.EmployerClubID = data.ClubID
-		l.leaderboard[targetWallet] = stats
-
-		// Update club staffing map
-		if club.Staff == nil {
-			club.Staff = make(map[string]string)
-		}
-		club.Staff[strings.ToLower(targetWallet)] = data.Role
-		l.clubs[data.ClubID] = club
-
-		l.logAdminAudit("PLAYER_HIRED", targetWallet, fmt.Sprintf("Club: %s (%s), Role: %s", club.Name, club.ID, data.Role))
-
-		// Notify the employee of their new position
-		notification, _ := json.Marshal(map[string]string{
-			"text": fmt.Sprintf("💼 <b>JOB ASSIGNMENT:</b> You are now the %s for %s!", data.Role, club.Name),
-		})
-		l.sendToClient(data.TargetID, Envelope{Type: "admin_notification", Payload: notification})
-
-		// Trigger global sync to update UI roles and badges
-		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		l.handleHirePlayer(env)
+	// DELEGATED TO club_service.go
 	case "purchase_territory":
-		var data struct {
-			ClubID      string `json:"club_id"`
-			TerritoryID string `json:"territory_id"`
-			TxID        string `json:"txid"`
-			Network     string `json:"network"`
-		}
-		if err := json.Unmarshal(env.Payload, &data); err != nil {
-			log.Printf("[TERRITORY] Invalid purchase_territory payload from %s: %v\n", env.FromID, err)
-			return
-		}
-
-		l.mutex.Lock()
-		defer l.mutex.Unlock()
-
-		ownerWallet, ok := l.wallets[env.FromID]
-		if !ok {
-			log.Printf("[TERRITORY] Purchase failed: Sender %s not connected.\n", env.FromID)
-			return
-		}
-
-		club, exists := l.clubs[data.ClubID]
-		if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Unauthorized or Club not found."}`)})
-			log.Printf("[TERRITORY] Purchase failed for %s: Unauthorized or Club %s not found.\n", ownerWallet, data.ClubID)
-			return
-		}
-
-		// Check if territory is already owned by any club
-		for _, existingClub := range l.clubs {
-			for _, t := range existingClub.Territories {
-				if t == data.TerritoryID {
-					l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: District already claimed."}`)})
-					log.Printf("[TERRITORY] Purchase failed for %s: Territory %s already claimed.\n", ownerWallet, data.TerritoryID)
-					return
-				}
-			}
-		}
-
-		// Verify the 2500 $VBV payment
-		purchaseCost := 2500.0
-		voiConfig := l.availableNetworks["Voi Mainnet"]
-		assetID := voiConfig.AssetID
-		verifyNet := "Voi"
-		if data.Network == "ALGO" {
-			assetID = l.avoiAssetID
-			verifyNet = "Algorand"
-		}
-
-		verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*1000000), assetID, ownerWallet, l.vaultAddress)
-		if err != nil || !verified {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Payment verification failed."}`)})
-			log.Printf("[TERRITORY] Payment verification failed for %s. Error: %v\n", ownerWallet, err)
-			return
-		}
-
-		// Add territory to club
-		club.Territories = append(club.Territories, data.TerritoryID)
-		l.clubs[data.ClubID] = club
-		club.LastActivity = time.Now()
-
-		l.logAdminAudit("TERRITORY_PURCHASED", ownerWallet, fmt.Sprintf("Club: %s (%s), Territory: %s", club.Name, club.ID, data.TerritoryID))
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🗺️ Club '%s' has acquired %s!"}`, club.Name, data.TerritoryID))})
-
-		// Trigger rank refresh and global sync
-		go l.refreshRegionalRoles() // Check for new Governor status
-		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		l.handlePurchaseTerritory(env)
 	case "kidnap_request":
 		l.handleKidnapRequest(env)
 	case "pay_ransom":
@@ -1022,6 +651,56 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.handleReleaseHostage(env)
 	case "spread_rumor":
 		l.handleSpreadRumor(env)
+	case "create_lease":
+		l.handleCreateLease(env)
+	case "take_lease":
+		l.handleTakeLease(env)
+	case "equip_cosmetic":
+		var data struct {
+			FaceplateID string `json:"faceplate_id"`
+		}
+		if err := json.Unmarshal(env.Payload, &data); err != nil {
+			return
+		}
+		l.mutex.Lock()
+		wallet, ok := l.wallets[env.FromID]
+		if !ok {
+			l.mutex.Unlock()
+			return
+		}
+		stats := l.leaderboard[wallet]
+		var success bool
+		var notification string
+		var auditAction string
+		if data.FaceplateID == "" {
+			stats.EquippedFaceplate = ""
+			stats.Reputation = l.CalculateReputation(stats) // CalculateReputation is safe to call with lock held
+			l.leaderboard[wallet] = stats
+			success = true
+			notification = "🎭 Cosmetic unequipped."
+			auditAction = "COSMETIC_UNEQUIPPED"
+		} else {
+			if _, exists := FaceplateRegistry[data.FaceplateID]; !exists {
+				notification = "❌ Equip Failed: Unknown cosmetic ID."
+			} else if stats.Inventory == nil || stats.Inventory[data.FaceplateID] <= 0 {
+				notification = "❌ Equip Failed: You do not own this cosmetic."
+			} else {
+				stats.EquippedFaceplate = data.FaceplateID
+				stats.Reputation = l.CalculateReputation(stats) // CalculateReputation is safe to call with lock held
+				l.leaderboard[wallet] = stats
+				success = true
+				notification = fmt.Sprintf("🎭 <b>COSMETIC EQUIPPED:</b> You are now wearing %s.", data.FaceplateID)
+				auditAction = "COSMETIC_EQUIPPED"
+			}
+		}
+		l.mutex.Unlock()
+		if success {
+			l.logAdminAudit(auditAction, wallet, fmt.Sprintf("ID: %s", data.FaceplateID))
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"%s"}`, notification))})
+	default:
+		log.Printf("[LOBBY] Unhandled message type: %s from %s\n", env.Type, env.FromID)
 	}
 }
 
@@ -1054,6 +733,9 @@ func (l *Lobby) checkRegionalStatus(clubID string) bool {
 	return false
 }
 
+// cleanupNonces performs periodic maintenance on ephemeral server state.
+// [AUDIT]: Pruning matchHistory is isolated from the 'matches' map.
+// Active spectating sessions rely on 'matches', while 'matchHistory' is only used for reward verification.
 func (l *Lobby) cleanupNonces() {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -1143,20 +825,24 @@ func (l *Lobby) handleBroadcast(message []byte) {
 
 func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	type playerInfo struct {
-		ID               string         `json:"id"`
-		IsAdmin          bool           `json:"is_admin"`
-		AvatarURL        string         `json:"avatar_url"`
-		Gloat            string         `json:"gloat"`
-		AvatarNotice     string         `json:"avatar_notice"`
-		BanExpires       time.Time      `json:"ban_expires"`
-		HasMardonBadge   bool           `json:"has_mardon_badge"`
-		Wins             int            `json:"wins"`
-		Reputation       int            `json:"reputation"`
-		JailedCards      map[int]string `json:"jailed_cards"`       // Added for UI display
-		SocialRank       string         `json:"social_rank"`        // Added for UI display
-		KidnappedCards   map[int]string `json:"kidnapped_cards"`    // Added for UI display
-		HeldHostageCards map[int]string `json:"held_hostage_cards"` // Added for UI display
-		Achievements     []string       `json:"achievements"`       // Added for UI display
+		ID                string         `json:"id"`
+		IsAdmin           bool           `json:"is_admin"`
+		AvatarURL         string         `json:"avatar_url"`
+		Gloat             string         `json:"gloat"`
+		AvatarNotice      string         `json:"avatar_notice"`
+		BanExpires        time.Time      `json:"ban_expires"`
+		HasMardonBadge    bool           `json:"has_mardon_badge"`
+		Wins              int            `json:"wins"`
+		Reputation        int            `json:"reputation"`
+		WantedLevel       int            `json:"wanted_level"`
+		Cunning           int            `json:"cunning"`
+		Nurturing         int            `json:"nurturing"`
+		JailedCards       map[int]string `json:"jailed_cards"`       // Added for UI display
+		SocialRank        string         `json:"social_rank"`        // Added for UI display
+		EquippedFaceplate string         `json:"equipped_faceplate"` // For UI rendering
+		KidnappedCards    map[int]string `json:"kidnapped_cards"`    // Added for UI display
+		HeldHostageCards  map[int]string `json:"held_hostage_cards"` 
+		Achievements      []string       `json:"achievements"`       // Added for UI display
 		// JobRole and EmployerID are already present in the playerInfo struct
 		RumorCount int    `json:"rumor_count"` // Added for UI display
 		JobRole    string `json:"job_role"`    // Manager, Security, Clerk
@@ -1166,34 +852,41 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	for _, client := range l.clients {
 		hasMardon := false
 		var banExpires time.Time
-		wins, reputation := 0, 0
+		wins, reputation, wanted, cunning, nurturing := 0, 0, 0, 0, 0
 		var jailedCards map[int]string
-		// kidnappedCards and heldHostageCards not currently used; TODO: implement criminal tracking in lobby display
+		var equippedFaceplate string
 		var socialRank string
 		var achievements []string
 		var jobRole string
 		var employerID string
+		var rumorCount int
 		if wallet, ok := l.wallets[client.id]; ok {
 			if stats, exists := l.leaderboard[wallet]; exists {
 				banExpires = stats.BanExpires
 				wins = stats.Wins
 				reputation = stats.Reputation
+				wanted = stats.WantedLevel
+				cunning = stats.Cunning
+				nurturing = stats.Nurturing
 				jailedCards = stats.JailedCards
+				equippedFaceplate = stats.EquippedFaceplate
 				socialRank = stats.SocialRank
-				achievements = stats.Achievements
 				jobRole = stats.JobRole
 				employerID = stats.EmployerClubID
 				achievements = stats.Achievements
 				if stats.Wins >= 50 && stats.DisconnectStreak == 0 {
 					hasMardon = true
 				}
+				rumorCount = stats.RumorCount
 			}
 		}
 		players = append(players, playerInfo{
 			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
-			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation,
-			JailedCards: jailedCards, SocialRank: socialRank, Achievements: achievements,
+			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation, 
+			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing,
+			JailedCards: jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
+			Achievements: achievements, RumorCount: rumorCount,
 			JobRole: jobRole, EmployerID: employerID,
 		})
 	}
@@ -1209,6 +902,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		AvailableNetworks map[string]NetworkConfig `json:"available_networks"`
 		Rumors            map[string]*Rumor        `json:"rumors"` // Added for UI display
 		AdminFocusNetwork string                   `json:"admin_focus_network"`
+		BannedAvatars     map[string]time.Time     `json:"banned_avatars"`
 	}{
 		Players: players, MaintenanceActive: l.maintenanceMode,
 		Clubs:   l.clubs,
@@ -1216,6 +910,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		ActiveMatchCount: len(l.matches) / 2, Tournament: l.tournament,
 		AvailableNetworks: l.availableNetworks, AdminFocusNetwork: l.adminFocusNetwork,
 		Rumors: l.rumors,
+		BannedAvatars:     l.bannedAvatars,
 	}
 
 	payload, _ := json.Marshal(update)
@@ -1542,6 +1237,11 @@ func (l *Lobby) addOrUpdateLinkedWallet(primaryAVM, linkedAddr, linkedChain stri
 func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, inMatchContext, scores, deck, isBountyMatch)
+}
+
+// updatePlayerPlaystyleTendenciesLocked is the internal version that assumes the mutex is already held.
+func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool) {
 
 	stats, exists := l.leaderboard[wallet]
 	if !exists {
@@ -1657,6 +1357,89 @@ func (l *Lobby) processPlaystyleDecay() {
 	}
 }
 
+// simulateTournament orchestrates a full tournament simulation, including bracket generation and match results.
+func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	log.Printf("[SIMULATION] Starting %d-player tournament simulation (Buy-in: %v)...\n", size, isBuyIn)
+
+	// 1. Generate mock participants
+	participants := make([]string, size)
+	for i := 0; i < size; i++ {
+		mockWallet := fmt.Sprintf("SIM_PLAYER_%d_%d", i, time.Now().UnixNano()%10000)
+		participants[i] = mockWallet
+		// Ensure mock players have basic stats to avoid nil pointer issues in leaderboard lookups
+		l.leaderboard[mockWallet] = PlayerStats{
+			Reputation: rand.Intn(1000),
+			Wins:       rand.Intn(50),
+			Inventory:  make(map[string]int),
+			Playstyle: PlaystyleTendencies{
+				PreferredRules:     make(map[string]float64),
+				PreferredCardMoods: make(map[string]float64),
+				PreferredItems:     make(map[string]float64),
+			},
+		}
+		// Simulate registration to trigger kickback logic (if isBuyIn)
+		if isBuyIn {
+			l.paidParticipants = append(l.paidParticipants, mockWallet)
+			l.faucetBalance += (50.0 / 2.0) // Simulate half buy-in to pot
+			l.tournamentPotBonus += (50.0 / 2.0)
+			l.distributeTournamentKickback(mockWallet, uint64(50*1000000), time.Now())
+		}
+	}
+
+	// 2. Initialize tournament state (similar to handleStartTournament)
+	matches := []TournamentMatch{}
+	seedMap := map[int][]int{
+		8:  {0, 7, 3, 4, 1, 6, 2, 5},
+		16: {0, 15, 7, 8, 4, 11, 3, 12, 1, 14, 6, 9, 5, 10, 2, 13},
+	}[size]
+
+	if seedMap == nil {
+		log.Printf("[SIMULATION ERROR] Invalid tournament size: %d\n", size)
+		return
+	}
+
+	for i := 0; i < len(seedMap); i += 2 {
+		matches = append(matches, TournamentMatch{
+			ID: fmt.Sprintf("R1-M%d", (i/2)+1), P1: participants[seedMap[i]], P2: participants[seedMap[i+1]], Round: 1,
+		})
+	}
+
+	l.tournament = TournamentState{
+		Active:       true,
+		Participants: participants,
+		Matches:      matches,
+		CurrentRound: 1,
+		Pot:          float64(size) * 50.0, // Assuming 50 VBV buy-in for simulation
+		BuyInAmount:  50.0,
+		IsBuyInMode:  isBuyIn,
+		OpenTime:     time.Now().Add(-1 * time.Hour), // Set in the past for registration
+	}
+
+	// 3. Simulate rounds until a winner is determined
+	for l.tournament.Active && len(l.tournament.Matches) > 0 {
+		currentRoundMatches := []TournamentMatch{}
+		for _, m := range l.tournament.Matches {
+			if m.Round == l.tournament.CurrentRound && m.Winner == "" {
+				currentRoundMatches = append(currentRoundMatches, m)
+			}
+		}
+		if len(currentRoundMatches) == 0 { break } // No more matches in this round
+
+		for _, m := range currentRoundMatches {
+			winner := m.P1
+			if rand.Intn(2) == 1 { winner = m.P2 } // Randomly pick winner
+			l.processTournamentResult(m.ID, winner) // This will advance rounds and finalize
+		}
+		// Small delay to simulate time passing between rounds
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	log.Printf("[SIMULATION] Tournament simulation complete. Winner: %s\n", l.tournament.Winner)
+}
+
 // getClubByTerritoryID returns the club that owns the given territory, or nil if none.
 func (l *Lobby) getClubByTerritoryID(territoryID string) *Club {
 	for _, club := range l.clubs {
@@ -1710,6 +1493,7 @@ func (l *Lobby) processMojoDecay() {
 
 	now := time.Now()
 	stagnationThreshold := 48 * time.Hour
+	decayOccurred := false
 
 	for _, club := range l.clubs {
 		if club.Mojo <= 0 {
@@ -1722,10 +1506,16 @@ func (l *Lobby) processMojoDecay() {
 			if club.Mojo < 0 {
 				club.Mojo = 0
 			}
+			decayOccurred = true
 
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
 			// We don't update LastActivity here, so it continues to decay every tick until activity occurs.
 		}
+	}
+
+	if decayOccurred {
+		// Trigger global sync so UI reflects the Mojo loss
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	}
 }
 
@@ -1777,9 +1567,8 @@ func (l *Lobby) archiveSeason() {
 	l.seasonStart = time.Now()
 	l.leaderboard = make(map[string]PlayerStats) // Clear HoF
 
-	// Persist new config
-	conf, _ := json.Marshal(map[string]interface{}{"start": l.seasonStart, "num": l.seasonNumber})
-	os.WriteFile("season.json", conf, 0644)
+	// Persist new config while preserving initialRewards
+	l.saveSeasonMetadataLocked()
 }
 
 // ensurePlayerStatsMapsInitialized ensures that all map fields in PlayerStats are initialized.

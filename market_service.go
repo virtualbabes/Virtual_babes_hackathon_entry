@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"log"
+	"strings"
 	"time"
 )
 
 // handleTradeShares allows players to trade equity in entities.
 func (l *Lobby) handleTradeShares(env *Envelope) {
 	var data struct {
-		EntityID string  `json:"entity_id"`
+		EntityID string  `json:"entity_id"` // This can be ClientID or Wallet Address
 		Action   string  `json:"action"`
 		Amount   float64 `json:"amount"`
 	}
@@ -22,18 +24,28 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	wallet, ok := l.wallets[env.FromID]
 	if !ok { return }
 
+	// Resolve target wallet: check active session map first, then fallback to direct address
 	targetWallet, targetExists := l.wallets[data.EntityID]
-	if !targetExists { return }
+	if !targetExists {
+		if strings.HasPrefix(data.EntityID, "voi") || strings.HasPrefix(data.EntityID, "0x") {
+			targetWallet = data.EntityID
+			targetExists = true
+		} else {
+			return
+		}
+	}
+	targetWallet = strings.ToLower(targetWallet)
 	targetStats := l.leaderboard[targetWallet]
 
-	basePrice := float64((targetStats.Wins * 10) + (targetStats.Reputation / 2) + 100)
+	basePrice := float64((targetStats.Wins * 10) + (float64(targetStats.Reputation) / 2.0) + 100.0)
 	for _, rumor := range l.rumors {
 		if rumor.TargetWallet == targetWallet && time.Now().Before(rumor.ExpiresAt) {
 			basePrice *= rumor.Strength
 		}
 	}
 	pricePerShare := basePrice
-	totalValueMicro := uint64(data.Amount * pricePerShare * 1000000)
+	totalValueMicro := uint64(math.Round(data.Amount * pricePerShare * 1000000.0))
+	totalValueBase := float64(totalValueMicro) / 1000000.0
 
 	stats := l.leaderboard[wallet]
 	if stats.Portfolio == nil { stats.Portfolio = make(map[string]float64) }
@@ -41,15 +53,31 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	if data.Action == "buy" {
 		if l.rewards[wallet] >= totalValueMicro {
 			l.rewards[wallet] -= totalValueMicro
-			stats.Portfolio[data.EntityID] += data.Amount
+			stats.Portfolio[targetWallet] += data.Amount
+			
+			// Industrial Loop: Investment returns to Faucet
+			l.faucetBalance += totalValueBase
+			l.applyDynamicScaling()
+			l.logAdminAudit("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s", data.Amount, targetWallet))
 		} else {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance."}`)})
 			return
 		}
 	} else if data.Action == "sell" {
-		if stats.Portfolio[data.EntityID] >= data.Amount {
-			stats.Portfolio[data.EntityID] -= data.Amount
+		if stats.Portfolio[targetWallet] >= data.Amount {
+			// Check Faucet Liquidity for payout
+			if l.faucetBalance < totalValueBase {
+				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Illiquid: Payout exceeds Arena capacity."}`)})
+				return
+			}
+
+			stats.Portfolio[targetWallet] -= data.Amount
 			l.rewards[wallet] += totalValueMicro
+
+			// Industrial Loop: Payout from Faucet
+			l.faucetBalance -= totalValueBase
+			l.applyDynamicScaling()
+			l.logAdminAudit("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
 		} else {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})
 			return

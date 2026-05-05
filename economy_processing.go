@@ -36,8 +36,8 @@ func (l *Lobby) processLoans() {
 				})
 			}
 
-			// Update playstyle on loan default
-			l.updatePlayerPlaystyleTendencies(borrowerWallet, false, [2]int{}, []int{}, false)
+			// Update playstyle on loan default (Internal call to avoid deadlock)
+			l.updatePlayerPlaystyleTendenciesLocked(borrowerWallet, false, [2]int{}, []int{}, false)
 			l.logAdminAudit("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
 
 			// Add the defaulted loan to the black market
@@ -59,19 +59,33 @@ func (l *Lobby) processAuctions() {
 				commissionMicro := uint64(float64(a.CurrentBid) * 0.10)
 				payoutMicro := a.CurrentBid - commissionMicro
 
-				// Settle $VBV rewards
-				// Deduct bid from highest bidder
+				// 2. Settle $VBV rewards (deduct bid from highest bidder, pay seller)
 				if l.rewards[a.HighestBidder] >= a.CurrentBid { // Ensure bidder still has funds
+					// 1. Add commission to faucet balance (Only on successful settlement!)
+					l.faucetBalance += float64(commissionMicro) / 1000000.0
+
 					l.rewards[a.HighestBidder] -= a.CurrentBid
 					l.rewards[a.SellerWallet] += payoutMicro
 
-					// Industrial Loop: commission to controlling Club
-					l.distributeShopRevenue(a.TerritoryID, commissionMicro, "AUCTION_FEE")
+					// Update club activity if commission was added to its treasury
+					if club := l.getClubByTerritoryID(a.TerritoryID); club != nil { // RLock is fine here
+						// This assumes commission is added to club treasury, which it is not currently in this function.
+						// However, if it were, this is where club.LastActivity should be updated.
+						// For now, the commission goes to the faucet.
+						// If a future change directs commission to club, this line should be uncommented:
+						// club.LastActivity = time.Now()
+					}
+
+					// 3. Apply dynamic scaling due to faucet balance change
+					l.applyDynamicScalingLocked() // Call the locked version
 
 					// Deliver items
 					stats := l.leaderboard[a.HighestBidder]
 					if stats.Inventory == nil {
 						stats.Inventory = make(map[string]int)
+					}
+					if a.Bundle.CardID != 0 {
+						stats.Inventory[fmt.Sprintf("CARD-%d", a.Bundle.CardID)]++
 					}
 					if a.Bundle.WeaponID != "" {
 						stats.Inventory[a.Bundle.WeaponID]++
@@ -88,6 +102,9 @@ func (l *Lobby) processAuctions() {
 					// Bidder no longer has funds, return item to seller
 					log.Printf("[AUCTION] Bidder %s for auction %s has insufficient funds. Returning item to seller %s.\n", a.HighestBidder, a.ID, a.SellerWallet)
 					stats := l.leaderboard[a.SellerWallet]
+					if a.Bundle.CardID != 0 {
+						stats.Inventory[fmt.Sprintf("CARD-%d", a.Bundle.CardID)]++
+					}
 					if a.Bundle.WeaponID != "" {
 						stats.Inventory[a.Bundle.WeaponID]++
 					}
@@ -101,6 +118,9 @@ func (l *Lobby) processAuctions() {
 			} else {
 				// No bids: return items to seller
 				stats := l.leaderboard[a.SellerWallet]
+				if a.Bundle.CardID != 0 {
+					stats.Inventory[fmt.Sprintf("CARD-%d", a.Bundle.CardID)]++
+				}
 				if a.Bundle.WeaponID != "" {
 					stats.Inventory[a.Bundle.WeaponID]++
 				}

@@ -14,8 +14,6 @@ import (
 // handleGetLoans returns all active loans or loans specific to a player.
 func (l *Lobby) handleGetLoans(w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
-	defer l.mutex.RUnlock()
-
 	var loans []*Loan
 	borrowerWallet := r.URL.Query().Get("wallet")
 
@@ -24,6 +22,15 @@ func (l *Lobby) handleGetLoans(w http.ResponseWriter, r *http.Request) {
 			loans = append(loans, loan)
 		}
 	}
+	l.mutex.RUnlock()
+
+	// Lazy Resolution outside the global lock to prevent display latency and deadlocks.
+	for _, loan := range loans {
+		if loan.BorrowerName == "" {
+			loan.BorrowerName = l.ResolveEnvoiName(loan.BorrowerWallet)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(loans)
 }
@@ -48,8 +55,15 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	borrowerName := l.ResolveEnvoiName(req.Wallet)
+
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	if l.faucetBalance < req.LoanAmount { // Check if faucet has enough to fund the loan
+		http.Error(w, "Faucet has insufficient funds for this loan", http.StatusServiceUnavailable)
+		return
+	}
 
 	// Nonce verification
 	nonceData, nonceExists := l.nonces[req.ClientID]
@@ -97,6 +111,7 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 	loanID := fmt.Sprintf("LOAN-%d", time.Now().UnixNano())
 	l.loans[loanID] = &Loan{
 		ID:               loanID,
+		BorrowerName:     borrowerName,
 		BorrowerWallet:   req.Wallet,
 		CollateralBundle: req.CollateralBundle,
 		LoanAmount:       loanAmountMicro,
@@ -154,6 +169,9 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add the full repayment amount (principal + interest) to the faucet balance
+	l.faucetBalance += float64(loan.RepaymentAmount) / 1000000.0
+	l.applyDynamicScaling() // Recalculate rewards based on new faucet balance
 	// Fulfillment
 	stats := l.leaderboard[req.Wallet]
 	if stats.Inventory == nil {
@@ -171,6 +189,7 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 	l.leaderboard[req.Wallet] = stats
 
 	delete(l.loans, req.LoanID)
+	// No need to update BorrowerName here, as the loan is being deleted.
 
 	l.logAdminAudit("LOAN_REPAID", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f", loan.ID, float64(loan.RepaymentAmount)/1000000.0))
 	w.Header().Set("Content-Type", "application/json")

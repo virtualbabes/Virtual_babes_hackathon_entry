@@ -52,8 +52,56 @@ type Club struct {
 	ActiveBuffs     map[string]string    `json:"active_buffs"`
 	BuffExpirations map[string]time.Time `json:"buff_expirations"` // Key -> Expiration Timestamp
 	Members         map[string]time.Time `json:"members"`          // Wallet -> Join Timestamp
+	Leases          map[string]*Lease    `json:"leases"`           // LeaseID -> Lease (cards available for rent)
 	Mojo            int                  `json:"club_mojo"`        // Unlocks higher tier items
 	Jail            map[int]ServerCard   `json:"jail"`             // CardID -> ServerCard (captured cards)
+
+// Lease represents a card available for temporary use within a club.
+type Lease struct {
+	ID            string    `json:"id"`
+	LenderWallet  string    `json:"lender_wallet"`
+	CardID        int       `json:"card_id"`
+	CardName      string    `json:"card_name"`
+	Price         float64   `json:"price"` // Base units of $VBV
+	DurationHours int       `json:"duration_hours"`
+	ExpiresAt     time.Time `json:"expires_at,omitempty"` // Set once taken
+	Borrower      string    `json:"borrower_wallet,omitempty"`
+	ClubID        string    `json:"club_id"`
+}
+
+// FaceplateStats defines the RPG modifiers provided by cosmetic items.
+type FaceplateStats struct {
+	MojoBonus    int
+	CunningBonus int
+}
+
+// FaceplateRegistry maps legacy cosmetic IDs to functional social simulation bonuses.
+var FaceplateRegistry = map[string]FaceplateStats{
+	"faceplate_neon_vibe":   {MojoBonus: 15, CunningBonus: 5},
+	"faceplate_shadow":      {MojoBonus: 5, CunningBonus: 20},
+	"faceplate_governor":    {MojoBonus: 50, CunningBonus: 10},
+	"faceplate_placeholder": {MojoBonus: 0, CunningBonus: 0},
+}
+
+// GetEffectiveCunning returns base cunning plus cosmetic bonuses.
+func (p PlayerStats) GetEffectiveCunning() int {
+	if p.EquippedFaceplate != "" {
+		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
+			return p.Cunning + fp.CunningBonus
+		}
+	}
+	return p.Cunning
+}
+
+// GetEffectiveMojo returns base mojo plus cosmetic bonuses.
+func (p PlayerStats) GetEffectiveMojo() int {
+	if p.EquippedFaceplate != "" {
+		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
+			return p.Mojo + fp.MojoBonus
+		}
+	}
+	return p.Mojo
+}
 	LastActivity    time.Time            `json:"last_activity"`    // For Mojo decay tracking
 	CreatedAt       time.Time            `json:"created_at"`
 }
@@ -249,9 +297,11 @@ type CardBundle struct {
 type Auction struct {
 	ID            string     `json:"id"`
 	SellerWallet  string     `json:"seller_wallet"`
+	SellerName    string     `json:"seller_name"` // Pre-resolved Envoi name
 	Bundle        CardBundle `json:"bundle"`
 	CurrentBid    uint64     `json:"current_bid"` // Micro-units of $VBV
 	HighestBidder string     `json:"highest_bidder"`
+	HighestBidderName string `json:"highest_bidder_name"` // Pre-resolved Envoi name
 	EndsAt        time.Time  `json:"ends_at"`
 	TerritoryID   string     `json:"territory_id"` // For commission distribution
 }
@@ -260,6 +310,7 @@ type Auction struct {
 type Loan struct {
 	ID               string     `json:"id"`
 	BorrowerWallet   string     `json:"borrower_wallet"`
+	BorrowerName     string     `json:"borrower_name"` // Pre-resolved Envoi name
 	CollateralBundle CardBundle `json:"collateral_bundle"`
 	LoanAmount       uint64     `json:"loan_amount"`      // Micro-units of $VBV
 	RepaymentAmount  uint64     `json:"repayment_amount"` // LoanAmount + Interest
@@ -373,6 +424,7 @@ type Lobby struct {
 	vaultAddress         string
 	faucetBalance        float64
 	rewards              map[string]uint64
+	initialRewards       map[string]uint64 // Unscaled base values for all assets in the reward stack
 	holdingBonuses       map[string][]HoldingBonus
 	initialBaseReward    uint64
 	seasonStart          time.Time
@@ -395,5 +447,8 @@ type Lobby struct {
 	broadcast            chan []byte
 	onboardedWallets     map[string]bool // Tracks wallets that have received an onboarding pack
 	onboardingSemaphore  chan struct{}
+	envoiCache           map[string]string // Wallet -> Envoi Name Cache
+	envoiMutex           sync.RWMutex      // Dedicated lock for name resolution
+	SybilSyncComplete    bool // Indicates historical claim state is fully restored
 	mutex                sync.RWMutex
 }

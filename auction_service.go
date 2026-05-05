@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/v2/encoding/msgpack"
@@ -13,11 +14,25 @@ import (
 // handleGetAuctions returns all active listings in the Art Gallery.
 func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
-	defer l.mutex.RUnlock()
 	var list []*Auction
 	for _, a := range l.auctions {
 		list = append(list, a)
 	}
+	l.mutex.RUnlock()
+
+	// Lazy Resolution outside the global lock to prevent display latency and deadlocks.
+	// Proactive resolution is still performed during creation and bidding.
+	for _, a := range list {
+		// If the name is missing, attempt resolution. 
+		// ResolveEnvoiName uses its own internal cache to avoid redundant indexer hits.
+		if a.SellerName == "" {
+			a.SellerName = l.ResolveEnvoiName(a.SellerWallet)
+		}
+		if a.HighestBidder != "" && a.HighestBidderName == "" {
+			a.HighestBidderName = l.ResolveEnvoiName(a.HighestBidder)
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
 }
@@ -37,6 +52,8 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sellerName := l.ResolveEnvoiName(req.Wallet)
+
 	l.mutex.RLock()
 	nonceData, nonceExists := l.nonces[req.ClientID]
 	l.mutex.RUnlock()
@@ -55,6 +72,13 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 	defer l.mutex.Unlock()
 
 	stats := l.leaderboard[req.Wallet]
+	if req.Bundle.CardID != 0 {
+		cardKey := fmt.Sprintf("CARD-%d", req.Bundle.CardID)
+		if stats.Inventory[cardKey] <= 0 {
+			http.Error(w, "Card not in inventory", http.StatusBadRequest)
+			return
+		}
+	}
 	if req.Bundle.WeaponID != "" && stats.Inventory[req.Bundle.WeaponID] <= 0 {
 		http.Error(w, "Weapon not in inventory", http.StatusBadRequest)
 		return
@@ -65,6 +89,9 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Escrow items
+	if req.Bundle.CardID != 0 {
+		stats.Inventory[fmt.Sprintf("CARD-%d", req.Bundle.CardID)]--
+	}
 	if req.Bundle.WeaponID != "" {
 		stats.Inventory[req.Bundle.WeaponID]--
 	}
@@ -77,6 +104,7 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 	l.auctions[auctionID] = &Auction{
 		ID:           auctionID,
 		SellerWallet: req.Wallet,
+		SellerName:   sellerName,
 		Bundle:       req.Bundle,
 		CurrentBid:   uint64(req.StartPrice * 1000000),
 		EndsAt:       time.Now().Add(time.Duration(req.Duration) * time.Hour),
@@ -120,6 +148,11 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Store previous highest bidder and their bid for refund
+	previousHighestBidder := auction.HighestBidder
+	previousHighestBid := auction.CurrentBid
+	bidderName := l.ResolveEnvoiName(req.Bidder)
+
 	nonceData, ok := l.nonces[req.ClientID]
 	if !ok || time.Since(nonceData.CreatedAt) > 5*time.Minute {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -131,9 +164,31 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Deduct new bid from current bidder
+	l.rewards[req.Bidder] -= req.Amount
+
+	// 2. Refund previous highest bidder (if any)
+	if previousHighestBidder != "" {
+		l.rewards[previousHighestBidder] += previousHighestBid
+		// Notify previous bidder of refund
+		l.sendToClient(l.getClientIDFromWallet(previousHighestBidder), Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>AUCTION REFUND:</b> Your bid of %.2f $VBV for auction %s has been refunded."}`, float64(previousHighestBid)/1000000.0, req.AuctionID)),
+		})
+	}
+
 	auction.CurrentBid = req.Amount
 	auction.HighestBidder = req.Bidder
-	l.logAdminAudit("AUCTION_BID", req.Bidder, fmt.Sprintf("Auction: %s, Amount: %.2f", req.AuctionID, float64(req.Amount)/1000000.0))
+	auction.HighestBidderName = bidderName
+
+	// 3. Update Faucet Balance and apply dynamic scaling (as funds move through the system)
+	// This assumes bids are held by the faucet during the auction.
+	// If bids are held by the auction contract, this would be different.
+	// For now, we simulate the funds moving into and out of the general reward pool.
+	l.faucetBalance += float64(req.Amount-previousHighestBid) / 1000000.0
+	l.applyDynamicScaling()
+
+	l.logAdminAudit("AUCTION_BID", req.Bidder, fmt.Sprintf("Auction: %s, Amount: %.2f, Previous Bidder: %s, Refunded: %.2f", req.AuctionID, float64(req.Amount)/1000000.0, previousHighestBidder, float64(previousHighestBid)/1000000.0))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Bid successfully placed."})

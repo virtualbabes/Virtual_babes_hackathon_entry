@@ -55,6 +55,7 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 	}
 	club.Staff[targetWallet] = data.Role
 	l.clubs[data.ClubID] = club
+	club.LastActivity = time.Now() // Club is active when staff changes
 
 	l.logAdminAudit("PLAYER_HIRED", targetWallet, fmt.Sprintf("Club: %s (%s), Role: %s", club.Name, club.ID, data.Role))
 
