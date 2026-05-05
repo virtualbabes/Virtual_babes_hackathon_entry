@@ -1,7 +1,9 @@
 # NFT Seduction Tasks
 
 ## Critical Launch Readiness
+- [x] Hardened Card Visuals: `renderCardHTML` now displays Mood, Artifacts, Fatigue, and Loyalty.
 - [x] Resolved profile synergy: Achievement, Mojo, and Jailed Card state now flows through Go WASM to UI.
+- [x] Audit `updateDynamicArenaFloor` function for correct background texture selection.
 - [x] Audit `processInsuranceRecovery` to ensure recovered cards are returned to victim's inventory.
 - [x] Audit `handleTournamentRegister` to ensure `distributeTournamentKickback` uses accurate `registrationTime`.
 - [x] Review the `handleKidnapRequest` function in `handlers_criminality.go` to ensure that the selection logic for the target card (favorite vs. rarest) is robust and handles edge cases where no cards are found.

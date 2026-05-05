@@ -249,6 +249,12 @@ window.onload = async () => {
             const base = CONFIG.ASSET_URL;
             document.documentElement.style.setProperty('--bg-arena-floor', `url(${base}Assets/Textures/arena_floor.png)`);
             document.documentElement.style.setProperty('--bg-glass-texture', `url(${base}Assets/Textures/glass_texture.webp)`);
+            // NEW: Define dynamic arena floor textures
+            document.documentElement.style.setProperty('--texture-solo', `url(${base}Assets/Textures/arena_solo.webp)`);
+            document.documentElement.style.setProperty('--texture-challenge', `url(${base}Assets/Textures/arena_challenge.webp)`);
+            document.documentElement.style.setProperty('--texture-tournament', `url(${base}Assets/Textures/arena_tournament.webp)`);
+            document.documentElement.style.setProperty('--texture-semi', `url(${base}Assets/Textures/arena_semi_final.webp)`);
+            document.documentElement.style.setProperty('--texture-final', `url(${base}Assets/Textures/arena_final.webp)`);
         }
         document.getElementById("engine-status").innerHTML = "<span class='status-active'>ACTIVE</span>";
         buildEmptyBoard();
@@ -3265,16 +3271,46 @@ function buildEmptyBoard() {
 
 function renderCardHTML(card) {
     const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : '';
-    const debuffBadge = (card.artifact && card.artifact < 0) ? `<div class="debuff-badge">PRISONER ${card.artifact}</div>` : '';
+    
+    // Mood Icon Mapping
+    let moodHTML = '';
+    if (card.mood && card.mood !== "Neutral") {
+        const moodClassMap = { "Volatile": "fire", "Serene": "water", "Spirited": "lightning", "Grounded": "earth" };
+        const moodEmojiMap = { "Volatile": "🔥", "Serene": "💧", "Spirited": "⚡", "Grounded": "🌿" };
+        const mClass = moodClassMap[card.mood] || "";
+        const mEmoji = moodEmojiMap[card.mood] || "✨";
+        if (mClass) moodHTML = `<div class="card-type-icon ${mClass}" title="Mood: ${card.mood}">${mEmoji}</div>`;
+    }
+
+    // Artifact / Bonus Display
+    let artifactHTML = '';
+    if (card.artifact > 0) {
+        artifactHTML = `<div class="artifact-badge" style="position: absolute; bottom: 30px; right: 5px; color: var(--neon-cyan); font-size: 9px; font-weight: bold; text-shadow: 0 0 5px var(--neon-cyan);">+${card.artifact}</div>`;
+    } else if (card.artifact < 0) {
+        artifactHTML = `<div class="debuff-badge">PRISONER ${card.artifact}</div>`;
+    }
+
+    // Fatigue & Loyalty Indicators
+    const fatigue = card.fatigue || 0;
+    const loyalty = card.loyalty || 0;
+    const statsHTML = `
+        <div class="card-mini-stats" style="position: absolute; bottom: 23px; left: 5px; right: 5px; display: flex; justify-content: space-between; font-size: 7px; font-family: 'Rajdhani', sans-serif; letter-spacing: 0.5px; pointer-events: none;">
+            <span style="color: ${fatigue > 50 ? '#ff4b4b' : '#8b949e'}">F:${fatigue}</span>
+            <span style="color: ${loyalty >= 100 ? 'var(--neon-green)' : '#8b949e'}">L:${loyalty}</span>
+        </div>
+    `;
+
     return `
         ${rarityBadge}
-        ${debuffBadge}
+        ${artifactHTML}
+        ${moodHTML}
         <div class="power-grid">
             <div style="grid-area: top">${window.GetLevelLabelForDisplay(card.power[0])}</div>
             <div style="grid-area: left">${window.GetLevelLabelForDisplay(card.power[3])}</div>
             <div style="grid-area: right">${window.GetLevelLabelForDisplay(card.power[1])}</div>
             <div style="grid-area: bottom">${window.GetLevelLabelForDisplay(card.power[2])}</div>
         </div>
+        ${statsHTML}
         <div class="card-name">${card.name}</div>
     `;
 }
@@ -4530,7 +4566,10 @@ function applyAvatarFilters() {
 function updateDynamicArenaFloor(state) {
     let texture = "var(--texture-solo)"; // Default AI/Solo
 
-    if (state.phase === "Active" || state.phase === "TournamentLobby") {
+    if (state.phase === "TournamentLobby") {
+        // Always show a tournament background in the tournament lobby
+        texture = "var(--texture-tournament)";
+    } else if (state.phase === "Active") {
         if (state.multiplayer) {
             if (state.tournament && state.tournament.active) {
                 const currentRound = state.tournament.current_round;

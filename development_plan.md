@@ -30,9 +30,11 @@
 - [x] Hardened Rumor System: Verified `processRumors` correctly handles deletion of expired entries.
 - [x] Hardened Tournament History: Implemented conditional deep verification based on `deep_verify` parameter.
 - [x] Hardened Tournament Registration: Verified `isElite` check correctly bypasses buy-in transaction verification.
+- [x] Hardened Card Visuals: Enhanced `renderCardHTML` with comprehensive attribute representation.
 - [x] Hardened Kidnap Gambit: Ensured robust card selection logic (favorite vs. rarest) and correct removal from victim's inventory in `handleKidnapRequest`.
 - [x] Hardened Tournament Kickbacks: Ensured `distributeTournamentKickback` uses accurate blockchain transaction time for club membership.
 - [x] Hardened Insurance Recovery: Ensured `processInsuranceRecovery` correctly returns recovered cards to the victim's inventory.
+- [x] Hardened UI Textures: Implemented dynamic arena floor textures based on game phase and tournament status.
 - [x] Hardened Black Market: Resolved deadlocks and implemented immediate UI synchronization for criminal activity.
 - [x] Hardened Auction Bidding: Implemented immediate deduction of new bids and refund of outbid funds.
 - [x] Hardened Sybil Sync UI: Frontend now correctly displays "warming up" message for onboarding.
