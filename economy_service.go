@@ -136,7 +136,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	if stats.EmployerClubID != "" {
 		// Note: Mutex expected to be held by caller (e.g. updateLeaderboard)
 		club, exists := l.clubs[stats.EmployerClubID]
-		if exists {
+		if exists { // Check if the club actually exists
 			// Multiplier scales with Club Mojo: 1.0 to 1.5 (at 1000 Mojo)
 			multiplier := 1.0 + (float64(club.Mojo) / 2000.0)
 			if multiplier > 1.5 {

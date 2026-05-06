@@ -124,7 +124,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	accountInfo, err := client.AccountInformation(targetWallet).Do(context.Background())
-	if err == nil && accountInfo.Amount >= 1000000 {
+	if err == nil && accountInfo.Amount >= 1000000 { // Check if account already has 1 VOI (1,000,000 microAlgos)
 		isSkip = true
 		w.WriteHeader(http.StatusNoContent) // User already has VOI, skip starter pack
 		return

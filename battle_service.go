@@ -69,7 +69,6 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 
 			if c.Mood == tileMood {
 				base += 50 // Match bonus: +0.5 Tier
-			} else if moodWeaknesses[c.Mood] == tileMood {
 			} else if moodWeaknesses[c.Mood] == tileMood { // Check for weakness
 				if !hasGroundedShield { // Only apply penalty if no Grounded Shield
 					base -= 50 // Weakness penalty: -0.5 Tier

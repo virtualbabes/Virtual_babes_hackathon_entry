@@ -355,7 +355,6 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				log.Printf("[SECURITY] Unauthorized CardID %d in move from %s. Using baseline power.\n", move.CardID, env.FromID)
 				card = ServerCard{ID: move.CardID, Power: [4]int{5, 5, 5, 5}}
 			}
-
 			
 			match.Board[move.GridIndex] = &ServerCard{
 				ID: move.CardID, Owner: pIdx, Power: card.Power,

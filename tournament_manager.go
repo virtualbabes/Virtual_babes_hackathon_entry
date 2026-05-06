@@ -99,7 +99,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 
 		// verifyBuyInTransaction expects a prefix that matches "Network Mainnet" keys
 		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*1000000), buyInAsset, req.Wallet, l.vaultAddress)
-		if err != nil || !verified || txTime < openTime.Unix() {
+		if err != nil || !verified || txUnixTime < openTime.Unix() {
 			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", req.Wallet, verifyNetwork, err)
 			http.Error(w, "Payment verification failed or transaction too old", http.StatusPaymentRequired)
 			return
