@@ -2983,11 +2983,12 @@ async function syncUI(scope = "all") {
             const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
             const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`;
 			const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`;
+			const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`;
 
             const newHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
                 ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${cunningVal}</span>` + // Display Cunning
                 ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${nurturingVal}</span>` + // Display Nurturing
-				socialHubBtn +
+				socialHubBtn + galleryBtn +
 				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST</button>` +
                 ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + 
                 courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
@@ -4028,36 +4029,49 @@ async function switchPortfolioTab(tab) {
         if (entries.length === 0) {
             html = `<div style="padding: 40px; opacity: 0.5;">No active investments found.</div>`;
         } else {
-            // Batch resolve Envoi names for all portfolio keys (wallets)
             const walletsToResolve = entries.map(([w]) => w);
             await Promise.all(walletsToResolve.map(w => resolveEnvoiName(w)));
 
-            entries.forEach(([id, amount]) => {
+			const itemsHtml = entries.map(([id, amount]) => {
                 if (amount <= 0) return;
-                // id is now the persistent wallet address
                 const p = lastLobbyPlayers.find(pl => pl.wallet && pl.wallet.toLowerCase() === id.toLowerCase());
                 const price = p ? ((p.wins * 10) + (p.reputation / 2) + 100) : 100;
                 const marketValue = amount * price;
                 totalMarketValue += marketValue;
                 const displayName = getCachedEnvoiName(id);
-                html += `
-                    <div class="player-item" style="padding: 15px;">
-                        <div style="text-align: left;">
-                            <b style="color: var(--neon-cyan);">${displayName}</b>
-                            <div style="font-size: 0.75em; opacity: 0.6;">Holding: ${amount.toFixed(2)} Shares</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="color: var(--neon-green); font-weight: bold;">${marketValue.toFixed(2)} $VBV</div>
-                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" 
-                                    onclick="tradeShares('${id}', 'sell', ${amount})">SELL ALL</button>
-                        </div>
-                    </div>`;
-            });
-            html += `
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--glass-border); text-align: right;">
-                    <small style="opacity: 0.5;">EST. LIQUIDITY VALUE</small><br>
-                    <b style="color: var(--neon-green); font-size: 1.2em;">${totalMarketValue.toFixed(2)} $VBV</b>
-                </div>`;
+				
+				return `
+					<div class="portfolio-item glass-panel m-0 mb-10">
+						<div class="item-info">
+							<div class="item-icon">👤</div>
+							<div class="item-details text-left">
+								<div class="item-name font-bold text-neon-cyan">${displayName}</div>
+								<div class="item-type font-size-0-75em opacity-5">Entity Shares</div>
+							</div>
+						</div>
+						<div class="item-stats">
+							<div class="stat">
+								<div class="stat-label">SHARES</div>
+								<div class="stat-value text-neon-green">${amount.toFixed(2)}</div>
+							</div>
+						</div>
+						<div class="item-value">
+							<div class="font-bold text-neon-green">${marketValue.toFixed(1)} $VBV</div>
+							<button class="outline x-small border-error mt-5" onclick="tradeShares('${id}', 'sell', ${amount})">SELL ALL</button>
+						</div>
+					</div>`;
+			}).join('');
+
+			html = `
+				<div class="portfolio-system">
+					<div class="portfolio-header mb-15">
+						<span class="portfolio-title text-neon-purple font-bold">MARKET HOLDINGS</span>
+						<div class="portfolio-value font-size-1-2em text-neon-green">VALUATION: ${totalMarketValue.toFixed(1)} $VBV</div>
+					</div>
+					<div class="portfolio-view">
+						${itemsHtml}
+					</div>
+				</div>`;
         }
         container.innerHTML = html;
     } else if (tab === 'jailed') {
@@ -4345,10 +4359,19 @@ async function openBlackMarket() {
     overlay.className = "overlay";
 
     let html = `
-        <div class="glass-panel" style="width: 600px; text-align: center; border-color: #ff4b4b;">
-            <h2 style="color: #ff4b4b; letter-spacing: 3px;">BLACK MARKET</h2>
-            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Liquidated assets from defaulted loans. High risk, high reward.</p>
-            <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+		<div class="economy-panel black-market" style="width: 650px;">
+			<div class="market-header">
+				<span class="market-title">THE UNDERWORLD</span>
+				<div class="access-level">RESTRICTED ACCESS</div>
+			</div>
+			
+			<div class="market-notice mb-20">
+				<div class="notice-icon">💀</div>
+				<div class="notice-title">DEFAULTED COLLATERAL</div>
+				<p class="notice-text">Assets listed here were seized from failed loans. Purchasing them triggers an infamy penalty but offers extreme tactical discounts.</p>
+			</div>
+
+			<div id="black-market-grid" class="market-grid" style="max-height: 400px; overflow-y: auto;">
     `;
 
     try {
@@ -4408,6 +4431,232 @@ async function openBlackMarket() {
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
 }
+
+/**
+ * Art Gallery Interface: Consignment and Auctions.
+ */
+async function openArtGalleryOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = "art-gallery-overlay";
+    overlay.className = "overlay";
+    
+    overlay.innerHTML = `
+        <div class="economy-panel gallery-panel" style="width: 900px; max-height: 85vh; overflow-y: auto;">
+            <div class="economy-header">
+                <span class="economy-title">THE ART GALLERY</span>
+                <div class="flex-row gap-15">
+                    <button class="outline x-small" onclick="openConsignmentOverlay()">CONSIGN ITEM</button>
+                    <button class="outline x-small border-error" onclick="document.getElementById('art-gallery-overlay').remove()">CLOSE</button>
+                </div>
+            </div>
+
+            <div class="auction-gallery">
+                <div class="gallery-header">
+                    <p class="opacity-7 italic font-size-0-85em">Tactical assets and rare artifacts up for public auction. All sales support the Industrial Loop.</p>
+                </div>
+                
+                <div id="gallery-items-container" class="gallery-grid">
+                    <div class="grid-span-all opacity-5 py-40 italic">Decrypting auction datastreams...</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    loadGalleryItems();
+}
+
+async function loadGalleryItems() {
+    const container = document.getElementById("gallery-items-container");
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/auctions`);
+        const auctions = await response.json();
+
+        if (!auctions || auctions.length === 0) {
+            container.innerHTML = `<div style="grid-column: 1/-1;" class="opacity-5 py-40 italic">The gallery floor is currently vacant. Check back during peak match hours.</div>`;
+            return;
+        }
+
+        container.innerHTML = auctions.map(a => {
+            const timeRemaining = Math.max(0, new Date(a.ends_at) - new Date());
+            const hours = Math.floor(timeRemaining / 3600000);
+            const mins = Math.floor((timeRemaining % 3600000) / 60000);
+            
+            return `
+                <div class="gallery-grid__item-bundle animate-slide-up">
+                    <div class="item-image">
+                        <img src="Assets/Images/portraits/placeholder.webp" alt="Exhibit">
+                    </div>
+                    <div class="item-info text-left">
+                        <div class="item-title font-bold text-neon-cyan">${a.bundle.weapon_id ? a.bundle.weapon_id.replace(/_/g, ' ') : 'Tactical Artifact'}</div>
+                        <div class="item-description font-size-0-8em opacity-6">Seller: ${a.seller_name}</div>
+                    </div>
+                    <div class="auction-info mt-10">
+                        <div class="current-bid">
+                            <span class="bid-label">HIGHEST BID</span>
+                            <span class="bid-amount text-neon-green">${(a.current_bid / 1000000).toFixed(1)} $VBV</span>
+                        </div>
+                        <div class="time-remaining">
+                            <span class="time-label">REMAINING</span>
+                            <span class="time-value">${hours}h ${mins}m</span>
+                        </div>
+                    </div>
+                    <button class="outline mt-15 w-full border-cyan text-neon-cyan" onclick="promptBid('${a.id}', ${a.current_bid})">PLACE BID</button>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = `<div style="grid-column: 1/-1;" class="text-error py-40">Gallery Indexer Unreachable.</div>`;
+    }
+}
+
+async function promptBid(auctionId, currentBidMicro) {
+    const minBid = (currentBidMicro + (currentBidMicro * 0.05)) / 1000000;
+    const bidAmount = prompt(`Enter your bid in $VBV (Minimum: ${minBid.toFixed(2)}):`, minBid.toFixed(2));
+    
+    if (bidAmount && !isNaN(bidAmount)) {
+        const bidMicro = Math.round(parseFloat(bidAmount) * 1000000);
+        if (bidMicro <= currentBidMicro) {
+            showToast("Bid must be at least 5% higher than current.", "error");
+            return;
+        }
+        
+        showToast("⚡ Authorizing gallery bid...", "info");
+        const state = window.GetGameState();
+        
+        try {
+            const response = await fetch(`${CONFIG.API_BASE}/api/auctions/bid`, {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    auction_id: auctionId,
+                    wallet: userAddress,
+                    amount: bidMicro,
+                    network: state.network
+                })
+            });
+            
+            if (response.ok) {
+                showToast("✅ Bid accepted! You are now the highest bidder.", "success");
+                loadGalleryItems();
+            } else {
+                const err = await response.text();
+                showToast(`❌ Bid Rejected: ${err}`, "error");
+            }
+        } catch (e) {
+            showToast("Gallery connection failed.", "error");
+        }
+    }
+}
+
+/**
+ * Consignment Flow: Interface for listing items in the Art Gallery.
+ */
+function openConsignmentOverlay() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "consignment-overlay";
+    overlay.className = "overlay";
+
+    // Filter inventory for listable assets (Cards and known items)
+    const listableItems = Object.entries(state.inventory || {}).filter(([id, qty]) => qty > 0);
+
+    overlay.innerHTML = `
+        <div class="economy-panel consignment-panel" style="width: 550px;">
+            <div class="market-header">
+                <span class="market-title text-neon-purple">ASSET CONSIGNMENT</span>
+                <div class="access-level">GALLERY PROTOCOL</div>
+            </div>
+
+            <div class="p-20">
+                <p class="opacity-6 font-size-0-85em mb-20">Select an asset from your collection to list on the public auction floor. 10% commission applies on successful settlement.</p>
+                
+                <div class="flex-col gap-10 mb-20" style="max-height: 300px; overflow-y: auto;">
+                    ${listableItems.length === 0 ? '<div class="opacity-3 italic py-20">No listable tactical assets detected.</div>' : 
+                        listableItems.map(([id, qty]) => `
+                            <div class="portfolio-item glass-panel m-0 p-10 flex-row justify-between align-center pointer" onclick="selectConsignmentItem('${id}')">
+                                <div class="flex-row align-center gap-10">
+                                    <div class="item-icon font-size-1-2em">📦</div>
+                                    <div class="text-left">
+                                        <div id="item-name-${id}" class="font-bold text-neon-cyan">${id.replace(/_/g, ' ').toUpperCase()}</div>
+                                        <div class="font-size-0-75em opacity-5">Available: ${qty}</div>
+                                    </div>
+                                </div>
+                                <input type="radio" name="consignment-target" value="${id}">
+                            </div>
+                        `).join('')}
+                </div>
+
+                <div id="consignment-pricing" class="hidden animate-slide-up">
+                    <div class="glass-panel p-15 border-cyan">
+                        <label class="font-size-0-8em text-neon-cyan font-bold block mb-5">STARTING BID ($VBV)</label>
+                        <input type="number" id="consignment-bid-input" class="glass-input w-full mb-10" placeholder="e.g. 500.00" step="0.1">
+                        <small class="opacity-5 italic">Note: Auctions run for 24 hours from timestamp of listing.</small>
+                    </div>
+                    
+                    <div class="flex-row gap-15 mt-20">
+                        <button class="outline w-full" onclick="document.getElementById('consignment-overlay').remove()">ABORT</button>
+                        <button class="w-full bg-neon-purple text-dark font-bold" onclick="submitConsignment()">LIST ASSET</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+function selectConsignmentItem(id) {
+    const radio = document.querySelector(`input[value="${id}"]`);
+    if (radio) radio.checked = true;
+    document.getElementById("consignment-pricing").classList.remove("hidden");
+}
+
+async function submitConsignment() {
+    const selectedInput = document.querySelector('input[name="consignment-target"]:checked');
+    const bidInput = document.getElementById("consignment-bid-input");
+    
+    if (!selectedInput || !bidInput.value) {
+        showToast("Please select an item and enter a starting bid.", "error");
+        return;
+    }
+
+    const itemId = selectedInput.value;
+    const bidBase = parseFloat(bidInput.value);
+    if (isNaN(bidBase) || bidBase <= 0) {
+        showToast("Invalid starting bid.", "error");
+        return;
+    }
+
+    showToast("⚡ Authorizing consignment protocol...", "info");
+    
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/auctions/create`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet: userAddress,
+                item_id: itemId,
+                starting_bid: Math.round(bidBase * 1000000), // Convert to micro-units
+                territory_id: "the_art_gallery"
+            })
+        });
+
+        if (response.ok) {
+            showToast(`✅ Asset listed! ${itemId.replace(/_/g, ' ')} is now on the auction floor.`, "success");
+            document.getElementById("consignment-overlay").remove();
+            loadGalleryItems(); // Refresh the gallery list
+        } else {
+            const err = await response.text();
+            showToast(`❌ Listing Failed: ${err}`, "error");
+        }
+    } catch (e) {
+        showToast("Gallery connection failure.", "error");
+    }
+}
+
+window.openConsignmentOverlay = openConsignmentOverlay;
+window.openArtGalleryOverlay = openArtGalleryOverlay;
+window.promptBid = promptBid;
 
 async function buyBlackMarketItem(loanId, price) {
     if (!userAddress) return showToast("Connect wallet first", "error");

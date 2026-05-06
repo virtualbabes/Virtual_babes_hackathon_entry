@@ -21,6 +21,8 @@
 - **Rewards**: Hardened `payoutAddress` validation in `faucet_service.go` to handle granular asset opt-ins.
 - **Economy Audit**: Ensured loan interest and auction commissions are added to `l.faucetBalance` before dynamic scaling.
 - **Stability**: Resolved critical deadlocks between `economy_processing.go` and `lobby_manager.go`.
+- **Consignment flow**: Implemented the auction creation interface in `app.js` using `_economy.scss` styles.
+- **Economy UI**: Refactored Entity Market and Black Market UI; implemented Art Gallery (Auctions) using orphaned `_economy.scss` styles.
 - **Social UI**: Implemented the Social Hub (Alliances, Career, Achievements) using orphaned `_social.scss` styles.
 - **UI Immersion**: Implemented 3D Territory Map, Heist Planning Terminal, and Kidnap Selection overlays using legacy SCSS features.
 - **Liquidity**: Implemented "Industrial Loop" recovery where black market scavenge fees return to the Faucet pool.

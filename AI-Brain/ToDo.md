@@ -104,7 +104,7 @@
      - [x] Implement criminality UI (using _criminality.scss) for heist planning, with risk meters and success animations.
      - [x] Create territory map (using _territory.scss) with 3D CSS transforms for regional dominance visualization.
      - [x] Expand social panel (using _social.scss) for player interactions, alliances, and extended leaderboards.
-     - Use _economy.scss for auction houses and portfolio management overlays.
+     - [x] Use _economy.scss for auction houses and portfolio management overlays.
    - **Immersion Boost**: These features would make the "Social Economic Simulation" feel more interactive, moving beyond basic matchmaking to full ecosystem engagement.
 
 #### 2. **Enhance Existing Neon-Glass Aesthetics**
@@ -143,6 +143,6 @@ Implementing these would transform the UI from functional to deeply immersive, a
 
 ## Next Tactical Steps
 1. **Social Panel Wiring**: Utilize `_social.scss` to create the player alliance and profile interaction UI.
-2. **Portfolio UI Hardening**: Apply `_economy.scss` styles to the Art Gallery and Entity Market for a high-finance aesthetic.
+2. [x] Implement the Consignment flow in app.js using the _economy.scss styles for creating auctions.
 3. **Mainnet Secret Audit**: Final verification of mnemonic encryption and environment variable injection for production.
 4. **Tournament Stress Test**: Execute a full 16-player mock tournament via `simulateTournament` while monitoring indexer latency.
