@@ -16,21 +16,16 @@ bin/
 main.wasm
 .vscode\mcp.json
 .gitignore
+.gitattributes
+
 # OS Junk
 *.DS_Store
 *Thumbs.db
 *ai_exclude
 
 # Project Documentation (Local Only)
-/A.I_memory.md 
+AI-Brain/A.I_memory.md 
 AI-Brain/Game_expansion_plan.md 
 AI-Brain/orphan_fix_list.md 
 AI-Brain/ToDo.md DEV_Log 
-DEV_Log/AI_mem_log 
-DEV_Log
-/AI_mem_log/mem.log 
-DEV_Log/AI_mem_log/mem1.log 
-DEV_Log/AI_mem_log/mem2.log 
-DEV_Log/Info/Rules.md 
-DEV_Log/Info/Whiteppr.md 
-DEV_Log/Session_Handover.md
+AI-Brain\What_is_this_repository.md

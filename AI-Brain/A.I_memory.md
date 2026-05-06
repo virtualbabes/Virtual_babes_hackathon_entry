@@ -88,3 +88,42 @@
 ## Orphans & Fixed Knowledge
 - `bridge_service.go`: Placeholder for future expansion; current onboarding is in `onboarding_service.go`.
 -- `payoutAddress`: (Resolved) Unified verification implemented in `faucet_service.go` reward loop.
+
+## Analysis: Orphaned UI CSS Logic and Improvement Suggestions
+
+Based on a review of the specified SCSS files, HTML, and JS, here's an assessment of orphaned CSS (unused styles) and recommendations for enhancing aesthetics and functional immersion in Virtualbabes Arena.
+
+### Orphaned CSS Logic
+These SCSS files define comprehensive styles for UI components that are **not present** in index.html, `app.js`, or collective-intelligence.js. They appear to be prepared for future features but are currently unused, making them "orphaned."
+
+1. **_shops.scss** (Fully Orphaned)
+   - Defines styles for `.shops-panel`, `.shop-categories`, `.shop-items`, `.shop-cart`, `.shop-offers`, etc.
+   - No corresponding HTML elements or JS functions (e.g., no `shops-panel` in DOM, no shop-related overlays in `app.js`).
+   - **Impact**: ~700 lines of unused CSS for shop browsing, purchasing, and special offers.
+
+2. **_criminality.scss** (Fully Orphaned)
+   - Defines styles for `.criminality-panel`, `.criminality-actions`, criminal action grids, etc.
+   - No usage in HTML/JS (no criminality overlays or panels).
+   - **Impact**: ~400 lines of unused CSS for heist/kidnap UI.
+
+3. **_economy.scss** (Partially Orphaned)
+   - Defines `.economy-panel`, `.market-ticker` (used for live ticker), `.auction-house`, etc.
+   - `.market-ticker` is used (created dynamically in `app.js`), but `.economy-panel` and auction styles are unused.
+   - **Impact**: ~300 lines partially unused; market ticker is active.
+
+4. **_social.scss** (Partially Orphaned)
+   - Defines `.social-panel`, `.achievement-system` (trophy badges used), `.leaderboard-enhanced`, etc.
+   - Trophy system is used (`.trophy-badge` in `openTrophyView`), but `.social-panel` and extended social features are unused.
+   - **Impact**: ~300 lines partially unused; achievements are active.
+
+5. **_territory.scss** (Fully Orphaned)
+   - Defines `.territory-panel`, `.territory-map`, 3D world map styles, etc.
+   - No territory UI in HTML/JS.
+   - **Impact**: ~400 lines of unused CSS for regional/club territory visualization.
+
+6. **Other Files** (Not Orphaned)
+   - _dashboard.scss, _main-layout.scss, _neon-glass.scss, _animations.scss, _spacing.scss: All actively used in index.html and `app.js`.
+   - styles.css: Compiled output, reflects used styles.
+   - collective-intelligence.js: Used for NPC taunts in `app.js`.
+
+**Total Orphaned CSS**: ~2,100+ lines across feature files, representing planned but unimplemented UI for shops, criminality, economy overlays, social hubs, and territories.
