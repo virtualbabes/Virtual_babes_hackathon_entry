@@ -2802,6 +2802,15 @@ async function syncUI(scope = "all") {
         updateDynamicArenaFloor(state);
     }
 
+	// DYNAMIC MOOD SHIFT: Adjust global accents based on game state
+	if (state.phase === "Active") {
+		const isCriminal = (state.p1_wanted_level || 0) > 10;
+		document.documentElement.style.setProperty('--neon-accent', isCriminal ? '#ff0844' : '#00f2fe');
+		document.body.classList.toggle('criminal-activity', isCriminal);
+	} else {
+		document.documentElement.style.setProperty('--neon-accent', '#00f2fe');
+	}
+
     // Update Deck Rating in UI
     if (state.deck_rating !== undefined) {
         document.getElementById("deck-rating-display").innerText = state.deck_rating;
