@@ -11,19 +11,16 @@ import (
 
 // getEffectiveServerPower replicates the modifier logic for server validation
 func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx int, gridIdx int) int {
-	base := c.Power[sideIdx]
-
-	// Apply Artifact/Equipment bonuses if active
-	if match.Rules["Artifact_bonus"] {
-		base += c.Artifact
-	}
+	// Determinism Sync: Artifact bonuses are added unconditionally to match main.go logic
+	base := c.Power[sideIdx] + c.Artifact
 
 	// Wanted Level Penalty: -5 power per Wanted Level point
-	playerID := match.P1ID
+	// Hardening: Use snapshotted wallets from match state to survive session drops
+	wallet := match.P1Wallet
 	if c.Owner == 1 {
-		playerID = match.P2ID
+		wallet = match.P2Wallet
 	}
-	wallet := l.wallets[playerID]
+
 	stats := l.leaderboard[wallet]
 
 	// Apply Wanted Level Penalty (Mitigated by Cunning)
@@ -57,10 +54,15 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 				"Grounded": "Volatile",
 			}
 
-			// Check for "grounded_shield" buff for the card's owner
+			// Check for "grounded_shield" buff for the card's owner.
+			// Hardening: Resolve the correct playerID from the match state using the owner index.
 			var hasGroundedShield bool
-			if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[playerID] != nil {
-				if _, ok := match.ActiveItemBuffs[playerID]["grounded_shield"]; ok {
+			pID := match.P1ID
+			if c.Owner == 1 {
+				pID = match.P2ID
+			}
+			if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[pID] != nil {
+				if _, ok := match.ActiveItemBuffs[pID]["grounded_shield"]; ok {
 					hasGroundedShield = true
 				}
 			}
@@ -140,6 +142,8 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					CardID:                neighbor.ID,
 					OriginalOwnerWallet:   originalOwnerWallet,
 					CapturingPlayerWallet: l.wallets[playerID],
+					CaptureType:           "BASIC",
+					GridIndex:             nbIdx,
 				})
 			}
 		}
@@ -160,6 +164,8 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						CardID:                match.Board[idx].ID,
 						OriginalOwnerWallet:   originalOwnerWallet,
 						CapturingPlayerWallet: l.wallets[playerID],
+						CaptureType:           "SAME",
+						GridIndex:             idx,
 					})
 					comboQueue = append(comboQueue, idx)
 				}
@@ -180,6 +186,8 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						CardID:                match.Board[idx].ID,
 						OriginalOwnerWallet:   originalOwnerWallet,
 						CapturingPlayerWallet: l.wallets[playerID],
+						CaptureType:           "POWER_UP",
+						GridIndex:             idx,
 					})
 					comboQueue = append(comboQueue, idx)
 				}
@@ -215,7 +223,13 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						if neighbor.Owner == 1 {
 							originalOwnerWallet = l.wallets[match.P2ID]
 						}
-						capturedCards = append(capturedCards, CapturedCardInfo{CardID: neighbor.ID, OriginalOwnerWallet: originalOwnerWallet, CapturingPlayerWallet: l.wallets[playerID]})
+						capturedCards = append(capturedCards, CapturedCardInfo{
+							CardID:                neighbor.ID,
+							OriginalOwnerWallet:   originalOwnerWallet,
+							CapturingPlayerWallet: l.wallets[playerID],
+							CaptureType:           "COMBO",
+							GridIndex:             nbIdx,
+						})
 					}
 					totalFlips++
 					comboQueue = append(comboQueue, nbIdx)
@@ -574,7 +588,13 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	jailedThisMatch := make(map[int]bool) // Track processed cards to prevent double-penalty in chain reactions
+
 	for _, captured := range capturedCards {
+		if jailedThisMatch[captured.CardID] {
+			continue
+		}
+
 		// Ensure the capturing player is associated with the owning club
 		capturingPlayerIsOwner := strings.EqualFold(owningClub.OwnerWallet, captured.CapturingPlayerWallet)
 		capturingPlayerIsMember := false
@@ -598,9 +618,20 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 		}
 
 		// Conditions met for Fallen Penalty Jailing
+		cardKey := fmt.Sprintf("CARD-%d", captured.CardID)
+		originalOwnerStats := l.leaderboard[captured.OriginalOwnerWallet]
+
+		// CRITICAL AUDIT FIX: Verify the original owner actually possesses the card in their persistent inventory.
+		// This prevents attempting to jail "board-only" captures or causing negative inventory counts.
+		count, hasCard := originalOwnerStats.Inventory[cardKey]
+		if !hasCard || count <= 0 {
+			log.Printf("[FALLEN_PENALTY_JAIL] Card %d not found in %s's persistent collection (Capture: %s). Skipping.\n", 
+				captured.CardID, captured.OriginalOwnerWallet, captured.CaptureType)
+			continue
+		}
+
 		card, cardExists := l.inventory[captured.CardID]
 		if !cardExists {
-			log.Printf("[FALLEN_PENALTY_JAIL] Captured card %d not found in global inventory.\n", captured.CardID)
 			continue
 		}
 
@@ -610,18 +641,33 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 		}
 		owningClub.Jail[card.ID] = card
 
-		// Remove from original owner's inventory
-		originalOwnerStats := l.leaderboard[captured.OriginalOwnerWallet]
-		delete(originalOwnerStats.Inventory, fmt.Sprintf("CARD-%d", card.ID))
+		// Remove from original owner's inventory (Decrementing instead of absolute deletion)
+		originalOwnerStats.Inventory[cardKey]--
+		if originalOwnerStats.Inventory[cardKey] <= 0 {
+			delete(originalOwnerStats.Inventory, cardKey)
+		}
+
 		if originalOwnerStats.JailedCards == nil {
 			originalOwnerStats.JailedCards = make(map[int]string)
 		}
 		originalOwnerStats.JailedCards[card.ID] = owningClub.ID
 		l.leaderboard[captured.OriginalOwnerWallet] = originalOwnerStats
+		jailedThisMatch[card.ID] = true
 
-		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s in territory %s due to Fallen Penalty.\n", captured.OriginalOwnerWallet, card.Name, owningClub.Name, match.TerritoryID)
-		l.sendToClient(l.getClientIDFromWallet(captured.OriginalOwnerWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>FALLEN PENALTY:</b> Your card '%s' has been jailed by Club %s!"}`, escapeHTML(card.Name), escapeHTML(owningClub.Name)))})
-		l.sendToClient(l.getClientIDFromWallet(captured.CapturingPlayerWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>FALLEN PENALTY:</b> You jailed '%s's card (%s)!"}`, escapeHTML(captured.OriginalOwnerWallet), escapeHTML(card.Name)))})
+		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s.\n", 
+			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)
+
+		// Use CaptureType in client notifications for high-fidelity tactical feedback
+		l.sendToClient(l.getClientIDFromWallet(captured.OriginalOwnerWallet), Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>FALLEN PENALTY:</b> Your card '%s' was seized via %s and jailed by Club %s!"}`, 
+				escapeHTML(card.Name), captured.CaptureType, escapeHTML(owningClub.Name))),
+		})
+		l.sendToClient(l.getClientIDFromWallet(captured.CapturingPlayerWallet), Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>FALLEN PENALTY:</b> You jailed '%s's card (%s) via %s capture!"}`, 
+				escapeHTML(captured.OriginalOwnerWallet), escapeHTML(card.Name), captured.CaptureType)),
+		})
 	}
 }
 

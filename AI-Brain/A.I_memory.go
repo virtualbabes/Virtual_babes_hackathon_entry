@@ -61,9 +61,9 @@
 - **Rumor Management**: Verified `processRumors` correctly deletes expired entries while holding the mutex.
 - **Tournament History**: Implemented conditional deep verification in `handleTournamentHistory` based on `deep_verify` parameter.
 - **Kidnap Gambit**: Hardened `handleKidnapRequest` with robust card selection (favorite vs. rarest) and explicit removal from victim's inventory.
-- **Jailing Mechanics**: Secured `processFallenPenaltyJail` and `processPrisonerRule` to use decrementing inventory logic and verified card existence before jailing. Utilized `CaptureType` for tactical feedback.
 - **Tournament Kickback Accuracy**: Ensured `distributeTournamentKickback` uses the precise blockchain transaction time for club membership verification.
 - **Mojo Decay**: Hardened `processMojoDecay` with periodic resets and added `LastActivity` triggers to management actions.
+- **Industrial Fine Split**: Audited `distributeCourthouseFineToClubsLocked` for equitable splitting between all clubs/governors and resolved recursive locking deadlock.
 - **Club Restock**: Audited `handleRestockInventory` for correct authorization and improved error feedback.
 - **Heist Mechanics**: Audited `handleHeist` security multipliers; implemented lazy pruning for expired traps and verified activity tracking/UI synchronization.
 - **AI Evaluation**: Hardened `PerformAIMove` simulation logic to use `getEffectivePower` and authoritative rule keys (`Power_copy`/`Power_up`).

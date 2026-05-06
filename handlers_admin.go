@@ -619,6 +619,11 @@ func (l *Lobby) handleSimulateTournament(w http.ResponseWriter, r *http.Request)
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[SIMULATION CRITICAL] Panic in tournament simulation: %v\n", r)
+			}
+		}()
 		l.simulateTournament(req.Size, req.IsBuyIn)
 		l.logAdminAudit("SIMULATE_TOURNAMENT", "GLOBAL", fmt.Sprintf("Size: %d, Buy-in: %v", req.Size, req.IsBuyIn))
 		l.broadcastToAdmins(fmt.Sprintf("🏆 Tournament simulation (%d players) completed!", req.Size))

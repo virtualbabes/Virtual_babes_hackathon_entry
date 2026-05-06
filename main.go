@@ -103,6 +103,7 @@ type Player struct {
 	AvatarURL       string       `json:"avatar_url"`
 	Buffs           []ActiveBuff `json:"buffs"`
 	AvatarBanNotice string       `json:"avatar_ban_notice"`
+	EquippedFaceplate string       `json:"equipped_faceplate"` // For UI rendering
 	Mojo            int          `json:"mojo"`             // Social standing for Club unlocks
 	SocialRank      string       `json:"social_rank"`      // e.g., "Nobody", "Regular", "Icon"
 	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
@@ -550,6 +551,8 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.Nurturing = data.Get("nurturing").Int()
 	p.RumorCount = data.Get("rumor_count").Int()
 
+	p.EquippedFaceplate = data.Get("equipped_faceplate").String()
+	p.FavoriteCardID = data.Get("favorite_card_id").Int()
 	// Sync Jailed Cards map
 	p.JailedCards = make(map[int]string)
 	jsJailed := data.Get("jailed_cards")
@@ -574,7 +577,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.KidnappedCards = make(map[int]string) // Reset ephemeral criminal tracking for sync
 	p.HeldHostageCards = make(map[int]string)
 
-	fmt.Printf("[ENGINE] Profile Synergized: %d Achievements, %d REP\n", len(p.Achievements), p.Reputation)
+	fmt.Printf("[ENGINE] Profile Synergized: %d Achievements, %d REP, Faceplate: %s, Fav Card: %d\n", len(p.Achievements), p.Reputation, p.EquippedFaceplate, p.FavoriteCardID)
 	return true
 }
 
@@ -1409,13 +1412,13 @@ func simulateCapturesOnBoard(board [9]*Card, placedCard *Card, gridIndex int, pl
 		neighborIndex := gridIndex + n.offset
 		if n.boundaryCheck(gridIndex) && board[neighborIndex] != nil {
 			neighborCard := board[neighborIndex]
-			pPower := placedCard.Power[n.placedPowerIdx]
-			nPower := neighborCard.Power[n.neighborPowerIdx]
+			pPower := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex)
+			nPower := getEffectivePower(neighborCard, n.neighborPowerIdx, neighborIndex)
 
-			if rules["Same"] && pPower == nPower {
+			if rules["Power_copy"] && pPower == nPower {
 				sameGroups[pPower] = append(sameGroups[pPower], neighborIndex)
 			}
-			if rules["Plus"] {
+			if rules["Power_up"] {
 				sum := pPower + nPower
 				plusGroups[sum] = append(plusGroups[sum], neighborIndex)
 			}
@@ -1469,7 +1472,7 @@ func simulateCapturesOnBoard(board [9]*Card, placedCard *Card, gridIndex int, pl
 				// Combo only triggers Basic Capture logic (Power Comparison)
 				// Check if it flips an *opponent's* card (from the perspective of playerIndex)
 				if neighbor.Owner != playerIndex && !flipped[nbIdx] {
-					if currentCard.Power[n.placedPowerIdx] > neighbor.Power[n.neighborPowerIdx] {
+					if getEffectivePower(currentCard, n.placedPowerIdx, currIdx) > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx) {
 						flipped[nbIdx] = true
 						totalScore += playerComboFlipWeight
 						comboQueue = append(comboQueue, nbIdx)
@@ -1560,13 +1563,13 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 		neighborIndex := gridIndex + n.offset
 		if n.boundaryCheck(gridIndex) && Game.Board[neighborIndex] != nil {
 			neighborCard := Game.Board[neighborIndex]
-			pPower := placedCard.Power[n.placedPowerIdx]
-			nPower := neighborCard.Power[n.neighborPowerIdx]
+			pPower := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex)
+			nPower := getEffectivePower(neighborCard, n.neighborPowerIdx, neighborIndex)
 
-			if Game.Rules["Same"] && pPower == nPower {
+			if Game.Rules["Power_copy"] && pPower == nPower {
 				sameGroups[pPower] = append(sameGroups[pPower], neighborIndex)
 			}
-			if Game.Rules["Plus"] {
+			if Game.Rules["Power_up"] {
 				sum := pPower + nPower
 				plusGroups[sum] = append(plusGroups[sum], neighborIndex)
 			}
@@ -1615,7 +1618,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 			if n.boundaryCheck(currIdx) && Game.Board[nbIdx] != nil {
 				neighbor := Game.Board[nbIdx]
 				if neighbor.Owner != placedCard.Owner && !flipped[nbIdx] {
-					if currCard.Power[n.placedPowerIdx] > neighbor.Power[n.neighborPowerIdx] {
+					if getEffectivePower(currCard, n.placedPowerIdx, currIdx) > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx) {
 						flipped[nbIdx] = true
 						totalScore += comboFlipWeight // Combo flip weight
 						comboQueue = append(comboQueue, nbIdx)
@@ -1629,7 +1632,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 		// Defensive penalty: avoid placing weak sides against open board slots
 		for _, n := range neighbors {
 			if n.boundaryCheck(gridIndex) && Game.Board[gridIndex+n.offset] == nil {
-				power := placedCard.Power[n.placedPowerIdx]
+				power := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex)
 				if power < 1500 { // Significant penalty for exposing sides lower than Level P (1500)
 					totalScore -= (1500 - power) / 10
 				}

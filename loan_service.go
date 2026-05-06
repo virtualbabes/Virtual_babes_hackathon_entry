@@ -122,7 +122,10 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Dispense loan amount to player's rewards
+	// CRITICAL FIX: Deduct principal from Faucet Pool to maintain economic balance
+	l.faucetBalance -= req.LoanAmount
 	l.rewards[req.Wallet] += loanAmountMicro
+	l.applyDynamicScalingLocked()
 
 	l.logAdminAudit("LOAN_TAKEN", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f, Repay: %.2f", loanID, req.LoanAmount, float64(repaymentAmountMicro)/1000000.0))
 	w.Header().Set("Content-Type", "application/json")
@@ -171,7 +174,7 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 
 	// Add the full repayment amount (principal + interest) to the faucet balance
 	l.faucetBalance += float64(loan.RepaymentAmount) / 1000000.0
-	l.applyDynamicScaling() // Recalculate rewards based on new faucet balance
+	l.applyDynamicScalingLocked() // Recalculate rewards based on new faucet balance
 	// Fulfillment
 	stats := l.leaderboard[req.Wallet]
 	if stats.Inventory == nil {

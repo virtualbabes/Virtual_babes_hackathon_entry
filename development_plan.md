@@ -31,10 +31,17 @@
 - [x] Hardened Tournament History: Implemented conditional deep verification based on `deep_verify` parameter.
 - [x] Hardened Tournament Registration: Verified `isElite` check correctly bypasses buy-in transaction verification.
 - [x] Hardened Kidnap Gambit: Ensured robust card selection logic (favorite vs. rarest) and correct removal from victim's inventory in `handleKidnapRequest`.
-- [x] Hardened Card Tooltip: `showPowerTooltip` now accurately reflects all card and player-level modifiers.
+- [x] Hardened Jailing Mechanics: Implemented capture-type tracking for deterministic flip attribution.
+- [x] Hardened Jailing Mechanics: Implemented capture-type tracking for deterministic flip attribution.
+- [x] Hardened Loan System: Verified collateral escrow and implemented principal deduction from faucet liquidity.
+- [x] Hardened Auction Commission: Ensured 10% commission from Art Gallery auctions is distributed to the owning club's treasury.
+- [x] Hardened Courthouse Fines: Resolved deadlock and verified equitable fine distribution logic.
+- [x] Hardened Industrial Leases: Resolved TakeLease deadlock and verified economic precision.
+- [x] Hardened Reputation System: Confirmed correct weighting of Employment Multiplier and Cosmetic Prestige bonuses.
+- [x] Hardened Lease Expirations: Ensured returned cards are restored and UI is synchronized.
+- [x] Hardened Move Validation: Secured `handleMove` power logic against session-drop penalty exploits.
+- [x] Hardened Opt-In Checks: Differentiated indexer errors from missing opt-ins in `checkAssetOptIn`.
 - [x] Hardened Tournament Kickbacks: Ensured `distributeTournamentKickback` uses accurate blockchain transaction time for club membership.
-- [x] Hardened Insurance Recovery: Ensured `processInsuranceRecovery` correctly returns recovered cards to the victim's inventory.
-- [x] Hardened UI Textures: Implemented dynamic arena floor textures based on game phase and tournament status.
 - [x] Hardened Black Market: Resolved deadlocks and implemented immediate UI synchronization for criminal activity.
 - [x] Hardened Auction Bidding: Implemented immediate deduction of new bids and refund of outbid funds.
 - [x] Hardened Sybil Sync UI: Frontend now correctly displays "warming up" message for onboarding.
@@ -70,7 +77,3 @@
 4. Complete: Implemented granular node-diffing for `board-container` in `syncUI` to prevent flickering during card flips.
 5. Complete: Displayed Cunning and Nurturing values in the `syncUI` profile overlay with Cyberpunk styling.
 6. Complete: Implemented Club Lease Board overlay with regional prioritization logic.
-
-
-## Next steps prompts:
-Check the `PerformAIMove` logic in `main.go` to ensure the bot accounts for card Fatigue and Loyalty modifiers when evaluating the optimal move.

@@ -109,6 +109,7 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 	// Update player's salary
 	stats := l.leaderboard[targetWallet]
 	stats.Salary = uint64(data.SalaryAmount * 1000000) // Store in micro-units
+	club.LastActivity = time.Now() // Management actions refresh club activity status
 	l.leaderboard[targetWallet] = stats
 
 	l.logAdminAudit("SET_SALARY", targetWallet, fmt.Sprintf("Club: %s (%s), Amount: %.2f $VBV", club.Name, club.ID, data.SalaryAmount))

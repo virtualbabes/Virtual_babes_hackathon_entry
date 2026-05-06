@@ -335,12 +335,12 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			
 			// Dispatch grouped rewards in background goroutine
 			go func(p string, rank int, amt uint64) {
-				txid, err := l.dispatchTournamentRewards(p, rank+1, amt)
+				txid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
 				if err != nil {
 					log.Printf("[TOURNAMENT ERROR] Payout failed for rank %d (%s): %v\n", rank+1, p, err)
 				} else {
-					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). Tx: %s\n", rank+1, p, txid)
-					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received pot share + reward stack. Tx: %s", rank+1, p, txid))
+					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). Tx: %s. Skipped: %v\n", rank+1, p, txid, skipped)
+					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received rewards. Tx: %s. (Skipped: %v)", rank+1, p, txid, strings.Join(skipped, ", ")))
 				}
 			}(player, i, shareMicro)
 		}
@@ -380,7 +380,7 @@ func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
 }
 
 // dispatchTournamentRewards handles multi-asset distribution for tournament finishers.
-func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (string, error) {
+func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (string, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	activeRewards := l.rewards
@@ -393,6 +393,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	sp, _ := client.SuggestedParams().Do(context.Background())
 
 	var txns []types.Transaction
+	var skippedAssets []string
 	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
 	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"rank\":%d,\"pot_share\":%d}", rank, potShareMicro))
 
@@ -409,13 +410,41 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 			amt += potShareMicro
 		}
 
+		// NEW: Granular Opt-in Verification to prevent group failure
+		optedIn, _, err := l.checkAssetOptIn("VOI", recipient, appIDStr)
+		if err != nil || !optedIn {
+			log.Printf("[TOURNAMENT] Skipping asset %s for %s: Opt-in missing or error: %v", appIDStr, recipient, err)
+			skippedAssets = append(skippedAssets, appIDStr)
+			continue
+		}
+
+		// Check vault's balance for this specific asset
+		boxResponse, err := client.GetApplicationBoxByName(appID, vaultAddrObj[:]).Do(context.Background())
+		if err != nil {
+			log.Printf("[TOURNAMENT] Reward app %s box fetch failed: %v", appIDStr, err)
+			skippedAssets = append(skippedAssets, appIDStr)
+			continue
+		}
+
+		if len(boxResponse.Value) >= 32 {
+			bal := new(big.Int).SetBytes(boxResponse.Value[:32]).Uint64()
+			if bal < amt {
+				log.Printf("[TOURNAMENT] Insufficient vault balance for asset %s. Needed: %d", appIDStr, amt)
+				skippedAssets = append(skippedAssets, appIDStr)
+				continue
+			}
+		}
+
 		// Build NoOp call for ARC-200 with winner as account argument and placement note
 		txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, []string{recipient}, nil, nil, sp, vaultAddrObj, note, types.Digest{}, [32]byte{}, types.Address{})
 		txns = append(txns, txn)
 	}
 
 	if len(txns) == 0 {
-		return "", fmt.Errorf("no reward assets configured for payout")
+		if len(skippedAssets) > 0 {
+			return "", skippedAssets, fmt.Errorf("all attempted assets skipped due to opt-in or balance failures")
+		}
+		return "", nil, fmt.Errorf("no reward assets configured for payout")
 	}
 
 	gid, _ := crypto.ComputeGroupID(txns)
@@ -429,9 +458,9 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	}
 
 	if _, err := client.SendRawTransaction(signedGroup).Do(context.Background()); err != nil {
-		return "", err
+		return "", skippedAssets, err
 	}
-	return firstTxID, nil
+	return firstTxID, skippedAssets, nil
 }
 
 func (l *Lobby) broadcastTournamentState() {

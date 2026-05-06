@@ -67,7 +67,7 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 	stats.WantedLevel = 0
 	l.leaderboard[req.Wallet] = stats
 	l.faucetBalance += (costBase / 2.0) // Half of the fine returns to the global faucet pool
-	l.distributeCourthouseFineToClubs(costBase / 2.0) // The other half is distributed to clubs
+	l.distributeCourthouseFineToClubsLocked(costBase / 2.0) // The other half is distributed to clubs
 	l.mutex.Unlock()
 
 	l.logAdminAudit("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine to reset Wanted Level", costBase))

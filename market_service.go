@@ -39,7 +39,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 
 	basePrice := float64((targetStats.Wins * 10) + (float64(targetStats.Reputation) / 2.0) + 100.0)
 	for _, rumor := range l.rumors {
-		if rumor.TargetWallet == targetWallet && time.Now().Before(rumor.ExpiresAt) {
+		if strings.EqualFold(rumor.TargetWallet, targetWallet) && time.Now().Before(rumor.ExpiresAt) {
 			basePrice *= rumor.Strength
 		}
 	}
@@ -57,7 +57,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			
 			// Industrial Loop: Investment returns to Faucet
 			l.faucetBalance += totalValueBase
-			l.applyDynamicScaling()
+			l.applyDynamicScalingLocked()
 			l.logAdminAudit("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s", data.Amount, targetWallet))
 		} else {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance."}`)})
@@ -76,7 +76,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 
 			// Industrial Loop: Payout from Faucet
 			l.faucetBalance -= totalValueBase
-			l.applyDynamicScaling()
+			l.applyDynamicScalingLocked()
 			l.logAdminAudit("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
 		} else {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})

@@ -860,18 +860,34 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 	if network == "VOI" {
 		assetID, _ := strconv.ParseUint(assetIDStr, 10, 64)
 		addr, _ := types.DecodeAddress(wallet)
-		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(context.Background())
-		return err == nil, 0, nil
+		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(context.Background()) 
+		if err != nil {
+			// If the error contains "404" or "not found", the user is definitely not opted in.
+			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+				return false, 0, nil
+			}
+			// Otherwise, it's a node/network error, return it so the caller knows the check failed.
+			return false, 0, fmt.Errorf("voi node error during opt-in check: %w", err)
+		}
+		return true, 0, nil
 	}
+
 	url := fmt.Sprintf("%s/v2/accounts/%s", netConfig.IndexerURL, wallet)
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return false, 0, err
+		return false, 0, fmt.Errorf("indexer connection failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return false, 0, nil
+	} else if resp.StatusCode != http.StatusOK {
+		return false, 0, fmt.Errorf("indexer returned error status: %d", resp.StatusCode)
+	}
+
 	var res struct {
 		Account struct {
 			Assets []struct {

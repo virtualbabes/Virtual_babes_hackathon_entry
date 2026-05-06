@@ -156,7 +156,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		portfolioPayload, _ := json.Marshal(stats.Portfolio) // Marshal portfolio while lock is held
 
 		// Check admin status and update client while lock is held
-		if l.isAdminWallet(data.Wallet) {
+		isAdmin := l.isAdminWallet(data.Wallet)
+		if isAdmin {
 			if c, ok := l.clients[env.FromID]; ok {
 				c.isAdmin = true
 			}
@@ -164,28 +165,31 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.mutex.Unlock() // Release lock after all state modifications
 		go l.syncStatsFromBlockchain(env.FromID, data.Wallet)
 		l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
-		if l.isAdminWallet(data.Wallet) {
-			if c, ok := l.clients[env.FromID]; ok {
-				c.isAdmin = true
-				msg := l.getLobbyUpdateMsgLocked()
-				go func() { l.broadcast <- msg }()
-			}
+		if isAdmin {
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 		}
 	case "register_avatar":
 		var data struct {
-			URL, Gloat string `json:"url"`
+			URL            string `json:"url"`
+			Gloat          string `json:"gloat"`
+			FavoriteCardID int    `json:"favorite_card_id"`
 		}
-		// Also allow setting a favorite card ID here
 		json.Unmarshal(env.Payload, &data)
 
 		targetURL := strings.TrimSpace(data.URL)
 		l.mutex.Lock()
+		wallet := l.wallets[env.FromID]
 
 		// Enforce Avatar Ban: check against active bans
 		if expiry, banned := l.bannedAvatars[targetURL]; banned && time.Now().Before(expiry) {
 			l.mutex.Unlock()
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", FromID: "SERVER", Payload: json.RawMessage(`{"text":"❌ <b>AVATAR BLOCKED:</b> This image is restricted by Arena security."}`)})
 			return
+		}
+
+		if stats, exists := l.leaderboard[wallet]; exists {
+			stats.FavoriteCardID = data.FavoriteCardID
+			l.leaderboard[wallet] = stats
 		}
 
 		if c, ok := l.clients[env.FromID]; ok {
@@ -342,7 +346,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			// SECURE SYNC: Fetch card from server authoritative inventory to prevent power spoofing
 			card, exists := l.inventory[move.CardID]
 			if !exists {
-				card = ServerCard{ID: move.CardID, Power: move.Power}
+				// Hardening: If card isn't in server cache, use a baseline weak card to prevent spoofing
+				log.Printf("[SECURITY] Unauthorized CardID %d in move from %s. Using baseline power.\n", move.CardID, env.FromID)
+				card = ServerCard{ID: move.CardID, Power: [4]int{5, 5, 5, 5}}
 			}
 
 			match.Board[move.GridIndex] = &ServerCard{
@@ -655,6 +661,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.handleCreateLease(env)
 	case "take_lease":
 		l.handleTakeLease(env)
+	case "bail_card":
+		l.handleBailCard(env)
 	case "equip_cosmetic":
 		var data struct {
 			FaceplateID string `json:"faceplate_id"`
@@ -1055,6 +1063,8 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 
 	match := &MatchState{
 		P1ID: id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
+		P1Wallet:      l.wallets[id1],
+		P2Wallet:      l.wallets[id2],
 		Rules:         map[string]bool{"Open": true},             // Default rules
 		P1WantedLevel: l.leaderboard[l.wallets[id1]].WantedLevel, // Wanted levels from leaderboard
 		P2WantedLevel: l.leaderboard[l.wallets[id2]].WantedLevel,
@@ -1369,17 +1379,11 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 	for i := 0; i < size; i++ {
 		mockWallet := fmt.Sprintf("SIM_PLAYER_%d_%d", i, time.Now().UnixNano()%10000)
 		participants[i] = mockWallet
-		// Ensure mock players have basic stats to avoid nil pointer issues in leaderboard lookups
 		l.leaderboard[mockWallet] = PlayerStats{
 			Reputation: rand.Intn(1000),
 			Wins:       rand.Intn(50),
-			Inventory:  make(map[string]int),
-			Playstyle: PlaystyleTendencies{
-				PreferredRules:     make(map[string]float64),
-				PreferredCardMoods: make(map[string]float64),
-				PreferredItems:     make(map[string]float64),
-			},
 		}
+		l.ensurePlayerStatsMapsInitialized(mockWallet)
 		// Simulate registration to trigger kickback logic (if isBuyIn)
 		if isBuyIn {
 			l.paidParticipants = append(l.paidParticipants, mockWallet)
@@ -1509,7 +1513,7 @@ func (l *Lobby) processMojoDecay() {
 			decayOccurred = true
 
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
-			// We don't update LastActivity here, so it continues to decay every tick until activity occurs.
+			club.LastActivity = now // Reset stagnation clock to prevent Mojo collapse; decay is now periodic.
 		}
 	}
 
@@ -1577,8 +1581,26 @@ func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	if stats.Inventory == nil {
 		stats.Inventory = make(map[string]int)
 	}
+	if stats.Relationships == nil {
+		stats.Relationships = make(map[string]int)
+	}
+	if stats.Portfolio == nil {
+		stats.Portfolio = make(map[string]float64)
+	}
 	if stats.JailedCards == nil {
 		stats.JailedCards = make(map[int]string)
+	}
+	if stats.KidnappedCards == nil {
+		stats.KidnappedCards = make(map[int]string)
+	}
+	if stats.HeldHostageCards == nil {
+		stats.HeldHostageCards = make(map[int]string)
+	}
+	if stats.PreferredRules == nil {
+		stats.PreferredRules = make(map[string]int)
+	}
+	if stats.Moods == nil {
+		stats.Moods = make(map[string]int)
 	}
 	if stats.Playstyle.PreferredRules == nil {
 		stats.Playstyle.PreferredRules = make(map[string]float64)

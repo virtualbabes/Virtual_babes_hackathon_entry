@@ -197,6 +197,8 @@ type ARC72Metadata struct {
 type MatchState struct {
 	P1ID              string
 	P2ID              string
+	P1Wallet          string // Snapshotted for penalty calculation stability
+	P2Wallet          string
 	TournamentMatchID string // Link to tournament bracket
 	P1Deck            []int  // Card IDs in P1's deck
 	P1Avatar          string
@@ -223,6 +225,7 @@ type CapturedCardInfo struct {
 	CardID                int
 	OriginalOwnerWallet   string // Wallet of the player who originally owned the card
 	CapturingPlayerWallet string // Wallet of the player who captured the card
+	CaptureType           string // "BASIC", "SAME", "POWER_UP", "COMBO"
 	GridIndex             int
 }
 

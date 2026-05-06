@@ -28,11 +28,14 @@ func (l *Lobby) processLoans() {
 				if borrowerStats.Reputation < 0 {
 					borrowerStats.Reputation = 0
 				}
+				// RECONCILE: Ensure calculated stats are in sync
+				borrowerStats.Reputation = l.CalculateReputation(borrowerStats)
+				l.leaderboard[borrowerWallet] = borrowerStats
 				l.leaderboard[borrowerWallet] = borrowerStats
 
 				l.sendToClient(l.getClientIDFromWallet(borrowerWallet), Envelope{
 					Type:    "admin_notification",
-					Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>LOAN DEFAULTED:</b> Collateral moved to Black Market. You received %d Market Tokens as equity."}`, tokenReward)),
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>LOAN DEFAULTED:</b> Collateral moved to Black Market. You received %.2f Market Tokens as equity."}`, float64(tokenReward)/1000000.0)),
 				})
 			}
 
@@ -44,6 +47,7 @@ func (l *Lobby) processLoans() {
 			l.blackMarket = append(l.blackMarket, *loan)
 
 			delete(l.loans, id)
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 		}
 	}
 }
@@ -61,20 +65,20 @@ func (l *Lobby) processAuctions() {
 
 				// 2. Settle $VBV rewards (deduct bid from highest bidder, pay seller)
 				if l.rewards[a.HighestBidder] >= a.CurrentBid { // Ensure bidder still has funds
-					// 1. Add commission to faucet balance (Only on successful settlement!)
-					l.faucetBalance += float64(commissionMicro) / 1000000.0
+					// Distribute commission: 10% to the club owning the Art Gallery territory, else to faucet
+					artGalleryClub := l.getClubByTerritoryID(a.TerritoryID) // a.TerritoryID is "the_art_gallery"
+					if artGalleryClub != nil {
+						artGalleryClub.Treasury += float64(commissionMicro) / 1000000.0
+						artGalleryClub.LastActivity = time.Now() // Update club activity
+						log.Printf("[AUCTION] Club %s (%s) earned %.2f $VBV commission from auction %s.\n", artGalleryClub.Name, artGalleryClub.ID, float64(commissionMicro)/1000000.0, a.ID)
+					} else {
+						// Fallback: If no club owns the Art Gallery, the commission goes to the faucet
+						l.faucetBalance += float64(commissionMicro) / 1000000.0
+						log.Printf("[AUCTION] No club owns 'the_art_gallery'. Commission from auction %s added to faucet.\n", a.ID)
+					}
 
 					l.rewards[a.HighestBidder] -= a.CurrentBid
 					l.rewards[a.SellerWallet] += payoutMicro
-
-					// Update club activity if commission was added to its treasury
-					if club := l.getClubByTerritoryID(a.TerritoryID); club != nil { // RLock is fine here
-						// This assumes commission is added to club treasury, which it is not currently in this function.
-						// However, if it were, this is where club.LastActivity should be updated.
-						// For now, the commission goes to the faucet.
-						// If a future change directs commission to club, this line should be uncommented:
-						// club.LastActivity = time.Now()
-					}
 
 					// 3. Apply dynamic scaling due to faucet balance change
 					l.applyDynamicScalingLocked() // Call the locked version
@@ -102,6 +106,9 @@ func (l *Lobby) processAuctions() {
 					// Bidder no longer has funds, return item to seller
 					log.Printf("[AUCTION] Bidder %s for auction %s has insufficient funds. Returning item to seller %s.\n", a.HighestBidder, a.ID, a.SellerWallet)
 					stats := l.leaderboard[a.SellerWallet]
+					if stats.Inventory == nil {
+						stats.Inventory = make(map[string]int)
+					}
 					if a.Bundle.CardID != 0 {
 						stats.Inventory[fmt.Sprintf("CARD-%d", a.Bundle.CardID)]++
 					}
@@ -118,6 +125,9 @@ func (l *Lobby) processAuctions() {
 			} else {
 				// No bids: return items to seller
 				stats := l.leaderboard[a.SellerWallet]
+				if stats.Inventory == nil {
+					stats.Inventory = make(map[string]int)
+				}
 				if a.Bundle.CardID != 0 {
 					stats.Inventory[fmt.Sprintf("CARD-%d", a.Bundle.CardID)]++
 				}
@@ -132,6 +142,7 @@ func (l *Lobby) processAuctions() {
 				l.sendToClient(l.getClientIDFromWallet(a.SellerWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"😔 <b>AUCTION EXPIRED:</b> No bids received. Item returned."}`)})
 			}
 			delete(l.auctions, id)
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 		}
 	}
 }

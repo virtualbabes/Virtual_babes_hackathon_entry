@@ -20,15 +20,14 @@ func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mutex.RUnlock()
 
-	// Lazy Resolution outside the global lock to prevent display latency and deadlocks.
-	// Proactive resolution is still performed during creation and bidding.
+	// Lazy Resolution: We resolve names outside the global state lock to prevent 
+	// display latency. Since we're iterating pointers, updating 'a' populates the 
+	// master record for all future requests.
 	for _, a := range list {
-		// If the name is missing, attempt resolution. 
-		// ResolveEnvoiName uses its own internal cache to avoid redundant indexer hits.
 		if a.SellerName == "" {
 			a.SellerName = l.ResolveEnvoiName(a.SellerWallet)
 		}
-		if a.HighestBidder != "" && a.HighestBidderName == "" {
+		if a.HighestBidder != "" && (a.HighestBidderName == "" || a.HighestBidderName == a.HighestBidder) {
 			a.HighestBidderName = l.ResolveEnvoiName(a.HighestBidder)
 		}
 	}

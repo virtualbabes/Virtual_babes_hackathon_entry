@@ -17,6 +17,13 @@ import (
 )
 
 func (l *Lobby) applyDynamicScaling() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.applyDynamicScalingLocked()
+}
+
+// applyDynamicScalingLocked contains the core logic for reward scaling and assumes the mutex is held.
+func (l *Lobby) applyDynamicScalingLocked() {
 	// Scaling is based on how full the faucet is relative to its target maximum
 	if l.maxFaucetCapacity <= 0 {
 		return

@@ -1,11 +1,25 @@
 # NFT Seduction Tasks
 
 ## Critical Launch Readiness
-- [x] Hardened Card Tooltip: `showPowerTooltip` now accurately reflects all card and player-level modifiers.
-- [x] Hardened Card Visuals: `renderCardHTML` now displays Mood, Artifacts, Fatigue, and Loyalty.
+- [x] Hardened Jailing Mechanics: Implemented capture-type tracking and inventory safety guards in `battle_service.go`.
+- [x] Hardened Move Validation: `CapturedCards` now distinguishes capture types (BASIC, SAME, etc.) for jailing accuracy.
 - [x] Resolved profile synergy: Achievement, Mojo, and Jailed Card state now flows through Go WASM to UI.
-- [x] Audit `updateDynamicArenaFloor` function for correct background texture selection.
-- [x] Audit `processInsuranceRecovery` to ensure recovered cards are returned to victim's inventory.
+- [x] Audit `processAuctions` logic for Art Gallery commission distribution.
+- [x] Hardened Industrial Leases: Verified ownership transfer, fixed deadlocks, and standardized payouts.
+- [x] Audit `distributeCourthouseFineToClubs` for correct split and activity updates; fixed deadlock.
+- [x] Audit `CalculateReputation` for correct Employment Multiplier and Cosmetic Prestige bonuses.
+- [x] Hardened Club Management: UI sync added to Create/Join/Purchase handlers.
+- [x] Audit `handleHeist` for activity tracking and social standing updates.
+- [x] Audit `archiveSeason` logic for correct seasonal stats export and leaderboard wipe.
+- [x] Hardened `dispatchTournamentRewards` with granular opt-in checks and skipped asset tracking.
+- [x] Audit `processLeaseExpirations` for correct card return and UI sync.
+- [x] Audit `handleMove` in `lobby_manager.go` for Wanted/Fatigue penalty persistence.
+- [x] Audit `checkAssetOptIn` for robust indexer error handling.
+- [x] Audit `handleSpreadRumor` and `handleTradeShares` for rumor application accuracy.
+- [x] Audit `handleRepayLoan` for interest verification and scaling concurrency.
+- [x] Hardened `processAuctions` to ensure inventory safety and immediate UI synchronization.
+- [x] Audit `processLoans` to ensure 15% residual value and UI sync are correct.
+- [x] Audit `handleTakeLoan` to ensure collateral escrow and faucet deductions are accurate.
 - [x] Audit `handleTournamentRegister` to ensure `distributeTournamentKickback` uses accurate `registrationTime`.
 - [x] Review the `handleKidnapRequest` function in `handlers_criminality.go` to ensure that the selection logic for the target card (favorite vs. rarest) is robust and handles edge cases where no cards are found.
 - [x] Audit `handleTournamentHistory` for `deep_verify` parameter to trigger full re-verification.
@@ -68,6 +82,3 @@
 - [x] Analyze frontend logic and build configuration (app.js, collective-intelligence.js, package.json).
 - [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis.
 - [x] Merge ReadMe.txt into README.md.
-
-## Next steps prompts:
-Check the `PerformAIMove` logic in `main.go` to ensure the bot accounts for card Fatigue and Loyalty modifiers when evaluating the optimal move.

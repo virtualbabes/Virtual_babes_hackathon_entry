@@ -214,6 +214,98 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
+// handleBailCard allows a player to pay a fine to release a jailed card.
+func (l *Lobby) handleBailCard(env *Envelope) {
+	var data BailCardData
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		log.Printf("[CRIMINALITY] Invalid bail_card payload from %s: %v\n", env.FromID, err)
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	playerWallet, ok := l.wallets[env.FromID]
+	if !ok {
+		log.Printf("[CRIMINALITY] Bail failed: Sender %s not connected.\n", env.FromID)
+		return
+	}
+
+	club, exists := l.clubs[data.ClubID]
+	if !exists {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Club not found."}`)})
+		return
+	}
+
+	jailedCard, isJailed := club.Jail[data.CardID]
+	if !isJailed {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Card not found in this club's jail."}`)})
+		return
+	}
+
+	// Ensure the card belongs to the player attempting to bail it
+	playerStats := l.leaderboard[playerWallet]
+	if clubIDForCard, ok := playerStats.JailedCards[data.CardID]; !ok || clubIDForCard != data.ClubID {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: You do not own this jailed card."}`)})
+		return
+	}
+
+	// Bail amount: 200 $VBV (micro-units)
+	const bailAmountMicro = 200 * 1000000
+	bailAmountBase := float64(bailAmountMicro) / 1000000.0
+
+	// Verify payment transaction
+	voiConfig, voiOk := l.availableNetworks["Voi Mainnet"]
+	avoiAssetID := l.avoiAssetID
+	vaultAddr := l.vaultAddress
+
+	if !voiOk {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Voi network configuration missing."}`)})
+		return
+	}
+
+	assetID := voiConfig.AssetID
+	verifyNet := "Voi"
+	if strings.EqualFold(data.Network, "ALGO") {
+		assetID = avoiAssetID
+		verifyNet = "Algorand"
+	}
+
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, bailAmountMicro, assetID, playerWallet, vaultAddr)
+	if err != nil || !verified {
+		log.Printf("[CRIMINALITY] Bail payment verification failed for %s (Card %d): %v\n", playerWallet, data.CardID, err)
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Payment verification failed or insufficient amount."}`)})
+		return
+	}
+
+	// Distribute bail proceeds to the jailing club's treasury
+	club.Treasury += bailAmountBase
+	club.LastActivity = time.Now() // Revenue counts as activity
+
+	// Release card from jail
+	delete(club.Jail, data.CardID)
+
+	// Remove from player's JailedCards and add back to Inventory
+	delete(playerStats.JailedCards, data.CardID)
+	if playerStats.Inventory == nil {
+		playerStats.Inventory = make(map[string]int)
+	}
+	playerStats.Inventory[fmt.Sprintf("CARD-%d", data.CardID)]++
+	l.leaderboard[playerWallet] = playerStats
+
+	l.logAdminAudit("CARD_BAILED", playerWallet, fmt.Sprintf("Card #%d bailed from Club %s for %.2f $VBV", data.CardID, club.Name, bailAmountBase))
+	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>BAIL PAID:</b> Your card '%s' has been released from %s's jail!"}`, escapeHTML(jailedCard.Name), escapeHTML(club.Name)))})
+
+	// Notify club owner/members (optional, but good for transparency)
+	clubOwnerClientID := l.getClientIDFromWallet(club.OwnerWallet)
+	if clubOwnerClientID != "" {
+		l.sendToClient(clubOwnerClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>BAIL RECEIVED:</b> Club %s received %.2f $VBV for card #%d."}`, escapeHTML(club.Name), bailAmountBase, data.CardID))})
+	}
+
+	// Broadcast update to refresh UI lists
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
 // processInsuranceRecovery checks for cards that have been held hostage for too long.
 func (l *Lobby) processInsuranceRecovery() {
 	l.mutex.Lock()

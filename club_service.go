@@ -43,8 +43,16 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
 	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
+	now := time.Now()
 	for buffID, itemID := range targetClub.ActiveBuffs {
 		if strings.HasPrefix(buffID, "TRAP_") {
+			// Lazy Pruning: Remove expired traps
+			if expiry, ok := targetClub.BuffExpirations[buffID]; ok && now.After(expiry) {
+				delete(targetClub.ActiveBuffs, buffID)
+				delete(targetClub.BuffExpirations, buffID)
+				continue
+			}
+
 			if item, exists := GlobalShopRegistry[itemID]; exists {
 				successChance += item.HeistSuccessModifier
 			}
@@ -75,8 +83,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.Playstyle.RiskTolerance += 0.05
 		playerStats.HeistAttempts++
 		targetClub.Treasury -= loot
-		targetClub.LastActivity = time.Now()
+		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
+		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.Cunning += 1
 
 		go l.unlockAchievement(wallet, "FIRST_HEIST")
@@ -84,7 +93,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		status = "failure"
 		playerStats.WantedLevel += 15
 		playerStats.Playstyle.RiskTolerance += 0.10
+		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.HeistAttempts++
+		targetClub.LastActivity = now // Defense engagement counts as activity
 
 		hasGuardDog := false
 		for _, trapItemID := range targetClub.ActiveBuffs {
@@ -124,6 +135,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		"target_club_id":  data.TargetClubID,
 	})
 	l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
+
+	// Trigger Global Sync so others see the treasury loot and the player's new Wanted Level
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
 // handleCreateClub allows a player to found a new organization.
@@ -180,6 +194,9 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 
 	l.logAdminAudit("CLUB_CREATED", wallet, fmt.Sprintf("Name: %s, ID: %s", data.Name, clubID))
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🏛️ Club '%s' successfully founded!"}`, data.Name))})
+
+	// Trigger Global Sync to show the new club on the world map
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
 // handleJoinClub allows a player to become a member of an existing club.
@@ -221,12 +238,23 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 		if club.Members == nil {
 			club.Members = make(map[string]time.Time)
 		}
+
+		// Prevent double-joining exploit
+		if _, isMember := club.Members[strings.ToLower(wallet)]; isMember {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚠️ You are already a member of this club."}`)})
+			return
+		}
+
 		club.Members[strings.ToLower(wallet)] = time.Now()
 		club.Treasury += 250.0
 		club.LastActivity = time.Now()
 		l.mutex.Unlock()
 		l.logAdminAudit("CLUB_JOIN", wallet, fmt.Sprintf("Club: %s", data.ClubID))
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 Welcome to %s!"}`, club.Name))})
+
+		// Sync UI to update membership lists and treasury balances
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	} else {
 		l.mutex.Unlock()
 	}
@@ -244,16 +272,24 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 		return
 	}
 
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
+	l.mutex.RLock()
 	ownerWallet, ok := l.wallets[env.FromID]
+	vaultAddr := l.vaultAddress
+	voiConfig, voiOk := l.availableNetworks["Voi Mainnet"]
+	l.mutex.RUnlock()
+
+	if !voiOk {
+		return
+	}
+
 	if !ok {
 		return
 	}
 
+	l.mutex.RLock()
 	club, exists := l.clubs[data.ClubID]
 	if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
+		l.mutex.RUnlock()
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Unauthorized or Club not found."}`)})
 		return
 	}
@@ -261,14 +297,15 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	for _, existingClub := range l.clubs {
 		for _, t := range existingClub.Territories {
 			if t == data.TerritoryID {
+				l.mutex.RUnlock()
 				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: District already claimed."}`)})
 				return
 			}
 		}
 	}
+	l.mutex.RUnlock()
 
 	purchaseCost := 2500.0
-	voiConfig := l.availableNetworks["Voi Mainnet"]
 	assetID := voiConfig.AssetID
 	verifyNet := "Voi"
 	if data.Network == "ALGO" {
@@ -276,20 +313,42 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*1000000), assetID, ownerWallet, l.vaultAddress)
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*1000000), assetID, ownerWallet, vaultAddr)
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Payment verification failed."}`)})
+		return
+	}
+
+	l.mutex.Lock()
+	// RE-VERIFY: Ensure territory was not claimed while we were verifying the transaction
+	for _, existingClub := range l.clubs {
+		for _, t := range existingClub.Territories {
+			if t == data.TerritoryID {
+				l.mutex.Unlock()
+				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: District claimed by another entity during verification."}`)})
+				return
+			}
+		}
+	}
+
+	club, exists = l.clubs[data.ClubID]
+	if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
+		l.mutex.Unlock()
 		return
 	}
 
 	club.Territories = append(club.Territories, data.TerritoryID)
 	l.clubs[data.ClubID] = club
 	club.LastActivity = time.Now()
+	l.mutex.Unlock()
 
 	l.logAdminAudit("TERRITORY_PURCHASED", ownerWallet, fmt.Sprintf("Club: %s (%s), Territory: %s", club.Name, club.ID, data.TerritoryID))
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🗺️ Club '%s' has acquired %s!"}`, club.Name, data.TerritoryID))})
 
 	go l.refreshRegionalRoles()
+
+	// Trigger Global Sync to update territory ownership visuals
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
 // handleRestockInventory allows authorized staff to restock items in the club shop.
@@ -307,10 +366,15 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	ownerWallet, ok := l.wallets[env.FromID]
-	club, exists := l.clubs[data.ClubID]
-	if !ok || !exists {
+	if !ok {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Restock Failed: Sender not connected."}`)})
 		return
 	}
+	club, exists := l.clubs[data.ClubID]
+	if !exists {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Restock Failed: Club not found."}`)})
+		return
+	}	
 
 	isOwner := strings.EqualFold(club.OwnerWallet, ownerWallet)
 	isManager := club.Staff[strings.ToLower(ownerWallet)] == "Manager"
@@ -357,11 +421,10 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>RESTOCK COMPLETE:</b> Added %d units of %s to inventory."}`, data.Quantity, item.Name))})
 }
 
-// distributeCourthouseFineToClubs distributes a portion of the fine among clubs and governors.
-func (l *Lobby) distributeCourthouseFineToClubs(amount float64) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
+// distributeCourthouseFineToClubsLocked distributes a portion of the fine among clubs and governors.
+// This function assumes the main lobby mutex is already held by the caller.
+func (l *Lobby) distributeCourthouseFineToClubsLocked(amount float64) {
+	now := time.Now()
 	if len(l.clubs) == 0 {
 		return
 	}
@@ -382,14 +445,14 @@ func (l *Lobby) distributeCourthouseFineToClubs(amount float64) {
 		taxPerGovernor := regionalTaxPool / float64(len(governors))
 		for _, govClub := range governors {
 			govClub.Treasury += taxPerGovernor
-			govClub.LastActivity = time.Now() // Revenue counts as activity
+			govClub.LastActivity = now // Revenue counts as activity
 		}
 	}
 
 	sharePerClub := remainingPool / float64(len(l.clubs))
 	for _, club := range l.clubs {
 		club.Treasury += sharePerClub
-		club.LastActivity = time.Now() // Revenue counts as activity
+		club.LastActivity = now // Revenue counts as activity
 	}
 }
 
@@ -481,7 +544,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	l.faucetBalance += lease.Price * 0.20
 	club.Treasury += lease.Price * 0.20
 	club.LastActivity = time.Now() // Club is active when a lease is taken
-	l.applyDynamicScaling()
+	l.applyDynamicScalingLocked()
 
 	memberShareTotalMicro := uint64(lease.Price * 0.10 * 1000000)
 	numMembers := uint64(len(club.Members))
@@ -500,7 +563,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 		// Fallback: If no members exist, the entire 10% share defaults to the Club Treasury
 		club.Treasury += lease.Price * 0.10
 	}
-	l.rewards[strings.ToLower(lease.LenderWallet)] += uint64(lease.Price * 0.50 * 1000000)
+	l.rewards[strings.ToLower(lease.LenderWallet)] += uint64(float64(priceMicro) * 0.50)
 
 	// Execute lease
 	lease.Borrower = borrowerWallet
@@ -521,6 +584,7 @@ func (l *Lobby) processLeaseExpirations() {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	now := time.Now()
+	leasesExpired := false
 	for _, club := range l.clubs {
 		for id, lease := range club.Leases {
 			if lease.Borrower != "" && now.After(lease.ExpiresAt) {
@@ -536,7 +600,12 @@ func (l *Lobby) processLeaseExpirations() {
 
 				delete(club.Leases, id)
 				l.logAdminAudit("LEASE_EXPIRED", lease.LenderWallet, fmt.Sprintf("Card %d returned from %s", lease.CardID, lease.Borrower))
+				leasesExpired = true
 			}
 		}
+	}
+
+	if leasesExpired {
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	}
 }

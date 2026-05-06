@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -39,8 +40,19 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 		return
 	}
 
+	// Hardening: Sanity check for rumor metrics
+	if data.Strength < 0.1 || data.Strength > 2.0 {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Strength must be between 0.1 and 2.0."}`)})
+		return
+	}
+	if data.Duration <= 0 || data.Duration > 1440 { // Max 24 hours
+		data.Duration = 60 // Default to 1 hour if invalid
+	}
+
+	targetWallet := strings.ToLower(data.TargetWallet)
+
 	// Validate target
-	if _, exists := l.leaderboard[data.TargetWallet]; !exists {
+	if _, exists := l.leaderboard[targetWallet]; !exists {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Target not found in Arena."}`)})
 		return
 	}
@@ -58,18 +70,18 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 	rumor := &Rumor{ // Define rumor here so rumorJSON can use it
 		ID:            rumorID,
 		SpreaderWallet: spreaderWallet,
-		TargetWallet:  data.TargetWallet,
+		TargetWallet:  targetWallet,
 		Type:          data.Type,
 		Strength:      data.Strength,
 		ExpiresAt:     time.Now().Add(time.Duration(data.Duration) * time.Minute),
 	}
 	l.rumors[rumorID] = rumor // Add to lobby's rumors map
 
-	l.logAdminAudit("RUMOR_SPREAD", spreaderWallet, fmt.Sprintf("Target: %s, Type: %s, Strength: %.2f, Duration: %dmin", data.TargetWallet, data.Type, data.Strength, data.Duration))
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📢 Rumor about %s spread successfully!"}`, data.TargetWallet))})
+	l.logAdminAudit("RUMOR_SPREAD", spreaderWallet, fmt.Sprintf("Target: %s, Type: %s, Strength: %.2f, Duration: %dmin", targetWallet, data.Type, data.Strength, data.Duration))
+	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📢 Rumor about %s spread successfully!"}`, targetWallet))})
 
 	// Notify target (if connected)
-	targetClientID := l.getClientIDFromWallet(data.TargetWallet)
+	targetClientID := l.getClientIDFromWallet(targetWallet)
 	if targetClientID != "" {
 		l.sendToClient(targetClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"👀 A %s rumor is circulating about you!"}`, data.Type))})
 	}
