@@ -22,8 +22,13 @@ import (
 // logAdminAudit records an administrative action to a separate file for permanent record keeping.
 func (l *Lobby) logAdminAudit(action, target, details string) {
 	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+	l.logAdminAuditLocked(action, target, details)
+}
+
+// logAdminAuditLocked records an administrative action, assuming the lock is held.
+func (l *Lobby) logAdminAuditLocked(action, target, details string) {
 	load := len(l.matches) / 2
-	l.mutex.RUnlock()
 
 	entry := struct {
 		Timestamp  string `json:"timestamp"`

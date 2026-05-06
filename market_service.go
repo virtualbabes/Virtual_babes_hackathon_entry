@@ -87,6 +87,9 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	l.leaderboard[wallet] = stats
 	portfolioPayload, _ := json.Marshal(stats.Portfolio)
 	l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
+
+	// Trigger Global Sync to update Faucet Balance and Market valuations for all players
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
 // observeGlobalSentiments aggregates playstyle data to identify meta-trends.

@@ -100,15 +100,18 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 	var comboQueue []int
 
 	// Determine playerID for buff check (owner of the placed card)
-	playerID := match.P1ID
+	// Hardening: Resolve wallets from match snapshot to handle mid-turn disconnects.
+	capturingPlayerWallet := match.P1Wallet
+	pID := match.P1ID
 	if pIdx == 1 {
-		playerID = match.P2ID
+		capturingPlayerWallet = match.P2Wallet
+		pID = match.P2ID
 	}
 
 	// Check for "rule_breaker" buff (Force_Plus_Trigger)
 	forcePlusTrigger := false
-	if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[playerID] != nil {
-		if _, ok := match.ActiveItemBuffs[playerID]["rule_breaker"]; ok {
+	if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[pID] != nil {
+		if _, ok := match.ActiveItemBuffs[pID]["rule_breaker"]; ok {
 			forcePlusTrigger = true
 		}
 	}
@@ -132,16 +135,16 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 
 			// Basic Capture (Direct Comparison)
 			if neighbor.Owner != pIdx && pPower > nPower {
-				originalOwnerWallet := l.wallets[match.P1ID] // Default to P1's wallet
+				originalOwnerWallet := match.P1Wallet // Default to P1's wallet
 				if neighbor.Owner == 1 {
-					originalOwnerWallet = l.wallets[match.P2ID]
+					originalOwnerWallet = match.P2Wallet
 				} // If neighbor was P2's card
 				neighbor.Owner = pIdx
 				totalFlips++
 				capturedCards = append(capturedCards, CapturedCardInfo{
 					CardID:                neighbor.ID,
 					OriginalOwnerWallet:   originalOwnerWallet,
-					CapturingPlayerWallet: l.wallets[playerID],
+					CapturingPlayerWallet: capturingPlayerWallet,
 					CaptureType:           "BASIC",
 					GridIndex:             nbIdx,
 				})
@@ -154,16 +157,16 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 		if len(indices) >= 2 {
 			for _, idx := range indices {
 				if match.Board[idx].Owner != pIdx {
-					originalOwnerWallet := l.wallets[match.P1ID]
+					originalOwnerWallet := match.P1Wallet
 					if match.Board[idx].Owner == 1 {
-						originalOwnerWallet = l.wallets[match.P2ID]
+						originalOwnerWallet = match.P2Wallet
 					}
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
 						CardID:                match.Board[idx].ID,
 						OriginalOwnerWallet:   originalOwnerWallet,
-						CapturingPlayerWallet: l.wallets[playerID],
+						CapturingPlayerWallet: capturingPlayerWallet,
 						CaptureType:           "SAME",
 						GridIndex:             idx,
 					})
@@ -176,16 +179,16 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 		if len(indices) >= 2 {
 			for _, idx := range indices {
 				if match.Board[idx].Owner != pIdx {
-					originalOwnerWallet := l.wallets[match.P1ID]
+					originalOwnerWallet := match.P1Wallet
 					if match.Board[idx].Owner == 1 {
-						originalOwnerWallet = l.wallets[match.P2ID]
+						originalOwnerWallet = match.P2Wallet
 					}
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
 						CardID:                match.Board[idx].ID,
 						OriginalOwnerWallet:   originalOwnerWallet,
-						CapturingPlayerWallet: l.wallets[playerID],
+						CapturingPlayerWallet: capturingPlayerWallet,
 						CaptureType:           "POWER_UP",
 						GridIndex:             idx,
 					})
@@ -219,14 +222,14 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						}
 					}
 					if !alreadyCaptured {
-						originalOwnerWallet := l.wallets[match.P1ID]
+						originalOwnerWallet := match.P1Wallet
 						if neighbor.Owner == 1 {
-							originalOwnerWallet = l.wallets[match.P2ID]
+							originalOwnerWallet = match.P2Wallet
 						}
 						capturedCards = append(capturedCards, CapturedCardInfo{
 							CardID:                neighbor.ID,
 							OriginalOwnerWallet:   originalOwnerWallet,
-							CapturingPlayerWallet: l.wallets[playerID],
+							CapturingPlayerWallet: capturingPlayerWallet,
 							CaptureType:           "COMBO",
 							GridIndex:             nbIdx,
 						})
@@ -240,6 +243,8 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 	return totalFlips, capturedCards
 }
 
+// verifyWinner determines the match outcome and initiates reward/jailing logic.
+// Note: This function assumes the Lobby mutex is already held by the caller.
 func (l *Lobby) verifyWinner(match *MatchState) {
 	p1, p2 := 0, 0
 	boardMap := make(map[int]bool)
@@ -284,17 +289,17 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	if p1 > p2 {
 		history.WinnerID, history.WinnerIndex = match.P1ID, 0
-		history.Opponent = l.wallets[match.P2ID]
-		l.finalizeMatchResult(match.P1ID, match.P1Deck, history)
+		history.Opponent = match.P2Wallet
+		l.finalizeMatchResultLocked(match.P1ID, match.P1Deck, history)
 
 		// Achievement: Perfect Game (10-0)
 		if p1 == 10 {
-			l.unlockAchievement(l.wallets[match.P1ID], "PERFECT_GAME")
+			l.unlockAchievementLocked(match.P1Wallet, "PERFECT_GAME")
 		}
 	} else if p2 > p1 {
 		history.WinnerID, history.WinnerIndex = match.P2ID, 1
-		history.Opponent = l.wallets[match.P1ID]
-		l.finalizeMatchResult(match.P2ID, match.P2Deck, history)
+		history.Opponent = match.P1Wallet
+		l.finalizeMatchResultLocked(match.P2ID, match.P2Deck, history)
 	} else { // Draw
 		history.WinnerID, history.WinnerIndex = "", 2 // 2 for Draw
 		history.Opponent = "DRAW"
@@ -314,12 +319,15 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		}
 
 		if history.WinnerID == hunterID {
+			hunterWallet := match.P1Wallet
+			if hunterID == match.P2ID { hunterWallet = match.P2Wallet }
+
 			history.BountyReward = float64(targetWanted * 50)
-			l.sendToClient(hunterID, Envelope{
+			l.sendToClientLocked(hunterID, Envelope{
 				Type:    "admin_notification",
 				Payload: json.RawMessage(fmt.Sprintf(`{"text":"🎯 <b>BOUNTY CLAIMED!</b> You've earned %.2f bonus $VBV."}`, history.BountyReward)),
 			})
-			l.unlockAchievement(l.wallets[hunterID], "OUTLAW_SLAYER")
+			l.unlockAchievementLocked(hunterWallet, "OUTLAW_SLAYER")
 		}
 	}
 
@@ -328,13 +336,13 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	// PRISONER RULE: Decide which jailing logic to apply
 	if match.Rules["Fallen_penalty"] && len(match.CapturedCards) > 0 {
-		l.processFallenPenaltyJail(match, match.CapturedCards) // Jail all captured cards if Fallen_penalty is active
+		l.processFallenPenaltyJailLocked(match, match.CapturedCards) // Jail all captured cards if Fallen_penalty is active
 	} else if p1 != p2 { // Only apply original prisoner rule if there's a clear loser
 		// Original Prisoner Rule: Jail loser's rarest card (if Fallen_penalty is not active or no cards were captured)
 		if p1 > p2 { // P1 won, P2 lost, so P2 is the loser
-			l.processPrisonerRule(match, l.wallets[match.P2ID], l.wallets[match.P1ID])
+			l.processPrisonerRuleLocked(match, match.P2Wallet, match.P1Wallet)
 		} else if p2 > p1 { // P2 won, P1 lost
-			l.processPrisonerRule(match, l.wallets[match.P1ID], l.wallets[match.P2ID])
+			l.processPrisonerRuleLocked(match, match.P1Wallet, match.P2Wallet)
 		}
 	}
 
@@ -347,26 +355,46 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 	var p1NewDeck []int
 	var p2NewDeck []int
 
-	boardMap := make(map[int]bool)
+	// Reconstruct hands based on current board ownership to handle tie-breakers.
+	// Hardening: We must handle duplicate card IDs correctly to prevent unplayed cards from being lost.
+	// Frequency maps of starting decks allow us to identify which specific instances remain in hands.
+	p1Starting := make(map[int]int)
+	for _, id := range match.P1Deck {
+		p1Starting[id]++
+	}
+	p2Starting := make(map[int]int)
+	for _, id := range match.P2Deck {
+		p2Starting[id]++
+	}
+
 	for _, c := range match.Board {
 		if c == nil {
 			continue
 		}
-		boardMap[c.ID] = true
+
+		// Redistribute: Cards on the board move to the CURRENT owner's deck.
 		if c.Owner == 0 {
 			p1NewDeck = append(p1NewDeck, c.ID)
 		} else {
 			p2NewDeck = append(p2NewDeck, c.ID)
 		}
+
+		// Decrement from starting pools to track used instances.
+		if p1Starting[c.ID] > 0 {
+			p1Starting[c.ID]--
+		} else if p2Starting[c.ID] > 0 {
+			p2Starting[c.ID]--
+		}
 	}
 
-	for _, id := range match.P1Deck {
-		if !boardMap[id] {
+	// Any instances remaining in starting pools were never played; they return to the original owners.
+	for id, count := range p1Starting {
+		for i := 0; i < count; i++ {
 			p1NewDeck = append(p1NewDeck, id)
 		}
 	}
-	for _, id := range match.P2Deck {
-		if !boardMap[id] {
+	for id, count := range p2Starting {
+		for i := 0; i < count; i++ {
 			p2NewDeck = append(p2NewDeck, id)
 		}
 	}
@@ -390,10 +418,10 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 	log.Printf("[BATTLE] Sudden Death tie-breaker initiated for match %s vs %s\n", match.P1ID, match.P2ID)
 }
 
-func (l *Lobby) finalizeMatchResult(winnerID string, deck []int, history MatchHistory) {
+func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history MatchHistory) {
 	l.matchHistory[winnerID] = history
 	if wallet, ok := l.wallets[winnerID]; ok {
-		l.updateLeaderboard(wallet, history.TournamentMatchID != "", history.Scores, deck, history.IsBountyMatch) // Pass match context
+		l.updateLeaderboardLocked(wallet, history.TournamentMatchID != "", history.Scores, deck, history.IsBountyMatch) // Pass match context
 		go func() {
 			rating := l.calculateDeckRating(deck)
 			l.mutex.Lock() // Lock for leaderboard modification
@@ -498,7 +526,7 @@ func (l *Lobby) incrementDNF(wallet string) {
 	if stats.DisconnectStreak > 3 {
 		stats.BanExpires = time.Now().Add(24 * time.Hour)
 	}
-	l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF (no match context)
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF (no match context)
 	stats.Reputation = l.CalculateReputation(stats)                            // Update the map with modified stats
 	l.leaderboard[wallet] = stats
 	go l.recordDNFOnChain(wallet)
@@ -506,7 +534,7 @@ func (l *Lobby) incrementDNF(wallet string) {
 
 // processPrisonerRule checks if a card should be jailed based on match outcome and territory.
 // This version jails the LOSER'S RAREST CARD.
-func (l *Lobby) processPrisonerRule(match *MatchState, loserWallet, winnerWallet string) {
+func (l *Lobby) processPrisonerRuleLocked(match *MatchState, loserWallet, winnerWallet string) {
 	// Rule applies if:
 	// 1. Match has a defined territory.
 	// 2. A Club owns this territory.
@@ -543,10 +571,12 @@ func (l *Lobby) processPrisonerRule(match *MatchState, loserWallet, winnerWallet
 		return // Loser is associated with the territory's club, no jailing
 	}
 
-	// Conditions met for Prisoner Rule
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	// Hardening: Ensure the loser is a valid player with a persistent record (not AI or tournament BYE)
+	if loserWallet == "" || strings.EqualFold(loserWallet, "BYE") {
+		return
+	}
 
+	// Conditions met for Prisoner Rule
 	rarestCard, found := l.findRarestCardInInventory(loserWallet)
 	if !found {
 		log.Printf("[PRISONER_RULE] No cards found in %s's inventory to jail.\n", loserWallet)
@@ -569,13 +599,13 @@ func (l *Lobby) processPrisonerRule(match *MatchState, loserWallet, winnerWallet
 	l.leaderboard[loserWallet] = loserStats
 
 	log.Printf("[PRISONER_RULE] %s's rarest card (%s) jailed by Club %s in territory %s.\n", loserWallet, rarestCard.Name, owningClub.Name, match.TerritoryID)
-	l.sendToClient(l.getClientIDFromWallet(loserWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>PRISONER RULE:</b> Your rarest card (%s) has been jailed by Club %s!"}`, escapeHTML(rarestCard.Name), escapeHTML(owningClub.Name)))})
-	l.sendToClient(l.getClientIDFromWallet(winnerWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>PRISONER RULE:</b> You jailed %s's rarest card (%s)!"}`, escapeHTML(loserWallet), escapeHTML(rarestCard.Name)))})
+	l.sendToClientLocked(l.getClientIDFromWalletLocked(loserWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>PRISONER RULE:</b> Your rarest card (%s) has been jailed by Club %s!"}`, escapeHTML(rarestCard.Name), escapeHTML(owningClub.Name)))})
+	l.sendToClientLocked(l.getClientIDFromWalletLocked(winnerWallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>PRISONER RULE:</b> You jailed %s's rarest card (%s)!"}`, escapeHTML(loserWallet), escapeHTML(rarestCard.Name)))})
 }
 
 // processFallenPenaltyJail implements the jailing logic when the Fallen_penalty rule is active.
 // It jails ALL captured cards, not just the loser's rarest.
-func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []CapturedCardInfo) {
+func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards []CapturedCardInfo) {
 	if match.TerritoryID == "" || len(capturedCards) == 0 {
 		return
 	}
@@ -585,13 +615,16 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 		return
 	}
 
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
 	jailedThisMatch := make(map[int]bool) // Track processed cards to prevent double-penalty in chain reactions
 
 	for _, captured := range capturedCards {
 		if jailedThisMatch[captured.CardID] {
+			continue
+		}
+
+		// Hardening: Ensure the original owner is a valid player with a leaderboard record.
+		// Tournament BYE or AI opponents should never have their "cards" jailed.
+		if captured.OriginalOwnerWallet == "" || strings.EqualFold(captured.OriginalOwnerWallet, "BYE") {
 			continue
 		}
 
@@ -619,7 +652,10 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 
 		// Conditions met for Fallen Penalty Jailing
 		cardKey := fmt.Sprintf("CARD-%d", captured.CardID)
-		originalOwnerStats := l.leaderboard[captured.OriginalOwnerWallet]
+		originalOwnerStats, exists := l.leaderboard[captured.OriginalOwnerWallet]
+		if !exists {
+			continue
+		}
 
 		// CRITICAL AUDIT FIX: Verify the original owner actually possesses the card in their persistent inventory.
 		// This prevents attempting to jail "board-only" captures or causing negative inventory counts.
@@ -658,12 +694,12 @@ func (l *Lobby) processFallenPenaltyJail(match *MatchState, capturedCards []Capt
 			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)
 
 		// Use CaptureType in client notifications for high-fidelity tactical feedback
-		l.sendToClient(l.getClientIDFromWallet(captured.OriginalOwnerWallet), Envelope{
+		l.sendToClientLocked(l.getClientIDFromWalletLocked(captured.OriginalOwnerWallet), Envelope{
 			Type:    "admin_notification",
 			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>FALLEN PENALTY:</b> Your card '%s' was seized via %s and jailed by Club %s!"}`, 
 				escapeHTML(card.Name), captured.CaptureType, escapeHTML(owningClub.Name))),
 		})
-		l.sendToClient(l.getClientIDFromWallet(captured.CapturingPlayerWallet), Envelope{
+		l.sendToClientLocked(l.getClientIDFromWalletLocked(captured.CapturingPlayerWallet), Envelope{
 			Type:    "admin_notification",
 			Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>FALLEN PENALTY:</b> You jailed '%s's card (%s) via %s capture!"}`, 
 				escapeHTML(captured.OriginalOwnerWallet), escapeHTML(card.Name), captured.CaptureType)),

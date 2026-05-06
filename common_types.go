@@ -195,24 +195,28 @@ type ARC72Metadata struct {
 
 // MatchState tracks an ongoing game on the server for win verification.
 type MatchState struct {
-	P1ID              string
-	P2ID              string
-	P1Wallet          string // Snapshotted for penalty calculation stability
-	P2Wallet          string
-	TournamentMatchID string // Link to tournament bracket
-	P1Deck            []int  // Card IDs in P1's deck
-	P1Avatar          string
-	P1Gloat           string
-	P2Deck            []int // Card IDs in P2's deck
-	P2Avatar          string
-	BoardMoods        [9]string // Moods assigned to specific tiles
-	P2Gloat           string
-	Board             [9]*ServerCard
-	Rules             map[string]bool
-	IsFinished        bool
-	Spectators        []string // Client IDs spectating this match
-	P1WantedLevel     int
-	P2WantedLevel     int
+	P1ID              string                    `json:"p1_id"`
+	P2ID              string                    `json:"p2_id"`
+	P1Wallet          string                    `json:"p1_wallet"` // Snapshotted for penalty calculation stability
+	P2Wallet          string                    `json:"p2_wallet"`
+	TournamentMatchID string                    `json:"tournament_match_id,omitempty"` // Link to tournament bracket
+	P1Deck            []int                     `json:"p1_deck"`                       // Card IDs in P1's deck
+	P1Avatar          string                    `json:"p1_avatar"`
+	P1Gloat           string                    `json:"p1_gloat"`
+	P2Deck            []int                     `json:"p2_deck"` // Card IDs in P2's deck
+	P2Avatar          string                    `json:"p2_avatar"`
+	BoardMoods        [9]string                 `json:"board_moods"` // Moods assigned to specific tiles
+	P2Gloat           string                    `json:"p2_gloat"`
+	Board             [9]*ServerCard            `json:"board"`
+	Rules             map[string]bool           `json:"rules"`
+	IsFinished        bool                      `json:"is_finished"`
+	Spectators        []string                  `json:"spectators"` // Client IDs spectating this match
+	P1WantedLevel     int                       `json:"p1_wanted_level"`
+	P2WantedLevel     int                       `json:"p2_wanted_level"`
+	P1Cunning         int                       `json:"p1_cunning"`
+	P1Nurturing       int                       `json:"p1_nurturing"`
+	P2Cunning         int                       `json:"p2_cunning"`
+	P2Nurturing       int                       `json:"p2_nurturing"`
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
 	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played

@@ -1,7 +1,14 @@
 # NFT Seduction Tasks
 
 ## Critical Launch Readiness
+- [x] Hardened spectator synchronization: `handleSpectate` populates penalty snapshots; hardened move routing and session cleanup.
+- [x] Hardened spectator synchronization: `SetBoardState` now ingests moods, territory, and full ruleset.
+- [x] Audit `handleHeist` logic for "Fence Fee" and Industrial Loop integration.
+- [x] Audit `handlePayRansom` and integrated kidnapping into the Industrial Loop.
+- [x] Audit `processFallenPenaltyJail` for AI/BYE handling and resolved match completion deadlocks.
 - [x] Hardened Jailing Mechanics: Implemented capture-type tracking and inventory safety guards in `battle_service.go`.
+- [x] Review and harden `initiateSuddenDeath` to prevent card loss/theft during tie-breakers.
+- [x] Audit `handleRestockInventory` for micro-unit precision in treasury deductions.
 - [x] Hardened Move Validation: `CapturedCards` now distinguishes capture types (BASIC, SAME, etc.) for jailing accuracy.
 - [x] Resolved profile synergy: Achievement, Mojo, and Jailed Card state now flows through Go WASM to UI.
 - [x] Audit `processAuctions` logic for Art Gallery commission distribution.
@@ -11,9 +18,12 @@
 - [x] Hardened Club Management: UI sync added to Create/Join/Purchase handlers.
 - [x] Audit `handleHeist` for activity tracking and social standing updates.
 - [x] Audit `archiveSeason` logic for correct seasonal stats export and leaderboard wipe.
+- [x] Audit `processInsuranceRecovery` and harden Kidnap Gambit recovery paths.
 - [x] Hardened `dispatchTournamentRewards` with granular opt-in checks and skipped asset tracking.
 - [x] Audit `processLeaseExpirations` for correct card return and UI sync.
 - [x] Audit `handleMove` in `lobby_manager.go` for Wanted/Fatigue penalty persistence.
+- [x] Audit `handleMove` in `lobby_manager.go` for Fallen Penalty state snapshots.
+- [x] Audit `handleGameProtocol` for robust handling of unregistered wallets.
 - [x] Audit `checkAssetOptIn` for robust indexer error handling.
 - [x] Audit `handleSpreadRumor` and `handleTradeShares` for rumor application accuracy.
 - [x] Audit `handleRepayLoan` for interest verification and scaling concurrency.

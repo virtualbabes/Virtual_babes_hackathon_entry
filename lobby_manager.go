@@ -178,7 +178,12 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 
 		targetURL := strings.TrimSpace(data.URL)
 		l.mutex.Lock()
-		wallet := l.wallets[env.FromID]
+		wallet, ok := l.wallets[env.FromID] // Check if wallet is registered
+		if !ok {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Avatar Registration Failed: Wallet not registered."}`)})
+			return
+		}
 
 		// Enforce Avatar Ban: check against active bans
 		if expiry, banned := l.bannedAvatars[targetURL]; banned && time.Now().Before(expiry) {
@@ -376,9 +381,19 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		var data ReportGloatData
 		json.Unmarshal(env.Payload, &data)
 		l.mutex.RLock()
-		opp, ok := l.wallets[data.OpponentClientID]
-		rep, _ := l.wallets[env.FromID]
+		opp, okOpp := l.wallets[data.OpponentClientID]
+		rep, okRep := l.wallets[env.FromID] // Check if reporter's wallet is registered
 		l.mutex.RUnlock()
+
+		if !okRep {
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Report Failed: Your wallet is not registered."}`)})
+			return
+		}
+		if !okOpp {
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Report Failed: Opponent's wallet not found."}`)})
+			return
+		}
+
 		if ok {
 			l.logAdminAudit("REPORT_GLOAT", opp, fmt.Sprintf("Reported by %s: %s", rep, data.GloatText))
 			alert, _ := json.Marshal(map[string]string{"text": fmt.Sprintf("🚨 <b>REPORT:</b> %s flagged %s", rep, opp)})
@@ -525,8 +540,18 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 
 		l.mutex.Lock()
-		wallet := l.wallets[env.FromID]
-		stats := l.leaderboard[wallet]
+		wallet, ok := l.wallets[env.FromID] // Check if wallet is registered
+		if !ok {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Purchase Failed: Wallet not registered."}`)})
+			return
+		}
+		stats, exists := l.leaderboard[wallet] // Check if player stats exist
+		if !exists {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Purchase Failed: Player stats not found."}`)})
+			return
+		}
 
 		// 1. Find the Club managing this territory
 		var targetClub *Club
@@ -661,6 +686,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		l.handleCreateLease(env)
 	case "take_lease":
 		l.handleTakeLease(env)
+	case "spectate":
+		l.handleSpectate(env)
 	case "bail_card":
 		l.handleBailCard(env)
 	case "equip_cosmetic":
@@ -674,12 +701,23 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		wallet, ok := l.wallets[env.FromID]
 		if !ok {
 			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Equip Failed: Wallet not registered."}`)})
+			return
+		}
+		stats, exists := l.leaderboard[wallet] // Check if player stats exist
+		if !ok {
+			l.mutex.Unlock()
 			return
 		}
 		stats := l.leaderboard[wallet]
 		var success bool
 		var notification string
 		var auditAction string
+		if !exists {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Equip Failed: Player stats not found."}`)})
+			return
+		}
 		if data.FaceplateID == "" {
 			stats.EquippedFaceplate = ""
 			stats.Reputation = l.CalculateReputation(stats) // CalculateReputation is safe to call with lock held
@@ -716,6 +754,11 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 func (l *Lobby) getClientIDFromWallet(wallet string) string {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
+	return l.getClientIDFromWalletLocked(wallet)
+}
+
+// getClientIDFromWalletLocked is the internal version that assumes the mutex is already held.
+func (l *Lobby) getClientIDFromWalletLocked(wallet string) string {
 	for id, w := range l.wallets {
 		if strings.EqualFold(w, wallet) {
 			return id
@@ -774,27 +817,40 @@ func (l *Lobby) handleUnregister(client *Client) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	if match, ok := l.matches[client.id]; ok {
-		opponentID := match.P1ID
-		if client.id == match.P1ID {
-			opponentID = match.P2ID
-		}
-		if opponentID != "" {
-			if opponent, exists := l.clients[opponentID]; exists {
-				notification, _ := json.Marshal(Envelope{
-					Type: "chat", FromID: "SERVER",
-					Payload: json.RawMessage(`{"text":"Match invalidated: Opponent disconnected."}`),
-				})
-				select {
-				case opponent.send <- notification:
-				default:
+		// Hardening: Only invalidate match if the disconnecting client is P1 or P2
+		if client.id == match.P1ID || client.id == match.P2ID {
+			opponentID := match.P1ID
+			if client.id == match.P1ID {
+				opponentID = match.P2ID
+			}
+			if opponentID != "" {
+				if opponent, exists := l.clients[opponentID]; exists {
+					notification, _ := json.Marshal(Envelope{
+						Type: "chat", FromID: "SERVER",
+						Payload: json.RawMessage(`{"text":"Match invalidated: Opponent disconnected."}`),
+					})
+					select {
+					case opponent.send <- notification:
+					default:
+					}
+				}
+				if wallet, ok := l.wallets[client.id]; ok {
+					l.incrementDNF(wallet)
+				}
+				delete(l.matches, opponentID)
+			}
+			delete(l.matches, client.id)
+		} else {
+			// It's a spectator: just remove from spectators list
+			var remaining []string
+			for _, sID := range match.Spectators {
+				if sID != client.id {
+					remaining = append(remaining, sID)
 				}
 			}
-			if wallet, ok := l.wallets[client.id]; ok {
-				l.incrementDNF(wallet)
-			}
-			delete(l.matches, opponentID)
+			match.Spectators = remaining
+			delete(l.matches, client.id)
 		}
-		delete(l.matches, client.id)
 	}
 	delete(l.wallets, client.id)
 	if _, ok := l.clients[client.id]; ok {
@@ -821,6 +877,22 @@ func (l *Lobby) handleBroadcast(message []byte) {
 			default:
 			}
 		}
+
+		// Spectator Broadcast Logic:
+		// If this is a move message, also send it to everyone in match.Spectators
+		if env.Type == "move" {
+			if match, ok := l.matches[env.ToID]; ok {
+				for _, sID := range match.Spectators {
+					if sID == env.FromID { continue } // Don't echo to sender
+					if s, ok := l.clients[sID]; ok {
+						select {
+						case s.send <- message:
+						default:
+						}
+					}
+				}
+			}
+		}
 	} else {
 		for _, client := range l.clients {
 			select {
@@ -829,6 +901,49 @@ func (l *Lobby) handleBroadcast(message []byte) {
 			}
 		}
 	}
+}
+
+// handleSpectate allows a client to join an ongoing match as a viewer.
+func (l *Lobby) handleSpectate(env *Envelope) {
+	var data struct {
+		TargetID string `json:"target_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Find the match associated with the target client
+	match, ok := l.matches[data.TargetID]
+	if !ok {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Stream Error: Match no longer active."}`)})
+		return
+	}
+
+	// Prevent duplicate entries in spectators list
+	alreadySpectating := false
+	for _, sID := range match.Spectators {
+		if sID == env.FromID {
+			alreadySpectating = true
+			break
+		}
+	}
+	if !alreadySpectating {
+		match.Spectators = append(match.Spectators, env.FromID)
+		l.matches[env.FromID] = match // Map session to match for move routing
+	}
+
+	// Marshal entire MatchState which now includes snake_case tags for penalty snapshots
+	payload, _ := json.Marshal(match)
+	l.sendToClientLocked(env.FromID, Envelope{
+		Type:    "match_start",
+		FromID:  "SERVER",
+		Payload: payload,
+	})
+
+	log.Printf("[LOBBY] Client %s is now spectating match %s vs %s\n", env.FromID, match.P1ID, match.P2ID)
 }
 
 func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
@@ -936,6 +1051,19 @@ func (l *Lobby) processMatchmaking() {
 
 	var matchedIndices = make(map[int]bool)
 
+	// 0. TOURNAMENT LOCK ANALYSIS: Identify players who MUST play their tournament match.
+	// This prevents bracket participants from being "stolen" by Standard or Bounty matchmaking
+	// if their assigned opponent hasn't joined the pool yet.
+	tourneyLocked := make(map[string]bool)
+	if l.tournament.Active && l.tournament.CurrentRound > 0 {
+		for _, match := range l.tournament.Matches {
+			if match.Round == l.tournament.CurrentRound && match.Winner == "" && match.P2 != "BYE" {
+				tourneyLocked[strings.ToLower(match.P1)] = true
+				tourneyLocked[strings.ToLower(match.P2)] = true
+			}
+		}
+	}
+
 	// 1. TOURNAMENT PRIORITY PASS: Pair players scheduled in the current bracket round
 	if l.tournament.Active && l.tournament.CurrentRound > 0 {
 		for _, match := range l.tournament.Matches {
@@ -945,10 +1073,10 @@ func (l *Lobby) processMatchmaking() {
 					if matchedIndices[k] {
 						continue
 					}
-					if entry.Wallet == match.P1 {
+					if strings.EqualFold(entry.Wallet, match.P1) {
 						idx1 = k
 					}
-					if entry.Wallet == match.P2 {
+					if strings.EqualFold(entry.Wallet, match.P2) {
 						idx2 = k
 					}
 				}
@@ -971,6 +1099,12 @@ func (l *Lobby) processMatchmaking() {
 		if matchedIndices[i] {
 			continue
 		}
+
+		// Skip if player belongs to an active tournament match but opponent isn't here yet.
+		if tourneyLocked[strings.ToLower(l.matchmakingPool[i].Wallet)] {
+			continue
+		}
+
 		p1 := l.matchmakingPool[i]
 		p1Wanted := l.leaderboard[p1.Wallet].WantedLevel
 
@@ -978,6 +1112,10 @@ func (l *Lobby) processMatchmaking() {
 			if matchedIndices[j] {
 				continue
 			}
+			if tourneyLocked[strings.ToLower(l.matchmakingPool[j].Wallet)] {
+				continue
+			}
+
 			p2 := l.matchmakingPool[j]
 			p2Wanted := l.leaderboard[p2.Wallet].WantedLevel
 
@@ -1021,11 +1159,19 @@ func (l *Lobby) processMatchmaking() {
 		if matchedIndices[i] {
 			continue
 		}
+		if tourneyLocked[strings.ToLower(l.matchmakingPool[i].Wallet)] {
+			continue
+		}
+
 		p1 := l.matchmakingPool[i]
 		for j := i + 1; j < len(l.matchmakingPool); j++ {
 			if matchedIndices[j] {
 				continue
 			}
+			if tourneyLocked[strings.ToLower(l.matchmakingPool[j].Wallet)] {
+				continue
+			}
+
 			p2 := l.matchmakingPool[j]
 
 			repDiff := p1.Reputation - p2.Reputation
@@ -1135,6 +1281,15 @@ func (l *Lobby) sendToClient(clientID string, env Envelope) {
 	l.mutex.RLock()
 	client, ok := l.clients[clientID]
 	l.mutex.RUnlock()
+	if !ok {
+		return
+	}
+	l.sendToClientLocked(clientID, env)
+}
+
+// sendToClientLocked sends an Envelope message to a specific client, assuming the lock is held.
+func (l *Lobby) sendToClientLocked(clientID string, env Envelope) {
+	client, ok := l.clients[clientID]
 	if !ok {
 		return
 	}

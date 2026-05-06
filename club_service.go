@@ -71,14 +71,24 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	canKidnap := false
 
 	if roll < successChance {
+		// SUCCESSFUL HEIST
 		status = "success"
 		if playerStats.GetEffectiveCunning() >= 3 && rand.Float64() < 0.25 {
 			canKidnap = true
 		}
 
+		// Calculate Loot: 10% of target club's treasury, capped at 500 VBV
 		loot := targetClub.Treasury * 0.10
 		if loot > 500 {
 			loot = 500
+		}
+
+		// INDUSTRIAL LOOP: 10% "Fence Fee" returns to the Faucet Pool
+		fenceFee := loot * 0.10
+		netLoot := loot - fenceFee
+		if fenceFee > 0 {
+			l.faucetBalance += fenceFee
+			l.applyDynamicScalingLocked()
 		}
 		playerStats.Playstyle.RiskTolerance += 0.05
 		playerStats.HeistAttempts++
@@ -86,7 +96,10 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
 		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
-		playerStats.Cunning += 1
+		playerStats.Cunning += 1 // Successful heists improve Cunning
+
+		// Add net loot to player's rewards
+		l.rewards[wallet] += uint64(netLoot * 1000000)
 
 		go l.unlockAchievement(wallet, "FIRST_HEIST")
 	} else {
@@ -123,7 +136,10 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	}
 
 	l.leaderboard[wallet] = playerStats
-	l.logAdminAudit("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s", data.TargetClubID, status))
+	l.logAdminAudit("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s, Loot: %.2f, FenceFee: %.2f", data.TargetClubID, status, netLoot, fenceFee))
+	if status == "success" {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>HEIST SUCCESS:</b> You looted %.2f $VBV from %s (Net after Fence Fee)."}`, netLoot, targetClub.Name))})
+	}
 
 	response, _ := json.Marshal(map[string]interface{}{
 		"status":          status,
@@ -401,14 +417,16 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	}
 
 	// Units: Both item.Price and club.Treasury are in base $VBV units.
-	// No micro-unit conversion is needed for internal treasury transfers.
-	totalCost := item.Price * float64(data.Quantity)
-	if club.Treasury < totalCost {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Restock Failed: Insufficient Treasury funds. Need %.2f $VBV."}`, totalCost))})
+	// Hardening: We use micro-unit math for the cost calculation to ensure absolute precision.
+	totalCostMicro := uint64(item.Price*1000000) * uint64(data.Quantity)
+	totalCostBase := float64(totalCostMicro) / 1000000.0
+
+	if club.Treasury < totalCostBase {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Restock Failed: Insufficient Treasury funds. Need %.2f $VBV."}`, totalCostBase))})
 		return
 	}
 
-	club.Treasury -= totalCost
+	club.Treasury -= totalCostBase
 	// Ensure map is initialized even if old data exists
 	if club.Inventory == nil {
 		club.Inventory = make(map[string]int)
@@ -417,7 +435,7 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	club.LastActivity = time.Now()
 	club.Inventory[data.ItemID] += data.Quantity
 
-	l.logAdminAudit("CLUB_RESTOCK", ownerWallet, fmt.Sprintf("Club: %s, Item: %s, Qty: %d, Cost: %.2f", club.Name, data.ItemID, data.Quantity, totalCost))
+	l.logAdminAudit("CLUB_RESTOCK", ownerWallet, fmt.Sprintf("Club: %s, Item: %s, Qty: %d, Cost: %.2f", club.Name, data.ItemID, data.Quantity, totalCostBase))
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>RESTOCK COMPLETE:</b> Added %d units of %s to inventory."}`, data.Quantity, item.Name))})
 }
 

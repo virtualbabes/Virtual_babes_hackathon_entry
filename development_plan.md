@@ -31,6 +31,9 @@
 - [x] Hardened Tournament History: Implemented conditional deep verification based on `deep_verify` parameter.
 - [x] Hardened Tournament Registration: Verified `isElite` check correctly bypasses buy-in transaction verification.
 - [x] Hardened Kidnap Gambit: Ensured robust card selection logic (favorite vs. rarest) and correct removal from victim's inventory in `handleKidnapRequest`.
+- [x] Hardened Spectator Logic: Implemented `handleSpectate`, secured move routing for viewers, and fixed session cleanup bugs.
+- [x] Hardened Spectator Sync: Ensured `SetBoardState` in WASM correctly ingests authoritative moods and participant penalty snapshots.
+- [x] Hardened Kidnap Economy: Integrated `handlePayRansom` into the Industrial Loop with 20% faucet recovery and scaling.
 - [x] Hardened Jailing Mechanics: Implemented capture-type tracking for deterministic flip attribution.
 - [x] Hardened Jailing Mechanics: Implemented capture-type tracking for deterministic flip attribution.
 - [x] Hardened Loan System: Verified collateral escrow and implemented principal deduction from faucet liquidity.

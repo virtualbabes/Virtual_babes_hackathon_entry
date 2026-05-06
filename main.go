@@ -156,6 +156,7 @@ type Engine struct {
 	AIScore             int                       // Tactical value of the bot's intended move
 	ServerLoad          int                       // Current active matches on the server
 	SpecialFanfare      string                    // Archetype for specific win/loss tracks: "Emotional", "Witch"
+	TerritoryID         string                    // The location of the current match
 	VaultLow            bool                      // Warning flag for low faucet balance
 	DeckRating          string                    // Current player's active deck rating (e.g., [A++])
 	MasterVolume        float64                   // Global master volume (0.0 - 1.0)
@@ -214,6 +215,7 @@ var Game = Engine{
 	AIScore:        0,
 	ServerLoad:     0,
 	SpecialFanfare: "",
+	TerritoryID:    "",
 	VaultLow:       false,
 	DeckRating:     "[Z]",
 	Latency:        0,
@@ -1010,14 +1012,63 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	jsRules := data.Get("rules")
-	if jsRules.Type() == js.TypeObject {
-		Game.Rules["Open"] = jsRules.Get("Open").Bool()
-		Game.Rules["Same"] = jsRules.Get("Same").Bool()
-		Game.Rules["Plus"] = jsRules.Get("Plus").Bool()
+	// 3. Sync Board Moods (Authoritative Environmental Hazards)
+	jsMoods := data.Get("board_moods")
+	if jsMoods.Type() == js.TypeObject {
+		for i := 0; i < 9; i++ {
+			mood := jsMoods.Index(i)
+			if mood.IsString() {
+				Game.BoardMoods[i] = mood.String()
+			} else {
+				Game.BoardMoods[i] = "Neutral"
+			}
+		}
 	}
 
-	fmt.Println("[ENGINE] Board and Rules Synced from Server.")
+	// 4. Sync Ruleset (Deterministic Alignment)
+	jsRules := data.Get("rules")
+	if jsRules.Type() == js.TypeObject {
+		ruleKeys := []string{"Open", "Power_copy", "Power_up", "Elemental_sync", "Fallen_penalty", "Artifact_bonus"}
+		for _, k := range ruleKeys {
+			if r := jsRules.Get(k); !r.IsUndefined() {
+				Game.Rules[k] = r.Bool()
+			}
+		}
+	}
+
+	// 5. Sync Tactical & Penalty Metadata for Spectator Accuracy
+	if tid := data.Get("territory_id"); !tid.IsUndefined() {
+		Game.TerritoryID = tid.String()
+	}
+	if a1 := data.Get("p1_avatar"); !a1.IsUndefined() { Game.Players[0].AvatarURL = a1.String() }
+	if g1 := data.Get("p1_gloat"); !g1.IsUndefined() { Game.Players[0].GloatMessage = g1.String() }
+	if a2 := data.Get("p2_avatar"); !a2.IsUndefined() { Game.Players[1].AvatarURL = a2.String() }
+	if g2 := data.Get("p2_gloat"); !g2.IsUndefined() { Game.Players[1].GloatMessage = g2.String() }
+
+	if w1 := data.Get("p1_wanted_level"); !w1.IsUndefined() { Game.Players[0].WantedLevel = w1.Int() }
+	if c1 := data.Get("p1_cunning"); !c1.IsUndefined() { Game.Players[0].Cunning = c1.Int() }
+	if n1 := data.Get("p1_nurturing"); !n1.IsUndefined() { Game.Players[0].Nurturing = n1.Int() }
+	
+	if w2 := data.Get("p2_wanted_level"); !w2.IsUndefined() { Game.Players[1].WantedLevel = w2.Int() }
+	if c2 := data.Get("p2_cunning"); !c2.IsUndefined() { Game.Players[1].Cunning = c2.Int() }
+	if n2 := data.Get("p2_nurturing"); !n2.IsUndefined() { Game.Players[1].Nurturing = n2.Int() }
+
+	jsScores := data.Get("scores")
+	if jsScores.Type() == js.TypeObject && jsScores.Length() >= 2 {
+		Game.Scores[0] = jsScores.Index(0).Int()
+		Game.Scores[1] = jsScores.Index(1).Int()
+	}
+
+	// 6. Recalculate Turn based on board occupancy (Deterministic Inference)
+	placedCount := 0
+	for _, c := range Game.Board {
+		if c != nil {
+			placedCount++
+		}
+	}
+	Game.Turn = placedCount % 2
+
+	fmt.Printf("[ENGINE] Spectator state synchronized. Phase: %s, Territory: %s, Turn: %d\n", Game.Phase, Game.TerritoryID, Game.Turn)
 	return true
 }
 
@@ -1814,6 +1865,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["p2_id"] = Game.Players[1].ID
 		state["multiplayer"] = Game.Multiplayer
 		state["special_fanfare"] = Game.SpecialFanfare
+		state["territory_id"] = Game.TerritoryID
 		// Expose player-specific stats for accurate client-side power calculations in tooltips
 		state["p1_wanted_level"] = Game.Players[0].WantedLevel
 		state["p1_cunning"] = Game.Players[0].Cunning
@@ -2207,7 +2259,6 @@ func registerFunctions() {
 	js.Global().Set("SetAssetBase", js.FuncOf(SetAssetBase))
 	js.Global().Set("SetApiBase", js.FuncOf(SetApiBase))
 	js.Global().Set("SetLocalPlayerIndex", js.FuncOf(SetLocalPlayerIndex))
-	js.Global().Set("SyncOpponentWanted", js.FuncOf(SyncOpponentWanted))
 	js.Global().Set("ImportARC72Card", js.FuncOf(ImportARC72Card))
 	js.Global().Set("ApplyArtifactToBoard", js.FuncOf(ApplyArtifactToBoard))
 	js.Global().Set("PlayCaptureEffect", js.FuncOf(PlayCaptureEffect))
