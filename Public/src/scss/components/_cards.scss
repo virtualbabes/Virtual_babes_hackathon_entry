@@ -16,12 +16,13 @@
     box-sizing: border-box;
     box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
     position: relative;
-    transition: all $transition-fast;
+    transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base;
     backdrop-filter: blur($glass-blur);
 
     &:hover {
         transform: translateY(-8px) scale(1.05);
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 8px 25px rgba($color-neon-cyan, 0.4);
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px var(--arena-mood-color);
+        border-color: var(--arena-mood-color);
     }
 
     &.hand-card {

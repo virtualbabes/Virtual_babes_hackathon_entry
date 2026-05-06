@@ -11,6 +11,7 @@
     border: 1px solid $glass-border-color;
     border-radius: 16px;
     box-shadow: $glass-shadow;
+    transition: border-color $transition-base, box-shadow $transition-base, transform $transition-base;
 }
 
 // Mixin for neon text glow

@@ -258,6 +258,42 @@
         </div>
     </div>
 
+    <!-- District Shops Overlay (Functional Immersion) -->
+    <div id="shops-overlay" class="overlay hidden">
+        <div class="glass-panel w-600 text-center animate-modal">
+            <h2 class="text-neon-purple">DISTRICT SHOPS</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">Browse unique enhancements from local Club-owned businesses.</p>
+            
+            <div id="shops-container" class="grid-cols-2 gap-15">
+                <!-- Populated dynamically by app.js from shop_registry.go data -->
+            </div>
+            
+            <button class="outline mt-20 w-full" onclick="hideAllOverlays()">Return to Arena</button>
+        </div>
+    </div>
+
+    <!-- Regional Dominance (3D Tactical Map) -->
+    <div id="territory-map-overlay" class="overlay hidden">
+        <div class="glass-panel w-800 text-center bg-black-90 animate-scale-in">
+            <h2 class="text-neon-cyan">REGIONAL DOMINANCE</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">3D Tactical Map of the Arena Districts</p>
+            
+            <div class="map-perspective-container">
+                <div id="map-3d-grid" class="map-grid-3d">
+                    <!-- Map tiles populated via club_service.go state -->
+                </div>
+            </div>
+
+            <div class="flex-row justify-center gap-15 mt-20 font-xsmall letter-spacing-1">
+                <div class="flex-row gap-5"><span class="status-indicator online"></span> CONTROLLED</div>
+                <div class="flex-row gap-5"><span class="status-indicator away"></span> CONTESTED</div>
+                <div class="flex-row gap-5"><span class="status-indicator offline"></span> NEUTRAL</div>
+            </div>
+
+            <button class="outline mt-20 w-full" onclick="hideAllOverlays()">Exit Map</button>
+        </div>
+    </div>
+
     <!-- Hall of Fame Overlay -->
     <div id="leaderboard-overlay" class="overlay hidden">
         <h1 style="font-size: 3.5em; margin-bottom: 10px;">Hall of Fame</h1>

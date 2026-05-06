@@ -5,10 +5,8 @@ Always consult and update the following files to maintain project context:
 * **Task Tracking:** Use `AI-Brain/A.I_memory.md` to track ongoing tasks and global memory.
 * **Bug Tracking:** Use `AI-Brain/orphan_fix_list.md` to log and track discovered or fixed orphaned code.
 * **Development Pipeline:** Use `AI-Brain/ToDo.md` to track development milestones.
-* **Knowledge Base:** Use the `DEV_Log/Info/` directory as your primary source of truth for architecture. Reference these files as needed:
   * `DIR.md`
   * `What_is_this_repository.md`
-  * `DEV_Log\Info\module_flows.md`
 
 ## 2. WORKSPACE NAVIGAION
 * **Active Context:** Always utilize the VS Code IDE features to search, navigate, and review open files. Do not guess; read the files to establish accurate context.

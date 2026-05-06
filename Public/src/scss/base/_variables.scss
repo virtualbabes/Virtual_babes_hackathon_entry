@@ -97,3 +97,13 @@ $avatar-size-large: 80px;
 $card-width: 100px;
 $card-height: 140px;
 $board-size: 300px;
+
+// Dynamic CSS Variables for Runtime Theming
+:root {
+    --arena-mood-color: #{$color-neon-cyan};
+    --arena-glow-intensity: 1;
+    --mood-volatile: #ff4b2b;
+    --mood-serene: #00f2fe;
+    --mood-spirited: #f9d423;
+    --mood-grounded: #43e97b;
+}
