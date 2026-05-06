@@ -15,6 +15,7 @@
 - **SCSS Refactor**: Integrated `.particle-canvas` styles into the modular utility system.
 - **Criminality**: Hardened heist logic to utilize `GetEffectiveCunning` (including faceplate bonuses) for success probability and kidnap eligibility.
 - **Frontend Display**: Implemented display of Cunning and Nurturing values in `syncUI` with Cyberpunk styling.
+- **Social UI**: Implemented the Social Hub (Alliances, Career, Achievements) using orphaned `_social.scss` styles.
 - **Criminality UI**: Wired the Kidnap Selection interface following successful heists using orphaned `_criminality.scss` styles.
 - **Territory Map UI**: Implemented the 3D territory map visualization in `app.js` using the orphaned `_territory.scss` styles.
 - **Heist Planning UI**: Implemented the Heist Planning interface in `app.js` using orphaned `_criminality.scss` styles.

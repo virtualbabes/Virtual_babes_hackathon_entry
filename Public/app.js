@@ -4782,51 +4782,173 @@ async function spreadRumor(targetWallet, type, strength, durationMinutes) {
 }
 
 function openTrophyView() {
+    openSocialPanelOverlay('achievements');
+}
+
+/**
+ * Opens the integrated Social Hub featuring Alliances, Career paths, and Achievements.
+ * Utilizes orphaned _social.scss styles for immersive hierarchy.
+ */
+async function openSocialPanelOverlay(initialTab = 'alliances') {
+    const state = window.GetGameState();
     const overlay = document.createElement("div");
-    overlay.id = "trophy-view-overlay";
+    overlay.id = "social-hub-overlay";
     overlay.className = "overlay";
 
-    const state = window.GetGameState() || {};
-    const unlocked = new Set(state.achievements || []);
-    const trophyCatalog = [
-        { id: "FIRST_VICTORY", name: "First Victory", description: "Win your first match.", tier: 1 },
-        { id: "TOURNAMENT_CHAMPION", name: "Tournament Champion", description: "Win a tournament.", tier: 2 },
-        { id: "FIRST_HEIST", name: "First Heist", description: "Complete a successful Club heist.", tier: 1 },
-        { id: "OUTLAW_SLAYER", name: "Outlaw Slayer", description: "Defeat a high-infamy opponent.", tier: 2 },
-        { id: "ARENA_LEGEND", name: "Arena Legend", description: "Achieve legendary status in the arena.", tier: 3 },
-        { id: "REHABILITATED", name: "Rehabilitated", description: "Pay off your courthouse fine and reset wanted level.", tier: 2 },
-        { id: "GOVERNOR", name: "Governor", description: "Control 2+ territories as a club leader.", tier: 3 }
-    ];
-
-    let trophiesHTML = "";
-    trophyCatalog.forEach(trophy => {
-        const hasUnlocked = unlocked.has(trophy.id);
-        const glowClass = `trophy-badge tier-${trophy.tier}` + (hasUnlocked ? "" : " locked");
-        trophiesHTML += `
-            <div class="${glowClass}" style="opacity: ${hasUnlocked ? 1 : 0.35};">
-                <div style="font-size: 2em;">${hasUnlocked ? '🏆' : '🔒'}</div>
-                <div style="font-size: 0.85em; margin-top: 5px;">${trophy.name}</div>
-                <div style="font-size: 0.65em; opacity: 0.7;">${trophy.description}</div>
-            </div>
-        `;
-    });
-
-    if (trophyCatalog.length === 0) {
-        trophiesHTML = `<div style="padding: 40px; opacity: 0.5;">No achievements have been loaded yet.</div>`;
-    }
-
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 600px; text-align: center;">
-            <h2 style="color: var(--neon-cyan);">ACHIEVEMENT TROPHIES</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin: 2rem 0;">
-                ${trophiesHTML}
+        <div class="social-panel glass-panel" style="width: 750px;">
+            <div class="social-header">
+                <span class="social-title">NEON SOCIAL HUB</span>
+                <div class="social-stats">
+                    <div class="stat-item">
+                        <div class="stat-label">MOJO</div>
+                        <div class="stat-value">${state.mojo || 0}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">REP</div>
+                        <div class="stat-value">${state.reputation || 0}</div>
+                    </div>
+                </div>
             </div>
-            <button class="outline mt-20 w-full" onclick="document.getElementById('trophy-view-overlay').remove()">CLOSE</button>
+
+            <div class="flex-row justify-center gap-10 mb-20">
+                <button id="social-tab-alliances" class="tab-btn ${initialTab === 'alliances' ? 'active' : ''}" onclick="switchSocialTab('alliances')">🤝 ALLIANCES</button>
+                <button id="social-tab-career" class="tab-btn ${initialTab === 'career' ? 'active' : ''}" onclick="switchSocialTab('career')">💼 CAREER</button>
+                <button id="social-tab-achievements" class="tab-btn ${initialTab === 'achievements' ? 'active' : ''}" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
+            </div>
+
+            <div id="social-content-hub" class="flex-col gap-15" style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+                <!-- Content injected by switchSocialTab -->
+            </div>
+
+            <button class="outline mt-20 w-full" onclick="document.getElementById('social-hub-overlay').remove()">DISCONNECT HUB</button>
         </div>
     `;
 
     document.body.appendChild(overlay);
+    switchSocialTab(initialTab);
 }
+
+async function switchSocialTab(tab) {
+    const container = document.getElementById("social-content-hub");
+    if (!container) return;
+
+    // Update Tab Styles
+    document.querySelectorAll('#social-hub-overlay .tab-btn').forEach(b => b.classList.remove('active'));
+    const tabBtn = document.getElementById(`social-tab-${tab}`);
+    if (tabBtn) tabBtn.classList.add('active');
+
+    const state = window.GetGameState();
+    container.innerHTML = `<div class="opacity-5 py-40 italic">Decrypting social datastreams...</div>`;
+
+    if (tab === 'alliances') {
+        const otherPlayers = lastLobbyPlayers.filter(p => p.id !== myClientId);
+        if (otherPlayers.length > 0) {
+            await Promise.all(otherPlayers.map(p => resolveEnvoiName(p.wallet)));
+        }
+
+        container.innerHTML = `
+            <div class="social-network">
+                <div class="network-header">
+                    <span class="network-title">REGION ALLIANCES</span>
+                    <div class="network-stats">DETECTED: <span class="connections-count">${otherPlayers.length}</span></div>
+                </div>
+                <div class="connections-list">
+                    ${otherPlayers.length === 0 ? '<div class="opacity-5 p-20 italic">No other entities detected in this sector.</div>' : 
+                        otherPlayers.map(p => `
+                            <div class="connection-item glass-panel">
+                                <div class="connection-avatar">
+                                    <img src="${p.avatar_url || 'Assets/Images/portraits/placeholder.webp'}" alt="Entity">
+                                </div>
+                                <div class="connection-info">
+                                    <div class="connection-name">${getCachedEnvoiName(p.wallet)}</div>
+                                    <div class="connection-role">${p.social_rank} | ${p.job_role || 'Freelancer'}</div>
+                                    <div class="connection-status online">CONNECTED</div>
+                                </div>
+                                <div class="connection-actions">
+                                    <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); sendChallenge('${p.id}')" title="Challenge Duel"></button>
+                                    <button class="action-btn invite" title="Propose Alliance"></button>
+                                </div>
+                            </div>
+                        `).join('')}
+                </div>
+            </div>
+        `;
+    } else if (tab === 'career') {
+        const tiers = [
+            { name: "Iron", mojo: 0, desc: "A nobody in the neon gutter.", icon: "🌑" },
+            { name: "Bronze", mojo: 100, desc: "A regular face at the local shops.", icon: "🥉" },
+            { name: "Silver", mojo: 300, desc: "Gaining recognition in the sector.", icon: "🥈" },
+            { name: "Gold", mojo: 600, desc: "An icon of the regional circuit.", icon: "🥇" },
+            { name: "Diamond", mojo: 1000, desc: "Arena legend. The elite respect you.", icon: "💎" }
+        ];
+
+        container.innerHTML = `
+            <div class="career-system">
+                <div class="career-header">
+                    <span class="career-title">PATH: <span class="job-role job-role--${(state.job_role || 'Freelancer').toLowerCase()}">${state.job_role || 'Freelancer'}</span></span>
+                    <div class="career-level">MOJO ${state.mojo || 0}</div>
+                </div>
+                <div class="career-path">
+                    ${tiers.map(t => {
+                        const isCurrent = (state.mojo || 0) >= t.mojo && (state.mojo || 0) < (tiers[tiers.indexOf(t)+1]?.mojo || 9999);
+                        const isCompleted = (state.mojo || 0) >= (tiers[tiers.indexOf(t)+1]?.mojo || 9999);
+                        const isLocked = (state.mojo || 0) < t.mojo;
+                        return `
+                            <div class="career-tier ${isCurrent ? 'current' : ''} ${isCompleted ? 'completed' : ''} ${isLocked ? 'locked' : ''}">
+                                <div class="tier-content">
+                                    <div class="tier-icon">${t.icon}</div>
+                                    <div class="tier-info">
+                                        <div class="tier-name">${t.name}</div>
+                                        <div class="tier-description">${t.desc}</div>
+                                        <div class="tier-requirements">
+                                            <span class="requirement ${!isLocked ? 'completed' : ''}">REQ: ${t.mojo} MOJO</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    } else if (tab === 'achievements') {
+        const unlocked = new Set(state.achievements || []);
+        const trophyCatalog = [
+            { id: "FIRST_VICTORY", name: "First Victory", description: "Win your first match.", tier: 1 },
+            { id: "TOURNAMENT_CHAMPION", name: "Tournament Champion", description: "Win a tournament.", tier: 2 },
+            { id: "FIRST_HEIST", name: "First Heist", description: "Complete a successful Club heist.", tier: 1 },
+            { id: "OUTLAW_SLAYER", name: "Outlaw Slayer", description: "Defeat a high-infamy opponent.", tier: 2 },
+            { id: "ARENA_LEGEND", name: "Arena Legend", description: "Achieve legendary status in the arena.", tier: 3 },
+            { id: "REHABILITATED", name: "Rehabilitated", description: "Pay off your courthouse fine and reset wanted level.", tier: 2 },
+            { id: "GOVERNOR", name: "Governor", description: "Control 2+ territories as a club leader.", tier: 3 }
+        ];
+
+        container.innerHTML = `
+            <div class="achievement-system">
+                <div class="achievements-header">
+                    <span class="achievements-title">HALL OF VALOR</span>
+                    <div class="achievements-progress">UNLOCKED: <span class="progress-text">${unlocked.size}/${trophyCatalog.length}</span></div>
+                </div>
+                <div class="achievements-grid">
+                    ${trophyCatalog.map(trophy => {
+                        const hasUnlocked = unlocked.has(trophy.id);
+                        return `
+                            <div class="trophy-badge tier-${trophy.tier} ${hasUnlocked ? 'unlocked' : 'locked'}">
+                                <div class="badge-icon ${hasUnlocked ? 'unlocked' : ''}">${hasUnlocked ? '🏆' : ''}</div>
+                                <div class="badge-name">${trophy.name}</div>
+                                <div class="badge-description">${trophy.description}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+}
+
+window.openSocialPanelOverlay = openSocialPanelOverlay;
+window.switchSocialTab = switchSocialTab;
 
 function tradeShares(entityId, action, amount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
