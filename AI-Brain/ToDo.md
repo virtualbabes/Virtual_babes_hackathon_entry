@@ -101,7 +101,7 @@
    - **Suggestions**:
      - Add shop overlays (using _shops.scss) for item purchasing, with animated item reveals and purchase confirmations.
      - Implement criminality UI (using _criminality.scss) for heist planning, with risk meters and success animations.
-     - Create territory map (using _territory.scss) with 3D CSS transforms for regional dominance visualization.
+     - [x] Create territory map (using _territory.scss) with 3D CSS transforms for regional dominance visualization.
      - Expand social panel (using _social.scss) for player interactions, alliances, and extended leaderboards.
      - Use _economy.scss for auction houses and portfolio management overlays.
    - **Immersion Boost**: These features would make the "Social Economic Simulation" feel more interactive, moving beyond basic matchmaking to full ecosystem engagement.

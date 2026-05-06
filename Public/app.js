@@ -3520,6 +3520,103 @@ function openClubFoundry() {
     document.body.appendChild(overlay);
 }
 
+/**
+ * Populates and displays the district shops overlay using synchronized club inventory.
+ */
+async function openShopsOverlay() {
+    const container = document.getElementById("shops-container");
+    if (!container) return;
+    
+    container.innerHTML = "";
+    const clubs = Object.values(globalClubs);
+    
+    let shopsFound = 0;
+    for (const club of clubs) {
+        const hasStock = club.inventory && Object.values(club.inventory).some(q => q > 0);
+        if (!hasStock) continue;
+        
+        shopsFound++;
+        const card = document.createElement("div");
+        card.className = "glass-panel p-15 m-0 text-left animate-slide-up";
+        card.style.borderColor = "var(--neon-purple)";
+        
+        card.innerHTML = `
+            <div class="flex-row justify-between align-center mb-10">
+                <b class="text-neon-purple">${club.name.toUpperCase()}</b>
+                <span class="font-size-0-7em opacity-5">${club.type}</span>
+            </div>
+            <div class="flex-col gap-5">
+                ${Object.entries(club.inventory).map(([itemId, qty]) => {
+                    if (qty <= 0) return '';
+                    const itemName = itemId.replace(/_/g, ' ').toUpperCase();
+                    // Pricing heuristic: items in shops usually follow registry pricing
+                    const price = 100; 
+                    return `
+                        <div class="flex-row justify-between font-size-0-85em">
+                            <span class="opacity-8">${itemName} (${qty})</span>
+                            <button class="outline p-2-8 font-size-9px border-purple" onclick="buyClubItem('${club.id}', '${itemId}', ${price}, '${club.territories[0]}')">
+                                BUY
+                            </button>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        container.appendChild(card);
+    }
+    
+    if (shopsFound === 0) {
+        container.innerHTML = `<div class="grid-span-2 opacity-5 italic py-40">No district shops currently have active inventory.</div>`;
+    }
+
+    document.getElementById("shops-overlay").classList.remove("hidden");
+}
+
+/**
+ * Populates the 3D grid with territory status and ownership.
+ */
+function openTerritoryMapOverlay() {
+    const grid = document.getElementById("map-3d-grid");
+    if (!grid) return;
+    
+    grid.innerHTML = "";
+    
+    const territoryMap = [
+        { id: "the_lab", name: "The Lab", icon: "🧪" },
+        { id: "north_district", name: "North Gate", icon: "⛩️" },
+        { id: "the_archive", name: "The Archive", icon: "📜" },
+        { id: "west_port", name: "West Port", icon: "⚓" },
+        { id: "arena_center", name: "Arena Center", icon: "⚔️" },
+        { id: "east_gate", name: "East Gate", icon: "🏯" },
+        { id: "south_slums", name: "The Slums", icon: "🏚️" },
+        { id: "casino", name: "The Casino", icon: "🎰" },
+        { id: "data_haven", name: "Data Haven", icon: "💾" }
+    ];
+
+    territoryMap.forEach(t => {
+        const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id));
+        const isOwned = !!club;
+        
+        const tile = document.createElement("div");
+        tile.className = `map-tile-3d ${isOwned ? 'owned' : ''} accelerated`;
+        tile.onclick = () => {
+            hideAllOverlays();
+            openTerritoryView(t.id);
+        };
+        
+        tile.innerHTML = `
+            <div class="tile-label">
+                <div class="font-size-1-5em mb-5">${t.icon}</div>
+                <div class="font-bold letter-spacing-1">${t.name.toUpperCase()}</div>
+                <div class="font-size-9px mt-5 text-neon-cyan">${isOwned ? club.name : 'NEUTRAL'}</div>
+            </div>
+        `;
+        grid.appendChild(tile);
+    });
+
+    document.getElementById("territory-map-overlay").classList.remove("hidden");
+}
+
 async function submitClubFoundry() {
     const name = document.getElementById("foundry-club-name").value.trim();
     const type = document.getElementById("foundry-shop-type").value;
@@ -5298,6 +5395,8 @@ async function takeLease(clubId, leaseId, price) {
 
 window.openClubLeaseBoard = openClubLeaseBoard;
 window.takeLease = takeLease;
+window.openShopsOverlay = openShopsOverlay;
+window.openTerritoryMapOverlay = openTerritoryMapOverlay;
 
 // --- Particle System ---
 function initParticleSystem() {
