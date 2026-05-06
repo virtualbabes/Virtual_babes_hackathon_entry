@@ -220,7 +220,7 @@ type MatchState struct {
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
 	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played
-	ActiveItemBuffs   map[string]map[string]int // PlayerID -> ItemID -> MatchesRemaining
+	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs"` // PlayerID -> ItemID -> MatchesRemaining
 	IsBountyMatch     bool
 }
 

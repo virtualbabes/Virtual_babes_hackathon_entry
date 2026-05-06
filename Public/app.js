@@ -3389,8 +3389,11 @@ function showPowerTooltip(e, card, index, state) {
         html += `
             <div class="tooltip-row">
                 <span style="opacity: 0.7;">${side}:</span>
-                <span>
-                    ${base} ${modifiersHtml}= <b style="color: var(--neon-cyan)">${totalEffectivePower} (${grade})</b>
+                <span style="display: flex; align-items: center; gap: 5px;">
+                    <span>${base}</span>
+                    ${modifiersHtml ? `<span style="font-size: 0.8em; opacity: 0.8;">(${modifiersHtml.trim()})</span>` : ''}
+                    <span>=</span>
+                    <b style="color: var(--neon-cyan)">${totalEffectivePower} (${grade})</b>
                 </span>
             </div>
         `;

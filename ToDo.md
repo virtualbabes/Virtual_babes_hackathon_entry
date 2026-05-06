@@ -1,6 +1,7 @@
 # NFT Seduction Tasks
 
 ## Critical Launch Readiness
+- [x] Audit `renderCardHTML` and `showPowerTooltip` for full penalty and buff synchronization.
 - [x] Hardened spectator synchronization: `handleSpectate` populates penalty snapshots; hardened move routing and session cleanup.
 - [x] Hardened spectator synchronization: `SetBoardState` now ingests moods, territory, and full ruleset.
 - [x] Audit `handleHeist` logic for "Fence Fee" and Industrial Loop integration.

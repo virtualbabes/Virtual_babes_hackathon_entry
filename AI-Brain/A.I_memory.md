@@ -64,6 +64,7 @@
 - **Kidnap Gambit**: Hardened `handleKidnapRequest` with robust card selection (favorite vs. rarest) and explicit removal from victim's inventory.
 - **Spectator Accuracy**: Hardened `SetBoardState` in `main.go` to synchronize authoritative board moods, territory, and penalty snapshots for accurate spectator tooltips.
 - **Kidnap Economy**: Audited `handlePayRansom` to implement a 20% 'Laundering Tax' returning to the faucet, completing the Industrial Loop for kidnappings.
+- **Tooltip Accuracy**: Hardened `showPowerTooltip` in `app.js` to correctly calculate and display effective power, including player penalties and item buffs, by synchronizing `ActiveItemBuffs` from WASM.
 - **Heist Economy**: Audited `handleHeist` to implement a 10% "Fence Fee" on successful loot, returning to the faucet and triggering dynamic scaling.
 - **Match Completion Hardening**: Audited `processFallenPenaltyJail` for AI/BYE guards and refactored match finalization to a Locked pattern to resolve recursive deadlocks.
 - **Jailing Mechanics**: Secured `processFallenPenaltyJail` and `processPrisonerRule` to use decrementing inventory logic and verified card existence before jailing. Utilized `CaptureType` for tactical feedback.

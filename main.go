@@ -157,6 +157,7 @@ type Engine struct {
 	ServerLoad          int                       // Current active matches on the server
 	SpecialFanfare      string                    // Archetype for specific win/loss tracks: "Emotional", "Witch"
 	TerritoryID         string                    // The location of the current match
+	ActiveItemBuffs     map[string]map[string]int // PlayerID -> ItemID -> MatchesRemaining
 	VaultLow            bool                      // Warning flag for low faucet balance
 	DeckRating          string                    // Current player's active deck rating (e.g., [A++])
 	MasterVolume        float64                   // Global master volume (0.0 - 1.0)
@@ -1040,6 +1041,22 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 	if tid := data.Get("territory_id"); !tid.IsUndefined() {
 		Game.TerritoryID = tid.String()
 	}
+
+	// 5.1 Sync Active Item Buffs
+	jsActiveItemBuffs := data.Get("active_item_buffs")
+	if jsActiveItemBuffs.Type() == js.TypeObject {
+		Game.ActiveItemBuffs = make(map[string]map[string]int)
+		js.Global().Get("Object").Call("keys", jsActiveItemBuffs).Call("forEach", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			playerID := args[0].String()
+			Game.ActiveItemBuffs[playerID] = make(map[string]int)
+			js.Global().Get("Object").Call("keys", jsActiveItemBuffs.Get(playerID)).Call("forEach", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+				itemID := args[0].String()
+				Game.ActiveItemBuffs[playerID][itemID] = jsActiveItemBuffs.Get(playerID).Get(itemID).Int()
+				return nil
+			}))
+			return nil
+		}))
+	}
 	if a1 := data.Get("p1_avatar"); !a1.IsUndefined() { Game.Players[0].AvatarURL = a1.String() }
 	if g1 := data.Get("p1_gloat"); !g1.IsUndefined() { Game.Players[0].GloatMessage = g1.String() }
 	if a2 := data.Get("p2_avatar"); !a2.IsUndefined() { Game.Players[1].AvatarURL = a2.String() }
@@ -1866,6 +1883,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["multiplayer"] = Game.Multiplayer
 		state["special_fanfare"] = Game.SpecialFanfare
 		state["territory_id"] = Game.TerritoryID
+		state["active_item_buffs"] = Game.ActiveItemBuffs
 		// Expose player-specific stats for accurate client-side power calculations in tooltips
 		state["p1_wanted_level"] = Game.Players[0].WantedLevel
 		state["p1_cunning"] = Game.Players[0].Cunning

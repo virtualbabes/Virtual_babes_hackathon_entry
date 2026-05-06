@@ -1208,13 +1208,13 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	}
 
 	match := &MatchState{
-		P1ID: id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
-		P1Wallet:      l.wallets[id1],
-		P2Wallet:      l.wallets[id2],
-		Rules:         map[string]bool{"Open": true},             // Default rules
-		P1WantedLevel: l.leaderboard[l.wallets[id1]].WantedLevel, // Wanted levels from leaderboard
-		P2WantedLevel: l.leaderboard[l.wallets[id2]].WantedLevel,
-		TerritoryID:   l.assignMatchTerritory(), // Assign a territory to the match
+		P1ID:            id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
+		P1Wallet:        l.wallets[id1],
+		P2Wallet:        l.wallets[id2],
+		Rules:           map[string]bool{"Open": true},             // Default rules
+		P1WantedLevel:   l.leaderboard[l.wallets[id1]].WantedLevel, // Wanted levels from leaderboard
+		P2WantedLevel:   l.leaderboard[l.wallets[id2]].WantedLevel,
+		TerritoryID:     l.assignMatchTerritory(), // Assign a territory to the match
 	}
 	l.matches[id1], l.matches[id2] = match, match
 
