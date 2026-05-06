@@ -47,6 +47,7 @@ func (l *Lobby) processLoans() {
 			l.blackMarket = append(l.blackMarket, *loan)
 
 			delete(l.loans, id)
+			// Trigger UI sync to reflect changes in the black market and player stats
 			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 		}
 	}

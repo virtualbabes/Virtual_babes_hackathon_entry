@@ -299,6 +299,7 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	transaction.WaitForConfirmation(client, firstTxID, 4, context.Background())
 
 	l.mutex.Lock()
+	l.mutex.Lock() // Lock to update faucet balance and re-evaluate dynamic scaling
 	l.faucetBalance -= totalUnits // Deduct from the overall faucet balance
 	l.applyDynamicScaling()       // Re-evaluate dynamic scaling after payout
 	l.mutex.Unlock()

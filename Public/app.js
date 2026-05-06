@@ -2649,7 +2649,7 @@ function clickGrid(index) {
     const state = window.GetGameState();
     
     // Multiplayer Guard: Only allow move if it's actually our turn
-    if (state.phase === "Active" && state.turn !== myPlayerIndex) {
+    if (state.phase === "Active" && state.turn !== state.local_player_index) {
         console.warn("It is not your turn!");
         return;
     }
@@ -2669,7 +2669,7 @@ function clickGrid(index) {
             const card = state.deck.find(c => c.id === selectedCardId);
             const envelope = {
                 type: "move",
-                to_id: currentOpponentId,
+                to_id: currentOpponentId, // This should be the opponent's client ID
                 payload: {
                     grid_index: index,
                     card_id: selectedCardId,
@@ -2681,7 +2681,7 @@ function clickGrid(index) {
         activeCardId = null; 
         syncUI("combat");
     }
-}
+} 
 
 // --- Deck Manager Logic ---
 function openDeckManager() {

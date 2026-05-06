@@ -90,6 +90,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 			l.faucetBalance += fenceFee
 			l.applyDynamicScalingLocked()
 		}
+		} 
 		playerStats.Playstyle.RiskTolerance += 0.05
 		playerStats.HeistAttempts++
 		targetClub.Treasury -= loot

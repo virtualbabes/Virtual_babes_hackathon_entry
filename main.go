@@ -1194,6 +1194,7 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 	}
 	Game.mutex.Unlock()
 
+	
 	// Reset AI score when the player takes their turn
 	Game.AIScore = 0
 
