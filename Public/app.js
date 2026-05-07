@@ -5952,7 +5952,6 @@ function updateHeistRiskAssessment(clubId) {
 	if (club.staff) Object.values(club.staff).forEach(role => { if(role === "Security") securityStaff++; });
 	
 	const securityLevel = (club.club_mojo / 10) + (securityStaff * 15);
-	const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100));
 
 	// Registry-aligned Trap Modifiers
 	const trapModifiers = {

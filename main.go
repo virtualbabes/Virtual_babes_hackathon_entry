@@ -1273,7 +1273,6 @@ func getEffectivePower(c *Card, sideIdx int, gridIdx int) int {
 	// Apply Wanted Level Penalty (Mitigated by Cunning)
 	wantedPenalty := (player.WantedLevel * 5)
 	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
-	mitigation := player.Cunning * 2
 	mitigation := player.GetEffectiveCunning() * 2
 	if mitigation > wantedPenalty { mitigation = wantedPenalty }
 	base -= (wantedPenalty - mitigation)
@@ -1874,7 +1873,6 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["rumor_count"] = Game.Players[0].RumorCount
 		state["playstyle"] = Game.Players[0].Playstyle
 		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
-		state["cunning"] = Game.Players[0].Cunning
 		state["cunning"] = Game.Players[0].GetEffectiveCunning()
 		state["nurturing"] = Game.Players[0].Nurturing
 		state["achievements"] = Game.Players[0].Achievements
