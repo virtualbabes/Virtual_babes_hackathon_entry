@@ -1,0 +1,60 @@
+# Orphan Fix List
+
+- Fixed double return statement in `checkCaptures` function within `battle_service.go`.
+- Synchronized Market Pricing formula between `app.js` and `lobby_manager.go`.
+- Fixed floating code block for `finalizeMatchResult` and missing function boundaries in `battle_service.go`.
+- Verified `calculateReputation` is consistently defined in `economy_service.go` and utilized in `battle_service.go`.
+- Confirmed `Lobby` initialization in `server.go` correctly seeds the persistent card cache.
+- Fixed missing closing braces in `battle_service.go` for `serverCheckCaptures` and `verifyWinner`.
+- Fixed duplicated return statement in `main.go` within the `checkCaptures` logic.
+- Fixed extra closing brace at the end of `battle_service.go`.
+- Synchronized 'Stolen' item logic: Items bought from the Black Market now carry a Wanted Level penalty.
+- Ensured `Lobby` struct initialization in `server.go` includes the new `rumors` map.
+- Unified `CalculateReputation` as a `Lobby` method to allow access to Club Mojo data.
+- Fixed duplicated `updateLeaderboard` function header in `battle_service.go`.
+- Removed redundant lowercase `calculateReputation` helper in `economy_service.go`.
+- Unified `CalculateReputation` as a `Lobby` method to allow access to Club Mojo data.
+- Fixed duplicated `updateLeaderboard` function header in `battle_service.go`.
+- Removed redundant lowercase `calculateReputation` helper in `economy_service.go`.
+- Unified `CalculateReputation` as a `Lobby` method to allow access to Club Mojo data.
+- Fixed duplicated `updateLeaderboard` function header in `battle_service.go`.
+- Removed redundant lowercase `calculateReputation` helper in `economy_service.go`.
+- Unified `CalculateReputation` as a `Lobby` method to allow access to Club Mojo data.
+- Fixed duplicated `updateLeaderboard` function header in `battle_service.go`.
+- Removed redundant lowercase `calculateReputation` helper in `economy_service.go`.
+- Fixed duplicated `checkAdminAuth` and `verifyAdminSignature` methods in `handlers_admin.go`.
+- Fixed `capturedCards` orphan in `battle_service.go` by tracking them in `MatchState`.
+- Added `BuffExpirations` to `Club` struct to support temporary defenses.
+- Fixed duplicated `checkAdminAuth` and `verifyAdminSignature` methods in `handlers_admin.go`.
+- Fixed `capturedCards` orphan in `battle_service.go` by tracking them in `MatchState`.
+- Added `BuffExpirations` to `Club` struct to support temporary defenses.
+- Fixed scope error in `updateMarketTicker` (buggy DOM implementation) during canvas refactor.
+- Fixed duplicate `wins, reputation` declaration in lobby_manager.go.
+- Fixed syntax error in heist `successChance` clamping logic.
+- Fixed redundant `achievements` assignment in lobby_manager.go.
+- Fixed malformed `trade_shares` and `purchase_territory` block overlaps.
+- Fixed duplicate `wins, reputation` declaration in lobby_manager.go.
+- Fixed syntax error in heist `successChance` clamping logic.
+- Fixed redundant `achievements` assignment in lobby_manager.go.
+- Fixed malformed `trade_shares` and `purchase_territory` block overlaps.
+- Added `KidnappedCards` and `HeldHostageCards` to `PlayerStats` and `playerInfo` for Kidnap Gambit.
+- Fixed scope error in `updateMarketTicker` (buggy DOM implementation) during canvas refactor.
+- Ensured `Lobby` struct initialization in `server.go` includes the new `rumors` map.
+- Ensured `Lobby` struct initialization in `server.go` includes the new `rumors` map.
+- Ensured `Lobby` struct initialization in `server.go` includes the new `rumors` map.
+- Ensured `Lobby` struct initialization in `server.go` includes the new `loans` map.
+- Cleaned up dangling code and unified fragmented logic in `battle_service.go`.
+- Fixed orphaned `finalizeMatchResult` block and missing `Sudden Death` implementation in `battle_service.go`.
+- Added placeholder `calculateReputation` implementation in `battle_service.go` to resolve compilation errors.
+- Consolidated `calculateReputation` logic into `economy_service.go` and removed redundant definitions.
+- Verified Build Resource features (Auctions/Kidnapping) are structurally compatible with `common_types.go`.
+- Moved `hire_player` and `set_salary` handlers from `lobby_manager.go` to `career.go` for better modularity.
+- Ensured `use_item` handler correctly deducts from inventory and applies effects to `PlayerStats` or `MatchState`.
+- Added `Mood` field to `ServerCard` in `common_types.go` to align with WASM engine and enable server-side mood effect calculation.
+- Ensured `use_item` handler correctly deducts from inventory and applies effects to `PlayerStats` or `MatchState`.
+- Detected duplicated `checkAdminAuth` and `verifyAdminSignature` blocks in `handlers_admin.go`. [PENDING FIX]
+- Moved `hire_player` handler from `lobby_manager.go` to `career.go` for better modularity.
+- Fixed `distributeShopRevenue` in `server.go` to iterate over new `Territories` slice instead of missing `TerritoryID`.
+- main.go: Added missing `TournamentState` struct.
+- main.go: Renamed `Player.EmployerID` to `Player.EmployerClubID` to fix undefined reference.
+- app.js: Fixed malformed try-catch blocks in `adminGloatBan` and `addXChainWallet`.

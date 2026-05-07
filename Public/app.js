@@ -2989,7 +2989,7 @@ async function syncUI(scope = "all") {
                 ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${cunningVal}</span>` + // Display Cunning
                 ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${nurturingVal}</span>` + // Display Nurturing
 				socialHubBtn + galleryBtn +
-				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST</button>` +
+				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` +
                 ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + 
                 courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
                 (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + 
@@ -3534,58 +3534,80 @@ function openClubFoundry() {
 
 /**
  * Populates and displays the district shops overlay using synchronized club inventory.
+ * Now utilizes the high-fidelity _shops.scss styles and category filtering.
  */
-async function openShopsOverlay() {
-    const container = document.getElementById("shops-container");
-    if (!container) return;
-    
-    container.innerHTML = "";
-    const clubs = Object.values(globalClubs);
-    
-    let shopsFound = 0;
-    for (const club of clubs) {
-        const hasStock = club.inventory && Object.values(club.inventory).some(q => q > 0);
-        if (!hasStock) continue;
-        
-        shopsFound++;
-        const card = document.createElement("div");
-        card.className = "glass-panel p-15 m-0 text-left animate-slide-up";
-        card.style.borderColor = "var(--neon-purple)";
-        
-        card.innerHTML = `
-            <div class="flex-row justify-between align-center mb-10">
-                <b class="text-neon-purple">${club.name.toUpperCase()}</b>
-                <span class="font-size-0-7em opacity-5">${club.type}</span>
-            </div>
-            <div class="flex-col gap-5">
-                ${Object.entries(club.inventory).map(([itemId, qty]) => {
-                    if (qty <= 0) return '';
-                    const itemName = itemId.replace(/_/g, ' ').toUpperCase();
-                    // Pricing heuristic: items in shops usually follow registry pricing
-                    const price = 100; 
-                    return `
-                        <div class="flex-row justify-between font-size-0-85em">
-                            <span class="opacity-8">${itemName} (${qty})</span>
-                            <button class="outline p-2-8 font-size-9px border-purple" onclick="buyClubItem('${club.id}', '${itemId}', ${price}, '${club.territories[0]}')">
-                                BUY
-                            </button>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-        container.appendChild(card);
-    }
-    
-    if (shopsFound === 0) {
-        container.innerHTML = `<div class="grid-span-2 opacity-5 italic py-40">No district shops currently have active inventory.</div>`;
-    }
+async function openShopsOverlay(initialCategory = 'Elemental') {
+	document.getElementById("shops-overlay").classList.remove("hidden");
+	switchShopCategory(initialCategory);
+}
 
-    document.getElementById("shops-overlay").classList.remove("hidden");
+function switchShopCategory(category) {
+	const container = document.getElementById("shops-container");
+	if (!container) return;
+
+	// Update Tab State
+	document.querySelectorAll('.category-tab').forEach(tab => {
+		tab.classList.toggle('active', tab.dataset.category === category);
+	});
+
+	container.innerHTML = `<div class="grid-span-all opacity-5 py-40 italic">Scanning district stock for ${category} hardware...</div>`;
+
+	// Client-side item metadata registry (mirrors shop_registry.go)
+	const itemRegistry = {
+		"mood_catalyst": { name: "Mood Catalyst", desc: "+50 Mood Bonus (3 Matches)", price: 100 },
+		"grounded_shield": { name: "Grounded Shield", desc: "Immunity to Mood Penalties (5 Matches)", price: 250 },
+		"rule_breaker": { name: "Rule Breaker", desc: "Force PLUS trigger (1 Match)", price: 150 },
+		"intel_report": { name: "Intel Report", desc: "See Opponent Hand (3 Matches)", price: 300 },
+		"stamina_stim": { name: "Stamina Stim", desc: "-20 Fatigue Immediately", price: 100 },
+		"loyalty_pledge": { name: "Loyalty Pledge", desc: "+10 Loyalty Immediately", price: 500 },
+		"tripwire": { name: "Laser Tripwire", desc: "+10% Heist Failure", price: 500 },
+		"sentry_turret": { name: "Sentry Turret", desc: "+25% Heist Failure", price: 1200 },
+		"guard_dog": { name: "Bio-Guard Dog", desc: "Forces Jail on Failure", price: 2000 }
+	};
+
+	const clubs = Object.values(globalClubs).filter(c => c.type === category);
+	let itemsHTML = "";
+
+	clubs.forEach(club => {
+		Object.entries(club.inventory || {}).forEach(([itemId, qty]) => {
+			if (qty <= 0) return;
+			const meta = itemRegistry[itemId] || { name: itemId.replace(/_/g, ' '), desc: "Tactical Enhancement", price: 100 };
+			
+			itemsHTML += `
+				<div class="shop-item animate-slide-up" onclick="buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}')">
+					<div class="item-image">
+						<img src="Assets/Images/portraits/placeholder.webp" alt="Hardware">
+						<div class="item-badge">${club.name}</div>
+					</div>
+					<div class="item-info">
+						<div class="item-title">${meta.name.toUpperCase()}</div>
+						<div class="item-description">${meta.desc}</div>
+						<div class="item-stats">
+							<div class="stat">
+								<div class="stat-label">STOCK</div>
+								<div class="stat-value">${qty}</div>
+							</div>
+						</div>
+					</div>
+					<div class="item-footer">
+						<div class="item-price">${meta.price}</div>
+						<button class="buy-button">PURCHASE</button>
+					</div>
+				</div>
+			`;
+		});
+	});
+
+	if (itemsHTML === "") {
+		container.innerHTML = `<div class="grid-span-all opacity-3 py-40 italic">Sector is currently dry for ${category} assets.</div>`;
+	} else {
+		container.innerHTML = itemsHTML;
+	}
 }
 
 /**
  * Populates the 3D grid with territory status and ownership.
+ * Fully utilizes the _territory.scss styles including 3D perspectives and status indicators.
  */
 function openTerritoryMapOverlay() {
     const grid = document.getElementById("map-3d-grid");
@@ -3608,9 +3630,15 @@ function openTerritoryMapOverlay() {
     territoryMap.forEach(t => {
         const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id));
         const isOwned = !!club;
+        const isGovernor = isOwned && club.region_name;
         
+        let tileClasses = `map-tile-3d accelerated`;
+        if (isGovernor) tileClasses += " governor-controlled";
+        else if (isOwned) tileClasses += " controlled";
+        else tileClasses += " neutral";
+
         const tile = document.createElement("div");
-        tile.className = `map-tile-3d ${isOwned ? 'owned' : ''} accelerated`;
+        tile.className = tileClasses;
         tile.onclick = () => {
             hideAllOverlays();
             openTerritoryView(t.id);
@@ -3618,10 +3646,17 @@ function openTerritoryMapOverlay() {
         
         tile.innerHTML = `
             <div class="tile-label">
-                <div class="font-size-1-5em mb-5">${t.icon}</div>
-                <div class="font-bold letter-spacing-1">${t.name.toUpperCase()}</div>
-                <div class="font-size-9px mt-5 text-neon-cyan">${isOwned ? club.name : 'NEUTRAL'}</div>
+                <div style="font-size: 24px; margin-bottom: 5px;">${t.icon}</div>
+                <div class="tile-name">${t.name.toUpperCase()}</div>
+                <div class="tile-owner">${isOwned ? club.name : 'NEUTRAL ZONE'}</div>
+                ${isOwned ? `
+                <div class="tile-stats">
+                    <span class="stat population" title="Staff Count">${Object.keys(club.staff || {}).length}</span>
+                    <span class="stat resources" title="Treasury">${club.treasury.toFixed(0)}</span>
+                    <span class="stat defense" title="Club Mojo">${club.club_mojo}</span>
+                </div>` : ''}
             </div>
+            ${isGovernor ? '<div class="tile-status developing"></div>' : ''}
         `;
         grid.appendChild(tile);
     });
@@ -3793,68 +3828,6 @@ async function buyClubItem(clubId, itemId, price, territoryId) {
     }
 }
 
-function openWorldMap() {
-    const overlay = document.createElement("div");
-    overlay.id = "world-map-overlay";
-    overlay.className = "overlay";
-    
-    // Mapping 0-8 to territory names for the grid
-    const territoryMap = [
-        { id: "the_lab", name: "The Lab", icon: "🧪" },
-        { id: "north_district", name: "North Gate", icon: "⛩️" },
-        { id: "the_archive", name: "The Archive", icon: "📜" },
-        { id: "west_port", name: "West Port", icon: "⚓" },
-        { id: "arena_center", name: "Arena Center", icon: "⚔️" },
-        { id: "east_gate", name: "East Gate", icon: "🏯" },
-        { id: "south_slums", name: "The Slums", icon: "🏚️" },
-        { id: "casino", name: "The Casino", icon: "🎰" },
-        { id: "data_haven", name: "Data Haven", icon: "💾" }
-    ];
-
-    let tilesHTML = "";
-    territoryMap.forEach(t => { // Corrected logic to check if club.territories (array) includes t.id
-        const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id));
-        const isOwned = !!club; // Check if any club owns this territory
-        const isGovernorControlled = isOwned && club.region_name; // Check if the owning club is a Governor
-
-        let tileClasses = "map-tile-3d";
-        if (isOwned) tileClasses += " owned";
-        if (isGovernorControlled) tileClasses += " governor-controlled"; // Add new class for Governor
-        
-        tilesHTML += `
-            <div class="${tileClasses}" onclick="event.stopPropagation(); document.getElementById('territory-map-overlay').remove(); openTerritoryView('${t.id}')">
-                <div class="tile-label">
-                    <div style="font-size: 24px; margin-bottom: 5px;">${t.icon}</div>
-                    <div>${t.name.toUpperCase()}</div>
-                    ${isOwned ? `<div style="color: var(--neon-purple); margin-top: 5px; font-size: 8px;">[ ${club.name} ]</div>` : '<div style="opacity: 0.4; margin-top: 5px; font-size: 8px;">UNCLAIMED</div>'}
-                    ${isGovernorControlled ? `<div style="color: var(--neon-cyan); font-size: 7px; font-weight: bold; margin-top: 2px;">GOVERNOR</div>` : ''}
-                </div>
-            </div>
-        `;
-    });
-
-    overlay.innerHTML = `
-        <div class="glass-panel territory-map" style="width: 80%; max-width: 900px; text-align: center;">
-            <h1 style="font-size: 2em; margin-bottom: 10px;">NEON TOPOGRAPHY</h1>
-            <p style="opacity: 0.6; font-size: 0.9em;">Tactical ownership map of the Arena. Select a district to visit shops or found a Club.</p>
-            
-            <div class="map-perspective-container">
-                <div class="map-grid-3d">
-                    ${tilesHTML}
-                </div>
-            </div>
-
-            <div class="flex-row justify-center gap-20 mt-20">
-                <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span style="font-size: 10px;">NEUTRAL</span></div>
-                <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span style="font-size: 10px;">CLUB CONTROLLED</span></div>
-            </div>
-
-            <button class="outline mt-20" onclick="document.getElementById('world-map-overlay').remove()">RETURN TO LOBBY</button>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-}
 
 function openCourthouse() {
     const state = window.GetGameState();
@@ -5840,97 +5813,106 @@ function animateParticles() {
 
 // --- Criminality: Heist Planning Logic ---
 
-/**
- * Opens the Heist Planning interface using orphaned criminality styles.
- */
 function openHeistPlanningOverlay() {
 	const state = window.GetGameState();
 	const overlay = document.createElement("div");
 	overlay.id = "heist-overlay";
 	overlay.className = "overlay";
 
+	// Filter for external clubs only
 	const clubs = Object.values(globalClubs).filter(c => c.id !== state.employer_id);
 	
 	overlay.innerHTML = `
-		<div class="criminality-panel glass-panel" style="width: 650px;">
+		<div class="criminality-panel glass-panel animate-modal" style="width: 700px; max-height: 90vh;">
 			<div class="criminality-header">
-				<span class="criminality-title">HEIST PLANNING TERMINAL</span>
+				<span class="criminality-title" style="text-shadow: 0 0 15px rgba(255, 75, 75, 0.5);">HEIST PLANNING TERMINAL</span>
 				<div class="criminality-stats">
 					<div class="stat-item">
-						<div class="stat-label">INFAMY</div>
-						<div class="stat-value">${state.wanted_level || 0}</div>
+						<div class="stat-label" style="color: var(--color-error-red); opacity: 0.7;">WANTED</div>
+						<div class="stat-value" style="color: var(--color-error-red);">${state.wanted_level || 0}</div>
 					</div>
 					<div class="stat-item">
-						<div class="stat-label">CUNNING</div>
-						<div class="stat-value">${state.cunning || 0}</div>
+						<div class="stat-label" style="color: var(--color-neon-cyan); opacity: 0.7;">CUNNING</div>
+						<div class="stat-value" style="color: var(--color-neon-cyan);">${state.cunning || 0}</div>
 					</div>
 				</div>
 			</div>
 
-			<div class="criminality-targets">
-				<div class="targets-header">
-					<div class="targets-title">SELECT TARGET CLUB</div>
-				</div>
-				<div class="targets-list flex-col gap-10">
-					${clubs.length === 0 ? '<div class="opacity-5 italic p-20">No external clubs detected in this sector.</div>' : 
-						clubs.map(club => `
-							<div class="target-item glass-panel p-10 m-0" onclick="updateHeistRiskAssessment('${club.id}')">
-								<div class="target-info">
-									<div class="target-name">${club.name}</div>
-									<div class="target-details">
-										<span class="detail-item wealth">${club.treasury.toFixed(2)} $VBV</span>
-										<span class="detail-item level">MOJO: ${club.mojo || club.club_mojo}</span>
+			<div class="p-20">
+				<div class="criminality-targets mb-20">
+					<div class="targets-header">
+						<div class="targets-title" style="font-size: 0.85em; opacity: 0.6; letter-spacing: 2px;">DETECTED SECTOR ENTITIES</div>
+					</div>
+					<div class="targets-list" style="grid-template-columns: repeat(2, 1fr); gap: 12px; max-height: 300px;">
+						${clubs.length === 0 ? '<div class="grid-span-all opacity-3 italic py-40">No external club treasuries detected in local range.</div>' : 
+							clubs.map(club => `
+								<div class="target-item glass-panel m-0 p-15 hover-lift" onclick="updateHeistRiskAssessment('${club.id}')">
+									<div class="target-info">
+										<div class="target-name font-bold text-neon-purple" style="font-size: 1.1em;">${club.name.toUpperCase()}</div>
+										<div class="target-details mt-5">
+											<span class="detail-item wealth" style="color: var(--color-neon-green); font-weight: bold;">${club.treasury.toFixed(2)} $VBV</span>
+											<span class="detail-item level" style="opacity: 0.6; font-size: 0.9em;">MOJO: ${club.club_mojo}</span>
+										</div>
 									</div>
+									<div class="target-select-btn mt-10">ANALYZE DEFENSES</div>
 								</div>
-								<button class="target-select-btn">SELECT</button>
-							</div>
-						`).join('')}
+							`).join('')}
+					</div>
+				</div>
+
+				<div id="heist-risk-section" class="criminality-risk invisible mt-10 p-20 glass-panel animate-shimmer" style="background: rgba(0,0,0,0.4); border-color: rgba(255, 166, 87, 0.3);">
+					<div class="risk-header mb-15">
+						<span class="risk-icon">📡</span>
+						<span class="risk-title">TACTICAL PROBABILITY ANALYSIS</span>
+					</div>
+					
+					<div class="risk-meter">
+						<div class="risk-labels">
+							<span class="risk-low" style="color: var(--color-neon-green);">SURGICAL</span>
+							<span class="risk-high" style="color: var(--color-error-red);">CRITICAL RISK</span>
+						</div>
+						<div class="risk-bar" style="height: 14px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);">
+							<div id="heist-risk-fill" class="risk-fill" style="width: 0%;"></div>
+						</div>
+					</div>
+					
+					<div class="flex-row justify-between align-center mt-15">
+						<div id="heist-chance-text" class="progress-status" style="text-align: left; font-size: 1em;"></div>
+						<div id="heist-security-details" class="font-mono" style="font-size: 0.75em; opacity: 0.5;"></div>
+					</div>
+					
+					<div class="flex-row justify-center gap-15 mt-25">
+						<button class="outline w-full secondary" onclick="document.getElementById('heist-overlay').remove()">ABORT OPS</button>
+						<button id="heist-execute-btn" class="w-full danger" style="letter-spacing: 2px;">EXECUTE STRIKE</button>
+					</div>
 				</div>
 			</div>
-
-			<div id="heist-risk-section" class="criminality-risk hidden mt-20 p-15 glass-panel">
-				<div class="risk-header">
-					<span class="risk-title">TACTICAL PROBABILITY</span>
-				</div>
-				<div class="risk-meter">
-					<div class="risk-labels">
-						<span class="risk-low">DETECTION RISK</span>
-						<span class="risk-high">HIGH</span>
-					</div>
-					<div class="risk-bar">
-						<div id="heist-risk-fill" class="risk-fill" style="width: 0%;"></div>
-					</div>
-				</div>
-				<div id="heist-chance-text" class="progress-status mt-10"></div>
-				
-				<div class="flex-row justify-center gap-15 mt-20">
-					<button class="outline w-full" onclick="document.getElementById('heist-overlay').remove()">ABORT</button>
-					<button id="heist-execute-btn" class="w-full" style="background: var(--color-error-red); color: white;">EXECUTE STRIKE</button>
-				</div>
+			
+			<div class="text-center pb-20 opacity-4 font-size-0-7em letter-spacing-1">
+				SECURITY ENFORCED BY THE INDUSTRIAL LOOP PROTOCOL
 			</div>
 		</div>
 	`;
 
 	document.body.appendChild(overlay);
 }
-
-/**
- * Calculates and updates the UI with the estimated success chance.
- */
 function updateHeistRiskAssessment(clubId) {
 	const state = window.GetGameState();
 	const club = globalClubs[clubId];
 	const section = document.getElementById("heist-risk-section");
 	const fill = document.getElementById("heist-risk-fill");
 	const text = document.getElementById("heist-chance-text");
+	const secText = document.getElementById("heist-security-details");
 	const btn = document.getElementById("heist-execute-btn");
 
 	if (!club || !section) return;
 
-	section.classList.remove("hidden");
+	// Visual activation
+	section.classList.remove("invisible");
+	document.querySelectorAll('.target-item').forEach(item => item.classList.remove('selected'));
+	event.currentTarget.classList.add('selected');
 	
-	// Heuristic simulation of server logic: Base 50% + (Cunning - Security)
-	// Security is mojo/10 + 15 per security staff
+	// Tactical Math: Base 50% + (Effective Cunning - Security Level)
 	let securityStaff = 0;
 	if (club.staff) Object.values(club.staff).forEach(role => { if(role === "Security") securityStaff++; });
 	
@@ -5938,13 +5920,14 @@ function updateHeistRiskAssessment(clubId) {
 	const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100));
 	const riskPercent = (1 - successChance) * 100;
 
+	// UI Feedback
 	fill.style.width = `${riskPercent}%`;
-	text.innerHTML = `Estimated Success: <b style="color: var(--neon-green);">${(successChance * 100).toFixed(0)}%</b><br>
-					  <small class="opacity-5">Target Security Rating: ${securityLevel.toFixed(1)}</small>`;
+	text.innerHTML = `ESTIMATED SUCCESS: <b style="color: var(--color-neon-green); font-size: 1.2em;">${(successChance * 100).toFixed(0)}%</b>`;
+	secText.innerHTML = `TARGET SEC_LEVEL: ${securityLevel.toFixed(1)} [STAFF: ${securityStaff}]`;
 	
+	btn.disabled = false;
 	btn.onclick = () => executeHeistStrike(clubId);
 }
-
 /**
  * Dispatches the heist request to the server.
  */

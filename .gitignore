@@ -23,9 +23,3 @@ main.wasm
 *Thumbs.db
 *ai_exclude
 
-# Project Documentation (Local Only)
-AI-Brain/A.I_memory.md 
-AI-Brain/Game_expansion_plan.md 
-AI-Brain/orphan_fix_list.md 
-AI-Brain/ToDo.md DEV_Log 
-AI-Brain\What_is_this_repository.md

@@ -43,22 +43,6 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
 	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
-	now := time.Now()
-	for buffID, itemID := range targetClub.ActiveBuffs {
-		if strings.HasPrefix(buffID, "TRAP_") {
-			// Lazy Pruning: Remove expired traps
-			if expiry, ok := targetClub.BuffExpirations[buffID]; ok && now.After(expiry) {
-				delete(targetClub.ActiveBuffs, buffID)
-				delete(targetClub.BuffExpirations, buffID)
-				continue
-			}
-
-			if item, exists := GlobalShopRegistry[itemID]; exists {
-				successChance += item.HeistSuccessModifier
-			}
-		}
-	}
-
 	if successChance < 0.05 {
 		successChance = 0.05
 	}

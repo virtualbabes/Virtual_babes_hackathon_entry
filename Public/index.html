@@ -262,15 +262,22 @@
 
     <!-- District Shops Overlay (Functional Immersion) -->
     <div id="shops-overlay" class="overlay hidden">
-        <div class="glass-panel w-600 text-center animate-modal">
-            <h2 class="text-neon-purple">DISTRICT SHOPS</h2>
-            <p class="font-size-0-8em opacity-7 mb-20">Browse unique enhancements from local Club-owned businesses.</p>
-            
-            <div id="shops-container" class="grid-cols-2 gap-15">
-                <!-- Populated dynamically by app.js from shop_registry.go data -->
+        <div class="shops-panel glass-panel w-800 text-center animate-modal">
+            <div class="shops-header">
+                <span class="shops-title">DISTRICT SHOPS</span>
+                <button class="outline x-small" onclick="hideAllOverlays()">CLOSE TERMINAL</button>
             </div>
-            
-            <button class="outline mt-20 w-full" onclick="hideAllOverlays()">Return to Arena</button>
+
+            <div class="shop-categories mb-20">
+                <div class="category-tab active" data-category="Elemental" onclick="switchShopCategory('Elemental')">ELEMENTAL</div>
+                <div class="category-tab" data-category="Tactical" onclick="switchShopCategory('Tactical')">TACTICAL</div>
+                <div class="category-tab" data-category="Vitality" onclick="switchShopCategory('Vitality')">VITALITY</div>
+                <div class="category-tab" data-category="Hardware" onclick="switchShopCategory('Hardware')">HARDWARE</div>
+            </div>
+
+            <div id="shops-container" class="shop-items" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Populated dynamically by app.js -->
+            </div>
         </div>
     </div>
 
