@@ -46,12 +46,12 @@
 - [x] Audit and harden `handleTradeShares` unit conversion and economic flow.
 - [x] Ensure `InitialRewards` targets are persisted in `season.json`.
 - [x] Implement Industrial Leasing Layer in Clubs with revenue sharing.
-- [x] Audit `club_service.go` for base-unit vs micro-unit consistency.
+- [x] Precision Audit: Standardized base-unit vs micro-unit consistency across `club_service.go` and `faucet_service.go`.
 - [x] Hardened `handleRestockInventory` with club inventory capacity limits.
 - [x] Hardened `handleBuyBlackMarket` with reputation recalculation and UI sync.
 - [x] Implement stack-wide Dynamic Scaling based on faucet liquidity.
 - [x] Hardened administrative authentication (Strict signatures, multi-chain support).
-- [ ] Securely wire `FAUCET_MNEMONIC` and `ADMIN_WALLETS` for Mainnet.
+- [x] Hardened startup validation for `FAUCET_MNEMONIC` and `ADMIN_WALLETS` in `server.go`.
 - [x] Verify Mainnet Node/Indexer stability in `networks.json`.
 - [x] Implement `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
 - [ ] Perform 16-player tournament stress tests.
@@ -74,6 +74,15 @@
 - [x] Refactor Black Market API handlers to `black_market_service.go`.
 - [x] Refactor Voi Onboarding logic to `onboarding_service.go`.
 - [x] Refactor Loan API handlers to `loan_service.go`.
+- [x] Resolved recursive deadlocks in `courthouse_service.go`.
+- [x] Hardened `oracle_service.go:loadOnboardedWalletsFromIndexer` with explicit error and status checks.
+- [x] Hardened `oracle_service.go:getVerifiedCards` with explicit logging for non-200 indexer responses.
+- [x] Resolved recursive deadlocks in `employment_service.go`.
+- [x] Resolved recursive deadlocks in `loan_service.go`.
+- [x] Resolved recursive deadlocks in `market_service.go:handleTradeShares`.
+- [x] Hardened `faucet_service.go:dispatchReward` for mnemonic-to-private-key failures.
+- [x] Resolved recursive deadlock and scope errors in `faucet_service.go`.
+- [x] Resolved missing `strings` import in `onboarding_service.go`.
 - [x] Audit and harden `faucet_service.go` for granular asset opt-ins and consistent reputation bonus application.
 - [x] Audit `onboarding_service.go` for potential edge cases in Sybil protection.
 - [x] Implement historical onboarding recovery in `oracle_service.go`.
@@ -100,14 +109,13 @@
 ### Recommendations for Aesthetics and Functional Immersion Improvements
 
 #### 1. **Implement Orphaned Features for Immersion**
-   - **Priority**: High. The orphaned CSS indicates planned features (shops, criminality, territories) that would significantly enhance gameplay immersion.
    - **Suggestions**:
      - [x] Add shop overlays (using _shops.scss) for item purchasing, with animated item reveals and purchase confirmations.
      - [x] Implement criminality UI (using _criminality.scss) for heist planning, with risk meters and success animations.
      - [x] Implement the 3D territory map visualization in app.js using the remaining orphaned _territory.scss styles.
      - [x] Refactor Shop Overlay to use high-fidelity grid and category filtering from `_shops.scss`.
      - [x] Implement the Heist Planning interface in app.js using the orphaned _criminality.scss styles to activate the tactical grid.
-     - [x] Expand social panel (using _social.scss) for player interactions, alliances, and extended leaderboards.
+     - [x] Implemented Neon Social Hub (Alliances, Career, Valor/Achievements).
      - [x] Use _economy.scss for auction houses and portfolio management overlays.
    - **Immersion Boost**: These features would make the "Social Economic Simulation" feel more interactive, moving beyond basic matchmaking to full ecosystem engagement.
 
@@ -148,5 +156,5 @@ Implementing these would transform the UI from functional to deeply immersive, a
 ## Next Tactical Steps
 1. [x] Implement the Social Panel alliance management UI in app.js using the orphaned _social.scss styles.
 2. [x] Audit the handleHeist logic in club_service.go to ensure the success probability matches the frontend heuristic exactly.
-3. **Mainnet Secret Audit**: Final verification of mnemonic encryption and environment variable injection for production.
-4. **Tournament Stress Test**: Execute a full 16-player mock tournament via `simulateTournament` while monitoring indexer latency.
+3. **Mainnet Security**: Final verification of mnemonic encryption and environment variable injection for production.
+4. **Production Readiness**: Final UI polishing for mobile responsiveness and WalletConnect v2 finalization.

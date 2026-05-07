@@ -13,16 +13,17 @@ Industrial Leases: A sophisticated rental market where Club members can lease hi
 3. Social Hierarchy & RPG Mechanics
 The simulation introduces "Social Standing" as a tangible asset:
 
-Clubs & Governance: Players can found clubs, own territories, and expand into regional governors.
-Employment System: Players can hold active jobs (Manager, Security, Clerk) with daily salaries paid from Club Treasuries.
+Clubs & Governance: Fully functional territory map and club creation system with regional governor status.
+Employment System: Functional careers with Mojo-based tiers and automatic salary distributions.
 Dynamic Attributes: RPG-style stats—Mojo (Social Rank), Cunning (Stealth/Success), and Nurturing (Fatigue mitigation)—are now wired into the combat power calculations and criminal success rates.
-Cosmetics with Utility: Faceplates are no longer just visual; they provide functional bonuses to Mojo and Cunning.
-4. Criminality & Market Intelligence
+Cosmetics with Utility: Faceplate registry provides functional bonuses to Mojo and Cunning, influencing social rank and heist success.
+4. Criminality, Market & Social
 The "High-Stakes" aspect of the simulation is driven by:
 
 Kidnap Gambit: A high-risk mechanic where cards can be taken hostage for ransom or insurance recovery.
 Entity Market: A trading platform where players buy/sell shares in NPCs and other players, influenced by a real-time Rumor Mill and market sentiment.
 Black Market: Liquidation of collateral from defaulted loans, creating a high-risk secondary market for "stolen" assets.
+Social Hub: A unified interface for managing Alliances, Career paths, and Trophies (Valor).
 5. Security & Launch Readiness
 The project is currently in a Production-Ready Beta state. Recent audits have hardened the following:
 

@@ -30,14 +30,23 @@
 - **Domain Separation**: Logic is now split across specialized services (Battle, Economy, Club, Employment, Oracle) to reduce `Lobby` mutex contention.
 
 ## Active Priorities
-1. **Mainnet Secrets**: Secure wiring of `FAUCET_MNEMONIC` and `ADMIN_WALLETS` for production launch.
+1. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
 
 ## Completed Tasks
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
-- **Validation**: Performed simulated 16-player tournament stress tests; verified bracket archival and kickback logic.
+- **Security**: Hardened `faucet_service.go:dispatchReward` to gracefully handle mnemonic-to-private-key failures.
+- **Bug Fix**: Resolved recursive deadlocks in `courthouse_service.go` by switching to `logAdminAuditLocked`.
+- **Bug Fix**: Added explicit error and status code handling in `oracle_service.go:loadOnboardedWalletsFromIndexer`.
+- **Bug Fix**: Added explicit logging for non-200 indexer responses in `oracle_service.go:getVerifiedCards`.
+- **Bug Fix**: Resolved recursive deadlocks in `employment_service.go` by switching to `Locked` variant helpers.
+- **Bug Fix**: Resolved recursive deadlocks in `loan_service.go` by switching to `logAdminAuditLocked`.
+- **Bug Fix**: Resolved recursive deadlocks in `market_service.go:handleTradeShares` by using `Locked` variant helpers.
+- **Bug Fix**: Resolved critical deadlock in `faucet_service.go` and fixed `skippedAssets` variable scope error.
+- **Bug Fix**: Added missing `strings` import to `onboarding_service.go` required for wallet normalization.
+- **Validation**: Performed simulated 8/16-player tournament stress tests; verified bracket archival and kickback logic.
 - **Rewards**: Hardened Top 5 placement identification and implemented atomic multi-asset distribution.
 - **Maintenance**: Verified `cleanupNonces` correctly prunes history without affecting active spectators.
-- **Audit**: Verified EVM `power_divisor` and `power_base` configurations.
+- **Audit**: Verified Multi-Chain `power_divisor` and `power_base` configurations in `availableNetworks`.
 - **Visuals**: Implemented canvas-based particle effects for card captures (Phase 2).
 - **SCSS Refactor**: Integrated `.particle-canvas` styles into the modular utility system.
 - **Criminality**: Hardened heist logic to utilize `GetEffectiveCunning` (including faceplate bonuses) for success probability and kidnap eligibility.
@@ -52,13 +61,13 @@
 - **Economy Audit**: Ensured loan interest and auction commissions are added to `l.faucetBalance` before dynamic scaling.
 - **Stability**: Resolved critical deadlocks between `economy_processing.go` and `lobby_manager.go`.
 - **Heist Logic Alignment**: Modified `handleHeist` in `club_service.go` to precisely match frontend heuristic by temporarily removing trap modifier calculation.
-- **Consignment flow**: Implemented the auction creation interface in `app.js` using `_economy.scss` styles.
+- **Consignment flow**: Implemented the auction creation and Art Gallery interface in `app.js`.
 - **Economy UI**: Refactored Entity Market and Black Market UI; implemented Art Gallery (Auctions) using orphaned `_economy.scss` styles.
 - **Social UI**: Implemented the Social Hub and Alliance Management UI using orphaned `_social.scss` styles.
 - **UI Immersion**: Implemented 3D Territory Map zoom controls and integrated remaining topographic styles from `_territory.scss`.
 - **Liquidity**: Implemented "Industrial Loop" recovery where black market scavenge fees return to the Faucet pool.
 - **UI Textures**: Implemented dynamic arena floor textures based on game phase and tournament status.
-- **Faceplates**: Cosmestic items now provide functional Mojo/Cunning bonuses via `FaceplateRegistry`. Mojo bonuses boost Reputation.
+- **Faceplates**: Cosmetic items now provide functional Mojo/Cunning bonuses via `FaceplateRegistry`. Mojo bonuses boost Reputation.
 - **Criminality UI**: Wired the Kidnap Selection interface following successful heists using orphaned `_criminality.scss` styles.
 - **Heist Audit**: Aligned Heist success probabilities by broadcasting effective stats in lobby updates and fixing scope bugs in `club_service.go`.
 - **Documentation**: Merged `ReadMe.txt` into `README.md`.
@@ -187,11 +196,11 @@
 - [x] Hardened administrative authentication (Strict signatures, multi-chain support).
 - [ ] Securely wire `FAUCET_MNEMONIC` and `ADMIN_WALLETS` for Mainnet.
 - [x] Verify Mainnet Node/Indexer stability in `networks.json`.
-- [x] Implement `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
-- [ ] Perform 16-player tournament stress tests.
+- [x] Hardened `checkVaultBalanceOnChain` and `checkNativeVaultBalanceOnChain` in `lobby_manager.go` ticker loop.
+- [x] Perform 16-player tournament stress tests.
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
-- [x] Resolve Faceplate Residue: Implemented Mojo/Cunning bonuses for Faceplates.
+- [x] RPG Integration: Implemented Mojo/Cunning bonuses for Faceplates.
 - [x] Audit `processMojoDecay` and update `club.LastActivity` in economic handlers.
 - [x] Implement 'equip_cosmetic' message type in `lobby_manager.go`.
 - [x] Audit `handleHeist` in `club_service.go` for `GetEffectiveCunning` integration.

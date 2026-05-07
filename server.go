@@ -334,8 +334,24 @@ func serveWs(lobby *Lobby, w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	godotenv.Load()
+	// Load local .env file if it exists (primarily for development)
+	if err := godotenv.Load(); err != nil {
+		log.Println("[INFO] No .env file found; relying on platform-injected environment variables.")
+	}
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// Mainnet Security Audit: Pre-validate critical secrets at startup to ensure stability
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw == "" {
+		log.Println("[CRITICAL WARNING] FAUCET_MNEMONIC is missing! Reward payouts and onboarding features will be disabled.")
+	} else if len(strings.Fields(mnemonicRaw)) != 25 {
+		log.Println("[ERROR] FAUCET_MNEMONIC appears malformed (expected 25 words). Check your deployment configuration.")
+	}
+
+	if os.Getenv("ADMIN_WALLETS") == "" {
+		log.Println("[WARNING] ADMIN_WALLETS is not configured. Administrative panel authentication will fail.")
+	}
 
 	lobby, err := newLobby()
 	if err != nil {

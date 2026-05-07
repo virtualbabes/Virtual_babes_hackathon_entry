@@ -182,6 +182,10 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if req == nil {
+		return nil, fmt.Errorf("failed to create HTTP request for indexer")
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err == nil && resp.StatusCode == http.StatusOK {
 		defer resp.Body.Close()
@@ -199,6 +203,10 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 				tokenMeta[t.TokenID] = metaResult{mintRound: t.MintRound, name: meta.Name, image: meta.Image, exists: true}
 			}
 		}
+	} else if err != nil {
+		log.Printf("[ORACLE] Indexer request failed for %s: %v\n", url, err)
+	} else {
+		log.Printf("[ORACLE] Indexer returned non-200 status for %s: %d %s\n", url, resp.StatusCode, resp.Status)
 	}
 
 	l.mutex.Lock()
@@ -490,6 +498,13 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 			return // Keep SybilSyncComplete as false
 		}
 
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("[ORACLE ERROR] Indexer returned non-200 status during onboarding sync: %d %s\n", resp.StatusCode, resp.Status)
+			resp.Body.Close()
+			cancel()
+			return // Critical failure: stop and keep SybilSyncComplete as false
+		}
+
 		var res struct {
 			Transfers []struct {
 				To       string `json:"to"`
@@ -497,9 +512,16 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 			} `json:"transfers"`
 		}
 
-		if err := json.NewDecoder(resp.Body).Decode(&res); err != nil || len(res.Transfers) == 0 {
-			resp.Body.Close()
-			cancel()
+		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
+		resp.Body.Close()
+		cancel()
+
+		if decodeErr != nil {
+			log.Printf("[ORACLE ERROR] Failed to decode indexer response during onboarding sync: %v\n", decodeErr)
+			return
+		}
+
+		if len(res.Transfers) == 0 {
 			break
 		}
 

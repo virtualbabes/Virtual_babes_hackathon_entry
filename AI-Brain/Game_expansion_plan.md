@@ -155,15 +155,15 @@ Pillar 3: Criminality & Intelligence
 Goal: Expand high-risk/high-reward gameplay, adding layers of intrigue and consequence.
 Flow: Players can engage in Kidnapping, face Ransom demands, and interact with NPCs who "remember" their playstyle.
 Current Status:
-Kidnapping & Ransom: Pending.
-Collective NPC Intelligence: Pending.
+Kidnapping & Ransom: Implemented. Hostage cards, ransom payments, and insurance recovery cycles are functional.
+Collective NPC Intelligence: Implemented. Personality-driven taunts based on observed playstyle (aggressiveness/risk) are active.
 Pillar 4: Performative Market & Social Flex
 
 Goal: Turn player performance into a liquid asset and enable social showcasing.
 Flow: Player achievements and reputation influence their market value. Social sharing tools allow players to broadcast their exploits.
 Current Status:
-Enhanced Portfolio View: UI update for Achievement Badges is pending. Valuation logic for achievements is pending.
-Social Sharing (X/Twitter): Pending.
+Enhanced Portfolio View: Implemented. Market holdings, valuation, and share trading are functional.
+Social Sharing (X/Twitter): Implemented. One-click victory sharing to X is functional.
 Deep RPG Mechanics
 
 Goal: Increase card usage strategy via persistence and elemental interactions.

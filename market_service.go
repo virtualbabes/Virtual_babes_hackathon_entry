@@ -58,16 +58,16 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			// Industrial Loop: Investment returns to Faucet
 			l.faucetBalance += totalValueBase
 			l.applyDynamicScalingLocked()
-			l.logAdminAudit("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s", data.Amount, targetWallet))
+			l.logAdminAuditLocked("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s", data.Amount, targetWallet))
 		} else {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance."}`)})
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance."}`)})
 			return
 		}
 	} else if data.Action == "sell" {
 		if stats.Portfolio[targetWallet] >= data.Amount {
 			// Check Faucet Liquidity for payout
 			if l.faucetBalance < totalValueBase {
-				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Illiquid: Payout exceeds Arena capacity."}`)})
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Illiquid: Payout exceeds Arena capacity."}`)})
 				return
 			}
 
@@ -77,16 +77,16 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			// Industrial Loop: Payout from Faucet
 			l.faucetBalance -= totalValueBase
 			l.applyDynamicScalingLocked()
-			l.logAdminAudit("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
+			l.logAdminAuditLocked("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
 		} else {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})
 			return
 		}
 	}
 
 	l.leaderboard[wallet] = stats
 	portfolioPayload, _ := json.Marshal(stats.Portfolio)
-	l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
+	l.sendToClientLocked(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
 
 	// Trigger Global Sync to update Faucet Balance and Market valuations for all players
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()

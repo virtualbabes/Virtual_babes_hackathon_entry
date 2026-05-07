@@ -70,7 +70,7 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 	l.distributeCourthouseFineToClubsLocked(costBase / 2.0) // The other half is distributed to clubs
 	l.mutex.Unlock()
 
-	l.logAdminAudit("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine to reset Wanted Level", costBase))
+	l.logAdminAuditLocked("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine to reset Wanted Level", costBase))
 	go l.unlockAchievement(req.Wallet, "REHABILITATED")
 
 	// Update all clients with the new social standing

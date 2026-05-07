@@ -210,10 +210,17 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	activeRewards := l.rewards
 	stats, hasStats := l.leaderboard[claimant] // Reputation bonus applies to the player (claimant)
+	vaultAddr := l.vaultAddress
+	rewardAsset := l.rewardAssetID
 	l.mutex.RUnlock()
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
-	pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	var skippedAssets []string
+	pk, err := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	if err != nil {
+		log.Printf("[FAUCET CRITICAL] Failed to convert FAUCET_MNEMONIC to private key: %v", err)
+		return "", false, skippedAssets, fmt.Errorf("faucet configuration error: invalid mnemonic")
+	}
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 
@@ -225,9 +232,8 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	}
 
 	var txns []types.Transaction
-	var skippedAssets []string // Changed to string for asset IDs
 	var totalUnits float64
-	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
+	vaultAddrObj, _ := types.DecodeAddress(vaultAddr)
 	winNote := []byte(fmt.Sprintf("VBT_WIN:{\"opp\":\"%s\",\"scores\":[%d,%d]}", history.Opponent, history.Scores[0], history.Scores[1]))
 
 	for appIDStr, baseAmt := range activeRewards {
@@ -300,7 +306,7 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 
 	l.mutex.Lock() // Lock to update faucet balance and re-evaluate dynamic scaling
 	l.faucetBalance -= totalUnits // Deduct from the overall faucet balance
-	l.applyDynamicScaling()       // Re-evaluate dynamic scaling after payout
+	l.applyDynamicScalingLocked() // Re-evaluate dynamic scaling after payout
 	l.mutex.Unlock()
 
 	logWinAudit(recipient, network, firstTxID, base64.StdEncoding.EncodeToString(gid[:]), uint64(totalUnits*1000000), history)

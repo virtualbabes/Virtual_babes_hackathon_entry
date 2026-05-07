@@ -127,7 +127,7 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 	l.rewards[req.Wallet] += loanAmountMicro
 	l.applyDynamicScalingLocked()
 
-	l.logAdminAudit("LOAN_TAKEN", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f, Repay: %.2f", loanID, req.LoanAmount, float64(repaymentAmountMicro)/1000000.0))
+	l.logAdminAuditLocked("LOAN_TAKEN", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f, Repay: %.2f", loanID, req.LoanAmount, float64(repaymentAmountMicro)/1000000.0))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(l.loans[loanID])
 
@@ -194,7 +194,7 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 	delete(l.loans, req.LoanID)
 	// No need to update BorrowerName here, as the loan is being deleted.
 
-	l.logAdminAudit("LOAN_REPAID", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f", loan.ID, float64(loan.RepaymentAmount)/1000000.0))
+	l.logAdminAuditLocked("LOAN_REPAID", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f", loan.ID, float64(loan.RepaymentAmount)/1000000.0))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Collateral returned."})
 

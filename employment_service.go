@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 // handleHirePlayer allows Club owners to assign roles to other players.
@@ -30,7 +31,7 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 
 	club, exists := l.clubs[data.ClubID]
 	if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Unauthorized or Club not found."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Unauthorized or Club not found."}`)})
 		log.Printf("[EMPLOYMENT] Hire failed for %s: Unauthorized or Club %s not found.\n", ownerWallet, data.ClubID)
 		return
 	}
@@ -38,7 +39,7 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 	targetWallet, targetConnected := l.wallets[data.TargetID]
 	targetWallet = strings.ToLower(targetWallet)
 	if !targetConnected {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Player not found in lobby."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Hiring Failed: Player not found in lobby."}`)})
 		log.Printf("[EMPLOYMENT] Hire failed for %s: Target player %s not in lobby.\n", ownerWallet, data.TargetID)
 		return
 	}
@@ -57,13 +58,13 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 	l.clubs[data.ClubID] = club
 	club.LastActivity = time.Now() // Club is active when staff changes
 
-	l.logAdminAudit("PLAYER_HIRED", targetWallet, fmt.Sprintf("Club: %s (%s), Role: %s", club.Name, club.ID, data.Role))
+	l.logAdminAuditLocked("PLAYER_HIRED", targetWallet, fmt.Sprintf("Club: %s (%s), Role: %s", club.Name, club.ID, data.Role))
 
 	// Notify the employee of their new position
 	notification, _ := json.Marshal(map[string]string{
 		"text": fmt.Sprintf("💼 <b>JOB ASSIGNMENT:</b> You are now the %s for %s!", data.Role, club.Name),
 	})
-	l.sendToClient(data.TargetID, Envelope{Type: "admin_notification", Payload: notification})
+	l.sendToClientLocked(data.TargetID, Envelope{Type: "admin_notification", Payload: notification})
 
 	// Trigger global sync to update UI roles and badges
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
@@ -94,14 +95,14 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 	targetWallet := strings.ToLower(data.TargetWallet)
 	club, exists := l.clubs[data.ClubID]
 	if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Salary Failed: Unauthorized or Club not found."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Salary Failed: Unauthorized or Club not found."}`)})
 		log.Printf("[EMPLOYMENT] Set salary failed for %s: Unauthorized or Club %s not found.\n", ownerWallet, data.ClubID)
 		return
 	}
 
 	// Ensure target is actually employed by this club
 	if club.Staff == nil || club.Staff[targetWallet] == "" {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Salary Failed: Player not employed by this club."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Salary Failed: Player not employed by this club."}`)})
 		log.Printf("[EMPLOYMENT] Set salary failed for %s: Player %s not employed by Club %s.\n", ownerWallet, targetWallet, data.ClubID)
 		return
 	}
@@ -112,13 +113,13 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 	club.LastActivity = time.Now() // Management actions refresh club activity status
 	l.leaderboard[targetWallet] = stats
 
-	l.logAdminAudit("SET_SALARY", targetWallet, fmt.Sprintf("Club: %s (%s), Amount: %.2f $VBV", club.Name, club.ID, data.SalaryAmount))
+	l.logAdminAuditLocked("SET_SALARY", targetWallet, fmt.Sprintf("Club: %s (%s), Amount: %.2f $VBV", club.Name, club.ID, data.SalaryAmount))
 
 	// Notify the employee of their new salary
 	notification, _ := json.Marshal(map[string]string{
 		"text": fmt.Sprintf("💰 <b>SALARY UPDATE:</b> Your new salary at %s is %.2f $VBV per day!", club.Name, data.SalaryAmount),
 	})
-	l.sendToClient(l.getClientIDFromWallet(targetWallet), Envelope{Type: "admin_notification", Payload: notification})
+	l.sendToClientLocked(l.getClientIDFromWalletLocked(targetWallet), Envelope{Type: "admin_notification", Payload: notification})
 
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	log.Printf("[EMPLOYMENT] Salary for %s set to %.2f $VBV by %s.\n", targetWallet, data.SalaryAmount, ownerWallet)
