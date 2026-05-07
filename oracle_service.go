@@ -725,7 +725,14 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	info, _ := client.AccountInformation(l.vaultAddress).Do(context.Background())
 	l.mutex.Lock()
-	l.faucetBalance = float64(info.Amount) / 1000000.0
+	
+	// CRITICAL GUARD: Ensure vault has at least 1 VOI for gas
+	if info.Amount < 1000000 {
+		log.Printf("[CRITICAL] Vault is low on gas! Balance: %d microVOI", info.Amount)
+		l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted. Reward dispatches will fail.")
+	}
+
+	l.faucetBalance = float64(info.Amount) / 1000000.0 // Note: This updates faucetBalance using native VOI units
 	l.mutex.Unlock()
 }
 

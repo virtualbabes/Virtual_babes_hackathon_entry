@@ -18,7 +18,7 @@ func (l *Lobby) processLoans() {
 			loan.Status = "defaulted"
 
 			// Residual Value: 15% of the loan amount is returned as Market Tokens
-			tokenReward := uint64(float64(loan.LoanAmount) * 0.15)
+			tokenReward := (loan.LoanAmount*15 + 50) / 100 // Round to nearest micro-unit to prevent fractional dust
 
 			borrowerWallet := loan.BorrowerWallet
 			borrowerStats, exists := l.leaderboard[borrowerWallet]

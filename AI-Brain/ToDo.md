@@ -74,6 +74,9 @@
 - [x] Refactor Black Market API handlers to `black_market_service.go`.
 - [x] Refactor Voi Onboarding logic to `onboarding_service.go`.
 - [x] Refactor Loan API handlers to `loan_service.go`.
+- [x] Hardened Market Token liquidation math in `economy_processing.go` to prevent fractional VBV dust.
+- [x] Created `economy_loop_maps.md` and analyzed Industrial Loop balancing.
+- [x] Performed Audit of Game/UI/File flow for complete implementation path.
 - [x] Resolved recursive deadlocks in `courthouse_service.go`.
 - [x] Audited `tournament_manager.go` for race conditions in concurrent registrations and `l.tournament.Pot` updates.
 - [x] Hardened `oracle_service.go:loadOnboardedWalletsFromIndexer` with explicit error and status checks.
@@ -93,7 +96,8 @@
 - [x] Audit `handleUpdateBaseReward` and `handleUpdateRewardAsset` routes in `server.go`.
 - [x] Implement non-blocking Envoi name resolution for `handleGetLoans`.
 - [x] Ensure Sybil sync status check correctly informs the UI.
-- [x] Pre-resolve Envoi names in `auction_service.go` for Art Gallery performance.
+- [ ] Refactor `app.js:syncUI` into modular component watchers to reduce technical debt.
+- [ ] Consolidate shared WASM/Server structs to prevent attribute drift.
 - [x] Ensure Sybil sync status check correctly informs the UI.
 - [x] Update `package.json` with Go and WASM build scripts.
 - [x] Audit `app.js` for memory leaks and handler stability.

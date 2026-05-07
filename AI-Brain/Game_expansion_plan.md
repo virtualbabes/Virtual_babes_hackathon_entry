@@ -134,10 +134,10 @@ Here's a breakdown of the expansion flow and what we should focus on next:
 The Grand Expansion Flow: Pillars of the Arena
 Pillar 1: The Industrial & Trust Layer
 
-Goal: Establish a social hierarchy through employment, property ownership, and regional dominance.
-Flow: Players found Clubs, acquire Territories, and hire other players into specialized roles (Manager, Security, Clerk). This creates a "Service Record" for players, building social trust. Clubs earn revenue from shop commissions and tournament kickbacks.
-Current Status:
-In-Game Employment & Careers: Implemented. Club owners can hire players, assign roles, and set salaries. A background ticker dispenses daily salaries from Club Treasuries.
+**Goal:** Establish a social hierarchy through employment, property ownership, and regional dominance. (COMPLETED)
+**Flow:** Circular economy where Clubs act as the primary sink and source of player utility.
+**Current Status:**
+In-Game Employment & Careers: Implemented.
 Courthouse Rerouting: Implemented. $VBV fines are now distributed to active Club Treasuries, making Clubs the "Security Guilds."
 Club Mojo & Tiered Unlocks: Mojo exists, but its direct impact on tiered shop unlocks is pending.
 Regional Expansion: Implemented. Clubs owning 2+ territories become "Regional Governors," gaining a 15% tax on Courthouse fines from their region. Territory acquisition is also implemented.

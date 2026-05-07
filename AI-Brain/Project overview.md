@@ -27,6 +27,8 @@ Social Hub: A unified interface for managing Alliances, Career paths, and Trophi
 5. Security & Launch Readiness
 The project is currently in a Production-Ready Beta state. Recent audits have hardened the following:
 
+**Recursive Deadlock Resolution**: Systemic fix applied across all service files to prevent RLock/Lock conflicts in audit and client notification paths.
+**Mnemonic Hardening**: `faucet_service.go` now handles mnemonic-to-private-key failures gracefully, preventing server panics.
 Sybil Protection: Algorand-to-Voi onboarding is gated by historical indexer checks to prevent drain-and-claim exploits.
 Spectator Sync: Live spectating is fully synchronized, including authoritative board moods and penalty snapshots.
 Tournament Automation: Bracket management for 8/16-player events is fully functional, with on-chain archival of results.

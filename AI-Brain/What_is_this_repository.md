@@ -20,6 +20,7 @@ Virtualbabes Arena is a blockchain-integrated card game platform blending real-t
 * `tournament_manager.go`: Handles 8/16-player brackets, verifies on-chain buy-ins, advances rounds, and archives results as blockchain notes.
 * `battle_service.go`: Oversees match logic, PvP validation, and server-authoritative win calculations.
 * `economy_service.go`: Manages $VBV token faucet, loans, auctions, black markets, and collateral liquidation.
+* **Industrial Loop**: Implementation of a circular economy where all protocol fees (Courthouse, Auction, Heist) return to the Faucet or Club Treasuries.
 * `achievement_service.go`: Tracks/unlocks trophies; updates leaderboards.
 * `courthouse_service.go`: Manages Wanted Level resets via $VBV fines; distributes fines to club treasuries.
 * `handlers_admin.go`: Admin panel (ARC-14 signature auth) for network config, bans, and broadcasts.
