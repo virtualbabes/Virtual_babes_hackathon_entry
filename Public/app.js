@@ -5953,6 +5953,21 @@ function updateHeistRiskAssessment(clubId) {
 	
 	const securityLevel = (club.club_mojo / 10) + (securityStaff * 15);
 	const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100));
+
+	// Registry-aligned Trap Modifiers
+	const trapModifiers = {
+		"tripwire": -0.10,
+		"sentry_turret": -0.25,
+		"guard_dog": -0.05
+	};
+	let trapPenalty = 0;
+	if (club.active_buffs) {
+		Object.values(club.active_buffs).forEach(itemId => {
+			if (trapModifiers[itemId]) trapPenalty += trapModifiers[itemId];
+		});
+	}
+
+	const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100 + trapPenalty));
 	const riskPercent = (1 - successChance) * 100;
 
 	// UI Feedback

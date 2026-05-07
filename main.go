@@ -121,6 +121,19 @@ type Player struct {
 	Playstyle        PlaystyleTendencies `json:"playstyle"`
 }
 
+// GetEffectiveCunning returns base cunning plus cosmetic bonuses and infamy penalties.
+func (p Player) GetEffectiveCunning() int {
+	eff := p.Cunning
+	if p.EquippedFaceplate != "" {
+		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
+			eff += fp.CunningBonus
+		}
+	}
+	penalty := p.WantedLevel / 5
+	if eff < penalty { return 0 }
+	return eff - penalty
+}
+
 // Engine acts as the supreme state machine for the entire App
 type Engine struct {
 	Network   string
@@ -1261,6 +1274,7 @@ func getEffectivePower(c *Card, sideIdx int, gridIdx int) int {
 	wantedPenalty := (player.WantedLevel * 5)
 	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
 	mitigation := player.Cunning * 2
+	mitigation := player.GetEffectiveCunning() * 2
 	if mitigation > wantedPenalty { mitigation = wantedPenalty }
 	base -= (wantedPenalty - mitigation)
 
@@ -1861,6 +1875,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["playstyle"] = Game.Players[0].Playstyle
 		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
 		state["cunning"] = Game.Players[0].Cunning
+		state["cunning"] = Game.Players[0].GetEffectiveCunning()
 		state["nurturing"] = Game.Players[0].Nurturing
 		state["achievements"] = Game.Players[0].Achievements
 	}

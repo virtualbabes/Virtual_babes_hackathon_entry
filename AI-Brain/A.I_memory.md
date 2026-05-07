@@ -34,8 +34,10 @@
 
 ## Completed Tasks
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
+- **RPG Alignment**: Hardened `GetEffectiveCunning` to account for Wanted Level penalties and synchronized logic across Server, WASM, and UI.
 - **Security**: Hardened `faucet_service.go:dispatchReward` to gracefully handle mnemonic-to-private-key failures.
 - **Bug Fix**: Resolved recursive deadlocks in `courthouse_service.go` by switching to `logAdminAuditLocked`.
+- **Concurrency Audit**: Verified `tournament_manager.go` is free of race conditions for `l.tournament.Pot` and concurrent registrations.
 - **Bug Fix**: Added explicit error and status code handling in `oracle_service.go:loadOnboardedWalletsFromIndexer`.
 - **Bug Fix**: Added explicit logging for non-200 indexer responses in `oracle_service.go:getVerifiedCards`.
 - **Bug Fix**: Resolved recursive deadlocks in `employment_service.go` by switching to `Locked` variant helpers.
@@ -47,6 +49,7 @@
 - **Rewards**: Hardened Top 5 placement identification and implemented atomic multi-asset distribution.
 - **Maintenance**: Verified `cleanupNonces` correctly prunes history without affecting active spectators.
 - **Audit**: Verified Multi-Chain `power_divisor` and `power_base` configurations in `availableNetworks`.
+- **Heist Hardening**: Fully integrated `HeistSuccessModifier` from Trap Buffs into heist success probability.
 - **Visuals**: Implemented canvas-based particle effects for card captures (Phase 2).
 - **SCSS Refactor**: Integrated `.particle-canvas` styles into the modular utility system.
 - **Criminality**: Hardened heist logic to utilize `GetEffectiveCunning` (including faceplate bonuses) for success probability and kidnap eligibility.

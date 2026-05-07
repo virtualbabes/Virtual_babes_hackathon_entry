@@ -85,12 +85,17 @@ var FaceplateRegistry = map[string]FaceplateStats{
 
 // GetEffectiveCunning returns base cunning plus cosmetic bonuses.
 func (p PlayerStats) GetEffectiveCunning() int {
+	eff := p.Cunning
 	if p.EquippedFaceplate != "" {
 		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
-			return p.Cunning + fp.CunningBonus
+			eff += fp.CunningBonus
 		}
 	}
-	return p.Cunning
+	// Infamy Penalty: Every 5 levels of Wanted Level reduces effective Cunning by 1
+	penalty := p.WantedLevel / 5
+	eff -= penalty
+	if eff < 0 { eff = 0 }
+	return eff
 }
 
 // GetEffectiveMojo returns base mojo plus cosmetic bonuses.

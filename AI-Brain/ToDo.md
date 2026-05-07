@@ -75,6 +75,7 @@
 - [x] Refactor Voi Onboarding logic to `onboarding_service.go`.
 - [x] Refactor Loan API handlers to `loan_service.go`.
 - [x] Resolved recursive deadlocks in `courthouse_service.go`.
+- [x] Audited `tournament_manager.go` for race conditions in concurrent registrations and `l.tournament.Pot` updates.
 - [x] Hardened `oracle_service.go:loadOnboardedWalletsFromIndexer` with explicit error and status checks.
 - [x] Hardened `oracle_service.go:getVerifiedCards` with explicit logging for non-200 indexer responses.
 - [x] Resolved recursive deadlocks in `employment_service.go`.

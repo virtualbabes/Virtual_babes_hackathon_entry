@@ -43,6 +43,13 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
 	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
+	// Apply Trap Penalties from the Club's active buffs
+	for _, itemID := range targetClub.ActiveBuffs {
+		if item, ok := GlobalShopRegistry[itemID]; ok && item.HeistSuccessModifier != 0 {
+			successChance += item.HeistSuccessModifier
+		}
+	}
+
 	if successChance < 0.05 {
 		successChance = 0.05
 	}

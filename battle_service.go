@@ -27,6 +27,7 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	wantedPenalty := (stats.WantedLevel * 5)
 	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
 	mitigation := stats.Cunning * 2
+	mitigation := stats.GetEffectiveCunning() * 2
 	if mitigation > wantedPenalty { mitigation = wantedPenalty }
 	base -= (wantedPenalty - mitigation)
 
