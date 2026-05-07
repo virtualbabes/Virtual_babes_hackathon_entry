@@ -52,7 +52,10 @@ func (l *Lobby) handleHeist(env *Envelope) {
 
 	roll := rand.Float64()
 	var status string
+	var netLoot, fenceFee float64
 	canKidnap := false
+
+	now := time.Now()
 
 	if roll < successChance {
 		// SUCCESSFUL HEIST
@@ -68,8 +71,8 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}
 
 		// INDUSTRIAL LOOP: 10% "Fence Fee" returns to the Faucet Pool
-		fenceFee := loot * 0.10
-		netLoot := loot - fenceFee
+		fenceFee = loot * 0.10
+		netLoot = loot - fenceFee
 		if fenceFee > 0 {
 			l.faucetBalance += fenceFee
 			l.applyDynamicScalingLocked()

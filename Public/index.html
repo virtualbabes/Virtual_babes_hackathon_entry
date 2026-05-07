@@ -283,9 +283,18 @@
 
     <!-- Regional Dominance (3D Tactical Map) -->
     <div id="territory-map-overlay" class="overlay hidden">
-        <div class="glass-panel w-800 text-center bg-black-90 animate-scale-in">
-            <h2 class="text-neon-cyan">REGIONAL DOMINANCE</h2>
-            <p class="font-size-0-8em opacity-7 mb-20">3D Tactical Map of the Arena Districts</p>
+        <div class="territory-panel glass-panel territory-map w-800 text-center animate-scale-in">
+            <div class="map-header">
+                <span class="map-title text-neon-cyan">NEON TOPOGRAPHY</span>
+                <div class="map-controls">
+                    <div class="map-zoom">
+                        <button class="zoom-in" onclick="adjustMapZoom(0.1)" title="Zoom In"></button>
+                        <button class="zoom-out" onclick="adjustMapZoom(-0.1)" title="Zoom Out"></button>
+                    </div>
+                    <button class="outline x-small" onclick="hideAllOverlays()">CLOSE TERMINAL</button>
+                </div>
+            </div>
+            <p class="font-size-0-8em opacity-7 mb-20">Real-time tactical intelligence of the Arena Districts.</p>
             
             <div class="map-perspective-container">
                 <div id="map-3d-grid" class="map-grid-3d">
@@ -293,13 +302,10 @@
                 </div>
             </div>
 
-            <div class="flex-row justify-center gap-15 mt-20 font-xsmall letter-spacing-1">
-                <div class="flex-row gap-5"><span class="status-indicator online"></span> CONTROLLED</div>
-                <div class="flex-row gap-5"><span class="status-indicator away"></span> CONTESTED</div>
-                <div class="flex-row gap-5"><span class="status-indicator offline"></span> NEUTRAL</div>
+            <div class="flex-row justify-center gap-20 mt-20">
+                <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span style="font-size: 10px;">NEUTRAL</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span style="font-size: 10px;">CLUB CONTROLLED</span></div>
             </div>
-
-            <button class="outline mt-20 w-full" onclick="hideAllOverlays()">Exit Map</button>
         </div>
     </div>
 

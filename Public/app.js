@@ -3605,13 +3605,27 @@ function switchShopCategory(category) {
 	}
 }
 
+let mapZoom = 1.0;
 /**
- * Populates the 3D grid with territory status and ownership.
- * Fully utilizes the _territory.scss styles including 3D perspectives and status indicators.
+ * Adjusts the zoom level of the 3D map grid.
  */
+function adjustMapZoom(delta) {
+    mapZoom += delta;
+    if (mapZoom < 0.5) mapZoom = 0.5;
+    if (mapZoom > 2.0) mapZoom = 2.0;
+    const grid = document.getElementById("map-3d-grid");
+    if (grid) {
+        grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${mapZoom})`;
+    }
+}
+
 function openTerritoryMapOverlay() {
     const grid = document.getElementById("map-3d-grid");
     if (!grid) return;
+    
+    // Reset Zoom
+    mapZoom = 1.0;
+    grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${mapZoom})`;
     
     grid.innerHTML = "";
     
@@ -4820,33 +4834,54 @@ async function switchSocialTab(tab) {
             await Promise.all(otherPlayers.map(p => resolveEnvoiName(p.wallet)));
         }
 
+        // Filter for existing alliances (simulated from portfolio/employment state)
+        const myClub = Object.values(globalClubs).find(c => c.id === state.employer_id);
+        const allianceWallets = myClub ? Object.keys(myClub.members || {}) : [];
+
+        const renderConnection = (p, isAlly) => `
+            <div class="connection-item glass-panel m-0 ${isAlly ? 'border-cyan' : ''}">
+                <div class="connection-avatar">
+                    <img src="${p.avatar_url || 'Assets/Images/portraits/placeholder.webp'}" alt="Entity">
+                </div>
+                <div class="connection-info text-left">
+                    <div class="connection-name font-bold ${isAlly ? 'text-neon-cyan' : ''}">${getCachedEnvoiName(p.wallet)}</div>
+                    <div class="connection-role font-size-0-75em opacity-6">${p.social_rank} | ${p.job_role || 'Freelancer'}</div>
+                    <div class="connection-status online font-size-0-7em">ACTIVE LINK</div>
+                </div>
+                <div class="connection-actions">
+                    <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); sendChallenge('${p.id}')" title="Challenge duel"></button>
+                    ${!isAlly ? `<button class="action-btn invite" onclick="proposeAlliance('${p.id}')" title="Propose Alliance"></button>` : ''}
+                    <button class="action-btn block" onclick="showToast('Entity communication restricted.', 'info')" title="Block stream"></button>
+                </div>
+            </div>`;
+
+        const allies = otherPlayers.filter(p => allianceWallets.includes(p.wallet?.toLowerCase()));
+        const others = otherPlayers.filter(p => !allianceWallets.includes(p.wallet?.toLowerCase()));
+
         container.innerHTML = `
-            <div class="social-network">
-                <div class="network-header">
-                    <span class="network-title">REGION ALLIANCES</span>
-                    <div class="network-stats">DETECTED: <span class="connections-count">${otherPlayers.length}</span></div>
+            <div class="social-network flex-col gap-20">
+                <div class="alliance-management">
+                    <div class="network-header mb-10">
+                        <span class="network-title text-neon-cyan font-bold letter-spacing-1">CONFIRMED ALLIANCES</span>
+                        <div class="network-stats opacity-5 font-size-0-8em">STRENGTH: ${allies.length}</div>
+                    </div>
+                    <div class="connections-list">
+                        ${allies.length === 0 ? '<div class="opacity-3 p-20 italic font-size-0-9em border-glass">No active alliance contracts found.</div>' : 
+                            allies.map(p => renderConnection(p, true)).join('')}
+                    </div>
                 </div>
-                <div class="connections-list">
-                    ${otherPlayers.length === 0 ? '<div class="opacity-5 p-20 italic">No other entities detected in this sector.</div>' : 
-                        otherPlayers.map(p => `
-                            <div class="connection-item glass-panel">
-                                <div class="connection-avatar">
-                                    <img src="${p.avatar_url || 'Assets/Images/portraits/placeholder.webp'}" alt="Entity">
-                                </div>
-                                <div class="connection-info">
-                                    <div class="connection-name">${getCachedEnvoiName(p.wallet)}</div>
-                                    <div class="connection-role">${p.social_rank} | ${p.job_role || 'Freelancer'}</div>
-                                    <div class="connection-status online">CONNECTED</div>
-                                </div>
-                                <div class="connection-actions">
-                                    <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); sendChallenge('${p.id}')" title="Challenge Duel"></button>
-                                    <button class="action-btn invite" title="Propose Alliance"></button>
-                                </div>
-                            </div>
-                        `).join('')}
+
+                <div class="sector-discovery">
+                    <div class="network-header mb-10">
+                        <span class="network-title text-neon-purple font-bold letter-spacing-1">SECTOR ENTITIES</span>
+                        <div class="network-stats opacity-5 font-size-0-8em">DETECTED: ${others.length}</div>
+                    </div>
+                    <div class="connections-list">
+                        ${others.length === 0 ? '<div class="opacity-3 p-20 italic font-size-0-9em">Scanning... no other entities in proximity.</div>' : 
+                            others.map(p => renderConnection(p, false)).join('')}
+                    </div>
                 </div>
-            </div>
-        `;
+            </div>`;
     } else if (tab === 'career') {
         const tiers = [
             { name: "Iron", mojo: 0, desc: "A nobody in the neon gutter.", icon: "🌑" },

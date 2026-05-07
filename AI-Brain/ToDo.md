@@ -94,6 +94,8 @@
 - [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis.
 - [x] Merge ReadMe.txt into README.md.
 - [x] Wire the Kidnap Selection UI in `app.js` using the orphaned criminality SCSS styles.
+- [x] Implement the 3D territory map visualization in app.js using the remaining orphaned _territory.scss styles.
+
 
 ### Recommendations for Aesthetics and Functional Immersion Improvements
 
@@ -102,10 +104,9 @@
    - **Suggestions**:
      - [x] Add shop overlays (using _shops.scss) for item purchasing, with animated item reveals and purchase confirmations.
      - [x] Implement criminality UI (using _criminality.scss) for heist planning, with risk meters and success animations.
-     - [x] Create territory map (using _territory.scss) with 3D CSS transforms for regional dominance visualization.
+     - [x] Implement the 3D territory map visualization in app.js using the remaining orphaned _territory.scss styles.
      - [x] Refactor Shop Overlay to use high-fidelity grid and category filtering from `_shops.scss`.
      - [x] Implement the Heist Planning interface in app.js using the orphaned _criminality.scss styles to activate the tactical grid.
-          - [x] Expand social panel (using _social.scss) for player interactions, alliances, and extended leaderboards.
      - [x] Expand social panel (using _social.scss) for player interactions, alliances, and extended leaderboards.
      - [x] Use _economy.scss for auction houses and portfolio management overlays.
    - **Immersion Boost**: These features would make the "Social Economic Simulation" feel more interactive, moving beyond basic matchmaking to full ecosystem engagement.
@@ -145,7 +146,7 @@
 Implementing these would transform the UI from functional to deeply immersive, aligning with the "high-stakes Social Economic Simulation" vision. The existing foundation (neon-glass, animations) is solid—expanding it with the orphaned features would complete the aesthetic.
 
 ## Next Tactical Steps
-1. **Social Panel Wiring**: Utilize `_social.scss` to create the player alliance and profile interaction UI.
-2. [ ] Update frontend heist risk assessment to include trap modifiers from `club.ActiveBuffs`.
+1. [x] Implement the Social Panel alliance management UI in app.js using the orphaned _social.scss styles.
+2. [x] Audit the handleHeist logic in club_service.go to ensure the success probability matches the frontend heuristic exactly.
 3. **Mainnet Secret Audit**: Final verification of mnemonic encryption and environment variable injection for production.
 4. **Tournament Stress Test**: Execute a full 16-player mock tournament via `simulateTournament` while monitoring indexer latency.
