@@ -74,6 +74,7 @@
 - [x] Refactor Black Market API handlers to `black_market_service.go`.
 - [x] Refactor Voi Onboarding logic to `onboarding_service.go`.
 - [x] Refactor Loan API handlers to `loan_service.go`.
+- [x] Completed development progress review and hardened `common_types.go` struct definitions.
 - [x] Hardened Market Token liquidation math in `economy_processing.go` to prevent fractional VBV dust.
 - [x] Created `economy_loop_maps.md` and analyzed Industrial Loop balancing.
 - [x] Performed Audit of Game/UI/File flow for complete implementation path.

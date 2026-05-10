@@ -31,7 +31,6 @@ func (l *Lobby) processLoans() {
 				// RECONCILE: Ensure calculated stats are in sync
 				borrowerStats.Reputation = l.CalculateReputation(borrowerStats)
 				l.leaderboard[borrowerWallet] = borrowerStats
-				l.leaderboard[borrowerWallet] = borrowerStats
 
 				l.sendToClient(l.getClientIDFromWallet(borrowerWallet), Envelope{
 					Type:    "admin_notification",

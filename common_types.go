@@ -55,6 +55,9 @@ type Club struct {
 	Leases          map[string]*Lease    `json:"leases"`           // LeaseID -> Lease (cards available for rent)
 	Mojo            int                  `json:"club_mojo"`        // Unlocks higher tier items
 	Jail            map[int]ServerCard   `json:"jail"`             // CardID -> ServerCard (captured cards)
+	LastActivity    time.Time            `json:"last_activity"`    // For Mojo decay tracking
+	CreatedAt       time.Time            `json:"created_at"`
+}
 
 // Lease represents a card available for temporary use within a club.
 type Lease struct {
@@ -106,9 +109,6 @@ func (p PlayerStats) GetEffectiveMojo() int {
 		}
 	}
 	return p.Mojo
-}
-	LastActivity    time.Time            `json:"last_activity"`    // For Mojo decay tracking
-	CreatedAt       time.Time            `json:"created_at"`
 }
 
 // UseItemData defines the payload for the "use_item" WebSocket message.
