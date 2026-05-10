@@ -1,0 +1,98 @@
+{
+  "Algorand Mainnet": {
+    "network_name": "Algorand Mainnet",
+    "explorer_url": "https://explorer.perawallet.app",
+    "indexer_url": "https://mainnet-idx.algonode.cloud",
+    "node_url": "https://mainnet-api.algonode.cloud",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "0",
+    "chain_id": "algorand:mainnet-v1.0",
+    "power_divisor": 1000000,
+    "power_base": 50
+  },
+  "Bitcoin": {
+    "network_name": "Bitcoin",
+    "explorer_url": "https://ordiscan.com",
+    "indexer_url": "https://ordinals.com",
+    "node_url": "https://ordinals.com",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "bip122:000000000019d6689c085ae165831e93",
+    "power_divisor": 1,
+    "power_base": 200
+  },
+  "Ethereum": {
+    "network_name": "Ethereum",
+    "explorer_url": "https://etherscan.io",
+    "indexer_url": "https://api.etherscan.io",
+    "node_url": "https://mainnet.infura.io/v3/your-project-id",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "eip155:1",
+    "power_divisor": 1000000000000000000,
+    "power_base": 100
+  },
+  "Flow": {
+    "network_name": "Flow",
+    "explorer_url": "https://flowscan.org",
+    "indexer_url": "https://rest-mainnet.onflow.org",
+    "node_url": "https://access-mainnet-beta.onflow.org",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "flow:mainnet",
+    "power_divisor": 100000000,
+    "power_base": 60
+  },
+  "Polygon": {
+    "network_name": "Polygon",
+    "explorer_url": "https://polygonscan.com",
+    "indexer_url": "https://api.polygonscan.com",
+    "node_url": "https://polygon-mainnet.infura.io/v3/your-project-id",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "eip155:137",
+    "power_divisor": 1000000000000000000,
+    "power_base": 40
+  },
+  "Solana": {
+    "network_name": "Solana",
+    "explorer_url": "https://solscan.io",
+    "indexer_url": "https://api.mainnet-beta.solana.com",
+    "node_url": "https://api.mainnet-beta.solana.com",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "solana:5eykt4UsFvXYfy2khQbSsLurFBXY",
+    "power_divisor": 1000000000,
+    "power_base": 75
+  },
+  "Voi Mainnet": {
+    "network_name": "Voi Mainnet",
+    "explorer_url": "https://block.voi.network",
+    "indexer_url": "https://mainnet-idx.voi.nodly.io",
+    "node_url": "https://mainnet-api.voi.nodly.io",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "algorand:wGHE2Pwd1-YdV4EuJFy9u6C24-L-2B05",
+    "power_divisor": 1000000,
+    "power_base": 50
+  },
+  "WAX": {
+    "network_name": "WAX",
+    "explorer_url": "https://wax.bloks.io",
+    "indexer_url": "https://wax.api.atomicassets.io",
+    "node_url": "https://wax.greymass.com",
+    "faucet_url": "",
+    "asset_id": "",
+    "app_id": "",
+    "chain_id": "wax:1064487b3cd1a897ce03ae5b6a865651",
+    "power_divisor": 100000000,
+    "power_base": 30
+  }
+}

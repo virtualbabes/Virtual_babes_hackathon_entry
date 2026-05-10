@@ -37,7 +37,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	targetWallet = strings.ToLower(targetWallet)
 	targetStats := l.leaderboard[targetWallet]
 
-	basePrice := float64((targetStats.Wins * 10) + (float64(targetStats.Reputation) / 2.0) + 100.0)
+	basePrice := float64((targetStats.Wins * 10) + int(float64(targetStats.Reputation)/2.0) + 100.0)
 	for _, rumor := range l.rumors {
 		if strings.EqualFold(rumor.TargetWallet, targetWallet) && time.Now().Before(rumor.ExpiresAt) {
 			basePrice *= rumor.Strength

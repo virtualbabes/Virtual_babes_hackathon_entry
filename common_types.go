@@ -368,6 +368,7 @@ type TournamentState struct {
 	BuyInAmount  float64           `json:"buy_in_amount"`
 	IsBuyInMode  bool              `json:"is_buy_in_mode"`
 	OpenTime     time.Time         `json:"open_time"` // Registration window start
+	Winner       string            `json:"winner"`
 }
 
 // TournamentSummary represents a finalized tournament for archival.

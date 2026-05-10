@@ -211,7 +211,6 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	activeRewards := l.rewards
 	stats, hasStats := l.leaderboard[claimant] // Reputation bonus applies to the player (claimant)
 	vaultAddr := l.vaultAddress
-	rewardAsset := l.rewardAssetID
 	l.mutex.RUnlock()
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")

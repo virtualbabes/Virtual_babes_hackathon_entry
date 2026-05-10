@@ -394,7 +394,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 
-		if ok {
+		if okRep && okOpp {
 			l.logAdminAudit("REPORT_GLOAT", opp, fmt.Sprintf("Reported by %s: %s", rep, data.GloatText))
 			alert, _ := json.Marshal(map[string]string{"text": fmt.Sprintf("🚨 <b>REPORT:</b> %s flagged %s", rep, opp)})
 			l.broadcastToAdmins(string(alert))
@@ -705,11 +705,11 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 		stats, exists := l.leaderboard[wallet] // Check if player stats exist
-		if !ok {
+		if !exists {
 			l.mutex.Unlock()
 			return
 		}
-		stats := l.leaderboard[wallet]
+		// stats already declared above
 		var success bool
 		var notification string
 		var auditAction string
@@ -1279,7 +1279,7 @@ func jsonListEnvelope(envType string, payload []byte) []byte {
 // sendToClient sends an Envelope message to a specific client.
 func (l *Lobby) sendToClient(clientID string, env Envelope) {
 	l.mutex.RLock()
-	client, ok := l.clients[clientID]
+	_, ok := l.clients[clientID]
 	l.mutex.RUnlock()
 	if !ok {
 		return
@@ -1595,6 +1595,15 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 		// Small delay to simulate time passing between rounds
 		time.Sleep(100 * time.Millisecond)
 	}
+
+	// Determine the winner
+	var winner string
+	for _, m := range l.tournament.Matches {
+		if m.Winner != "" && m.Winner != "BYE" {
+			winner = m.Winner
+		}
+	}
+	l.tournament.Winner = winner
 
 	log.Printf("[SIMULATION] Tournament simulation complete. Winner: %s\n", l.tournament.Winner)
 }

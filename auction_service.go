@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/v2/encoding/msgpack"
@@ -191,4 +190,27 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Bid successfully placed."})
+}
+
+// processAuctions handles auction expiration and settlement.
+func (l *Lobby) processAuctions() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	now := time.Now()
+
+	for id, auction := range l.auctions {
+		if now.After(auction.EndsAt) {
+			// Auction expired
+			if auction.HighestBidder != "" {
+				// Settle auction: transfer item to winner, pay seller
+				// TODO: Implement settlement logic
+				l.logAdminAudit("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Amount: %d", id, auction.CurrentBid))
+			} else {
+				// No bids, return item to seller
+				// TODO: Implement return logic
+				l.logAdminAudit("AUCTION_EXPIRED", auction.SellerWallet, fmt.Sprintf("Auction: %s, No bids", id))
+			}
+			delete(l.auctions, id)
+		}
+	}
 }

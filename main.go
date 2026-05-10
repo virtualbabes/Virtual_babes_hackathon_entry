@@ -15,6 +15,20 @@ import (
 	"time"
 )
 
+// FaceplateStats defines the RPG modifiers provided by cosmetic items.
+type FaceplateStats struct {
+	MojoBonus    int
+	CunningBonus int
+}
+
+// FaceplateRegistry maps legacy cosmetic IDs to functional social simulation bonuses.
+var FaceplateRegistry = map[string]FaceplateStats{
+	"faceplate_neon_vibe":   {MojoBonus: 15, CunningBonus: 5},
+	"faceplate_shadow":      {MojoBonus: 5, CunningBonus: 20},
+	"faceplate_governor":    {MojoBonus: 50, CunningBonus: 10},
+	"faceplate_placeholder": {MojoBonus: 0, CunningBonus: 0},
+}
+
 // TournamentMatch represents a single duel within the bracket.
 // This mirrors the server's TournamentMatch for client-side display.
 type TournamentMatch struct {
@@ -1031,7 +1045,7 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 	if jsMoods.Type() == js.TypeObject {
 		for i := 0; i < 9; i++ {
 			mood := jsMoods.Index(i)
-			if mood.IsString() {
+			if mood.Type() == js.TypeString {
 				Game.BoardMoods[i] = mood.String()
 			} else {
 				Game.BoardMoods[i] = "Neutral"

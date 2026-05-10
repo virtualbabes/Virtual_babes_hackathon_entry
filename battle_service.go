@@ -421,7 +421,7 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history MatchHistory) {
 	l.matchHistory[winnerID] = history
 	if wallet, ok := l.wallets[winnerID]; ok {
-		l.updateLeaderboardLocked(wallet, history.TournamentMatchID != "", history.Scores, deck, history.IsBountyMatch) // Pass match context
+		l.updateLeaderboard(wallet, history.TournamentMatchID != "", history.Scores, deck, history.IsBountyMatch) // Pass match context
 		go func() {
 			rating := l.calculateDeckRating(deck)
 			l.mutex.Lock() // Lock for leaderboard modification

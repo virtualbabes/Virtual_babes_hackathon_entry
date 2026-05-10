@@ -4,18 +4,18 @@
   "description": "Virtualbabes Arena: The Multi-Chain NFT Seduction Faucet & Tournament Platform",
   "main": "server.go",
   "scripts": {
-    "sass:build": "node-sass Public/src/scss/main.scss Public/styles.css --output-style compressed",
-    "sass:watch": "node-sass Public/src/scss/main.scss Public/styles.css --watch --recursive",
-    "wasm:build": "GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go",
-    "wasm:init": "cp \"$(go env GOROOT)/misc/wasm/wasm_exec.js\" Public/",
-    "server:build": "CGO_ENABLED=0 go build -ldflags=\"-w -s\" -o server-bin server.go",
-    "build": "npm run wasm:build && npm run sass:build && npm run server:build",
-    "start": "go run server.go"
+    "sass:build": "sass Public/src/scss/main.scss Public/styles.css --style=compressed",
+    "sass:watch": "sass Public/src/scss/main.scss Public/styles.css --watch",
+    "wasm:build": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env, {GOOS:'js', GOARCH:'wasm'}); const r=spawnSync('go',['build','-o','Public/main.wasm','main.go'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
+    "wasm:init": "node -e \"const fs=require('fs'); const path=require('path'); const cp=require('child_process'); const groot=cp.execSync('go env GOROOT').toString().trim(); const src=path.join(groot,'lib','wasm','wasm_exec.js'); const dest=path.join(process.cwd(),'Public','wasm_exec.js'); fs.copyFileSync(src,dest); console.log('Copied', src, 'to', dest);\"",
+    "server:build": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env); delete env.GOOS; delete env.GOARCH; env.CGO_ENABLED='0'; const r=spawnSync('go',['build','-ldflags','-w -s','-o','server-bin','.'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
+    "build": "npm run wasm:init && npm run wasm:build && npm run sass:build && npm run server:build",
+    "start": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env, {PORT:'8083'}); const r=spawnSync('go',['run','.'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\""
   },
   "keywords": [],
   "author": "slapkarnts",
   "license": "ISC",
   "devDependencies": {
-    "node-sass": "^9.0.0"
+    "sass": "^1.83.1"
   }
 }
