@@ -74,12 +74,17 @@
 - [x] Refactor Black Market API handlers to `black_market_service.go`.
 - [x] Refactor Voi Onboarding logic to `onboarding_service.go`.
 - [x] Refactor Loan API handlers to `loan_service.go`.
-- [x] Completed development progress review and hardened `common_types.go` struct definitions.
-- [x] Hardened Market Token liquidation math in `economy_processing.go` to prevent fractional VBV dust.
-- [x] Created `economy_loop_maps.md` and analyzed Industrial Loop balancing.
-- [x] Performed Audit of Game/UI/File flow for complete implementation path.
 - [x] Resolved recursive deadlocks in `courthouse_service.go`.
-- [x] Audited `tournament_manager.go` for race conditions in concurrent registrations and `l.tournament.Pot` updates.
+- [x] Hardened `common_types.go` by adding missing `EquippedFaceplate` field to `PlayerStats`.
+- [x] Cleaned up corrupted JavaScript fragments and media query syntax errors in `_overlays.scss`.
+- [x] Resolved SCSS syntax errors (orphans) in `_dashboard.scss`, `_cards.scss`, `_social.scss`, `_territory.scss`, and `_overlays.scss`.
+- [x] Cleaned up accidentally included JavaScript logic in `_overlays.scss`.
+- [x] Verified `_shops.scss` and `_economy.scss` are free of JavaScript fragments.
+- [x] Resolved cross-browser compatibility issues for `scrollbar-width` and `user-drag` in `_overlays.scss` and `app.js`.
+- [x] Resolved SCSS syntax errors and Safari compatibility issues in `layouts/_dashboard.scss`.
+- [x] Resolved Safari compatibility issues for `backdrop-filter` in `layouts/_main-layout.scss`.
+- [x] Resolved cross-browser compatibility issues for `text-size-adjust` in `base/_reset.scss`.
+- [x] Resolved Safari compatibility issues for `backdrop-filter` in `base/_dashboard.scss`.
 - [x] Hardened `oracle_service.go:loadOnboardedWalletsFromIndexer` with explicit error and status checks.
 - [x] Hardened `oracle_service.go:getVerifiedCards` with explicit logging for non-200 indexer responses.
 - [x] Resolved recursive deadlocks in `employment_service.go`.
@@ -97,8 +102,7 @@
 - [x] Audit `handleUpdateBaseReward` and `handleUpdateRewardAsset` routes in `server.go`.
 - [x] Implement non-blocking Envoi name resolution for `handleGetLoans`.
 - [x] Ensure Sybil sync status check correctly informs the UI.
-- [ ] Refactor `app.js:syncUI` into modular component watchers to reduce technical debt.
-- [ ] Consolidate shared WASM/Server structs to prevent attribute drift.
+- [x] Pre-resolve Envoi names in `auction_service.go` for Art Gallery performance.
 - [x] Ensure Sybil sync status check correctly informs the UI.
 - [x] Update `package.json` with Go and WASM build scripts.
 - [x] Audit `app.js` for memory leaks and handler stability.

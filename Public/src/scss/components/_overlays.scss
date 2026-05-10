@@ -10,8 +10,8 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -27,14 +27,14 @@
     }
 
     &.blur-light {
-        backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
         background: rgba(0, 0, 0, 0.6);
     }
 
     &.blur-heavy {
-        backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px);
         background: rgba(0, 0, 0, 0.9);
     }
 }
@@ -1347,7 +1347,6 @@
         }
     }
 }
-}
 
 /* AI Thinking Indicator specific styles */
 #ai-thinking-indicator p {
@@ -1551,6 +1550,14 @@
     max-height: 250px;
     overflow-y: auto;
     scrollbar-width: thin;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: $glass-border-color;
+        border-radius: 3px;
+    }
 }
 .season-winner-row {
     padding: 8px 15px;
@@ -1736,6 +1743,7 @@
     -ms-user-select: none;
     user-select: none;
     -webkit-user-drag: none;
+    user-drag: none;
 }
 
 /* ---------------------------------------------------------
@@ -1805,7 +1813,7 @@
     /* Season History & Hall of Fame Mobile (< 480px) */
     .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
     .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
-}    .season-winner-row { padding: 6px 10px; }
+}        .season-winner-row { padding: 6px 10px; }
     .season-winner-row .player-name { font-size: 0.85em; }
     .season-winner-row .player-stats { font-size: 0.75em; }
 

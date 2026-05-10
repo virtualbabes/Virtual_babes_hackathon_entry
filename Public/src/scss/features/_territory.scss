@@ -1048,6 +1048,7 @@
         }
     }
 }
+.map-tile-3d.governor-controlled {
     box-shadow: 0 0 25px rgba($color-neon-cyan, 0.6), inset 0 0 10px rgba($color-neon-cyan, 0.4); // Stronger glow
     background: linear-gradient(45deg, rgba($color-neon-cyan, 0.1), rgba($color-neon-blue, 0.1)); // Subtle gradient
     transform: translateZ(25px) scale(1.02); // Slightly elevated and larger

@@ -257,6 +257,7 @@ type PlayerStats struct {
 	DisconnectStreak  int                `json:"disconnect_streak"`
 	BanExpires        time.Time          `json:"ban_expires"`
 	GloatBannedUntil  time.Time          `json:"gloat_banned_until"`
+	EquippedFaceplate string             `json:"equipped_faceplate"`
 	Reputation        int                `json:"reputation"`
 	Mojo              int                `json:"mojo"`                // Social standing for Club unlocks
 	SocialRank        string             `json:"social_rank"`         // e.g., "Nobody", "Regular", "Icon"

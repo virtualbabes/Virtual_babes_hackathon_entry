@@ -58,3 +58,18 @@
 - main.go: Added missing `TournamentState` struct.
 - main.go: Renamed `Player.EmployerID` to `Player.EmployerClubID` to fix undefined reference.
 - app.js: Fixed malformed try-catch blocks in `adminGloatBan` and `addXChainWallet`.
+- layouts/_dashboard.scss: Fixed Safari compatibility for `backdrop-filter` and resolved orphaned properties causing syntax errors.
+- components/_cards.scss: Resolved orphaned block at end of file and added Safari compatibility for `backdrop-filter`.
+- features/_social.scss: Resolved dangling closing brace and orphaned comment block.
+- layouts/_main-layout.scss: Fixed Safari compatibility for `backdrop-filter`.
+- base/_reset.scss: Added standard `text-size-adjust` property for cross-browser compatibility.
+- base/_dashboard.scss: Fixed Safari compatibility for `backdrop-filter`.
+- features/_territory.scss: Resolved orphaned block for governor-controlled tiles causing syntax errors.
+- components/_overlays.scss: Resolved orphaned closing braces and malformed media query blocks causing syntax errors.
+- base/_reset.scss: Corrected `text-size-adjust` prefix order for browser compatibility.
+- components/_overlays.scss: Corrected `backdrop-filter` prefix order.
+- components/_overlays.scss: Final scrub of JavaScript template literals and malformed responsive blocks.
+- features/_shops.scss & features/_economy.scss: Audited and confirmed free of JavaScript fragments.
+- components/_overlays.scss: Removed accidentally included JavaScript template literals and fixed malformed media query blocks.
+- app.js & _overlays.scss: Added standard `user-drag: none` fallback for `-webkit-user-drag`.
+- app.js & _overlays.scss: Added `-webkit-` fallbacks for `scrollbar-width: thin`.

@@ -136,6 +136,7 @@
     border: 2px solid $glass-border-color;
     overflow: hidden;
     background: $glass-bg-color;
+    -webkit-backdrop-filter: blur($glass-blur);
     backdrop-filter: blur($glass-blur);
     box-shadow: $glass-shadow;
 

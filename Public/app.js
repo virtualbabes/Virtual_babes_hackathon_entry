@@ -2204,7 +2204,7 @@ async function fetchTournamentHistory(page = 1, deepVerify = false) {
                     <span>Archived: ${date} ${time}</span>
                 </div>
                 </div>
-                <div id="details-${t.id}" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--glass-border); display: flex; gap: 30px; overflow-x: auto; padding-bottom: 15px; scrollbar-width: thin;">
+				<div id="details-${t.id}" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--glass-border); display: flex; gap: 30px; overflow-x: auto; padding-bottom: 15px; -webkit-overflow-scrolling: touch; scrollbar-width: thin;">
                     ${generateBracketHTML(t.matches, -1)}
                 </div>
             `;
