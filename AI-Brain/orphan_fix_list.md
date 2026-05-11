@@ -73,3 +73,4 @@
 - components/_overlays.scss: Removed accidentally included JavaScript template literals and fixed malformed media query blocks.
 - app.js & _overlays.scss: Added standard `user-drag: none` fallback for `-webkit-user-drag`.
 - app.js & _overlays.scss: Added `-webkit-` fallbacks for `scrollbar-width: thin`.
+- index.html: [FIXED] Added missing labels, titles, and placeholders on form elements; migrated all inline CSS styles to utility classes/external sheets.

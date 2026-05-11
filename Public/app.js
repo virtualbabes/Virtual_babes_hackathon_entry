@@ -57,7 +57,7 @@ const CONFIG = (() => {
         API_BASE: (window.location.protocol === "https:" ? "https://" : "http://") + backendHost,
         // Production CDN: Link to the Public folder in the deploy branch
         ASSET_URL: isLocal ? "/" : "https://raw.githubusercontent.com/slapkarnts/VOiconomy-faucet/deploy/Public/",
-        WC_PROJECT_ID: 'your_walletconnect_project_id', // Matches .env.example placeholder
+        WC_PROJECT_ID: document.querySelector('meta[name="walletconnect-project-id"]')?.content || 'your_walletconnect_project_id', // Set this in index.html or replace with a real project ID
         VOI_CHAIN_ID: 'algorand:wGHE2Pwd1-YdV4EuJFy9u6C24-L-2B05',
         ALGO_CHAIN_ID: 'algorand:mainnet-v1.0',
         VAULT_ADDRESS: null,                      // Dynamic: Synced from server on connect
@@ -175,8 +175,10 @@ function getNetworkConfig(networkShortName) {
 
 // --- WalletConnect Initialization ---
 async function initWalletConnect() {
-    if (!CONFIG.WC_PROJECT_ID || CONFIG.WC_PROJECT_ID === 'YOUR_WALLETCONNECT_PROJECT_ID') {
+    const projectId = (CONFIG.WC_PROJECT_ID || "").toString().trim();
+    if (!projectId || projectId.toLowerCase().includes('your_walletconnect_project_id')) {
         console.warn("[WC] WalletConnect Project ID not configured.");
+        showToast("WalletConnect is not configured. Set walletconnect-project-id in index.html.", "warning");
         return;
     }
 
@@ -537,6 +539,26 @@ async function connectWith(provider) {
         showToast(err.message, "error");
     }
 }
+
+// Expose HTML event handlers for inline onclicks in module mode
+window.handleWalletAction = handleWalletAction;
+window.connectWith = connectWith;
+window.closeWalletSelector = closeWalletSelector;
+window.hideAllOverlays = hideAllOverlays;
+window.openPayoutSettings = openPayoutSettings;
+window.savePayoutAddress = savePayoutAddress;
+window.toggleMuteMusic = toggleMuteMusic;
+window.toggleMatchmakingQueue = toggleMatchmakingQueue;
+window.sendChatMessage = sendChatMessage;
+window.registerForTournament = registerForTournament;
+window.openTournamentBracket = openTournamentBracket;
+window.openDeckManager = openDeckManager;
+window.openShopsOverlay = openShopsOverlay;
+window.openTerritoryMapOverlay = openTerritoryMapOverlay;
+window.ToggleLeaderboard = window.ToggleLeaderboard || ToggleLeaderboard;
+window.openSettingsOverlay = openSettingsOverlay;
+window.proceedToWarRoom = proceedToWarRoom;
+window.closeDeckManager = closeDeckManager;
 
 function updateWalletUI(address) {
     userAddress = address;
