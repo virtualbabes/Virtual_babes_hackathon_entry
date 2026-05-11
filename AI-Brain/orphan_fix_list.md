@@ -78,5 +78,5 @@
 - features/_shops.scss: [FIXED] Added `width`, `text-align`, `max-height`, and `overflow-y` properties to `.shops-panel` and `.shop-items` to align with `index.html` refactor.
 - features/_territory.scss: [FIXED] Added `width`, `text-align` to `.territory-panel` and defined `.map-legend-text` to align with `index.html` refactor.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
-- components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency.
-- components/_overlays.scss: [FIXED] Corrected `user-drag` to `-webkit-user-drag`.
+- components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency; Corrected `user-drag` to `-webkit-user-drag`; Added new classes for Admin Control Panel styling.
+- index.html: [FIXED] Eliminated all remaining inline styles from the Admin Control Panel.

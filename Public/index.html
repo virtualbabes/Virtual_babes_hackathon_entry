@@ -400,6 +400,8 @@
                 </div>
             </div>
 
+            </div>
+
             <!-- Right: Deck Composition -->
             <div class="column glass-panel flex-1 border-neon-cyan">
                 <h3>Current Deck (5 Cards)</h3>
@@ -412,14 +414,14 @@
                     <button class="outline w-full font-xs p-1" onclick="addXChainWallet()">➕ LINK X-CHAIN WALLET</button>
                 </div>
 
-                <div id="deck-stat-summary" style="display: flex; justify-content: space-around; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; font-size: 0.9em; border: 1px solid var(--glass-border);">
-                    <div>ATTACK: <b id="total-atk" style="color: var(--neon-cyan);">0</b></div>
-                    <div>DEFENSE: <b id="total-def" style="color: var(--neon-purple);">0</b></div>
+                <div id="deck-stat-summary" class="display-flex justify-around p-10 bg-black-80 rounded-md mb-10 font-sm border border-bottom-glass">
+                    <div>ATTACK: <b id="total-atk" class="text-neon-cyan">0</b></div>
+                    <div>DEFENSE: <b id="total-def" class="text-neon-purple">0</b></div>
                 </div>
-                <div id="deck-drop-zone" style="flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 15px; border: 2px dashed var(--glass-border); border-radius: 12px;">
+                <div id="deck-drop-zone" class="flex-1 display-flex flex-col gap-10 p-15 border-2 border-dashed rounded-lg">
                     <!-- Drop cards here -->
                 </div>
-                <div id="deck-selector-bar" style="display: flex; justify-content: center; gap: 10px; margin-top: 15px;">
+                <div id="deck-selector-bar" class="display-flex justify-center gap-10 mt-15">
                     <!-- 4 Deck Slots with Reputation Locks -->
                 </div>
             </div>
@@ -428,198 +430,197 @@
 
     <!-- Admin Control Panel -->
     <div id="admin-control-panel" class="overlay hidden">
-        <div class="glass-panel" style="width: 90vw; max-width: 800px; text-align: center;">
+        <div class="glass-panel admin-panel-main">
             <h1>Admin Suite</h1>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">
+            <div class="admin-layout">
                 <!-- Power Scaling Controls -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-purple);">
+                <div class="glass-panel admin-section admin-section-power-scaling">
                     <h2>Power Scaling</h2>
-                    <div style="margin-bottom: 20px; text-align: left;">
-                        <label for="admin-power-divisor">Divisor: <b id="power-divisor-val" style="color: var(--neon-cyan);">1000000.0</b></label>
-                        <input type="range" id="admin-power-divisor" min="100000" max="10000000" step="10000" value="1000000" style="width: 100%;" 
+                    <div class="form-group-row mb-20 text-left">
+                        <label for="admin-power-divisor">Divisor: <b id="power-divisor-val" class="text-neon-cyan">1000000.0</b></label>
+                        <input type="range" id="admin-power-divisor" min="100000" max="10000000" step="10000" value="1000000" class="w-full" 
                                oninput="document.getElementById('power-divisor-val').innerText = parseFloat(this.value).toFixed(1)">
-                        <small style="display: block; opacity: 0.6; font-size: 0.7em; margin-top: 5px;">Higher divisor = Lower resulting card power</small>
+                        <small class="display-block opacity-6 font-xs mt-5">Higher divisor = Lower resulting card power</small>
                     </div>
-                    <div style="margin-bottom: 20px; text-align: left;">
-                        <label for="admin-power-base">Base Power: <b id="power-base-val" style="color: var(--neon-cyan);">50</b></label>
-                        <input type="range" id="admin-power-base" min="0" max="200" step="1" value="50" style="width: 100%;" 
+                    <div class="form-group-row mb-20 text-left">
+                        <label for="admin-power-base">Base Power: <b id="power-base-val" class="text-neon-cyan">50</b></label>
+                        <input type="range" id="admin-power-base" min="0" max="200" step="1" value="50" class="w-full" 
                                oninput="document.getElementById('power-base-val').innerText = this.value">
-                        <small style="display: block; opacity: 0.6; font-size: 0.7em; margin-top: 5px;">Minimum power for cards with no sale history</small>
+                        <small class="display-block opacity-6 font-xs mt-5">Minimum power for cards with no sale history</small>
                     </div>
-                    <button onclick="adminUpdatePowerScaling()" style="width: 100%; background: var(--neon-purple);">Update Power Scaling</button>
+                    <button onclick="adminUpdatePowerScaling()" class="w-full bg-neon-purple">Update Power Scaling</button>
                 </div>
 
                 <!-- System Overrides -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px;">
+                <div class="glass-panel admin-section admin-section-rules">
                     <h2>Global Rules</h2>
-                    <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">
+                    <div class="flex-col gap-10 align-start">
                         <label><input type="checkbox" id="rule-open"> Open</label>
                         <label><input type="checkbox" id="rule-same"> Same</label>
                         <label><input type="checkbox" id="rule-plus"> Plus</label>
-                        <button onclick="adminUpdateRules()" style="width: 100%;">Sync Global Rules</button>
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 10px 0;">
+                        <button onclick="adminUpdateRules()" class="w-full">Sync Global Rules</button>
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
                         <label><input type="checkbox" id="dev-mode-toggle" onclick="adminToggleDevMode()"> Dev Mode (AI Loses)</label>
                     </div>
                 </div>
 
                 <!-- Network Configuration -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-blue);">
+                <div class="glass-panel admin-section admin-section-network">
                     <h2>Network Configuration</h2>
-                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                    <div class="flex-col gap-10 text-left">
                         <label for="admin-network-select">Active Arena Network:</label>
-                        <select id="admin-network-select" class="glass-input" style="width: 100%; font-size: 0.9em;" onchange="onAdminNetworkSelectChange()" aria-label="Select network">
+                        <select id="admin-network-select" class="glass-input w-full font-sm" onchange="onAdminNetworkSelectChange()" aria-label="Select network">
                             <!-- Options populated dynamically -->
                         </select>
-                        <button onclick="adminSetActiveNetwork()" style="width: 100%; background: var(--neon-blue);">Set Active Network</button>
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 10px 0;"> 
-                        <div id="admin-network-details" style="font-size: 0.75em; opacity: 0.8; line-height: 1.4; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;">
+                        <button onclick="adminSetActiveNetwork()" class="w-full bg-neon-blue">Set Active Network</button>
+                        <hr class="w-full my-10 border-0 border-bottom-glass"> 
+                        <div id="admin-network-details" class="font-xs opacity-8 line-height-1-2 bg-black-80 p-10 rounded-md">
                             <i style="opacity: 0.5;">Select a network to view details...</i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Add New Network -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-purple);">
+                <div class="glass-panel admin-section admin-section-add-network">
                     <h2>Add New Network</h2>
-                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                    <div class="flex-col gap-10 text-left">
                         <label for="new-network-name">Network Name:</label>
-                        <input type="text" id="new-network-name" placeholder="e.g., Ethereum Mainnet" class="glass-input">
+                        <input type="text" id="new-network-name" placeholder="e.g., Ethereum Mainnet" class="glass-input" title="Network Display Name" aria-label="New network name">
 
                         <label for="new-explorer-url">Explorer URL:</label>
-                        <input type="text" id="new-explorer-url" placeholder="e.g., https://etherscan.io" class="glass-input">
+                        <input type="text" id="new-explorer-url" placeholder="e.g., https://etherscan.io" class="glass-input" title="Block Explorer URL" aria-label="New explorer url">
 
                         <label for="new-indexer-url">Indexer URL:</label>
-                        <input type="text" id="new-indexer-url" placeholder="e.g., https://api.thegraph.com/subgraphs/name/..." class="glass-input">
+                        <input type="text" id="new-indexer-url" placeholder="e.g., https://api.thegraph.com/..." class="glass-input" title="Network Indexer Endpoint" aria-label="New indexer url">
 
                         <label for="new-node-url">Node RPC URL:</label>
-                        <input type="text" id="new-node-url" placeholder="e.g., https://mainnet.infura.io/v3/..." class="glass-input">
+                        <input type="text" id="new-node-url" placeholder="e.g., https://mainnet.infura.io/..." class="glass-input" title="Network Node RPC" aria-label="New node url">
 
                         <label for="new-faucet-url">Faucet URL (Optional):</label>
-                        <input type="text" id="new-faucet-url" placeholder="e.g., https://faucet.example.com" class="glass-input">
+                        <input type="text" id="new-faucet-url" placeholder="e.g., https://faucet.example.com" class="glass-input" title="External Faucet Link" aria-label="New faucet url">
 
                         <label for="new-asset-id">Default Asset ID (e.g., VBV):</label>
-                        <input type="number" id="new-asset-id" placeholder="e.g., 40227315" class="glass-input">
+                        <input type="number" id="new-asset-id" placeholder="e.g., 40227315" class="glass-input" title="Primary Network Asset" aria-label="New asset id">
 
                         <label for="new-app-id">Default App/Contract ID (e.g., Collection):</label>
-                        <input type="number" id="new-app-id" placeholder="e.g., 7900471" class="glass-input">
+                        <input type="number" id="new-app-id" placeholder="e.g., 7900471" class="glass-input" title="Collection Contract ID" aria-label="New app id">
 
                         <label for="new-chain-id">WalletConnect Chain ID (CAIP-2):</label>
-                        <input type="text" id="new-chain-id" placeholder="e.g., eip155:1" class="glass-input">
+                        <input type="text" id="new-chain-id" placeholder="e.g., eip155:1" class="glass-input" title="CAIP-2 Chain Identifier" aria-label="New chain id">
 
                         <label for="new-power-divisor">Power Divisor:</label>
-                        <input type="number" id="new-power-divisor" value="1000000" step="10000" class="glass-input">
+                        <input type="number" id="new-power-divisor" value="1000000" step="10000" class="glass-input" title="Network Power Divisor" aria-label="New power divisor">
 
                         <label for="new-power-base">Power Base:</label>
-                        <input type="number" id="new-power-base" value="50" class="glass-input">
+                        <input type="number" id="new-power-base" value="50" class="glass-input" title="Network Base Power" aria-label="New power base">
 
-                        <button onclick="adminAddNetwork()" style="width: 100%; background: var(--neon-purple);">Add Network to Registry</button>
+                        <button onclick="adminAddNetwork()" class="w-full bg-neon-purple">Add Network to Registry</button>
                     </div>
                 </div>
 
                 <!-- Moderation & Management -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: #ff4b4b;">
+                <div class="glass-panel admin-section admin-section-moderation">
                     <h2>Moderation</h2>
-                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                    <div class="flex-col gap-10 text-left">
                         <label for="admin-ban-wallet">Target Wallet Address:</label>
-                        <input type="text" id="admin-ban-wallet" class="glass-input" placeholder="voi1..." style="width: 100%; font-size: 0.9em;">
+                        <input type="text" id="admin-ban-wallet" class="glass-input w-full font-sm" placeholder="voi1..." title="Target Wallet" aria-label="Ban wallet input">
                         <label for="admin-ban-hours">Ban Duration (Hours):</label>
-                        <input type="number" id="admin-ban-hours" class="glass-input" placeholder="24" style="width: 100%; font-size: 0.9em;">
-                        <button onclick="adminBanWallet()" style="width: 100%; background: #ff4b4b;">Ban Player</button>
+                        <input type="number" id="admin-ban-hours" class="glass-input w-full font-sm" placeholder="24" title="Ban Duration" aria-label="Ban hours input">
+                        <button onclick="adminBanWallet()" class="w-full bg-error">Ban Player</button>
                         
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
                         
                         <label for="admin-ban-avatar-url">Target NFT Image URL:</label>
-                        <input type="text" id="admin-ban-avatar-url" class="glass-input" placeholder="https://..." style="width: 100%; font-size: 0.9em;">
-                        <button onclick="adminAvatarBan(document.getElementById('admin-ban-avatar-url').value)" style="width: 100%; background: #ffa657;">Ban Avatar Asset</button>
+                        <input type="text" id="admin-ban-avatar-url" class="glass-input w-full font-sm" placeholder="https://..." title="Target Avatar URL" aria-label="Ban avatar input">
+                        <button onclick="adminAvatarBan(document.getElementById('admin-ban-avatar-url').value)" class="w-full bg-warning">Ban Avatar Asset</button>
 
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
                         
                         <label for="admin-reset-wallet">Reset History for Wallet:</label>
-                        <input type="text" id="admin-reset-wallet" class="glass-input" placeholder="voi1..." style="width: 100%; font-size: 0.9em;">
-                        <button onclick="adminResetStats()" class="outline" style="width: 100%; border-color: #ff4b4b; color: #ff4b4b;">Reset Stats</button>
+                        <input type="text" id="admin-reset-wallet" class="glass-input w-full font-sm" placeholder="voi1..." title="Reset Target Wallet" aria-label="Reset stats input">
+                        <button onclick="adminResetStats()" class="outline w-full border-error text-error">Reset Stats</button>
                     </div>
                 </div>
 
                 <!-- System & Economy -->
-                <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-green);">
+                <div class="glass-panel admin-section admin-section-economy">
                     <h2>System & Economy</h2>
-                    <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
+                    <div class="flex-col gap-10 text-left">
                         <label for="admin-msg-text">Broadcast Announcement:</label>
-                        <input type="text" id="admin-msg-text" class="glass-input" placeholder="Enter message..." style="width: 100%; font-size: 0.9em;">
-                        <button onclick="adminBroadcast()" style="width: 100%;">Broadcast Message</button>
+                        <input type="text" id="admin-msg-text" class="glass-input w-full font-sm" placeholder="Enter message..." title="System Broadcast" aria-label="System message">
+                        <button onclick="adminBroadcast()" class="w-full">Broadcast Message</button>
                         
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
                         
                         <label for="admin-refill-amt">Update Faucet Balance:</label>
-                        <input type="number" id="admin-refill-amt" class="glass-input" placeholder="Amount ($VBV)..." style="width: 100%; font-size: 0.9em;">
-                        <button onclick="adminRefillVault()" style="width: 100%; background: var(--neon-green);">Refill Vault</button>
+                        <input type="number" id="admin-refill-amt" class="glass-input w-full font-sm" placeholder="Amount ($VBV)..." title="Faucet Refill Amount" aria-label="Refill amount">
+                        <button onclick="adminRefillVault()" class="w-full bg-neon-green">Refill Vault</button>
 
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
 
                         <label for="admin-maint-mins">Maintenance Countdown (Mins):</label>
-                        <input type="number" id="admin-maint-mins" class="glass-input" placeholder="10" style="width: 100%; font-size: 0.9em;">
-                        <div style="display: flex; gap: 5px;">
-                            <button onclick="adminToggleMaintenance(true)" style="flex: 1; background: #ffa657;">Start</button>
-                            <button onclick="adminToggleMaintenance(false)" class="outline" style="flex: 1; border-color: #ffa657; color: #ffa657;">Stop</button>
+                        <input type="number" id="admin-maint-mins" class="glass-input w-full font-sm" placeholder="10" title="Maintenance Duration" aria-label="Maintenance minutes">
+                        <div class="display-flex gap-5">
+                            <button onclick="adminToggleMaintenance(true)" class="flex-1 bg-warning">Start</button>
+                            <button onclick="adminToggleMaintenance(false)" class="outline flex-1 border-warning text-warning">Stop</button>
                         </div>
                         
-                        <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
                         <label>Reward Stack Management:</label>
-                        <div id="admin-reward-list" style="margin-bottom: 5px; max-height: 100px; overflow-y: auto;"></div>
-                        <input type="number" id="admin-add-asset" class="glass-input" placeholder="Asset ID" style="width: 100%; padding: 8px; margin-bottom: 5px; font-size: 12px;">
-                        <input type="number" id="admin-add-amt" class="glass-input" placeholder="Amount" style="width: 100%; padding: 8px; margin-bottom: 5px; font-size: 12px;">
-                        <button onclick="adminAddReward()" style="width: 100%; font-size: 11px;">Add Reward Asset</button>
+                        <div id="admin-reward-list" class="mb-5 max-h-150 overflow-y-auto"></div>
+                        <input type="number" id="admin-add-asset" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Asset ID" title="Reward Asset ID" aria-label="Reward asset id">
+                        <input type="number" id="admin-add-amt" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Amount" title="Reward Amount" aria-label="Reward amount">
+                        <button onclick="adminAddReward()" class="w-full font-xs">Add Reward Asset</button>
                     </div>
 
-                    <hr style="border: 0; border-top: 1px solid var(--glass-border); width: 100%; margin: 15px 0;">
+                    <hr class="w-full my-10 border-0 border-bottom-glass">
                     <label>Tournament Simulation:</label>
-                    <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                        <select id="admin-sim-size" class="glass-input" style="flex: 1; font-size: 0.9em;" aria-label="Simulation size">
+                    <div class="display-flex gap-5 mb-5">
+                        <select id="admin-sim-size" class="glass-input flex-1 font-sm" title="Simulation Player Count" aria-label="Simulation size">
                             <option value="8">8 Players</option>
                             <option value="16">16 Players</option>
                         </select>
                         <label class="flex-row align-center gap-5"><input type="checkbox" id="admin-sim-buyin"> Buy-in</label>
                     </div>
-                    <button onclick="adminSimulateTournament()" style="width: 100%; background: var(--neon-purple);">Simulate Tournament</button>
+                    <button onclick="adminSimulateTournament()" class="w-full bg-neon-purple">Simulate Tournament</button>
 
                 </div>
             </div>
             
             <!-- Admin Logs -->
-            <div class="glass-panel" style="flex: 1; min-width: 300px; border-color: var(--neon-cyan);">
+            <div class="glass-panel admin-section admin-section-logs">
                 <h2>Admin Logs</h2>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-                    <input type="text" id="admin-log-filter" class="glass-input" placeholder="Filter logs (e.g., SECURITY)" style="flex: 1; min-width: 200px;">
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <label style="font-size: 0.7em; opacity: 0.7;">START:</label>
-                        <
-                         type="datetime-local" id="admin-log-start" class="glass-input" style="font-size: 0.8em; padding: 5px;">
+                <div class="admin-log-filter-bar">
+                    <input type="text" id="admin-log-filter" class="glass-input flex-1 min-w-200" placeholder="Filter logs (e.g., SECURITY)" title="Audit Log Filter" aria-label="Log filter">
+                    <div class="display-flex gap-5 align-center">
+                        <label class="font-xs opacity-7">START:</label>
+                        <input type="datetime-local" id="admin-log-start" class="glass-input font-sm p-1" title="Filter Start Date" aria-label="Log start date">
                     </div>
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <label style="font-size: 0.7em; opacity: 0.7;">END:</label>
-                        <input type="datetime-local" id="admin-log-end" class="glass-input" style="font-size: 0.8em; padding: 5px;">
+                    <div class="display-flex gap-5 align-center">
+                        <label class="font-xs opacity-7">END:</label>
+                        <input type="datetime-local" id="admin-log-end" class="glass-input font-sm p-1" title="Filter End Date" aria-label="Log end date">
                     </div>
-                    <button onclick="fetchAdminLogs()" class="outline" style="padding: 5px 10px; font-size: 11px;">Apply Filters</button>
+                    <button onclick="fetchAdminLogs()" class="outline p-2 font-xs">Apply Filters</button>
                 </div>
-                <div id="admin-logs-display" style="max-height: 300px; overflow-y: auto; text-align: left; font-size: 0.8em; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"></div>
-                <button onclick="fetchAdminLogs()" style="width: 100%; margin-top: 10px;">Refresh Logs</button>
+                <div id="admin-logs-display" class="max-h-300 overflow-y-auto text-left font-sm bg-black-80 p-10 rounded-md"></div>
+                <button onclick="fetchAdminLogs()" class="w-full mt-10">Refresh Logs</button>
             </div>
-            <div style="margin-top: 20px; font-size: 0.8em; opacity: 0.7;">Last Admin Action: <span id="admin-last-action">Awaiting first action...</span></div>
-            <button class="outline" onclick="hideAllOverlays()" style="margin-top: 20px;">Close Admin Panel</button>
+            <div class="mt-20 font-sm opacity-7">Last Admin Action: <span id="admin-last-action">Awaiting first action...</span></div>
+            <button class="outline mt-20" onclick="hideAllOverlays()">Close Admin Panel</button>
         </div>
     </div>
 
     <!-- Global Maintenance Bar -->
-    <div id="maintenance-bar" class="hidden" style="width: 100%; background: rgba(255, 166, 87, 0.2); border-bottom: 1px solid #ffa657; padding: 10px 0; text-align: center; color: #ffa657; font-weight: bold; letter-spacing: 1px; z-index: 1500; position: relative;">
+    <div id="maintenance-bar" class="hidden maintenance-bar">
         ⚠️ ARENA MAINTENANCE IN: <span id="maintenance-timer">00:00</span>
     </div>
 
     <!-- Tournament Transition Overlay -->
-    <div id="tournament-transition-overlay" class="overlay hidden" style="z-index: 5000; background: rgba(0,0,0,0.9);">
+    <div id="tournament-transition-overlay" class="overlay hidden tournament-transition-overlay">
         <div class="text-center">
-            <h1 style="font-size: 3em; margin-bottom: 0; animation: transition-glow-pulse 2s infinite;">BRACKET ADVANCEMENT</h1>
-            <div class="round-number-display" style="font-size: 5em; font-family: 'Orbitron', sans-serif; color: var(--neon-cyan); text-shadow: 0 0 30px var(--neon-cyan);">ROUND 1</div>
-            <p style="letter-spacing: 5px; opacity: 0.7; color: var(--neon-purple); font-weight: bold;">PREPARE FOR COMBAT</p>
+            <h1 class="font-3xl mb-0 animate-pulse">BRACKET ADVANCEMENT</h1>
+            <div class="round-number-display text-glow-strong">ROUND 1</div>
+            <p class="letter-spacing-5 opacity-7 text-neon-purple font-bold">PREPARE FOR COMBAT</p>
         </div>
     </div>
 
