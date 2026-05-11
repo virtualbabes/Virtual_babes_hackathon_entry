@@ -29,7 +29,15 @@
 - **Industrial Leases**: Club members can lease cards; revenue split: 50% Lender, 20% Faucet, 20% Treasury, 10% Members.
 - **Domain Separation**: Logic is now split across specialized services (Battle, Economy, Club, Employment, Oracle) to reduce `Lobby` mutex contention.
 
+# A.I. Memory: Virtualbabes Arena
+
 ## Active Priorities
+1. **Frontend Refactor**: Modularizing `app.js` into categorized sub-files for improved maintainability.
+2. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
+
+## Completed Tasks
+- **UI Hardening**: Resolved accessibility issues (labels/titles) and removed all illegal inline styles in `index.html`.
+
 1. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
 
 ## Completed Tasks
