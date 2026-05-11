@@ -10,7 +10,9 @@
 - [x] **Frontend Refactor**: Removed redundant `initWebSocket` and `handleServerMessage` definitions and associated global variables from `app.js`.
 - [x] **Property Correction**: Switched `user-drag` to `-webkit-user-drag` for standard compliance.
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
+- [x] Audit `renderCardHTML` function in `ui.js` for performance bottlenecks and re-allocations.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
+- [x] Audit `initWebSocket` message handler in `network.js` for high-frequency move overhead; implemented batching logic.
 - [x] Resolve Faceplate Residue: Implemented Mojo/Cunning bonuses for Faceplates.
 - [x] Audit `processMojoDecay` and update `club.LastActivity` in economic handlers.
 - [x] Implement 'equip_cosmetic' message type in `lobby_manager.go`.

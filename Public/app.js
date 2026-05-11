@@ -1,39 +1,28 @@
 import { collectiveIntelligence } from './collective-intelligence.js';
 import { CONFIG } from './js/config.js';
 import { initWebSocket, sendPing, handleServerMessage, myClientId, setMyClientId, setNonceResolver, getNonceResolver, setReconnectAttempts, getReconnectAttempts, setIdentitySyncTimeout, getIdentitySyncTimeout, setLastPingTime, getLastPingTime, setCurrentLatency, getCurrentLatency } from './js/network.js';
-import { showToast, setTransactionStatus, hideAllOverlays, showMatchPreview, showTournamentTransition, showKidnapOverlay } from './js/ui.js';
-import { initWalletConnect, connectWith, disconnectUserWallet, updateWalletUI, walletProvider, setWalletProvider, signClient, wcModal } from './js/wallet.js';
-import { updatePayoutUI, openPayoutSettings, savePayoutAddress, payoutAddress, setPayoutAddress } from './js/wallet.js';
-import { fetchLeaderboard, renderSideLeaderboard, switchHofTab, fetchTournamentHistory, filterSeasonHistory, fetchSeasonHistory, updateTournamentPaginationUI, handleTournamentUI, renderTournamentBracket, registerForTournament, openTournamentBracket, closeTournamentBracket, currentTournamentPage, tournamentLimit, totalTournaments, lastTournamentData, seasonEnd, seasonTimerInterval, startSeasonTimer } from './js/leaderboard.js';
-import { updatePlayerList, handleMatchmakingUpdate, toggleMatchmakingQueue, inMatchmakingQueue, setInMatchmakingQueue, sendChallenge, acceptChallenge, declineChallenge, sendMatchSync, sendSpectate, showMatchPreview as gameShowMatchPreview, proceedToWarRoom, sendPing as gameSendPing } from './js/game.js';
+import { showToast, setTransactionStatus, hideAllOverlays, showMatchPreview, showTournamentTransition } from './js/ui.js';
+import { initWalletConnect, connectWith, disconnectUserWallet, updateWalletUI, walletProvider, setWalletProvider, signClient, wcModal, userAddress, setUserAddress, isVerified, setIsVerified, payoutAddress, setPayoutAddress, updatePayoutUI, openPayoutSettings, savePayoutAddress, linkedWallets, setLinkedWallets } from './js/wallet.js';
+import { fetchLeaderboard, renderSideLeaderboard, switchHofTab, fetchTournamentHistory, filterSeasonHistory, fetchSeasonHistory, updateTournamentPaginationUI, handleTournamentUI, renderTournamentBracket, registerForTournament, openTournamentBracket, closeTournamentBracket, currentTournamentPage, tournamentLimit, totalTournaments, lastTournamentData, seasonEnd, seasonTimerInterval, startSeasonTimer, generateBracketHTML } from './js/leaderboard.js';
+import { activeCardId, aiThinking, lastBoardState, currentChallengerId, currentOpponentId, spectatorMatchState, myPlayerIndex, matchHistorySaved, lastLobbyPlayers, lastTauntPhase, lastTauntTurn, setMyPlayerIndex, setCurrentOpponentId, setSpectatorMatchState, setMatchHistorySaved, setLastLobbyPlayers, setLastTauntPhase, setLastTauntTurn, buildEmptyBoard, toggleMatchmakingQueue, handleMatchmakingUpdate, updatePlayerList, sendChatMessage, handleChatKey, renderChatMessage, saveMatchResult, renderMatchHistory, showChallengeNotification, acceptChallenge, sendMatchSync, reportGloat, declineChallenge, sendSpectate, proceedToWarRoom, sendChallenge, triggerToggleNetwork, selectCard, clickGrid, calculateDeckRating, executeQuickCast, showPowerTooltip } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, refreshInventory, renderAvatarGrid, applyAvatarFilters, selectAvatar, setupCropEvents, userNFTs, setUserNFTs, currentAvatarUrl, setCurrentAvatarUrl, cropState, setCropState, isCropInitialized, setIsCropInitialized } from './js/deck.js';
 import { getAdminHeaders, adminRefillVault, updateAdminRewardList, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminGloatBan, adminAvatarBan, adminBanWalletFromLog, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, startAdminLogPolling, fetchLastAdminAction, lastAdminKey, cachedAdminHeaders, setCachedAdminHeaders, availableNetworks, setAvailableNetworks, globalClubs, setGlobalClubs, adminFocusNetwork, setAdminFocusNetwork, updateAdminNetworkUI, onAdminNetworkSelectChange } from './js/admin.js';
-import { openShopsOverlay, switchShopCategory, buyClubItem, openClubFoundry, submitClubFoundry, openTerritoryView, openArtGalleryOverlay, loadGalleryItems, promptBid, openConsignmentOverlay, selectConsignmentItem, submitConsignment } from './js/economy.js';
-import { openCourthouse, submitCourthouseFine, openPortfolioView, switchPortfolioTab, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openBlackMarket, buyBlackMarketItem, openRumorMill, spreadRumor, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, payRansom, releaseHostage, showKidnapOverlay as criminalityShowKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
+import { openShopsOverlay, switchShopCategory, buyClubItem, openClubFoundry, submitClubFoundry, openTerritoryView, openArtGalleryOverlay, loadGalleryItems, promptBid, openConsignmentOverlay, selectConsignmentItem, submitConsignment, openPortfolioView, switchPortfolioTab, tradeShares, openBlackMarket, buyBlackMarketItem } from './js/economy.js';
+import { openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openTrophyView, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, openKidnapSelectionOverlay, executeKidnap, payRansom, releaseHostage, showKidnapOverlay as criminalityShowKidnapOverlay, startRecoveryTimer, rumorTimers, activeRumors, renderRumorBoard, updateActiveRumors as criminalityUpdateActiveRumors } from './js/criminality.js';
 import { setMasterVolume, setMusicVolume, setSfxVolume, toggleMuteMaster, toggleMuteMusic, toggleMuteSfx, masterVolume, musicVolume, sfxVolume } from './js/audio.js';
 import { initParticleSystem, animateParticles, triggerCaptureParticles, particles, particleCanvas, particleCtx, particleAnimationId } from './js/particles.js';
 import { getCachedEnvoiName, resolveAssetSymbol, getAssetSymbol, resolveEnvoiName, getNetworkConfig, assetCache, envoiCache } from './js/utils.js';
 
-let activeCardId = null; // Tracks the card you clicked in your hand
-let aiThinking = false; // To track if AI is currently performing a move
-let lastBoardState = Array(9).fill(null); // Track state to detect captures
-let currentChallengerId = null; // Stores the ID of the player who sent the current challenge
-let currentOpponentId = null;   // The player we are currently battling
-let spectatorMatchState = null; // Stores P1/P2 mapping for spectators
-let isVerified = false;         // Global verification status
-let lastTauntPhase = null;      // Tracks narrative state to prevent duplicate taunts
-let lastTauntTurn = null;
 let activeRumors = []; // Global array to hold active rumors
 
 // --- Ticker State ---
 let tickerItems = [];
 
 let myPlayerIndex = 0;          // 0 for P1, 1 for P2
-let userAddress = null;
 let matchHistorySaved = false;
-let lastLobbyPlayers = []; // Cache for portfolio valuation
-let linkedWallets = JSON.parse(localStorage.getItem("vbabes_linked_wallets") || "[]");
 let ignoredReporters = new Set(JSON.parse(localStorage.getItem("vbabes_ignored_reporters") || "[]"));
+
+let lastBoardMoods = Array(9).fill(null);
 
 let tooltipEl = null;
 // 1. Initialize Go WASM Engine
@@ -64,7 +53,7 @@ window.onload = async () => {
             document.documentElement.style.setProperty('--texture-final', `url(${base}Assets/Textures/arena_final.webp)`);
         }
         document.getElementById("engine-status").innerHTML = "<span class='status-active'>ACTIVE</span>";
-        buildEmptyBoard(); // Imported from game.js
+        buildEmptyBoard();
         initWebSocket(handleServerMessage); // Pass the message handler
         initWalletConnect(); // Initialize WC alongside WS
         renderMatchHistory();
@@ -104,17 +93,18 @@ window.openTournamentBracket = openTournamentBracket;
 window.openDeckManager = openDeckManager;
 window.openShopsOverlay = openShopsOverlay;
 window.openTerritoryMapOverlay = openTerritoryMapOverlay;
+window.openSocialPanelOverlay = openSocialPanelOverlay; // Expose from criminality.js
 window.ToggleLeaderboard = window.ToggleLeaderboard || ToggleLeaderboard;
 window.openSettingsOverlay = openSettingsOverlay;
-window.proceedToWarRoom = proceedToWarRoom; // Imported from game.js
-window.closeDeckManager = closeDeckManager; // Imported from deck.js
+window.proceedToWarRoom = proceedToWarRoom;
+window.closeDeckManager = closeDeckManager;
 
 window.updateWalletUI = (address) => { // This function will be moved to wallet.js
-    userAddress = address;
+    setUserAddress(address);
     const btn = document.getElementById("wallet-btn");
     if (address) {
         btn.innerText = address.substring(0, 8) + "...";
-        btn.classList.add("outline");
+        btn.classList.add("outline"); // Add outline class for styling
 
         // Register wallet with the Live Lobby server
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -126,7 +116,7 @@ window.updateWalletUI = (address) => { // This function will be moved to wallet.
 
         // BRIDGE LOGIC: If on Algorand, ensure the user is "birthed" into Voi
         const state = window.GetGameState(); // This will need to be imported or passed
-        if (state.network === "ALGO") {
+        if (state.network === "ALGO") { // Check if the current network is Algorand
             checkVoiReadiness(address);
         }
 
@@ -177,7 +167,7 @@ async function checkVoiReadiness(address) {
     }
 }
 
-window.adminGloatBan = async (walletToBan = null, hoursToBan = null) => { // This will be moved to admin.js
+window.adminGloatBan = async (walletToBan = null, hoursToBan = null) => {
     const wallet = walletToBan || document.getElementById("admin-ban-wallet").value.trim();
     const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
     
@@ -201,7 +191,7 @@ window.adminGloatBan = async (walletToBan = null, hoursToBan = null) => { // Thi
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
-window.ignoreReporter = (wallet) => { // This will be moved to admin.js
+window.ignoreReporter = (wallet) => {
     if (!wallet) return;
     ignoredReporters.add(wallet);
     localStorage.setItem("vbabes_ignored_reporters", JSON.stringify(Array.from(ignoredReporters)));
@@ -209,7 +199,7 @@ window.ignoreReporter = (wallet) => { // This will be moved to admin.js
     fetchAdminLogs(); // Re-render to apply filter
 }
 
-window.fetchAdminLogs = async () => { // This will be moved to admin.js
+window.fetchAdminLogs = async () => {
     const headers = await getAdminHeaders();
     if (!headers) return;
 
@@ -296,7 +286,7 @@ window.fetchAdminLogs = async () => { // This will be moved to admin.js
     }
 }
 
-window.getAdminHeaders = async () => { // This will be moved to admin.js
+window.getAdminHeaders = async () => {
     if (!userAddress) { 
         showToast("Please connect your admin wallet.", "error");
         return null;
@@ -370,8 +360,7 @@ window.getAdminHeaders = async () => { // This will be moved to admin.js
     }
 }
 
-// --- Admin Action Handlers ---
-window.adminRefillVault = async () => { // This will be moved to admin.js
+window.adminRefillVault = async () => {
     const amount = parseFloat(document.getElementById("admin-refill-amt").value);
     if (isNaN(amount)) return;
     const headers = await getAdminHeaders();
@@ -388,7 +377,7 @@ window.adminRefillVault = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Refill failed", "error"); }
 }
 
-window.updateAdminRewardList = (rewards) => { // This will be moved to admin.js
+window.updateAdminRewardList = (rewards) => {
     const container = document.getElementById("admin-reward-list");
     container.innerHTML = "";
     Object.entries(rewards || {}).forEach(([id, amt]) => {
@@ -402,7 +391,7 @@ window.updateAdminRewardList = (rewards) => { // This will be moved to admin.js
     });
 }
 
-window.adminAddReward = async () => { // This will be moved to admin.js
+window.adminAddReward = async () => {
     const assetId = parseInt(document.getElementById("admin-add-asset").value);
     const amount = parseFloat(document.getElementById("admin-add-amt").value);
     if (!assetId || isNaN(amount)) return;
@@ -420,7 +409,7 @@ window.adminAddReward = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Action failed", "error"); }
 }
 
-window.adminRemoveReward = async (assetId) => { // This will be moved to admin.js
+window.adminRemoveReward = async (assetId) => {
     const headers = await getAdminHeaders();
     if (!headers) return;
 
@@ -435,7 +424,7 @@ window.adminRemoveReward = async (assetId) => { // This will be moved to admin.j
     } catch (err) { showToast("❌ Update failed", "error"); }
 }
 
-window.adminAddNetwork = async () => { // This will be moved to admin.js
+window.adminAddNetwork = async () => {
     const headers = await getAdminHeaders();
     if (!headers) return;
 
@@ -469,7 +458,7 @@ window.adminAddNetwork = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Failed to add network", "error"); }
 }
 
-window.adminBroadcast = async () => { // This will be moved to admin.js
+window.adminBroadcast = async () => {
     const text = document.getElementById("admin-msg-text").value;
     if (!text) return;
     const headers = await getAdminHeaders();
@@ -489,7 +478,7 @@ window.adminBroadcast = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Broadcast failed", "error"); }
 }
 
-window.adminUpdateRules = async () => { // This will be moved to admin.js
+window.adminUpdateRules = async () => {
     const req = {
         Open: document.getElementById("rule-open").checked,
         Power_copy: document.getElementById("rule-same").checked,
@@ -512,7 +501,7 @@ window.adminUpdateRules = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Rules update failed", "error"); }
 }
 
-window.adminBanWallet = async (walletToBan = null, hoursToBan = null) => { // This will be moved to admin.js
+window.adminBanWallet = async (walletToBan = null, hoursToBan = null) => {
     const wallet = walletToBan || document.getElementById("admin-ban-wallet").value.trim();
     const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
     if (!wallet) return;
@@ -540,7 +529,7 @@ window.adminBanWallet = async (walletToBan = null, hoursToBan = null) => { // Th
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
-window.adminAvatarBan = async (url = null, hours = null) => { // This will be moved to admin.js
+window.adminAvatarBan = async (url = null, hours = null) => {
     const targetUrl = url || document.getElementById("admin-ban-avatar-url").value.trim();
     if (!targetUrl) return;
     const headers = await getAdminHeaders();
@@ -567,12 +556,12 @@ window.adminAvatarBan = async (url = null, hours = null) => { // This will be mo
     }
 }
 
-window.adminBanWalletFromLog = (wallet) => { // This will be moved to admin.js
+window.adminBanWalletFromLog = (wallet) => {
     // Default to 24 hours for a quick ban from logs
     adminBanWallet(wallet, 24);
 }
 
-window.adminUpdatePowerScaling = async () => { // This will be moved to admin.js
+window.adminUpdatePowerScaling = async () => {
     const divisor = parseFloat(document.getElementById("admin-power-divisor").value);
     const base = parseInt(document.getElementById("admin-power-base").value);
     const headers = await getAdminHeaders();
@@ -589,7 +578,7 @@ window.adminUpdatePowerScaling = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Power update failed", "error"); }
 }
 
-window.addXChainWallet = async () => { // This will be moved to wallet.js
+window.addXChainWallet = async () => {
     if (!signClient || !wcModal || !userAddress) return;
     showToast("Opening WalletConnect for X-Chain Link...", "info");
 
@@ -723,7 +712,7 @@ window.addXChainWallet = async () => { // This will be moved to wallet.js
     }
 }
 
-window.updateLinkedWalletsUI = () => { // This will be moved to wallet.js
+window.updateLinkedWalletsUI = () => {
     const container = document.getElementById("linked-wallets-list");
     if (!container) return;
     container.innerHTML = "";
@@ -738,7 +727,7 @@ window.updateLinkedWalletsUI = () => { // This will be moved to wallet.js
     });
 }
 
-window.removeLinkedWallet = (index) => { // This will be moved to wallet.js
+window.removeLinkedWallet = (index) => {
     linkedWallets.splice(index, 1);
     localStorage.setItem("vbabes_linked_wallets", JSON.stringify(linkedWallets));
     refreshInventory();
@@ -762,7 +751,7 @@ window.savePayoutAddress = () => { // This will be moved to wallet.js
     }
 }
 
-window.updatePayoutUI = () => { // This will be moved to wallet.js
+window.updatePayoutUI = () => {
     const display = document.getElementById("payout-address-display");
     if (display) {
         display.innerText = payoutAddress ? (payoutAddress.substring(0, 6) + "..." + payoutAddress.substring(54)) : "Default Wallet";
@@ -788,7 +777,7 @@ function updateAdminNetworkUI() {
     onAdminNetworkSelectChange();
 }
 
-window.onAdminNetworkSelectChange = () => { // This will be moved to admin.js
+window.onAdminNetworkSelectChange = () => {
     const name = document.getElementById("admin-network-select").value;
     const config = availableNetworks[name];
     const details = document.getElementById("admin-network-details");
@@ -809,7 +798,7 @@ window.onAdminNetworkSelectChange = () => { // This will be moved to admin.js
     }
 }
 
-window.adminSetActiveNetwork = async () => { // This will be moved to admin.js
+window.adminSetActiveNetwork = async () => {
     const networkName = document.getElementById("admin-network-select").value;
     const headers = await getAdminHeaders();
     if (!headers) return;
@@ -847,7 +836,7 @@ async function adminToggleMaintenance(active) {
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
-window.adminToggleDevMode = async () => { // This will be moved to admin.js
+window.adminToggleDevMode = async () => {
     const enabled = document.getElementById("dev-mode-toggle").checked;
     // Add a safety check when enabling
     if (enabled && !confirm("⚠️ DEV MODE: This will force a 100% win rate against the bot for reward testing. Enable?")) {
@@ -858,7 +847,7 @@ window.adminToggleDevMode = async () => { // This will be moved to admin.js
     showToast(`🛠️ Dev Mode ${enabled ? 'Enabled' : 'Disabled'}`, enabled ? "success" : "info");
 }
 
-window.adminResetStats = async () => { // This will be moved to admin.js
+window.adminResetStats = async () => {
     const wallet = document.getElementById("admin-ban-wallet").value.trim();
     if (!wallet) return;
     if (!confirm(`⚠️ CRITICAL: You are about to PERMANENTLY WIPE all stats for wallet: ${wallet}. This cannot be undone. Proceed?`)) return;
@@ -883,7 +872,7 @@ window.adminResetStats = async () => { // This will be moved to admin.js
     } catch (err) { showToast("❌ Server connection error", "error"); }
 }
 
-window.adminSimulateTournament = async () => { // This will be moved to admin.js
+window.adminSimulateTournament = async () => {
     const size = parseInt(document.getElementById("admin-sim-size").value);
     const isBuyIn = document.getElementById("admin-sim-buyin").checked;
     if (isNaN(size) || (size !== 8 && size !== 16)) {
@@ -910,13 +899,13 @@ window.adminSimulateTournament = async () => { // This will be moved to admin.js
     }
 }
 
-window.adminLogTicker = null; // Imported from admin.js
-window.startAdminLogPolling = () => { // This will be moved to admin.js
+window.adminLogTicker = null;
+window.startAdminLogPolling = () => {
     if (adminLogTicker) return;
     adminLogTicker = setInterval(fetchLastAdminAction, 15000); // Check every 15s for status bar
 }
 
-window.fetchLastAdminAction = async () => { // This will be moved to admin.js
+window.fetchLastAdminAction = async () => {
     if (!lastAdminKey && !cachedAdminHeaders) { // Imported from admin.js
         document.getElementById("admin-last-action").innerText = "Awaiting first action..."; 
         return; 
@@ -954,14 +943,14 @@ window.disconnectUserWallet = async () => { // This will be moved to wallet.js
         walletProvider = null;
         
         window.disconnectWallet(); // Reset Go Engine
-        isVerified = false; // Global variable in app.js
-        userAddress = null; // Clear user address
+        setIsVerified(false);
+        setUserAddress(null);
         updateWalletUI(null);
     } catch (err) {
         console.error("Disconnect failed", err);
     }
 }
-window.highlightStartButton = (isReady) => { // Imported from ui.js
+window.highlightStartButton = (isReady) => {
     const btn = document.getElementById("start-btn");
     if (isReady) {
         btn.disabled = false;
@@ -976,7 +965,7 @@ window.highlightStartButton = (isReady) => { // Imported from ui.js
 
 // --- Matchmaking Logic ---
 
-function toggleMatchmakingQueue() {
+window.toggleMatchmakingQueue = () => {
     if (!userAddress) { showToast("Connect wallet first", "error"); return; }
     const state = window.GetGameState();
     if (state.deck.length < 5) { showToast("Deck must have 5 cards", "error"); return; }
@@ -989,7 +978,7 @@ function toggleMatchmakingQueue() {
                 deck_rating: state.deck_rating
             }
         }));
-        const btn = document.getElementById("btn-matchmaking");
+        const btn = document.getElementById("btn-matchmaking"); // Get the matchmaking button
         btn.disabled = true; // This will be re-enabled by handleMatchmakingUpdate
         btn.innerText = "Joining Queue...";
     } else {
@@ -1000,7 +989,7 @@ function toggleMatchmakingQueue() {
     }
 }
 
-function handleMatchmakingUpdate(data) {
+window.handleMatchmakingUpdate = (data) => {
     const btn = document.getElementById("btn-matchmaking");
     const status = document.getElementById("queue-status");
 
@@ -1028,7 +1017,7 @@ function handleMatchmakingUpdate(data) {
     }
 }
 
-window.sendPing = () => { // This will be moved to network.js
+window.sendPing = () => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     setLastPingTime(Date.now());
     socket.send(JSON.stringify({ type: "ping" }));
@@ -1036,7 +1025,7 @@ window.sendPing = () => { // This will be moved to network.js
 
 function updatePlayerList(players) {
     const list = document.getElementById("active-players");
-    list.innerHTML = "";
+    list.innerHTML = ""; // Clear existing list items
     
     // Check if current user is banned
     const me = players.find(p => p.id === myClientId);
@@ -1062,7 +1051,7 @@ function updatePlayerList(players) {
     });
 }
 
-window.updateMarketTicker = (players) => { // This will be moved to economy.js
+window.updateMarketTicker = (players) => {
     const spacing = 60;
     let tickerContainer = document.getElementById("market-ticker");
     if (!tickerContainer) {
@@ -1137,7 +1126,7 @@ window.updateMarketTicker = (players) => { // This will be moved to economy.js
     }
 }
 
-window.startTickerAnimation = () => { // This will be moved to economy.js
+window.startTickerAnimation = () => {
     const canvas = document.getElementById("market-ticker-canvas");
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1200,7 +1189,7 @@ window.startTickerAnimation = () => { // This will be moved to economy.js
     tickerAnimId = requestAnimationFrame(animate);
 }
 
-window.banTicker = null; // Imported from ui.js
+window.banTicker = null;
 function handleLocalBanUI(banExpires) {
     const container = document.getElementById("local-ban-cooldown");
     const fill = document.getElementById("ban-progress-fill");
@@ -1240,7 +1229,7 @@ function handleLocalBanUI(banExpires) {
     banTicker = setInterval(tick, 1000);
 }
 
-window.startSeasonTimer = () => { // This will be moved to leaderboard.js
+window.startSeasonTimer = () => {
     if (seasonTimerInterval) clearInterval(seasonTimerInterval);
     const timerEl = document.getElementById("season-timer");
     
@@ -1266,7 +1255,7 @@ window.startSeasonTimer = () => { // This will be moved to leaderboard.js
     seasonTimerInterval = setInterval(update, 60000); // Check once per minute
 }
 
-window.maintenanceTicker = null; // Imported from ui.js
+window.maintenanceTicker = null;
 function handleMaintenanceUI(active, targetTimestamp) {
     const bar = document.getElementById("maintenance-bar");
     const timerDisplay = document.getElementById("maintenance-timer");
@@ -1302,7 +1291,7 @@ function handleMaintenanceUI(active, targetTimestamp) {
     maintenanceTicker = setInterval(tick, 1000);
 }
 
-window.sendChatMessage = () => { // This will be moved to game.js
+window.sendChatMessage = () => {
     const input = document.getElementById("chat-input");
     const text = input.value.trim();
     if (!text || !socket) return;
@@ -1315,7 +1304,7 @@ window.sendChatMessage = () => { // This will be moved to game.js
     input.value = "";
 }
 
-window.switchHofTab = (tab) => { // This will be moved to leaderboard.js
+window.switchHofTab = (tab) => {
     document.getElementById("hof-rankings-view").classList.add("hidden");
     document.getElementById("hof-history-view").classList.add("hidden");
     document.getElementById("hof-seasons-view").classList.add("hidden");
@@ -1341,7 +1330,7 @@ window.switchHofTab = (tab) => { // This will be moved to leaderboard.js
     }
 }
 
-window.toggleTournamentDetails = (id) => { // This will be moved to leaderboard.js
+window.toggleTournamentDetails = (id) => {
     const details = document.getElementById(`details-${id}`);
     if (!details) return;
     details.classList.toggle("hidden");
@@ -1449,7 +1438,7 @@ async function fetchTournamentHistory(page = 1, deepVerify = false) {
     }
 }
 
-window.filterSeasonHistory = () => { // This will be moved to leaderboard.js
+window.filterSeasonHistory = () => {
     const input = document.getElementById("season-filter-input");
     const val = input.value.trim();
     fetchSeasonHistory(val ? parseInt(val) : null);
@@ -1520,7 +1509,7 @@ async function fetchSeasonHistory(seasonNum = null) {
     }
 }
 
-window.handleChatKey = (e) => { // This will be moved to game.js
+window.handleChatKey = (e) => {
     if (e.key === 'Enter') sendChatMessage();
 }
 
@@ -1538,7 +1527,7 @@ function renderChatMessage(sender, text) {
     display.scrollTop = display.scrollHeight;
 }
 
-window.saveMatchResult = async (state) => { // This will be moved to game.js
+window.saveMatchResult = async (state) => {
     const history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
     const opponent = currentOpponentId || (state.multiplayer ? "Unknown Human" : "Vbabe Bot");
     
@@ -1555,7 +1544,7 @@ window.saveMatchResult = async (state) => { // This will be moved to game.js
     await renderMatchHistory();
 }
 
-window.renderMatchHistory = async () => { // This will be moved to game.js
+window.renderMatchHistory = async () => {
     const history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
     const display = document.getElementById("history-display");
     if (!display || history.length === 0) return;
@@ -1581,7 +1570,7 @@ window.renderMatchHistory = async () => { // This will be moved to game.js
     });
 }
 
-window.showToast = (message, type = 'info', duration = 5000) => { // This will be moved to ui.js
+window.showToast = (message, type = 'info', duration = 5000) => {
     const container = document.getElementById("toast-container");
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
@@ -1598,8 +1587,7 @@ window.showToast = (message, type = 'info', duration = 5000) => { // This will b
     }
 }
 
-// Bridge for Go to trigger Payout UI flow
-window.processRewardPayout = async (payloadStr) => { // Imported from wallet.js
+window.processRewardPayout = async (payloadStr) => {
     const payload = JSON.parse(payloadStr);
     showToast("🛰️ Requesting secure nonce from server...", "info");
 
@@ -1728,7 +1716,7 @@ window.processRewardPayout = async (payloadStr) => { // Imported from wallet.js
     }
 };
 
-window.showChallengeNotification = (challengerId) => { // This will be moved to game.js
+window.showChallengeNotification = (challengerId) => {
     currentChallengerId = challengerId;
     const challengeOverlay = document.getElementById("challenge-overlay");
     const challengeText = document.getElementById("challenge-text");
@@ -1738,7 +1726,7 @@ window.showChallengeNotification = (challengerId) => { // This will be moved to 
     // Optionally play a sound or vibrate
 }
 
-window.acceptChallenge = () => { // This will be moved to game.js
+window.acceptChallenge = () => {
     if (!socket || !currentChallengerId) return;
     const state = window.GetGameState();
     const envelope = {
@@ -1760,7 +1748,7 @@ window.acceptChallenge = () => { // This will be moved to game.js
     currentChallengerId = null;
 }
 
-window.sendMatchSync = (targetId) => { // This will be moved to game.js
+window.sendMatchSync = (targetId) => {
     const state = window.GetGameState();
     const envelope = {
         type: "challenge",
@@ -1776,7 +1764,7 @@ window.sendMatchSync = (targetId) => { // This will be moved to game.js
     socket.send(JSON.stringify(envelope));
 }
 
-window.reportGloat = (opponentClientId, gloatText) => { // This will be moved to game.js
+window.reportGloat = (opponentClientId, gloatText) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
         showToast("Cannot report: Not connected to server.", "error");
         return;
@@ -1796,7 +1784,7 @@ window.reportGloat = (opponentClientId, gloatText) => { // This will be moved to
     showToast("Gloat message reported. Thank you for helping keep the arena clean!", "success");
 }
 
-window.declineChallenge = () => { // This will be moved to game.js
+window.declineChallenge = () => {
     if (!socket || !currentChallengerId) return;
 
     const envelope = {
@@ -1811,7 +1799,7 @@ window.declineChallenge = () => { // This will be moved to game.js
     currentChallengerId = null;
 }
 
-window.sendSpectate = (targetId) => { // This will be moved to game.js
+window.sendSpectate = (targetId) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
     const envelope = {
@@ -1825,7 +1813,7 @@ window.sendSpectate = (targetId) => { // This will be moved to game.js
     showToast(`👁️ Requesting access to stream...`, "info");
 }
 
-window.showMatchPreview = (data) => { // This will be moved to ui.js
+window.showMatchPreview = (data) => {
     document.getElementById("preview-p1-id").innerText = data.p1_id;
     document.getElementById("preview-p1-rating").innerText = data.p1_rating || "[Z]";
     document.getElementById("preview-p2-id").innerText = data.p2_id;
@@ -1834,7 +1822,7 @@ window.showMatchPreview = (data) => { // This will be moved to ui.js
     document.getElementById("match-preview-overlay").classList.remove("hidden");
 }
 
-window.proceedToWarRoom = () => { // This will be moved to game.js
+window.proceedToWarRoom = () => {
     if (!spectatorMatchState) return;
     
     document.getElementById("match-preview-overlay").classList.add("hidden");
@@ -1844,7 +1832,7 @@ window.proceedToWarRoom = () => { // This will be moved to game.js
     syncUI("all");
 }
 
-window.sendChallenge = (targetId) => { // This will be moved to game.js
+window.sendChallenge = (targetId) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
     const state = window.GetGameState();
@@ -1864,12 +1852,12 @@ window.sendChallenge = (targetId) => { // This will be moved to game.js
     alert(`Challenge sent to ${targetId}`);
 }
 
-window.triggerToggleNetwork = () => { // This will be moved to game.js
+window.triggerToggleNetwork = () => {
     window.toggleNetwork();
     syncUI();
 }
 
-window.selectCard = (id) => { // This will be moved to game.js
+window.selectCard = (id) => {
     activeCardId = id; // Global variable in app.js
     if (window.PlaySelectSound) window.PlaySelectSound();
     syncUI("inventory"); // Re-render to show the selected card glowing
@@ -1880,7 +1868,7 @@ function clickGrid(index) {
     
     // Multiplayer Guard: Only allow move if it's actually our turn
     if (state.phase === "Active" && state.turn !== state.local_player_index) {
-        console.warn("It is not your turn!"); // Imported from game.js
+        console.warn("It is not your turn!");
         return;
     }
 
@@ -1891,7 +1879,7 @@ function clickGrid(index) {
     const selectedCardId = activeCardId;
 
     // Execute locally
-    const success = window.PlaceCard(index, activeCardId); // This will be moved to game.js
+    const success = window.PlaceCard(index, activeCardId);
     if (success) {
         // If in multiplayer, broadcast the move to the opponent
         if (state.phase === "Active" && currentOpponentId) {
@@ -1914,12 +1902,12 @@ function clickGrid(index) {
 } 
 
 // --- Deck Manager Logic --- // These will be moved to deck.js
-window.openDeckManager = () => {
+window.openDeckManager = () => { // Imported from deck.js
     document.getElementById("deck-manager-overlay").classList.remove("hidden");
     renderDeckManager();
 }
 
-window.closeDeckManager = () => {
+window.closeDeckManager = () => { // Imported from deck.js
     document.getElementById("deck-manager-overlay").classList.add("hidden"); // Imported from deck.js
     
     // TACTICAL SYNC: Report the highest possible deck rating to the Hall of Fame
@@ -1934,7 +1922,7 @@ window.closeDeckManager = () => {
     syncUI("all");
 }
 
-window.renderDeckManager = () => { // This will be moved to deck.js
+window.renderDeckManager = () => {
     const state = window.GetGameState();
     const invGrid = document.getElementById("inventory-grid");
     const deckZone = document.getElementById("deck-drop-zone");
@@ -2010,7 +1998,7 @@ window.renderDeckManager = () => { // This will be moved to deck.js
 }
 
 // Initialize Drag & Drop
-const dropZone = document.getElementById("deck-drop-zone"); // Imported from deck.js
+const dropZone = document.getElementById("deck-drop-zone");
 dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); };
 dropZone.ondragleave = () => dropZone.classList.remove("drag-over");
 dropZone.ondrop = (e) => {
@@ -2022,7 +2010,7 @@ dropZone.ondrop = (e) => {
 };
 
 // 4. THE RENDER LOOP (The Camera fetching Go State)
-window.syncUI = async (scope = "all") => { // This will be the main sync function in app.js
+export async function syncUI(scope = "all") {
     if (!window.GetGameState) return; // Ensure Go function exists
     // Partial state sync: only update sections present in the current state snapshot
     const state = window.GetGameState(scope);
@@ -2042,12 +2030,12 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
 	}
 
     // Update Deck Rating in UI
-    if (state.deck_rating !== undefined) { // Imported from ui.js
+    if (state.deck_rating !== undefined) {
         document.getElementById("deck-rating-display").innerText = state.deck_rating;
     }
 
     // Update Mojo Display
-    const mojoEl = document.getElementById("mojo-display"); // Assuming this element exists in index.html
+    const mojoEl = document.getElementById("mojo-display");
     if (mojoEl && state.mojo !== undefined) mojoEl.innerHTML = `MOJO: ${state.mojo || 0} [${state.social_rank || 'Nobody'}] <span style="font-size: 0.7em; opacity: 0.7; margin-left: 10px;">RUMORS: ${state.rumor_count || 0}</span>`; // Imported from ui.js
 
     // 0. Resolve missing reward symbols concurrently to prevent UI flickering
@@ -2061,7 +2049,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     
     // --- Update Dashboard ---
     // Overlay Management
-    if (state.phase !== undefined || state.show_leaderboard !== undefined) { // Imported from ui.js
+    if (state.phase !== undefined || state.show_leaderboard !== undefined) {
         hideAllOverlays();
         const mainContainer = document.getElementById("main-game-container");
         mainContainer.classList.add('hidden'); // Hide main game by default
@@ -2076,7 +2064,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
             }
         } else if (state.phase === "Setup" && userAddress) {
             document.getElementById("setup-overlay").classList.remove("hidden");
-        } else if (!userAddress) {
+        } else if (!userAddress) { // Check if userAddress is null or empty
             // If no wallet connected, show wallet selector
             document.getElementById("wallet-selector-overlay").classList.remove("hidden");
             renderRumorBoard(); // Ensure rumor board is rendered even if no wallet is connected
@@ -2087,7 +2075,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // --- Narrative Intelligence Hook & AI Indicator ---
-    if (state.phase === "Active" && !state.multiplayer) { // Imported from game.js
+    if (state.phase === "Active" && !state.multiplayer) {
         // 1. Show thinking indicator on AI turn
         if (state.turn === 1) {
             document.getElementById("ai-thinking-indicator").classList.remove("hidden");
@@ -2112,7 +2100,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // --- Winner Overlay: Character-Aware Feedback ---
-    if (state.phase === "Finished" && state.winner !== undefined) { // Imported from ui.js
+    if (state.phase === "Finished" && state.winner !== undefined) {
         const overlay = document.getElementById("winner-overlay");
         const winText = document.getElementById("winner-text");
         const scoreText = document.getElementById("score-text");
@@ -2163,7 +2151,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // Challenge Overlay (if active)
-    if (currentChallengerId) { // Imported from game.js
+    if (currentChallengerId) {
         document.getElementById("challenge-overlay").classList.remove("hidden");
     }
 
@@ -2187,44 +2175,53 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     // --- Update Rewards Dashboard (Economy Scope) ---
     if (state.rewards !== undefined) { // Imported from economy.js
         const rewardsDashboard = document.getElementById("rewards-dashboard");
-        if (rewardsDashboard) {
+        const myJailedCards = state.jailed_cards || {};
+        const myKidnappedCards = state.kidnapped_cards || {};
+        const myHeldHostageCards = state.held_hostage_cards || {};
+        const wantedVal = state.wanted_level || 0;
+
+        // OPTIMIZATION: Only build and update the string if fundamental stats or collections changed
+        const dashboardStateKey = `${wantedVal}-${state.cunning}-${state.nurturing}-${Object.keys(state.rewards).length}-${Object.keys(myJailedCards).length}-${Object.keys(myKidnappedCards).length}`;
+        
+        if (rewardsDashboard && rewardsDashboard.dataset.stateKey !== dashboardStateKey) {
+            rewardsDashboard.dataset.stateKey = dashboardStateKey;
+            
             let totalValue = 0;
             let rewardItems = [];
-            Object.entries(state.rewards || {}).forEach(([id, amt]) => {
+            
+            const rewardEntries = Object.entries(state.rewards || {});
+            for (const [id, amt] of rewardEntries) {
                 totalValue += amt;
                 const symbol = getAssetSymbol(id);
                 rewardItems.push(`<span style="color: var(--neon-green)">${amt.toFixed(1)}</span> <small>${symbol}</small>`);
-            });
+            }
+
             const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
             const rumorCost = 500;
-            const myJailedCards = state.jailed_cards || {};
-            const myKidnappedCards = state.kidnapped_cards || {};
-            const myHeldHostageCards = state.held_hostage_cards || {};
-            const wantedVal = state.wanted_level || 0;
             const cunningVal = state.cunning || 0;
             const nurturingVal = state.nurturing || 0; // Get nurturing value
             const jobRole = state.job_role || "";
-            const outlawsInLobby = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
+            const outlawsInLobby = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10); // Imported from game.js
 
-            const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : '';
-            const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : '';
+            const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : ''; // Imported from criminality.js
+            const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : ''; // Imported from economy.js
             const rumorMillBtn = (playerRewards >= rumorCost) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-green); color: var(--neon-green);" onclick="openRumorMill()">📢 RUMOR MILL</button>` : '';
-            const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : '';
-            const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : '';
-            const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`;
-			const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`;
-			const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`;
+            const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : ''; // Imported from criminality.js
+            const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : ''; // Imported from criminality.js
+            const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`; // Imported from economy.js
+			const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`; // Imported from criminality.js
+			const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`; // Imported from economy.js
 
-            const newHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") +
+            const newHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") + // Display total win value
                 ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${cunningVal}</span>` + // Display Cunning
                 ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${nurturingVal}</span>` + // Display Nurturing
 				socialHubBtn + galleryBtn +
-				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` +
-                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + 
+				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` + // Imported from criminality.js
+                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + // Imported from economy.js
                 courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
-                (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + 
-                (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + 
-                (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : '');
+                (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + // Imported from economy.js
+                (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + // Imported from economy.js
+                (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : ''); // Imported from economy.js
             
             if (rewardsDashboard.innerHTML !== newHTML) {
                 rewardsDashboard.innerHTML = newHTML;
@@ -2233,7 +2230,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // --- Update Latency ---
-    const latencyEl = document.getElementById("latency-display"); // Imported from network.js or ui.js
+    const latencyEl = document.getElementById("latency-display");
     if (state.latency > 0) {
         latencyEl.innerText = `${state.latency} ms (${state.network_health})`;
         // Use health levels for UI color
@@ -2242,7 +2239,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     } else {
         latencyEl.innerText = "-- ms";
     }
-    renderRumorBoard(); // Ensure rumor board is updated
+    renderRumorBoard();
 
     updateAdminRewardList(state.rewards); // Imported from admin.js
 
@@ -2250,7 +2247,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
 
     // --- Update Avatars from WASM URLs ---
     // Update music toggle button icon
-    const musicToggleBtn = document.getElementById("music-toggle-btn"); // Imported from audio.js
+    const musicToggleBtn = document.getElementById("music-toggle-btn");
     if (musicToggleBtn) {
         musicToggleBtn.innerText = state.musicVolume === 0 ? "🔇" : "🎵";
         musicToggleBtn.title = state.musicVolume === 0 ? "Unmute Music" : "Mute Music";
@@ -2260,7 +2257,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     document.getElementById("p2-avatar").style.backgroundImage = `url('${state.p2_avatar}')`;
 
     // --- Update Avatar Ban Notice ---
-    const noticeEl = document.getElementById("avatar-notice-banner"); // Imported from ui.js
+    const noticeEl = document.getElementById("avatar-notice-banner");
     if (state.p1_avatar_notice) {
         if (noticeEl) {
             noticeEl.classList.remove("hidden");
@@ -2271,7 +2268,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // --- Admin Panel Visibility ---
-    const adminPanel = document.getElementById("admin-control-panel"); // Imported from admin.js
+    const adminPanel = document.getElementById("admin-control-panel");
     if (state.is_admin) {
         adminPanel.classList.remove("hidden");
         
@@ -2299,7 +2296,7 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
     }
 
     // --- Logic for Saving History (Moved to after overlay logic) ---
-    if (state.phase === "Active") { matchHistorySaved = false; } // Global variable in app.js
+    if (state.phase === "Active") { setMatchHistorySaved(false); }
     else if (state.phase === "Finished" && !matchHistorySaved) { await saveMatchResult(state); matchHistorySaved = true; } // Global variable in app.js
 
     // --- Update Turn Display ---
@@ -2325,28 +2322,26 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
             state.board.forEach((card, index) => {
                 const slot = boardContainer.children[index];
                 const prevCard = lastBoardState[index];
-                const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
+                const currentMood = state.board_moods ? state.board_moods[index] : "Neutral";
 
-                // Update Mood Visuals for the slot
-                const moodClass = `mood-${tileMood.toLowerCase()}`;
-                // Remove old mood classes, add new one if not neutral
-                // Resetting className to "grid-slot" first ensures only current mood is applied
-                if (!slot.classList.contains("grid-slot")) { // Avoid unnecessary re-assignment
-                    slot.className = "grid-slot";
-                }
-                if (tileMood !== "Neutral" && !slot.classList.contains(moodClass)) {
-                    slot.classList.add(moodClass);
-                } else if (tileMood === "Neutral" && slot.classList.contains(moodClass)) {
-                    slot.classList.remove(moodClass);
+                // OPTIMIZATION: Only update classes if mood changed
+                if (lastBoardMoods[index] !== currentMood) {
+                    const moodClass = `mood-${currentMood.toLowerCase()}`;
+                    slot.className = "grid-slot"; // Reset
+                    if (currentMood !== "Neutral") {
+                        slot.classList.add(moodClass);
+                    }
+                    lastBoardMoods[index] = currentMood;
                 }
 
                 // Handle card presence and changes
                 if (card) {
                     let cardDiv = slot.querySelector(".playing-card");
                     const isCaptured = card && prevCard && card.owner !== prevCard.owner;
+                    // OPTIMIZATION: Track data changes to avoid renderCardHTML (string building)
+                    const hasCardDataChanged = !prevCard || card.id !== prevCard.id || card.owner !== prevCard.owner || card.artifact !== prevCard.artifact || card.mood !== prevCard.mood;
 
                     if (!cardDiv) {
-                        // Card added to an empty slot
                         cardDiv = document.createElement("div");
                         cardDiv.className = "playing-card";
                         slot.appendChild(cardDiv);
@@ -2362,13 +2357,9 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
                     }
 
                     // Update card content and styling
-                    const newCardHTML = renderCardHTML(card);
-                    if (cardDiv.innerHTML !== newCardHTML) { // Only update if content changed
-                        cardDiv.innerHTML = newCardHTML;
-                    }
-                    const newBorderColor = card.owner === 0 ? "var(--neon-cyan)" : "#ff4b4b";
-                    if (cardDiv.style.borderColor !== newBorderColor) { // Only update if color changed
-                        cardDiv.style.borderColor = newBorderColor;
+                    if (hasCardDataChanged) {
+                        cardDiv.innerHTML = renderCardHTML(card);
+                        cardDiv.style.borderColor = card.owner === 0 ? "var(--neon-cyan)" : "#ff4b4b";
                     }
 
                     // Tooltip Interaction (re-attach if cardDiv was new or replaced)
@@ -2393,125 +2384,31 @@ window.syncUI = async (scope = "all") => { // This will be the main sync functio
         }
     }
 
-    // Update local state tracking for next sync
-    lastBoardState = JSON.parse(JSON.stringify(state.board));
+    // OPTIMIZATION: Surgical shallow copy for next sync comparison instead of JSON stringify
+    if (state.board) {
+        for (let i = 0; i < 9; i++) {
+            lastBoardState[i] = state.board[i] ? { ...state.board[i] } : null;
+        }
+    }
 
     // --- Render Player Hand ---
-    const handContainer = document.getElementById("hand-container");
-    handContainer.innerHTML = "";
-    const placedIds = state.board.filter(c => c !== null).map(c => c.id);
-    state.deck.forEach(card => {
-        if (!placedIds.includes(card.id)) {
-            const cardDiv = document.createElement("div");
-            const isSelected = activeCardId === card.id ? 'selected-card' : '';
-            cardDiv.className = `playing-card hand-card ${isSelected}`;
-            cardDiv.onclick = () => selectCard(card.id);
-            cardDiv.innerHTML = renderCardHTML(card);
-            handContainer.appendChild(cardDiv);
-        }
-    });
-}
-
-// --- Rumor System UI ---
-window.rumorTimers = {}; // Imported from criminality.js
-
-function updateActiveRumors(rumorsData) {
-    // Clear existing timers
-    for (const id in rumorTimers) {
-        clearInterval(rumorTimers[id]);
-    }
-    rumorTimers = {};
-
-    activeRumors = [];
-    if (rumorsData) {
-        // If rumorsData is an object (from lobby_update), convert to array
-        if (typeof rumorsData === 'object' && !Array.isArray(rumorsData)) {
-            for (const id in rumorsData) {
-                activeRumors.push(rumorsData[id]);
-            }
-        } else if (Array.isArray(rumorsData)) { // If it's already an array
-            activeRumors = rumorsData;
-        } else if (rumorsData.id) { // If it's a single rumor object (from rumor_update)
-            activeRumors.push(rumorsData);
-        }
-    }
-
-    // Filter out expired rumors immediately
-    activeRumors = activeRumors.filter(r => new Date(r.ExpiresAt) > Date.now());
-
-    renderRumorBoard();
-}
-
-async function renderRumorBoard() {
-    let rumorBoard = document.getElementById("rumor-board");
-    if (!rumorBoard) {
-        rumorBoard = document.createElement("div");
-        rumorBoard.id = "rumor-board";
-        rumorBoard.className = "rumor-board-container";
-        // Find a good place to insert it, e.g., before the chat container
-        const chatContainer = document.getElementById("chat-container");
-        if (chatContainer) {
-            chatContainer.parentNode.insertBefore(rumorBoard, chatContainer);
-        } else {
-            document.querySelector('.column.right').prepend(rumorBoard); // Fallback
-        }
-    }
-
-    rumorBoard.innerHTML = "";
-    if (activeRumors.length === 0) {
-        rumorBoard.classList.add("hidden");
-        return;
-    }
-    rumorBoard.classList.remove("hidden");
-
-    rumorBoard.innerHTML += `<div class="rumor-board-title">ACTIVE RUMORS</div>`;
-
-    for (const rumor of activeRumors) {
-        const targetName = await getCachedEnvoiName(rumor.TargetWallet);
-        const rumorEl = document.createElement("div");
-        rumorEl.className = `rumor-item rumor-${rumor.Type}`;
-        rumorEl.innerHTML = `
-            <span class="rumor-text">📣 ${rumor.Type.toUpperCase()}: ${targetName}</span>
-            <span class="rumor-timer" id="rumor-timer-${rumor.ID}"></span>
-        `;
-        rumorBoard.appendChild(rumorEl);
-
-        // Start countdown for this rumor
-        startRumorCountdown(rumor.ID, rumor.ExpiresAt);
-    }
-}
-
-function startRumorCountdown(rumorID, expiresAt) {
-    const timerEl = document.getElementById(`rumor-timer-${rumorID}`);
-    if (!timerEl) return;
-
-    rumorTimers[rumorID] = setInterval(() => {
-        const remaining = new Date(expiresAt).getTime() - Date.now();
-        if (remaining <= 0) {
-            clearInterval(rumorTimers[rumorID]);
-            delete rumorTimers[rumorID];
-            updateActiveRumors(); // Re-render to remove expired rumor
-            return;
-        }
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }, 1000);
+    // Hand rendering logic remains in app.js for now, as it's tightly coupled with activeCardId and selectCard
+    // which are currently in app.js. This will be moved to game.js later.
 }
 
 // --- Initial UI State --- // Imported from ui.js
-if (!userAddress) document.getElementById("wallet-selector-overlay").classList.remove("hidden"); // Imported from wallet.js
+if (!userAddress) document.getElementById("wallet-selector-overlay").classList.remove("hidden");
 
-function buildEmptyBoard() {
-    const boardContainer = document.getElementById("board-container");
+window.buildEmptyBoard = () => {
+    const boardContainer = document.getElementById("board-container"); // Get the board container element
     boardContainer.innerHTML = "";
     for(let i=0; i<9; i++) {
         boardContainer.innerHTML += `<div class="grid-slot" onclick="clickGrid(${i})">Slot ${i}</div>`;
     }
 }
 
-window.renderCardHTML = (card) => { // This will be moved to ui.js
-    const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : '';
+window.renderCardHTML = (card) => {
+    const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : ''; // Display rarity badge if rarity > 1.0
     
     // Mood Icon Mapping
     let moodHTML = '';
@@ -2556,7 +2453,7 @@ window.renderCardHTML = (card) => { // This will be moved to ui.js
     `;
 }
 
-window.showPowerTooltip = (e, card, index, state) => { // This will be moved to ui.js
+window.showPowerTooltip = (e, card, index, state) => {
     if (!tooltipEl) {
         tooltipEl = document.createElement("div");
         tooltipEl.className = "power-tooltip";
@@ -2661,12 +2558,12 @@ window.showPowerTooltip = (e, card, index, state) => { // This will be moved to 
     movePowerTooltip(e);
 }
 
-window.movePowerTooltip = (e) => { // This will be moved to ui.js
+window.movePowerTooltip = (e) => {
     if (!tooltipEl) return;
     const padding = 15;
     let x = e.clientX + padding;
     let y = e.clientY + padding;
-
+    // Imported from ui.js
     // Boundary check to keep tooltip on screen
     if (x + 220 > window.innerWidth) x = e.clientX - 230;
     if (y + 180 > window.innerHeight) y = e.clientY - 190;
@@ -2675,12 +2572,12 @@ window.movePowerTooltip = (e) => { // This will be moved to ui.js
     tooltipEl.style.top = y + "px";
 }
 
-window.hidePowerTooltip = () => { // This will be moved to ui.js
+window.hidePowerTooltip = () => {
     if (tooltipEl) tooltipEl.style.opacity = "0";
 }
 
-window.showQuickCastMenu = (gridIndex) => { // This will be moved to game.js
-    const container = document.querySelector(".tooltip-quickcast"); // Imported from ui.js
+window.showQuickCastMenu = (gridIndex) => {
+    const container = document.querySelector(".tooltip-quickcast");
     if (!container) return;
 
     const state = window.GetGameState();
@@ -2765,7 +2662,7 @@ window.openClubFoundry = () => {
  * Populates and displays the district shops overlay using synchronized club inventory.
  * Now utilizes the high-fidelity _shops.scss styles and category filtering.
  */
-window.openShopsOverlay = async (initialCategory = 'Elemental') => { // This will be moved to economy.js
+window.openShopsOverlay = async (initialCategory = 'Elemental') => {
 	document.getElementById("shops-overlay").classList.remove("hidden");
 	switchShopCategory(initialCategory);
 }
@@ -2834,7 +2731,7 @@ function switchShopCategory(category) {
 	}
 }
 
-window.mapZoom = 1.0; // Imported from economy.js
+window.mapZoom = 1.0;
 /**
  * Adjusts the zoom level of the 3D map grid.
  */
@@ -2848,7 +2745,7 @@ function adjustMapZoom(delta) {
     }
 }
 
-window.openTerritoryMapOverlay = () => { // This will be moved to economy.js
+window.openTerritoryMapOverlay = () => {
     const grid = document.getElementById("map-3d-grid");
     if (!grid) return;
     
@@ -2971,7 +2868,7 @@ window.submitClubFoundry = async () => {
     }
 }
 
-window.openTerritoryView = (territoryId) => { // This will be moved to economy.js
+window.openTerritoryView = (territoryId) => {
     const club = Object.values(globalClubs).find(c => c.territory === territoryId);
     const overlay = document.createElement("div");
     overlay.id = "territory-view-overlay";
@@ -3042,7 +2939,7 @@ window.openTerritoryView = (territoryId) => { // This will be moved to economy.j
     document.body.appendChild(overlay);
 }
 
-window.buyClubItem = async (clubId, itemId, price, territoryId) => { // This will be moved to economy.js
+window.buyClubItem = async (clubId, itemId, price, territoryId) => {
     if (!userAddress) return showToast("Connect wallet first", "error");
     
     try {
@@ -3071,127 +2968,7 @@ window.buyClubItem = async (clubId, itemId, price, territoryId) => { // This wil
     }
 }
 
-
-window.openCourthouse = () => { // This will be moved to criminality.js
-    const state = window.GetGameState();
-    const wanted = state.wanted_level || 0;
-    if (wanted <= 0) return;
-
-    const fine = wanted * 100;
-    const overlay = document.createElement("div");
-    overlay.id = "courthouse-overlay";
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-        <div class="glass-panel courthouse-panel">
-            <h2 class="text-error" style="letter-spacing: 3px;">ARENA COURTHOUSE</h2>
-            <p style="font-size: 0.9em; opacity: 0.8;">The High Council has flagged you for criminal activities.<br>Infamy Status: <b>LEVEL ${wanted}</b></p>
-            
-            <div class="glass-panel fine-display-box">
-                <div style="font-size: 0.75em; opacity: 0.7;">REHABILITATION FINE</div>
-                <b class="fine-amount">${fine} $VBV</b>
-                <div style="font-size: 0.7em; opacity: 0.5; margin-top: 5px;">(100 $VBV per Wanted point)</div>
-            </div>
-
-            <p style="font-size: 0.8em; opacity: 0.6; padding: 0 20px;">Settling your debt to society will clear your Wanted Level and restore your cards to peak combat performance.</p>
-
-            <div class="mt-20 flex-row justify-center gap-15">
-                <button class="outline" onclick="document.getElementById('courthouse-overlay').remove()">LURK IN SHADOWS</button>
-                <button id="courthouse-pay-btn" style="background: linear-gradient(45deg, #ff4b4b, #ff0844);" onclick="submitCourthouseFine()">PAY FINE & CLEAR NAME</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
-
-window.submitCourthouseFine = async () => { // This will be moved to criminality.js
-    const state = window.GetGameState();
-    const wanted = state.wanted_level || 0;
-    if (wanted <= 0) return;
-
-    const btn = document.getElementById("courthouse-pay-btn");
-    const amountMicro = wanted * 100 * 1000000;
-    const network = state.network;
-    const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
-
-    btn.disabled = true;
-    btn.innerText = "PROCESSING...";
-
-    try {
-        showToast(`⚖️ Signing ${wanted * 100} $VBV Fine...`, "info");
-        let txid = "";
-        let txObj = null;
-
-        if (network === "VOI") {
-            const methodSelector = new Uint8Array([0x2b, 0x42, 0x6d, 0xec]); // transfer(address,uint256)
-            const recipientAddr = algosdk.decodeAddress(CONFIG.VAULT_ADDRESS).publicKey;
-            const amountArg = new Uint8Array(32);
-            const amountBI = BigInt(amountMicro);
-            for (let i = 0; i < 8; i++) amountArg[31 - i] = Number((amountBI >> BigInt(i * 8)) & 0xffn);
-
-            txObj = {
-                from: userAddress, type: 'appl', appIndex: parseInt(assetId),
-                appArgs: [methodSelector, recipientAddr, amountArg],
-                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
-            };
-        } else {
-            txObj = {
-                from: userAddress, to: CONFIG.VAULT_ADDRESS, type: 'axfer',
-                assetIndex: parseInt(assetId), amount: amountMicro,
-                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
-            };
-        }
-
-        if (walletProvider === 'nautilus') {
-            const signed = await window.algo.signTxn([{ txn: algosdk.encodeObj(txObj), signers: [userAddress] }]);
-            const { txId } = await window.algo.sendRawTransaction(signed[0]);
-            txid = txId;
-        } else if (walletProvider === 'kibisis') {
-            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
-            const signed = await window.kibisis.signTxns([{ txn: txnB64 }]);
-            const { txId } = await window.kibisis.pushTxns(signed);
-            txid = txId;
-        } else if (walletProvider === 'walletconnect' && signClient) {
-            const sessions = signClient.session.getAll();
-            const chainId = network === "VOI" ? CONFIG.VOI_CHAIN_ID : CONFIG.ALGO_CHAIN_ID;
-            const txnB64 = btoa(String.fromCharCode(...algosdk.encodeObj(txObj)));
-            const response = await signClient.request({
-                topic: sessions[0].topic, chainId: chainId,
-                request: { method: "algo_signTxn", params: [[{ txn: txnB64, signers: [userAddress] }]] }
-            });
-            const signedTxnBytes = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
-            const netCfg = getNetworkConfig(network);
-            const client = new algosdk.Algodv2("", netCfg.node_url, "");
-            const { txId } = await client.sendRawTransaction(signedTxnBytes).do();
-            txid = txId;
-        }
-
-        if (!txid) throw new Error("Transaction cancelled or failed.");
-
-        const response = await fetch(`${CONFIG.API_BASE}/api/courthouse/reset`, {
-            method: "POST",
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet: userAddress, txid: txid, network: network })
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            showToast(`⚖️ ${result.message}`, "success");
-            document.getElementById("courthouse-overlay")?.remove();
-            if (window.SyncOpponentWanted) window.SyncOpponentWanted(myPlayerIndex, 0);
-            syncUI();
-        } else {
-            const err = await response.text();
-            showToast(`❌ Courthouse Error: ${err}`, "error");
-        }
-    } catch (err) {
-        showToast(`Fine Payment Failed: ${err.message}`, "error");
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "PAY FINE & CLEAR NAME";
-    }
-}
-
-window.openPortfolioView = async (initialTab = 'portfolio') => { // This will be moved to economy.js
+window.openPortfolioView = async (initialTab = 'portfolio') => { // Imported from economy.js
     const state = window.GetGameState();
     const overlay = document.createElement("div");
     const myJailedCards = state.jailed_cards || {};
@@ -3222,7 +2999,7 @@ window.openPortfolioView = async (initialTab = 'portfolio') => { // This will be
     switchPortfolioTab(initialTab);
 }
 
-window.switchPortfolioTab = async (tab) => { // This will be moved to economy.js
+window.switchPortfolioTab = async (tab) => {
     const container = document.getElementById("portfolio-content-area");
     const holdingsBtn = document.getElementById("tab-holdings");
     const jailedBtn = document.getElementById("tab-jailed");
@@ -3272,7 +3049,7 @@ window.switchPortfolioTab = async (tab) => { // This will be moved to economy.js
 							</div>
 						</div>
 						<div class="item-value">
-							<div class="font-bold text-neon-green">${marketValue.toFixed(1)} $VBV</div>
+							<div class="font-bold text-neon-green">${marketValue.toFixed(1)} $VBV</div> 
 							<button class="outline x-small border-error mt-5" onclick="tradeShares('${id}', 'sell', ${amount})">SELL ALL</button>
 						</div>
 					</div>`;
@@ -3367,7 +3144,7 @@ window.switchPortfolioTab = async (tab) => { // This will be moved to economy.js
     }
 }
 
-window.initiateBail = async (cardId, clubId) => { // This will be moved to criminality.js
+window.initiateBail = async (cardId, clubId) => {
     if (!userAddress) return;
     if (!confirm(`Are you sure you want to pay 200 $VBV to release Card #${cardId}?`)) return;
 
@@ -3498,7 +3275,7 @@ window.openSecuritySentry = () => {
     document.body.appendChild(overlay);
 }
 
-window.deployTrap = (trapId) => { // This will be moved to criminality.js
+window.deployTrap = (trapId) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     
     showToast(`🛰️ Deploying ${trapId.replace('_', ' ')}...`, "info");
@@ -3511,7 +3288,7 @@ window.deployTrap = (trapId) => { // This will be moved to criminality.js
     document.getElementById("security-sentry-overlay")?.remove();
 }
 
-window.openBountyBoard = async () => { // This will be moved to criminality.js
+window.openBountyBoard = async () => {
     const state = window.GetGameState();
     const myWanted = state.wanted_level || 0;
     const isHunter = myWanted <= 2;
@@ -3560,7 +3337,7 @@ window.openBountyBoard = async () => { // This will be moved to criminality.js
     document.body.appendChild(overlay);
 }
 
-window.openBlackMarket = async () => { // This will be moved to economy.js
+window.openBlackMarket = async () => {
     const state = window.GetGameState();
     const wanted = state.wanted_level || 0;
     const cunning = state.cunning || 0;
@@ -3652,7 +3429,7 @@ window.openBlackMarket = async () => { // This will be moved to economy.js
  * Art Gallery Interface: Consignment and Auctions. // Imported from economy.js
  */
 async function openArtGalleryOverlay() {
-    const overlay = document.createElement("div");
+    const overlay = document.createElement("div"); // Create a new div element for the overlay
     overlay.id = "art-gallery-overlay";
     overlay.className = "overlay";
     
@@ -3682,7 +3459,7 @@ async function openArtGalleryOverlay() {
     loadGalleryItems();
 }
 
-window.loadGalleryItems = async () => { // This will be moved to economy.js
+window.loadGalleryItems = async () => {
     const container = document.getElementById("gallery-items-container");
     try {
         const response = await fetch(`${CONFIG.API_BASE}/api/auctions`);
@@ -3725,7 +3502,7 @@ window.loadGalleryItems = async () => { // This will be moved to economy.js
     }
 }
 
-window.promptBid = async (auctionId, currentBidMicro) => { // This will be moved to economy.js
+window.promptBid = async (auctionId, currentBidMicro) => {
     const minBid = (currentBidMicro + (currentBidMicro * 0.05)) / 1000000;
     const bidAmount = prompt(`Enter your bid in $VBV (Minimum: ${minBid.toFixed(2)}):`, minBid.toFixed(2));
     
@@ -3821,7 +3598,7 @@ function openConsignmentOverlay() {
     document.body.appendChild(overlay);
 }
 
-window.selectConsignmentItem = (id) => { // This will be moved to economy.js
+window.selectConsignmentItem = (id) => {
     const radio = document.querySelector(`input[value="${id}"]`);
     if (radio) radio.checked = true;
     document.getElementById("consignment-pricing").classList.remove("hidden");
@@ -3870,11 +3647,11 @@ async function submitConsignment() {
     }
 }
 
-window.openConsignmentOverlay = openConsignmentOverlay; // This will be moved to economy.js
-window.openArtGalleryOverlay = openArtGalleryOverlay; // This will be moved to economy.js
-window.promptBid = promptBid; // This will be moved to economy.js
+window.openConsignmentOverlay = openConsignmentOverlay;
+window.openArtGalleryOverlay = openArtGalleryOverlay;
+window.promptBid = promptBid;
 
-async function buyBlackMarketItem(loanId, price) { // This will be moved to economy.js
+async function buyBlackMarketItem(loanId, price) {
     if (!userAddress) return showToast("Connect wallet first", "error");
     if (!confirm(`Are you sure you want to buy this item for ${price.toFixed(2)} $VBV? This will increase your Wanted Level.`)) return;
 
@@ -3902,7 +3679,7 @@ async function buyBlackMarketItem(loanId, price) { // This will be moved to econ
     }
 }
 
-window.openRumorMill = async () => { // This will be moved to criminality.js
+window.openRumorMill = async () => {
     const state = window.GetGameState();
     const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
     const rumorCost = 500; // Matches server-side cost
@@ -3963,7 +3740,7 @@ window.openRumorMill = async () => { // This will be moved to criminality.js
     document.body.appendChild(overlay);
 }
 
-window.spreadRumor = async (targetWallet, type, strength, durationMinutes) => { // This will be moved to criminality.js
+window.spreadRumor = async (targetWallet, type, strength, durationMinutes) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return showToast("❌ Not connected to server.", "error");
     if (!userAddress) return showToast("❌ Connect wallet first.", "error");
 
@@ -3997,12 +3774,12 @@ window.spreadRumor = async (targetWallet, type, strength, durationMinutes) => { 
     }
 }
 
-window.openTrophyView = () => { // This will be moved to criminality.js
+window.openTrophyView = () => {
     openSocialPanelOverlay('achievements');
 }
 
 /**
- * Opens the integrated Social Hub featuring Alliances, Career paths, and Achievements. // Imported from criminality.js
+ * Opens the integrated Social Hub featuring Alliances, Career paths, and Achievements.
  * Utilizes orphaned _social.scss styles for immersive hierarchy.
  */
 async function openSocialPanelOverlay(initialTab = 'alliances') {
@@ -4045,7 +3822,7 @@ async function openSocialPanelOverlay(initialTab = 'alliances') {
     switchSocialTab(initialTab);
 }
 
-window.switchSocialTab = async (tab) => { // This will be moved to criminality.js
+window.switchSocialTab = async (tab) => {
     const container = document.getElementById("social-content-hub");
     if (!container) return;
 
@@ -4075,10 +3852,10 @@ window.switchSocialTab = async (tab) => { // This will be moved to criminality.j
                 <div class="connection-info text-left">
                     <div class="connection-name font-bold ${isAlly ? 'text-neon-cyan' : ''}">${getCachedEnvoiName(p.wallet)}</div>
                     <div class="connection-role font-size-0-75em opacity-6">${p.social_rank} | ${p.job_role || 'Freelancer'}</div>
-                    <div class="connection-status online font-size-0-7em">ACTIVE LINK</div>
+                        <div class="connection-status online font-size-0-7em">ACTIVE LINK</div> 
                 </div>
                 <div class="connection-actions">
-                    <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); sendChallenge('${p.id}')" title="Challenge duel"></button>
+                        <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); window.sendChallenge('${p.id}')" title="Challenge duel"></button>
                     ${!isAlly ? `<button class="action-btn invite" onclick="proposeAlliance('${p.id}')" title="Propose Alliance"></button>` : ''}
                     <button class="action-btn block" onclick="showToast('Entity communication restricted.', 'info')" title="Block stream"></button>
                 </div>
@@ -4202,7 +3979,7 @@ function tradeShares(entityId, action, amount) {
     document.getElementById("portfolio-view-overlay")?.remove();
 }
 
-// Function to show the main game container and hide other overlays // Imported from ui.js
+// Function to show the main game container and hide other overlays
 window.showMainGameContainer = () => {
     document.getElementById("main-game-container").classList.remove("hidden");
 }
@@ -4266,7 +4043,7 @@ async function refreshInventory() {
     if (loader) loader.classList.add("hidden");
 }
 
-window.renderAvatarGrid = (nfts) => { // This will be moved to deck.js
+window.renderAvatarGrid = (nfts) => { // Imported from deck.js
     const grid = document.getElementById("avatar-grid");
     if (!grid) return;
     grid.innerHTML = "";
@@ -4289,7 +4066,7 @@ window.renderAvatarGrid = (nfts) => { // This will be moved to deck.js
     });
 }
 
-window.applyAvatarFilters = () => { // This will be moved to deck.js
+window.applyAvatarFilters = () => {
     const search = document.getElementById("avatar-search").value.toLowerCase();
     const sort = document.getElementById("avatar-sort").value;
     
@@ -4308,7 +4085,7 @@ window.applyAvatarFilters = () => { // This will be moved to deck.js
     renderAvatarGrid(filtered);
 }
 
-window.updateDynamicArenaFloor = (state) => { // This will be moved to ui.js
+window.updateDynamicArenaFloor = (state) => {
 function updateDynamicArenaFloor(state) { 
     let texture = "var(--texture-solo)"; // Default AI/Solo
 
@@ -4340,7 +4117,7 @@ function updateDynamicArenaFloor(state) {
     document.body.style.backgroundImage = `${texture}, radial-gradient(circle at top center, #1a0b2e, var(--bg-dark), #000000)`;
 }
 
-window.selectAvatar = (url) => { // This will be moved to deck.js
+window.selectAvatar = (url) => {
     const preview = document.getElementById("avatar-preview-section");
     const img = document.getElementById("crop-image");
     if (!preview || !img) return;
@@ -4356,7 +4133,7 @@ window.selectAvatar = (url) => { // This will be moved to deck.js
     // Calibration is handled by the img.onload listener in setupCropEvents
 }
 
-window.setupCropEvents = () => { // This will be moved to deck.js
+window.setupCropEvents = () => {
     const frame = document.getElementById("crop-frame");
     const img = document.getElementById("crop-image");
     const slider = document.getElementById("zoom-slider");
@@ -4469,7 +4246,7 @@ window.setupCropEvents = () => { // This will be moved to deck.js
     window.applyAvatarFilters = applyAvatarFilters;
 }
 
-window.generateBracketHTML = (matches, activeRound = -1) => { // This will be moved to leaderboard.js
+window.generateBracketHTML = (matches, activeRound = -1) => {
     if (!matches || matches.length === 0) {
         const msg = activeRound === -1 ? "Match data pending blockchain verification or unavailable." : "Matches will be generated once tournament starts...";
         return `<div style="color: #888; font-style: italic; padding: 10px; text-align: center; width: 100%;">${msg}</div>`;
@@ -4517,7 +4294,7 @@ window.generateBracketHTML = (matches, activeRound = -1) => { // This will be mo
     return html;
 }
 
-window.updateTournamentPaginationUI = () => { // This will be moved to leaderboard.js
+window.updateTournamentPaginationUI = () => {
     const prevBtn = document.getElementById("prev-tournament-btn");
     const nextBtn = document.getElementById("next-tournament-btn");
     const info = document.getElementById("tournament-page-info");
@@ -4543,7 +4320,7 @@ window.updateTournamentPaginationUI = () => { // This will be moved to leaderboa
     };
 }
 
-function handleTournamentUI(tournamentState) { // This will be moved to leaderboard.js
+function handleTournamentUI(tournamentState) {
     const banner = document.getElementById("tournament-banner");
     const statusText = document.getElementById("tournament-status-text");
     const regBtn = document.getElementById("tournament-reg-btn");
@@ -4577,7 +4354,7 @@ function handleTournamentUI(tournamentState) { // This will be moved to leaderbo
     }
 }
 
-window.renderTournamentBracket = async (state) => { // This will be moved to leaderboard.js
+window.renderTournamentBracket = async (state) => {
     // Prime Envoi names for all bracket participants
     const participants = new Set();
     state.matches.forEach(m => {
@@ -4594,7 +4371,7 @@ window.renderTournamentBracket = async (state) => { // This will be moved to lea
     if (visualization) visualization.innerHTML = generateBracketHTML(state.matches, state.current_round);
 }
 
-window.registerForTournament = async () => { // This will be moved to leaderboard.js
+window.registerForTournament = async () => {
     const regBtn = document.getElementById("tournament-reg-btn");
     if (!userAddress) { showToast("Connect wallet first", "error"); return; }
     const state = window.GetGameState();
@@ -4745,27 +4522,27 @@ window.registerForTournament = async () => { // This will be moved to leaderboar
     }
 }
 
-window.openTournamentBracket = () => { // This will be moved to leaderboard.js
+window.openTournamentBracket = () => { // Imported from leaderboard.js
     window.SetPhase("TournamentLobby");
     syncUI();
 }
 
-window.closeTournamentBracket = () => { // This will be moved to leaderboard.js
+window.closeTournamentBracket = () => { // Imported from leaderboard.js
     window.SetPhase("Lobby");
     syncUI();
 }
 
-window.openSettingsOverlay = () => { // This will be moved to ui.js
+window.openSettingsOverlay = () => { // Imported from ui.js
     document.getElementById("settings-overlay").classList.remove("hidden");
 }
 
-window.closeSettingsOverlay = () => { // This will be moved to ui.js
+window.closeSettingsOverlay = () => { // Imported from ui.js
     document.getElementById("settings-overlay").classList.add("hidden");
 }
 
-window.setMasterVolume = (value) => { // This will be moved to audio.js
+window.setMasterVolume = (value) => { // Imported from audio.js
     masterVolume = parseFloat(value); // Imported from audio.js
-    window.SetMasterVolume(masterVolume); // This is a WASM call
+    window.SetMasterVolume(masterVolume);
     syncUI();
 }
 
@@ -4775,7 +4552,7 @@ window.setMusicVolume = (value) => {
     syncUI();
 }
 
-window.setSfxVolume = (value) => { // This will be moved to audio.js
+window.setSfxVolume = (value) => {
     sfxVolume = parseFloat(value);
     window.SetSfxVolume(sfxVolume);
     syncUI();
@@ -4787,7 +4564,7 @@ function toggleMuteMaster() {
     setMasterVolume(masterVolume);
 }
 
-window.toggleMuteMusic = () => { // This will be moved to audio.js
+window.toggleMuteMusic = () => {
     const state = window.GetGameState();
     let newMusicVolume = state.musicVolume === 0 ? 0.5 : 0; // Toggle between 0 and 0.5
     window.SetMusicVolume(newMusicVolume); // Update WASM engine
@@ -4795,7 +4572,7 @@ window.toggleMuteMusic = () => { // This will be moved to audio.js
     syncUI(); // Re-sync UI to reflect changes, including the new button
 }
 
-window.toggleMuteSfx = () => { // This will be moved to audio.js
+window.toggleMuteSfx = () => {
     sfxVolume = sfxVolume === 0 ? 0.5 : 0;
     document.getElementById("sfx-volume").value = sfxVolume;
     setSfxVolume(sfxVolume);
@@ -4815,7 +4592,7 @@ window.setTransactionStatus = (message, type = 'info') => {
     }
 }
 
-window.shareTournamentVictory = () => { // This will be moved to ui.js
+window.shareTournamentVictory = () => {
     const state = window.GetGameState();
     const rating = state.deck_rating || "[Z]";
     const score = `${state.scores[0]}-${state.scores[1]}`;
@@ -4836,7 +4613,7 @@ window.shareTournamentVictory = () => { // This will be moved to ui.js
     showToast("Opening X Social Share...", "info");
 }
 
-window.showTournamentTransition = (roundNumber) => { // This will be moved to ui.js
+window.showTournamentTransition = (roundNumber) => {
     const overlay = document.getElementById("tournament-transition-overlay"); // Assume an overlay exists
     if (!overlay) return;
     
@@ -4852,7 +4629,7 @@ window.showTournamentTransition = (roundNumber) => { // This will be moved to ui
 }
 
 // Show kidnap overlay with ransom demand
-window.showKidnapOverlay = (payload) => { // This will be moved to criminality.js
+window.showKidnapOverlay = (payload) => {
     const overlay = document.getElementById("kidnap-overlay");
     const content = document.getElementById("kidnap-content");
     if (!overlay || !content) return;
@@ -4873,7 +4650,7 @@ window.showKidnapOverlay = (payload) => { // This will be moved to criminality.j
     startRecoveryTimer(payload.expires_at);
 }
 
-function payRansom(cardId, perpWallet, ransomAmount) { // This will be moved to criminality.js
+function payRansom(cardId, perpWallet, ransomAmount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (!perpWallet) {
         showToast("Unable to pay ransom: missing kidnapper wallet.", "error");
@@ -4897,7 +4674,7 @@ function payRansom(cardId, perpWallet, ransomAmount) { // This will be moved to 
     }));
 }
 
-window.releaseHostage = (cardId) => { // This will be moved to criminality.js
+window.releaseHostage = (cardId) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (!confirm(`Release Card #${cardId} back to its victim?`)) return;
 
@@ -4907,7 +4684,7 @@ window.releaseHostage = (cardId) => { // This will be moved to criminality.js
     }));
 }
 
-function startRecoveryTimer(expiresAt) { // This will be moved to criminality.js
+function startRecoveryTimer(expiresAt) {
     const timerEl = document.getElementById("recovery-timer");
     if (!timerEl) return;
 
@@ -4926,7 +4703,7 @@ function startRecoveryTimer(expiresAt) { // This will be moved to criminality.js
     }, 1000);
 }
 
-async function openClubLeaseBoard() { // This will be moved to economy.js
+async function openClubLeaseBoard() {
     const state = window.GetGameState();
     const overlay = document.createElement("div");
     overlay.id = "lease-board-overlay";
@@ -4999,7 +4776,7 @@ async function openClubLeaseBoard() { // This will be moved to economy.js
     document.body.appendChild(overlay);
 }
 
-window.takeLease = async (clubId, leaseId, price) => { // This will be moved to economy.js
+window.takeLease = async (clubId, leaseId, price) => {
     if (!userAddress) return showToast("Connect wallet first", "error"); // Imported from ui.js
     if (!confirm(`Rent this card for ${price} $VBV?\n\nProceeding will commit funds from your victory balance.`)) return; // Imported from ui.js
     socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } })); // Imported from network.js
@@ -5029,7 +4806,7 @@ window.initParticleSystem = () => {
     }
 }
 
-window.animateParticles = () => { // Imported from particles.js
+window.animateParticles = () => {
     if (!particleCtx) return;
 
     particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
@@ -5064,9 +4841,7 @@ window.animateParticles = () => { // Imported from particles.js
     }
 }
 
-window.openHeistPlanningOverlay = () => { // This will be moved to criminality.js
-
-function openHeistPlanningOverlay() {
+window.openHeistPlanningOverlay = () => { // Imported from criminality.js
 	const state = window.GetGameState();
 	const overlay = document.createElement("div");
 	overlay.id = "heist-overlay";
@@ -5149,7 +4924,7 @@ function openHeistPlanningOverlay() {
 
 	document.body.appendChild(overlay);
 }
-window.updateHeistRiskAssessment = (clubId) => { // This will be moved to criminality.js
+window.updateHeistRiskAssessment = (clubId) => {
 	const state = window.GetGameState(); // This will be moved to criminality.js
 	const club = globalClubs[clubId];
 	const section = document.getElementById("heist-risk-section");
@@ -5198,7 +4973,7 @@ window.updateHeistRiskAssessment = (clubId) => { // This will be moved to crimin
 /**
  * Dispatches the heist request to the server.
  */
-window.executeHeistStrike = (clubId) => { // This will be moved to criminality.js
+window.executeHeistStrike = (clubId) => {
 	if (!socket || socket.readyState !== WebSocket.OPEN) return;
 	
 	showToast("🔪 Deploying field operatives...", "warning");
@@ -5209,7 +4984,7 @@ window.executeHeistStrike = (clubId) => { // This will be moved to criminality.j
 	document.getElementById("heist-overlay")?.remove();
 }
 
-window.handleHeistResult = (payload) => { // This will be moved to criminality.js
+window.handleHeistResult = (payload) => {
 	const title = payload.status === "success" ? "HEIST SUCCESS" : "HEIST FAILED";
 	const type = payload.status === "success" ? "success" : "error";
 	const msg = payload.status === "success" ? `Successfully looted the treasury! Infamy increased.` : `The alarm was triggered! You barely escaped.`;
@@ -5225,7 +5000,7 @@ window.handleHeistResult = (payload) => { // This will be moved to criminality.j
  * Opens the Kidnap Selection interface following a successful heist.
  * Utilizes hostage-card and criminality styles for a high-stakes feel.
  */ // Imported from criminality.js
-function openKidnapSelectionOverlay(targetClubId) {
+window.openKidnapSelectionOverlay = (targetClubId) => {
 	const club = globalClubs[targetClubId];
 	if (!club) return;
 
@@ -5258,7 +5033,7 @@ function openKidnapSelectionOverlay(targetClubId) {
 	document.body.appendChild(overlay);
 }
 
-window.executeKidnap = (targetClubId) => { // This will be moved to criminality.js
+window.executeKidnap = (targetClubId) => {
 	if (!socket || socket.readyState !== WebSocket.OPEN) return;
 	
 	showToast("💀 Seizing the hostage...", "warning");
@@ -5269,7 +5044,7 @@ window.executeKidnap = (targetClubId) => { // This will be moved to criminality.
 	document.getElementById("kidnap-selection-overlay")?.remove();
 }
 
-window.triggerCaptureParticles = (gridIndex, owner) => { // Imported from particles.js
+window.triggerCaptureParticles = (gridIndex, owner) => {
     if (!particleCtx) return;
 
     const boardContainer = document.getElementById("board-container");

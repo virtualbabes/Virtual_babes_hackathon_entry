@@ -19,8 +19,10 @@
 2. Complete: Optimized Market Ticker canvas rendering with text measurement caching and viewport culling.
 3. Complete: Hardened `syncUI` logic to support partial snapshots and prevent DOM flickering during high-frequency lobby updates.
 4. Complete: Implemented granular node-diffing for `board-container` in `syncUI` to prevent flickering during card flips.
+5. Complete: Optimized `renderCardHTML` in `ui.js` by hoisting static maps and caching global lookups.
 5. Complete: Displayed Cunning and Nurturing values in the `syncUI` profile overlay with Cyberpunk styling.
 6. Complete: Implemented Club Lease Board overlay with regional prioritization logic.# A.I. Memory: Virtualbabes Arena
+7. Complete: Optimized `handleServerMessage` in `network.js` by batching UI sync calls via `requestAnimationFrame` and removing high-frequency console logs.
 
 ## Critical Logic Patterns
 - **Switchboard Pattern**: Server-side signing for faucet rewards; client-side proof of intent.

@@ -3,14 +3,15 @@
 import { CONFIG } from './config.js';
 import { showToast, setTransactionStatus } from './ui.js';
 import { updateWalletUI, disconnectUserWallet } from './wallet.js';
-import { handleTournamentUI } from './leaderboard.js';
+import { handleTournamentUI, setSeasonEnd, startSeasonTimer } from './leaderboard.js';
 import { updatePlayerList } from './game.js';
-import { updateMarketTicker } from './economy.js';
+import { updateMarketTicker, buyBlackMarketItem } from './economy.js';
 import { handleMaintenanceUI } from './ui.js';
 import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs } from './admin.js';
-import { updateActiveRumors } from './criminality.js';
+import { updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer } from './criminality.js';
 
 export let socket = null;
+import { setLastLobbyPlayers, setMyPlayerIndex, setCurrentOpponentId, setSpectatorMatchState, renderChatMessage, saveMatchResult, setMatchHistorySaved } from './game.js';
 export let myClientId = null;
 export let reconnectAttempts = 0;
 export let nonceResolver = null;
@@ -78,6 +79,30 @@ export function sendPing() {
     socket.send(JSON.stringify({ type: "ping" }));
 }
 
+let syncScheduled = false;
+let currentSyncScope = null;
+
+/**
+ * PERFORMANCE OPTIMIZATION: Batches UI synchronization requests using requestAnimationFrame.
+ * This prevents layout thrashing and redundant DOM diffing when multiple WebSocket messages 
+ * arrive within the same frame (common during rapid AI moves or Combo chain reactions).
+ */
+function requestBatchedSync(scope = "all") {
+    // "all" scope covers any other granular scope
+    if (currentSyncScope === "all") return;
+    currentSyncScope = scope;
+
+    if (syncScheduled) return;
+    syncScheduled = true;
+
+    requestAnimationFrame(() => {
+        const targetScope = currentSyncScope;
+        syncScheduled = false;
+        currentSyncScope = null;
+        if (window.syncUI) window.syncUI(targetScope);
+    });
+}
+
 export function handleServerMessage(msg) {
     switch(msg.type) {
         case "pong":
@@ -104,19 +129,19 @@ export function handleServerMessage(msg) {
             // syncUI("all"); // This will be handled by app.js
             break;
         case "lobby_update":
-            // Update the player list from the nested 'players' array
-            // lastLobbyPlayers = msg.payload.players; // This will be handled in app.js
+            // Update the player list from the nested 'players' array and set it in game.js
+            setLastLobbyPlayers(msg.payload.players);
             updatePlayerList(msg.payload.players);
             updateMarketTicker(msg.payload.players);
 
             // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
-            // const me = msg.payload.players.find(p => p.id === myClientId); // This will be handled in app.js
-            // if (me) {
-            //     if (window.SyncFullProfile) window.SyncFullProfile(me);
-            //     if (me.avatar_url && window.SetAvatar) {
-            //         window.SetAvatar(me.avatar_url, me.gloat, me.avatar_notice);
-            //     }
-            // }
+            const me = msg.payload.players.find(p => p.id === myClientId);
+            if (me) {
+                if (window.SyncFullProfile) window.SyncFullProfile(me);
+                if (me.avatar_url && window.SetAvatar) {
+                    window.SetAvatar(me.avatar_url, me.gloat, me.avatar_notice);
+                }
+            }
             
             handleMaintenanceUI(msg.payload.maintenance_active, msg.payload.maintenance_time);
 
@@ -134,98 +159,93 @@ export function handleServerMessage(msg) {
             }
             updateActiveRumors(msg.payload.rumors);
 
-            // if (msg.payload.season_end) { // This will be handled in leaderboard.js
-            //     seasonEnd = new Date(msg.payload.season_end);
-            //     document.getElementById("season-num-display").innerText = msg.payload.season_number;
-            //     document.getElementById("season-countdown-widget").classList.remove("hidden");
-            //     startSeasonTimer();
-            // }
-            // syncUI("all"); // This will be handled by app.js
+            if (msg.payload.season_end) {
+                setSeasonEnd(new Date(msg.payload.season_end));
+                document.getElementById("season-num-display").innerText = msg.payload.season_number;
+                document.getElementById("season-countdown-widget").classList.remove("hidden");
+                startSeasonTimer();
+            } // Assuming syncUI is still in app.js
+            requestBatchedSync("all");
             break;
         case "portfolio_update":
-            if (window.SyncPortfolio) window.SyncPortfolio(msg.payload);
-            // syncUI("economy"); // This will be handled by app.js
-            // renderRumorBoard(); // This will be handled by app.js
+            if (window.SyncPortfolio) window.SyncPortfolio(msg.payload); // SyncPortfolio is a WASM call
             break;
-        case "heist_result":
-            // handleHeistResult(msg.payload); // This will be handled by app.js
+        case "heist_result": // Now handled by criminality.js
+            handleHeistResult(msg.payload);
             break;
         case "challenge":
-            // const action = msg.payload.action; // This will be handled by app.js
-            // if (action === "invite") {
-            //     showChallengeNotification(msg.from_id);
-            // } else if (action === "accept") {
-            //     // Challenger side: Receive acceptor's deck and send own deck back
-            //     console.log("[MATCH] Challenge accepted. Syncing decks...");
-            //     currentOpponentId = msg.from_id;
-            //     myPlayerIndex = 0;
-            //     if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
-            //     if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
-            //     if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
-            //     window.SyncOpponentDeck(1, msg.payload.deck);
-            //     sendMatchSync(msg.from_id);
-            //     window.StartMatch(true);
-            //     syncUI("combat");
-            // } else if (action === "decline") {
-            //     alert(`Challenge declined by ${msg.from_id}.`);
-            // } else if (action === "sync_back") {
-            //     // Acceptor side: Receive challenger's deck and start
-            //     currentOpponentId = msg.from_id;
-            //     myPlayerIndex = 1;
-            //     if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);
-            //     if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
-            //     if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
-            //     window.SyncOpponentDeck(0, msg.payload.deck);
-            //     window.StartMatch(true);
-            //     syncUI("combat");
-            // }
+            const action = msg.payload.action;
+            if (action === "invite") {
+                showChallengeNotification(msg.from_id);
+            } else if (action === "accept") {
+                // Challenger side: Receive acceptor's deck and send own deck back
+                console.log("[MATCH] Challenge accepted. Syncing decks..."); 
+                setCurrentOpponentId(msg.from_id);
+                setMyPlayerIndex(0);
+                if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
+                window.SyncOpponentDeck(1, msg.payload.deck);
+                sendMatchSync(msg.from_id);
+                window.StartMatch(true);
+                requestBatchedSync("combat");
+            } else if (action === "decline") {
+                alert(`Challenge declined by ${msg.from_id}.`);
+            } else if (action === "sync_back") {
+                // Acceptor side: Receive challenger's deck and start
+                setCurrentOpponentId(msg.from_id);
+                setMyPlayerIndex(1);
+                if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
+                window.SyncOpponentDeck(0, msg.payload.deck);
+                window.StartMatch(true);
+                requestBatchedSync("combat");
+            }
             break;
         case "match_start":
-            console.log("[WS] Synchronizing match state...", msg.payload);
-            // spectatorMatchState = msg.payload; // This will be handled in app.js
+            console.log("[WS] Synchronizing match state...", msg.payload); // This will be handled in app.js
+            setSpectatorMatchState(msg.payload);
             showMatchPreview(msg.payload);
             break;
         case "move":
-            console.log(`[WS] Move received from ${msg.from_id} at grid ${msg.payload.grid_index}`);
+            // Performance Optimization: high-frequency move logging suppressed in production
+            // console.log(`[WS] Move received from ${msg.from_id} at grid ${msg.payload.grid_index}`);
             
-            // if (msg.from_id !== myClientId) { // This will be handled in app.js
-            //     let success = false;
-            //     if (spectatorMatchState) {
-            //         // We are a spectator: Determine player index from match state
-            //         const pIdx = (msg.from_id === spectatorMatchState.p1_id) ? 0 : 1;
-            //         success = window.SyncMove(msg.payload.grid_index, msg.payload.card_id, pIdx);
-            //     } else {
-            //         // We are a player: Standard turn-based placement
-            //         success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
-            //     }
-            //     if (!success) console.warn("[WS] Move sync failed.");
-            //     syncUI("combat");
-            // }
+            if (msg.from_id !== myClientId) {
+                let success = false;
+                if (spectatorMatchState) { // Use window.spectatorMatchState from game.js
+                    // We are a spectator: Determine player index from match state
+                    const pIdx = (msg.from_id === spectatorMatchState.p1_id) ? 0 : 1;
+                    success = window.SyncMove(msg.payload.grid_index, msg.payload.card_id, pIdx);
+                } else {
+                    // We are a player: Standard turn-based placement
+                    success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
+                }
+                if (!success) console.warn("[WS] Move sync failed.");
+                requestBatchedSync("combat");
+            }
             break;
         case "chat":
-            // renderChatMessage(msg.from_id, msg.payload.text); // This will be handled in app.js
-            
-            // if (msg.from_id === "SERVER" && msg.payload.text.includes("Match invalidated")) { // This will be handled in app.js
-            //     window.ResetGame();
-            //     syncUI("combat");
-            //     showToast("⚠️ Match terminated: Opponent left.", "error");
-            // }
+            renderChatMessage(msg.from_id, msg.payload.text);
+            if (msg.from_id === "SERVER" && msg.payload.text.includes("Match invalidated")) {
+                window.ResetGame();
+                requestBatchedSync("combat");
+                showToast("⚠️ Match terminated: Opponent left.", "error");
+            }
             break;
         case "vault_update":
             console.log("[WS] Vault balance update received:", msg.payload.balance);
             window.SyncVaultBalance(msg.payload.balance);
-            // syncUI("economy"); // This will be handled by app.js
             break;
         case "rules_update":
             console.log("[WS] Global rules update received:", msg.payload);
             window.SyncRules(msg.payload);
-            showToast("⚙️ Global Game Rules Updated by Admin", "info");
-            // syncUI("combat"); // This will be handled by app.js
+            showToast("⚙️ Global Game Rules Updated by Admin", "info"); // This is a UI notification
             break;
         case "rewards_update":
             console.log("[WS] Reward stack update received:", msg.payload);
             window.SyncRewards(msg.payload);
-            // syncUI("economy"); // This will be handled by app.js
             break;
         case "maintenance_update":
             console.log("[WS] Maintenance update received:", msg.payload);
@@ -239,16 +259,16 @@ export function handleServerMessage(msg) {
             }
             break;
         case "kidnap_success":
-            showToast("Kidnap successful! Card held hostage.", "success", 5000);
+            showToast("Kidnap successful! Card held hostage.", "success", 5000); // This is a UI notification, can stay in network or move to criminality
             break;
-        case "ransom_demand":
+        case "ransom_demand": // Now handled by criminality.js
             showKidnapOverlay(msg.payload);
             break;
-        case "ransom_paid":
-            showToast("Ransom paid. Card released.", "success", 5000);
+        case "ransom_paid": // Now handled by criminality.js
+            showToast("Ransom paid. Card released.", "success", 5000); 
             hideAllOverlays();
             break;
-        case "insurance_recovery":
+        case "insurance_recovery": // This is a UI notification, can stay in network or move to criminality
             showToast("Insurance recovery: Hostage card released.", "info", 5000);
             break;
         case "rumor_update":

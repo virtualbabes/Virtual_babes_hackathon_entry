@@ -260,7 +260,7 @@ export const collectiveIntelligence = {
         if (!playstyle) return null;
 
         const tendencies = [];
-        
+
         // Select personality. Default to "The Architect" if name not found or generic.
         const personality = this.personalities[npcName] || this.personalities["The Architect"];
 

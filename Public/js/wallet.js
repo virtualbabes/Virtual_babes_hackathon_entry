@@ -6,14 +6,19 @@ import { getNetworkConfig } from './utils.js';
 import { socket, setNonceResolver } from './network.js';
 import { fetchUserNFTs } from './deck.js';
 
+export let userAddress = null;
+export let isVerified = false;
+export let linkedWallets = JSON.parse(localStorage.getItem("vbabes_linked_wallets") || "[]");
+
 export let walletProvider = null;      // Current active provider (nautilus, kibisis, etc.)
 export let signClient = null; // WalletConnect State
 export let wcModal = null;    // WalletConnect Modal State
-export let payoutAddress = localStorage.getItem("vbabes_payout_address") || null;
-export let linkedWallets = JSON.parse(localStorage.getItem("vbabes_linked_wallets") || "[]");
 
 export const setWalletProvider = (provider) => { walletProvider = provider; };
 export const setPayoutAddress = (address) => { payoutAddress = address; };
+export const setUserAddress = (address) => { userAddress = address; };
+export const setIsVerified = (verified) => { isVerified = verified; };
+export const setLinkedWallets = (wallets) => { linkedWallets = wallets; };
 
 // --- WalletConnect Initialization ---
 export async function initWalletConnect() {
@@ -168,8 +173,8 @@ export async function disconnectUserWallet() {
         walletProvider = null;
         
         window.disconnectWallet();
-        window.isVerified = false; // Assuming isVerified is a global in app.js
-        window.userAddress = null; // Assuming userAddress is a global in app.js
+        setIsVerified(false);
+        setUserAddress(null);
         updateWalletUI(null);
     } catch (err) {
         console.error("Disconnect failed", err);

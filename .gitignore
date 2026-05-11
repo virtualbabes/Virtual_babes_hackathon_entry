@@ -23,3 +23,5 @@ main.wasm
 *Thumbs.db
 *ai_exclude
 
+# Modules .js
+node_modules
