@@ -32,12 +32,6 @@
 # A.I. Memory: Virtualbabes Arena
 
 ## Active Priorities
-1. **Frontend Refactor**: Modularizing `app.js` into categorized sub-files for improved maintainability.
-2. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
-
-## Completed Tasks
-- **UI Hardening**: Resolved accessibility issues (labels/titles) and removed all illegal inline styles in `index.html`.
-
 1. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
 
 ## Completed Tasks
