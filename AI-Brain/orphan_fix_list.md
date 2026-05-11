@@ -74,3 +74,9 @@
 - app.js & _overlays.scss: Added standard `user-drag: none` fallback for `-webkit-user-drag`.
 - app.js & _overlays.scss: Added `-webkit-` fallbacks for `scrollbar-width: thin`.
 - index.html: [FIXED] Added missing labels, titles, and placeholders on form elements; migrated all inline CSS styles to utility classes/external sheets.
+- index.html: [FIXED] Refactored `shops-overlay` and `territory-map-overlay` to use modular SCSS classes instead of inline styles and generic utility classes.
+- features/_shops.scss: [FIXED] Added `width`, `text-align`, `max-height`, and `overflow-y` properties to `.shops-panel` and `.shop-items` to align with `index.html` refactor.
+- features/_territory.scss: [FIXED] Added `width`, `text-align` to `.territory-panel` and defined `.map-legend-text` to align with `index.html` refactor.
+- base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
+- components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency.
+- components/_overlays.scss: [FIXED] Corrected `user-drag` to `-webkit-user-drag`.

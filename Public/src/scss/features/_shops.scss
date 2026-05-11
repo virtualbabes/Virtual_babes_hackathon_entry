@@ -5,6 +5,8 @@
 // Shops Panel Base
 .shops-panel {
     @include neon-glass-panel;
+    width: 800px; // Aligned with index.html
+    text-align: center; // Aligned with index.html
     padding: $spacing-lg;
     border-color: rgba($color-neon-purple, 0.3);
     background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.05) 0%, transparent 70%);
@@ -98,6 +100,8 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: $spacing-lg;
+    max-height: 60vh; // Aligned with index.html
+    overflow-y: auto; // Aligned with index.html
     margin-bottom: $spacing-xl;
 
     .shop-item {

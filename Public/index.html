@@ -393,23 +393,23 @@
         
         <div class="dashboard h-70vh overflow-hidden">
             <!-- Left: Global Inventory (Tier List) -->
-            <div class="column glass-panel" style="flex: 2;">
+            <div class="column glass-panel flex-2">
                 <h3>Available Cards (Inventory)</h3>
-                <div id="inventory-grid" style="display: grid; grid-template-columns: repeat(auto-fill, 100px); gap: 10px; overflow-y: auto; padding: 10px;">
+                <div id="inventory-grid" class="inventory-grid">
                     <!-- Cards will be rendered here with draggable=true -->
                 </div>
             </div>
 
             <!-- Right: Deck Composition -->
-            <div class="column glass-panel" style="flex: 1; border-color: var(--neon-cyan);">
+            <div class="column glass-panel flex-1 border-neon-cyan">
                 <h3>Current Deck (5 Cards)</h3>
-                <button onclick="window.AutoBuildDeck(); renderDeckManager();" style="width: 100%; margin-bottom: 10px; background: var(--neon-purple);">⚡ AUTO-BUILD BEST DECK</button>
+                <button onclick="window.AutoBuildDeck(); renderDeckManager();" class="w-full mb-10 bg-neon-purple">⚡ AUTO-BUILD BEST DECK</button>
                 
                 <!-- X-Chain Management -->
-                <div style="margin-bottom: 15px; border: 1px solid var(--glass-border); padding: 10px; border-radius: 8px; background: rgba(0,242,254,0.05);">
-                    <div style="font-size: 0.7em; opacity: 0.7; margin-bottom: 5px; letter-spacing: 1px;">X-CHAIN NFT SOURCES</div>
-                    <div id="linked-wallets-list" style="margin-bottom: 8px;"></div>
-                    <button class="outline" style="width: 100%; font-size: 11px; padding: 5px;" onclick="addXChainWallet()">➕ LINK X-CHAIN WALLET</button>
+                <div class="mb-15 border border-bottom-glass p-10 rounded-md bg-warning-dim">
+                    <div class="font-xs opacity-7 mb-5 letter-spacing-1">X-CHAIN NFT SOURCES</div>
+                    <div id="linked-wallets-list" class="mb-8"></div>
+                    <button class="outline w-full font-xs p-1" onclick="addXChainWallet()">➕ LINK X-CHAIN WALLET</button>
                 </div>
 
                 <div id="deck-stat-summary" style="display: flex; justify-content: space-around; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 10px; font-size: 0.9em; border: 1px solid var(--glass-border);">
@@ -592,7 +592,8 @@
                     <input type="text" id="admin-log-filter" class="glass-input" placeholder="Filter logs (e.g., SECURITY)" style="flex: 1; min-width: 200px;">
                     <div style="display: flex; gap: 5px; align-items: center;">
                         <label style="font-size: 0.7em; opacity: 0.7;">START:</label>
-                        <input type="datetime-local" id="admin-log-start" class="glass-input" style="font-size: 0.8em; padding: 5px;">
+                        <
+                         type="datetime-local" id="admin-log-start" class="glass-input" style="font-size: 0.8em; padding: 5px;">
                     </div>
                     <div style="display: flex; gap: 5px; align-items: center;">
                         <label style="font-size: 0.7em; opacity: 0.7;">END:</label>

@@ -1549,15 +1549,17 @@
 .season-winners-list {
     max-height: 250px;
     overflow-y: auto;
-    scrollbar-width: thin;
-
     &::-webkit-scrollbar {
         width: 6px;
     }
+    &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+    }
     &::-webkit-scrollbar-thumb {
-        background: $glass-border-color;
+        background: rgba(0, 242, 254, 0.2); // $glass-border-color
         border-radius: 3px;
     }
+    scrollbar-width: thin;
 }
 .season-winner-row {
     padding: 8px 15px;
@@ -1743,7 +1745,6 @@
     -ms-user-select: none;
     user-select: none;
     -webkit-user-drag: none;
-    user-drag: none;
 }
 
 /* ---------------------------------------------------------

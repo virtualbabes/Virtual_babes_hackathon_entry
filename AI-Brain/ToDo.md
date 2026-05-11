@@ -5,6 +5,8 @@
 - [x] **Accessibility Audit**: Add `<label>` elements or `aria-label` attributes to all form inputs/selects in `index.html`.
 - [x] **A11y Metadata**: Ensure all interactive elements have `title` and/or `placeholder` attributes.
 - [x] **CSS Refactoring**: Extract all inline `style="..."` attributes from `index.html` into `_main-layout.scss` or `_neon-glass.scss`.
+- [x] **Cross-Browser Hardening**: Added `-webkit-` and `-moz-` prefixes for `text-size-adjust` and custom scrollbars.
+- [x] **Property Correction**: Switched `user-drag` to `-webkit-user-drag` for standard compliance.
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
 - [x] Resolve Faceplate Residue: Implemented Mojo/Cunning bonuses for Faceplates.
@@ -60,7 +62,7 @@
 - [x] Hardened `syncUI` in `app.js` with partial state sync and flicker guards for rewards.
 - [x] Hardened `syncUI` board rendering with granular node-diffing to prevent flickering.
 - [x] Analyze frontend logic and build configuration (app.js, collective-intelligence.js, package.json).
-- [ ] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis (Regressed: Accessibility and Inline Styles pending).
+- [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis.
 - [x] Merge ReadMe.txt into README.md.
 - [x] Wire the Kidnap Selection UI in `app.js` using the orphaned criminality SCSS styles.
 - [x] Implement the 3D territory map visualization in app.js using the remaining orphaned _territory.scss styles.
@@ -128,7 +130,7 @@
 - [x] Hardened `syncUI` in `app.js` with partial state sync and flicker guards for rewards.
 - [x] Hardened `syncUI` board rendering with granular node-diffing to prevent flickering.
 - [x] Analyze frontend logic and build configuration (app.js, collective-intelligence.js, package.json).
-- [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis.
+- [x] Comprehensive SCSS/CSS UI/UX audit and HTML structural analysis (SCSS alignment for shops/territory overlays completed).
 - [x] Merge ReadMe.txt into README.md.
 - [x] Wire the Kidnap Selection UI in `app.js` using the orphaned criminality SCSS styles.
 - [x] Implement the 3D territory map visualization in app.js using the remaining orphaned _territory.scss styles.

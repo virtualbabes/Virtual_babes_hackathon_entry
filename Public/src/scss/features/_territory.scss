@@ -5,6 +5,8 @@
 // Territory Panel Base
 .territory-panel {
     @include neon-glass-panel;
+    width: 800px; // Aligned with index.html
+    text-align: center; // Aligned with index.html
     padding: $spacing-lg;
     border-color: rgba($color-neon-purple, 0.3);
     background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.05) 0%, transparent 70%);
@@ -1058,4 +1060,8 @@
 .map-tile-3d.governor-controlled:hover {
     transform: translateZ(35px) scale(1.05); // Even more elevated on hover
     box-shadow: 0 0 40px rgba($color-neon-cyan, 0.8), inset 0 0 15px rgba($color-neon-cyan, 0.6);
+}
+
+.map-legend-text {
+    font-size: 10px; // Aligned with index.html
 }
