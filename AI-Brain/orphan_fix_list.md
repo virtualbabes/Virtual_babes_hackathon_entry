@@ -79,4 +79,6 @@
 - features/_territory.scss: [FIXED] Added `width`, `text-align` to `.territory-panel` and defined `.map-legend-text` to align with `index.html` refactor.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
 - components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency; Corrected `user-drag` to `-webkit-user-drag`; Added new classes for Admin Control Panel styling.
+- app.js: [FIXED] Extracted CONFIG object to `js/config.js` and core WebSocket logic to `js/network.js`.
+- app.js: [FIXED] Removed redundant `initWebSocket` and `handleServerMessage` definitions and associated global variables.
 - index.html: [FIXED] Eliminated all remaining inline styles from the Admin Control Panel.

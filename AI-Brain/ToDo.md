@@ -7,6 +7,7 @@
 - [x] **CSS Refactoring**: Extract all inline `style="..."` attributes from `index.html` into `_main-layout.scss` or `_neon-glass.scss`.
 - [x] **Cross-Browser Hardening**: Added `-webkit-` and `-moz-` prefixes for `text-size-adjust` and custom scrollbars.
 - [x] **Admin Panel Refactor**: Eliminated all remaining inline styles from the Admin Control Panel in `index.html`.
+- [x] **Frontend Refactor**: Removed redundant `initWebSocket` and `handleServerMessage` definitions and associated global variables from `app.js`.
 - [x] **Property Correction**: Switched `user-drag` to `-webkit-user-drag` for standard compliance.
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
