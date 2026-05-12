@@ -45,6 +45,14 @@
     max-width: 90vw;
     max-height: 90vh;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba($color-neon-cyan, 0.2) transparent;
+    &::-webkit-scrollbar { width: 8px; height: 8px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb { 
+        background: rgba($color-neon-cyan, 0.2); 
+        border-radius: $border-radius-md; 
+    }
     border-radius: $border-radius-xl;
     position: relative;
 
@@ -327,6 +335,14 @@
                 grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
                 gap: $spacing-sm;
                 overflow-y: auto;
+                scrollbar-width: thin;
+                scrollbar-color: rgba($color-neon-cyan, 0.2) transparent;
+                &::-webkit-scrollbar { width: 6px; }
+                &::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+                &::-webkit-scrollbar-thumb { 
+                    background: rgba($color-neon-cyan, 0.2);
+                    border-radius: 3px;
+                }
                 padding: $spacing-md;
                 flex: 1;
             }
@@ -607,6 +623,14 @@
             .logs-display {
                 max-height: 300px;
                 overflow-y: auto;
+                scrollbar-width: thin;
+                scrollbar-color: rgba($color-neon-cyan, 0.2) transparent;
+                &::-webkit-scrollbar { width: 6px; }
+                &::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+                &::-webkit-scrollbar-thumb { 
+                    background: rgba($color-neon-cyan, 0.2);
+                    border-radius: 3px;
+                }
                 background: rgba(0, 0, 0, 0.2);
                 border-radius: $border-radius-md;
                 padding: $spacing-md;
@@ -1556,10 +1580,11 @@
         background: rgba(0, 0, 0, 0.1);
     }
     &::-webkit-scrollbar-thumb {
-        background: rgba(0, 242, 254, 0.2); // $glass-border-color
+        background: rgba($color-neon-cyan, 0.2);
         border-radius: 3px;
     }
     scrollbar-width: thin;
+    scrollbar-color: rgba($color-neon-cyan, 0.2) rgba(0, 0, 0, 0.1);
 }
 .season-winner-row {
     padding: 8px 15px;
@@ -1677,6 +1702,11 @@
     background-position: center;
     border: 2px solid $glass-border-color;
     cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-user-drag: none;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
     overflow: hidden;
@@ -1845,7 +1875,6 @@
         font-weight: bold;
     }
 }
-}
 
 /* ---------------------------------------------------------
    BAN COOLDOWN VISUALIZER
@@ -1914,10 +1943,7 @@
     /* Season History & Hall of Fame Mobile (< 480px) */
     .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
     .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
-}        .season-winner-row { padding: 6px 10px; }
-    .season-winner-row .player-name { font-size: 0.85em; }
-    .season-winner-row .player-stats { font-size: 0.75em; }
-
+}
 // Modal Panel Header (General)
 .modal-panel-header {
     display: flex;

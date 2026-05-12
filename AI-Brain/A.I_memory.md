@@ -40,6 +40,9 @@
 - **UI Hardening**: Resolved accessibility issues (labels/titles) and removed all illegal inline styles in `index.html`.
 - **A11y Audit**: Ensured all form elements in the Arena dashboard and Admin suite are WCAG compliant.
 - **SCSS Audit**: Fixed cross-browser compatibility for `text-size-adjust`, `scrollbar-width`, and `user-drag`.
+- **SCSS Hardening**: Synchronized standard and Webkit scrollbar behaviors in `_reset.scss` for full Safari/Firefox/Chrome parity.
+- **SCSS Hardening**: Resolved "at-rule or selector expected" syntax error in `_overlays.scss`.
+- **Browser Compatibility**: Added Webkit scrollbar fallbacks to `.overlay-content` to support Safari and Chrome < 121.
 - **CSS Refactoring**: Migrated remaining inline styles from the Deck Manager and Admin Suite to modular SCSS (Admin Suite completed).
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.

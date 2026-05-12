@@ -77,7 +77,9 @@
 - index.html: [FIXED] Refactored `shops-overlay` and `territory-map-overlay` to use modular SCSS classes instead of inline styles and generic utility classes.
 - features/_shops.scss: [FIXED] Added `width`, `text-align`, `max-height`, and `overflow-y` properties to `.shops-panel` and `.shop-items` to align with `index.html` refactor.
 - features/_territory.scss: [FIXED] Added `width`, `text-align` to `.territory-panel` and defined `.map-legend-text` to align with `index.html` refactor.
+- base/_reset.scss: [FIXED] Synchronized global scrollbar support for Firefox and Safari.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
+- components/_overlays.scss: [FIXED] Resolved malformed media query and duplicate CSS block causing "at-rule or selector expected" error. Added Webkit scrollbar fallbacks.
 - components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency; Corrected `user-drag` to `-webkit-user-drag`; Added new classes for Admin Control Panel styling.
 - app.js: [FIXED] Extracted CONFIG object to `js/config.js` and core WebSocket logic to `js/network.js`.
 - app.js: [FIXED] Removed redundant `initWebSocket` and `handleServerMessage` definitions and associated global variables.
