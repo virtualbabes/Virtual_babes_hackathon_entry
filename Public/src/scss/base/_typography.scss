@@ -14,7 +14,7 @@ h1 {
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 20px rgba($color-neon-cyan, 0.3);
+    text-shadow: 0 0 10px rgba($color-neon-cyan, 0.2), 0 0 20px rgba($color-neon-purple, 0.1);
     font-size: $font-size-3xl;
     margin-bottom: $spacing-lg;
 }
@@ -23,14 +23,14 @@ h2 {
     color: $color-neon-cyan;
     font-size: $font-size-2xl;
     margin-bottom: $spacing-md;
-    text-shadow: 0 0 15px rgba($color-neon-cyan, 0.2);
+    text-shadow: 0 0 8px rgba($color-neon-cyan, 0.3);
 }
 
 h3 {
     color: $color-neon-purple;
     font-size: $font-size-xl;
     margin-bottom: $spacing-md;
-    text-shadow: 0 0 10px rgba($color-neon-purple, 0.2);
+    text-shadow: 0 0 10px rgba($color-neon-purple, 0.3);
 }
 
 // Text Color Utilities
@@ -107,17 +107,22 @@ h3 {
 .no-underline { text-decoration: none; }
 
 // Special Text Effects
+// Hardened for legibility: uses a layered glow to preserve character edges
 .text-glow {
-    text-shadow: 0 0 10px currentColor;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.2), 0 0 10px currentColor;
 }
 
 .text-glow-strong {
-    text-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3), 0 0 15px currentColor, 0 0 25px currentColor;
 }
 
+// Accessible Outline: Ensure outline is only used on larger text (Base and up)
 .text-outline {
     -webkit-text-stroke: 1px currentColor;
     -webkit-text-fill-color: transparent;
+    // Fallback: provides a very faint shadow so letters don't disappear on busy backgrounds
+    text-shadow: 1px 1px 0px rgba(0,0,0,0.5); 
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
 }
 
 // Responsive Typography

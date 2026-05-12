@@ -9,7 +9,7 @@ button {
     text-transform: uppercase;
     letter-spacing: 1px;
     cursor: pointer;
-    transition: all $transition-fast;
+    transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast, border-color $transition-fast, opacity $transition-fast;
     border: none;
     border-radius: $border-radius-md;
     padding: $spacing-md $spacing-lg;
@@ -174,7 +174,7 @@ button.xlarge, .btn-xlarge {
     padding: $spacing-lg;
     border-radius: $border-radius-lg;
     cursor: pointer;
-    transition: all $transition-fast;
+    transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
     border: 1px solid $glass-border-color;
     display: flex;
     flex-direction: column;

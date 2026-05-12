@@ -76,7 +76,10 @@
 - index.html: [FIXED] Added missing labels, titles, and placeholders on form elements; migrated all inline CSS styles to utility classes/external sheets.
 - index.html: [FIXED] Refactored `shops-overlay` and `territory-map-overlay` to use modular SCSS classes instead of inline styles and generic utility classes.
 - features/_shops.scss: [FIXED] Added `width`, `text-align`, `max-height`, and `overflow-y` properties to `.shops-panel` and `.shop-items` to align with `index.html` refactor.
-- features/_territory.scss: [FIXED] Added `width`, `text-align` to `.territory-panel` and defined `.map-legend-text` to align with `index.html` refactor.
+- features/_territory.scss: [FIXED] Optimized 3D rendering with `will-change` and replaced all hardcoded colors with tokens.
+- layouts/_dashboard.scss: [FIXED] Replaced expensive `transition: all` with specific properties to resolve performance bottlenecks.
+- components/_cards.scss: [FIXED] Eliminated 'transition: all' bottlenecks and implemented hardware acceleration for playing cards and avatars.
+- components/_buttons.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks.
 - base/_reset.scss: [FIXED] Synchronized global scrollbar support for Firefox and Safari.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
 - components/_overlays.scss: [FIXED] Resolved malformed media query and duplicate CSS block causing "at-rule or selector expected" error. Added Webkit scrollbar fallbacks.

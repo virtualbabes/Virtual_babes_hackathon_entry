@@ -11,6 +11,7 @@
 - [x] **Property Correction**: Switched `user-drag` to `-webkit-user-drag` for standard compliance.
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Audit `renderCardHTML` function in `ui.js` for performance bottlenecks and re-allocations.
+- [x] **A11y Typography**: Hardened neon text contrast and outlines in `_typography.scss`.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
 - [x] Audit `initWebSocket` message handler in `network.js` for high-frequency move overhead; implemented batching logic.
 - [x] Resolve Faceplate Residue: Implemented Mojo/Cunning bonuses for Faceplates.

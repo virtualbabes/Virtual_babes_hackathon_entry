@@ -16,7 +16,10 @@
     box-sizing: border-box;
     box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
     position: relative;
-    transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base;
+    transform: translateZ(0); // Hardware acceleration
+    backface-visibility: hidden;
+    will-change: transform, box-shadow, border-color;
+    transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base, opacity $transition-base;
     -webkit-backdrop-filter: blur($glass-blur);
     backdrop-filter: blur($glass-blur);
 
@@ -192,7 +195,8 @@
     pointer-events: none;
     opacity: 0;
     transform: translateY(10px);
-    transition: all $transition-fast;
+    will-change: opacity, transform;
+    transition: opacity $transition-fast, transform $transition-fast;
 
     &.visible {
         opacity: 1;
@@ -315,6 +319,7 @@
 .deck-slot-btn {
     padding: 8px 12px; font-size: 11px; border: 1px solid $glass-border-color; 
     background: rgba($color-bg-dark, 0.5); border-radius: 6px; cursor: pointer; color: $color-text-muted;
+    transition: border-color $transition-fast, color $transition-fast, box-shadow $transition-fast;
 }
 .deck-slot-btn.active { border-color: $color-neon-cyan; color: $color-neon-cyan; box-shadow: 0 0 10px $color-neon-cyan; }
 .deck-slot-btn.locked { opacity: 0.4; cursor: not-allowed; }
@@ -322,6 +327,7 @@
 .card-mini {
     width: 90px; height: 120px; background: $color-bg-dark; border: 1px solid $glass-border-color;
     border-radius: 8px; cursor: grab; position: relative;
+    transition: transform $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
 }
 .card-mini:active { cursor: grabbing; }
 
