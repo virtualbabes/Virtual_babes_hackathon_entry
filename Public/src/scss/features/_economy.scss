@@ -7,7 +7,7 @@
     @include neon-glass-panel;
     padding: $spacing-lg;
     border-color: rgba($color-neon-green, 0.3);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
 }
 
 // Economy Header
@@ -50,6 +50,30 @@
             }
         }
     }
+}
+
+.art-gallery-panel {
+    width: 850px;
+    .economy-title, .economy-stats { color: $color-neon-purple; }
+}
+
+.loan-store-panel {
+    width: 800px;
+    .economy-title { color: $color-neon-blue; }
+    .store-balance { color: $color-neon-green; }
+}
+
+.portfolio-panel {
+    width: 600px;
+    .economy-title { color: $color-neon-cyan; }
+    .portfolio-value { color: $color-neon-green; }
+}
+
+.club-foundry-panel {
+    width: 550px;
+    text-align: center;
+    
+    .foundry-description { font-size: 0.85em; opacity: 0.7; margin-bottom: 25px; }
 }
 
 // Market Ticker (Live performance prices)
@@ -112,7 +136,7 @@
             align-items: center;
             gap: $spacing-sm;
             padding: $spacing-xs $spacing-md;
-            background: rgba(0, 0, 0, 0.3);
+                background: rgba($color-bg-dark, 0.3);
             border-radius: $border-radius-sm;
             margin-right: $spacing-md;
             white-space: nowrap;
@@ -428,7 +452,7 @@
                 display: flex;
                 justify-content: space-around;
                 padding: $spacing-lg;
-                background: rgba(0, 0, 0, 0.2);
+                background: rgba($color-bg-dark, 0.2);
                 border-radius: $border-radius-md;
                 border: 1px solid $glass-border-color;
 
@@ -530,7 +554,7 @@
     @include neon-glass-panel;
     border-color: $color-error-red;
     box-shadow: 0 0 15px rgba($color-error-red, 0.4);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
 
     .market-header {
         display: flex;
@@ -744,7 +768,7 @@
             }
 
             &:hover {
-                background: rgba(0, 0, 0, 0.3);
+                background: rgba($color-bg-dark, 0.3);
             }
 
             .transaction-icon {

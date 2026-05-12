@@ -29,21 +29,21 @@ export function openCourthouse() {
     overlay.id = "courthouse-overlay";
     overlay.className = "overlay";
     overlay.innerHTML = `
-        <div class="glass-panel courthouse-panel">
-            <h2 class="text-error" style="letter-spacing: 3px;">ARENA COURTHOUSE</h2>
-            <p style="font-size: 0.9em; opacity: 0.8;">The High Council has flagged you for criminal activities.<br>Infamy Status: <b>LEVEL ${wanted}</b></p>
+        <div class="courthouse-panel glass-panel">
+            <h2 class="text-error">ARENA COURTHOUSE</h2>
+            <p class="infamy-status">The High Council has flagged you for criminal activities.<br>Infamy Status: <b>LEVEL ${wanted}</b></p>
             
             <div class="glass-panel fine-display-box">
-                <div style="font-size: 0.75em; opacity: 0.7;">REHABILITATION FINE</div>
+                <div class="fine-label">REHABILITATION FINE</div>
                 <b class="fine-amount">${fine} $VBV</b>
-                <div style="font-size: 0.7em; opacity: 0.5; margin-top: 5px;">(100 $VBV per Wanted point)</div>
+                <div class="fine-subtext">(100 $VBV per Wanted point)</div>
             </div>
 
-            <p style="font-size: 0.8em; opacity: 0.6; padding: 0 20px;">Settling your debt to society will clear your Wanted Level and restore your cards to peak combat performance.</p>
+            <p class="rehabilitation-text">Settling your debt to society will clear your Wanted Level and restore your cards to peak combat performance.</p>
 
-            <div class="mt-20 flex-row justify-center gap-15">
-                <button class="outline" onclick="document.getElementById('courthouse-overlay').remove()">LURK IN SHADOWS</button>
-                <button id="courthouse-pay-btn" style="background: linear-gradient(45deg, #ff4b4b, #ff0844);" onclick="submitCourthouseFine()">PAY FINE & CLEAR NAME</button>
+            <div class="courthouse-actions mt-20 flex-row justify-center gap-15">
+                <button class="outline btn-lurk" onclick="document.getElementById('courthouse-overlay').remove()">LURK IN SHADOWS</button>
+                <button id="courthouse-pay-btn" class="danger" onclick="submitCourthouseFine()">PAY FINE & CLEAR NAME</button>
             </div>
         </div>
     `;
@@ -217,42 +217,42 @@ export function openSecuritySentry() {
         { id: "guard_dog", name: "Bio-Guard Dog", desc: "Forces Jail on Failure" }
     ];
 
-    const activeTraps = Object.entries(club.active_buffs || {})
+    const activeTrapsList = Object.entries(club.active_buffs || {})
         .filter(([key]) => key.startsWith("TRAP_"));
 
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 550px; text-align: center; border-color: var(--neon-cyan);">
-            <h2 style="color: var(--neon-cyan); letter-spacing: 2px;">🛡️ SECURITY SENTRY: ${club.name.toUpperCase()}</h2>
-            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Deploy tactical hardware to protect the Treasury from heisters.</p>
+        <div class="security-sentry-panel glass-panel">
+            <h2>🛡️ SECURITY SENTRY: ${club.name.toUpperCase()}</h2>
+            <p class="description">Deploy tactical hardware to protect the Treasury from heisters.</p>
             
-            <div style="text-align: left; margin-bottom: 20px;">
-                <small style="color: var(--neon-cyan); font-weight: bold; opacity: 0.5;">ACTIVE DEFENSES (${activeTraps.length}/3)</small>
+            <div class="defense-section">
+                <small class="section-label">ACTIVE DEFENSES (${activeTrapsList.length}/3)</small>
                 <div class="flex-col gap-5 mt-5">
-                    ${activeTraps.length === 0 ? '<div style="opacity: 0.3; font-style: italic;">No active traps detected.</div>' : 
-                      activeTraps.map(([id, type]) => `
-                        <div class="player-item" style="padding: 8px 12px; border-color: var(--neon-green);">
+                    ${activeTrapsList.length === 0 ? '<div class="no-traps">No active traps detected.</div>' : 
+                      activeTrapsList.map(([id, type]) => `
+                        <div class="active-trap-item player-item">
                             <span>🛰️ ${type.toUpperCase()}</span>
-                            <span style="color: var(--neon-green); font-size: 10px;">ONLINE</span>
+                            <span class="trap-online-status">ONLINE</span>
                         </div>
                       `).join('')}
                 </div>
             </div>
 
-            <div style="text-align: left;">
-                <small style="color: var(--neon-cyan); font-weight: bold; opacity: 0.5;">AVAILABLE HARDWARE</small>
+            <div class="available-hardware-section">
+                <small class="section-label">AVAILABLE HARDWARE</small>
                 <div class="flex-col gap-10 mt-5">
                     ${availableTraps.map(trap => {
                         const count = state.inventory[trap.id] || 0;
                         return `
-                            <div class="glass-panel p-10 m-0 flex-row justify-between align-center">
-                                <div>
+                            <div class="hardware-item glass-panel flex-row justify-between align-center">
+                                <div class="info">
                                     <b>${trap.name}</b>
-                                    <div style="font-size: 0.75em; opacity: 0.6;">${trap.desc}</div>
+                                    <div class="desc">${trap.desc}</div>
                                 </div>
                                 <div class="flex-row align-center gap-10">
-                                    <span style="font-size: 11px; opacity: 0.8;">Owned: ${count}</span>
-                                    <button class="outline" style="font-size: 10px; padding: 5px 15px;" 
-                                            ${count === 0 || activeTraps.length >= 3 ? 'disabled' : ''} 
+                                    <span class="count">Owned: ${count}</span>
+                                    <button class="outline btn-deploy-trap" 
+                                            ${count === 0 || activeTrapsList.length >= 3 ? 'disabled' : ''} 
                                             onclick="deployTrap('${trap.id}')">DEPLOY</button>
                                 </div>
                             </div>
@@ -345,12 +345,12 @@ export async function openRumorMill() {
 
     let targetsHtml = '';
     if (lastLobbyPlayers.length === 0) {
-        targetsHtml = `<div style="padding: 20px; opacity: 0.5;">No other players in the lobby to spread rumors about.</div>`;
+        targetsHtml = `<div class="empty-notice">No other players in the lobby to spread rumors about.</div>`;
     } else {
         // Filter out self
         const otherPlayers = lastLobbyPlayers.filter(p => p.id !== myClientId);
         if (otherPlayers.length === 0) {
-            targetsHtml = `<div style="padding: 20px; opacity: 0.5;">No other players in the lobby to spread rumors about.</div>`;
+            targetsHtml = `<div class="empty-notice">No other players in the lobby to spread rumors about.</div>`;
         } else {
             // Pre-resolve envoi names for all targets
             const targetWallets = new Set(otherPlayers.map(p => p.wallet));
@@ -359,16 +359,14 @@ export async function openRumorMill() {
             targetsHtml = otherPlayers.map(p => {
                 const targetName = getCachedEnvoiName(p.wallet);
                 return `
-                    <div class="player-item" style="padding: 10px; border-color: var(--glass-border);">
-                        <div style="text-align: left;">
-                            <b style="color: var(--neon-cyan);">${targetName}</b>
-                            <div style="font-size: 0.75em; opacity: 0.6;">${p.reputation} REP | ${p.wins} WINS</div>
+                    <div class="rumor-target-item player-item">
+                        <div class="rumor-target-info">
+                            <b class="rumor-target-name">${targetName}</b>
+                            <div class="rumor-target-stats">${p.reputation} REP | ${p.wins} WINS</div>
                         </div>
                         <div class="flex-row gap-5">
-                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: var(--neon-green); color: var(--neon-green);" 
-                                    onclick="spreadRumor('${p.wallet}', 'positive', 1.1, 60)">+ POSITIVE</button>
-                            <button class="outline" style="font-size: 9px; padding: 4px 8px; border-color: #ff4b4b; color: #ff4b4b;" 
-                                    onclick="spreadRumor('${p.wallet}', 'negative', 0.9, 60)">- NEGATIVE</button>
+                            <button class="outline btn-rumor-positive" onclick="spreadRumor('${p.wallet}', 'positive', 1.1, 60)">+ POSITIVE</button>
+                            <button class="outline btn-rumor-negative" onclick="spreadRumor('${p.wallet}', 'negative', 0.9, 60)">- NEGATIVE</button>
                         </div>
                     </div>
                 `;
@@ -377,10 +375,10 @@ export async function openRumorMill() {
     }
 
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 600px; text-align: center;">
-            <h2 style="color: var(--neon-green); letter-spacing: 3px;">RUMOR MILL</h2>
-            <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">Influence market sentiment. Cost: <b style="color: var(--neon-green);">${rumorCost} $VBV</b></p>
-            <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+        <div class="rumor-mill-panel glass-panel">
+            <h2>RUMOR MILL</h2>
+            <p class="description">Influence market sentiment. Cost: <b class="text-neon-green">${rumorCost} $VBV</b></p>
+            <div class="targets-scroll-list flex-col gap-10">
                 ${targetsHtml}
             </div>
             <button class="outline mt-20" onclick="document.getElementById('rumor-mill-overlay').remove()">CLOSE</button>
@@ -439,7 +437,7 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
     overlay.className = "overlay";
 
     overlay.innerHTML = `
-        <div class="social-panel glass-panel" style="width: 750px;">
+        <div class="social-panel glass-panel">
             <div class="social-header">
                 <span class="social-title">NEON SOCIAL HUB</span>
                 <div class="social-stats">
@@ -460,7 +458,7 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
                 <button id="social-tab-achievements" class="tab-btn ${initialTab === 'achievements' ? 'active' : ''}" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
             </div>
 
-            <div id="social-content-hub" class="flex-col gap-15" style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
+            <div id="social-content-hub" class="content-hub-scroll flex-col gap-15">
                 <!-- Content injected by switchSocialTab -->
             </div>
 
@@ -482,7 +480,7 @@ export async function switchSocialTab(tab) {
     if (tabBtn) tabBtn.classList.add('active');
 
     const state = window.GetGameState();
-    container.innerHTML = `<div class="opacity-5 py-40 italic">Decrypting social datastreams...</div>`;
+    container.innerHTML = `<div class="loading-text">Decrypting social datastreams...</div>`;
 
     if (tab === 'alliances') {
         const otherPlayers = lastLobbyPlayers.filter(p => p.id !== myClientId);
@@ -502,7 +500,7 @@ export async function switchSocialTab(tab) {
                 <div class="connection-info text-left">
                     <div class="connection-name font-bold ${isAlly ? 'text-neon-cyan' : ''}">${getCachedEnvoiName(p.wallet)}</div>
                     <div class="connection-role font-size-0-75em opacity-6">${p.social_rank} | ${p.job_role || 'Freelancer'}</div>
-                        <div class="connection-status online font-size-0-7em">ACTIVE LINK</div>
+                        <div class="connection-status online">ACTIVE LINK</div>
                 </div>
                 <div class="connection-actions">
                         <button class="action-btn message" onclick="document.getElementById('social-hub-overlay').remove(); window.sendChallenge('${p.id}')" title="Challenge duel"></button>
@@ -521,7 +519,7 @@ export async function switchSocialTab(tab) {
                         <span class="network-title text-neon-cyan font-bold letter-spacing-1">CONFIRMED ALLIANCES</span>
                         <div class="network-stats opacity-5 font-size-0-8em">STRENGTH: ${allies.length}</div>
                     </div>
-                    <div class="connections-list">
+                    <div class="connections-list alliances-grid">
                         ${allies.length === 0 ? '<div class="opacity-3 p-20 italic font-size-0-9em border-glass">No active alliance contracts found.</div>' : 
                             allies.map(p => renderConnection(p, true)).join('')}
                     </div>
@@ -532,7 +530,7 @@ export async function switchSocialTab(tab) {
                         <span class="network-title text-neon-purple font-bold letter-spacing-1">SECTOR ENTITIES</span>
                         <div class="network-stats opacity-5 font-size-0-8em">DETECTED: ${others.length}</div>
                     </div>
-                    <div class="connections-list">
+                    <div class="connections-list discovery-grid">
                         ${others.length === 0 ? '<div class="opacity-3 p-20 italic font-size-0-9em">Scanning... no other entities in proximity.</div>' : 
                             others.map(p => renderConnection(p, false)).join('')}
                     </div>
@@ -621,17 +619,17 @@ export function openHeistPlanningOverlay() {
 	const clubs = Object.values(globalClubs).filter(c => c.id !== state.employer_id);
 	
 	overlay.innerHTML = `
-		<div class="criminality-panel glass-panel animate-modal" style="width: 700px; max-height: 90vh;">
+		<div class="criminality-panel heist-terminal glass-panel animate-modal">
 			<div class="criminality-header">
-				<span class="criminality-title" style="text-shadow: 0 0 15px rgba(255, 75, 75, 0.5);">HEIST PLANNING TERMINAL</span>
+				<span class="criminality-title">HEIST PLANNING TERMINAL</span>
 				<div class="criminality-stats">
 					<div class="stat-item">
-						<div class="stat-label" style="color: var(--color-error-red); opacity: 0.7;">WANTED</div>
-						<div class="stat-value" style="color: var(--color-error-red);">${state.wanted_level || 0}</div>
+						<div class="stat-label stat-label-red">WANTED</div>
+						<div class="stat-value stat-value-red">${state.wanted_level || 0}</div>
 					</div>
 					<div class="stat-item">
-						<div class="stat-label" style="color: var(--color-neon-cyan); opacity: 0.7;">CUNNING</div>
-						<div class="stat-value" style="color: var(--color-neon-cyan);">${state.cunning || 0}</div>
+						<div class="stat-label stat-label-cyan">CUNNING</div>
+						<div class="stat-value stat-value-cyan">${state.cunning || 0}</div>
 					</div>
 				</div>
 			</div>
@@ -639,7 +637,7 @@ export function openHeistPlanningOverlay() {
 			<div class="p-20">
 				<div class="criminality-targets mb-20">
 					<div class="targets-header">
-						<div class="targets-title" style="font-size: 0.85em; opacity: 0.6; letter-spacing: 2px;">DETECTED SECTOR ENTITIES</div>
+						<div class="targets-title">DETECTED SECTOR ENTITIES</div>
 					</div>
 					<div class="targets-list" style="grid-template-columns: repeat(2, 1fr); gap: 12px; max-height: 300px;">
 						${clubs.length === 0 ? '<div class="grid-span-all opacity-3 italic py-40">No external club treasuries detected in local range.</div>' : 
@@ -648,8 +646,8 @@ export function openHeistPlanningOverlay() {
 									<div class="target-info">
 										<div class="target-name font-bold text-neon-purple" style="font-size: 1.1em;">${club.name.toUpperCase()}</div>
 										<div class="target-details mt-5">
-											<span class="detail-item wealth" style="color: var(--color-neon-green); font-weight: bold;">${club.treasury.toFixed(2)} $VBV</span>
-											<span class="detail-item level" style="opacity: 0.6; font-size: 0.9em;">MOJO: ${club.club_mojo}</span>
+											<span class="detail-item wealth">${club.treasury.toFixed(2)} $VBV</span>
+											<span class="detail-item level">MOJO: ${club.club_mojo}</span>
 										</div>
 									</div>
 									<div class="target-select-btn mt-10">ANALYZE DEFENSES</div>
@@ -658,7 +656,7 @@ export function openHeistPlanningOverlay() {
 					</div>
 				</div>
 
-				<div id="heist-risk-section" class="criminality-risk invisible mt-10 p-20 glass-panel animate-shimmer" style="background: rgba(0,0,0,0.4); border-color: rgba(255, 166, 87, 0.3);">
+				<div id="heist-risk-section" class="criminality-risk invisible mt-10 p-20 glass-panel animate-shimmer">
 					<div class="risk-header mb-15">
 						<span class="risk-icon">📡</span>
 						<span class="risk-title">TACTICAL PROBABILITY ANALYSIS</span>
@@ -666,22 +664,22 @@ export function openHeistPlanningOverlay() {
 					
 					<div class="risk-meter">
 						<div class="risk-labels">
-							<span class="risk-low" style="color: var(--color-neon-green);">SURGICAL</span>
-							<span class="risk-high" style="color: var(--color-error-red);">CRITICAL RISK</span>
+							<span class="risk-low">SURGICAL</span>
+							<span class="risk-high">CRITICAL RISK</span>
 						</div>
-						<div class="risk-bar" style="height: 14px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);">
+						<div class="risk-bar">
 							<div id="heist-risk-fill" class="risk-fill" style="width: 0%;"></div>
 						</div>
 					</div>
 					
 					<div class="flex-row justify-between align-center mt-15">
-						<div id="heist-chance-text" class="progress-status" style="text-align: left; font-size: 1em;"></div>
-						<div id="heist-security-details" class="font-mono" style="font-size: 0.75em; opacity: 0.5;"></div>
+						<div id="heist-chance-text" class="progress-status"></div>
+						<div id="heist-security-details" class="security-details font-mono"></div>
 					</div>
 					
 					<div class="flex-row justify-center gap-15 mt-25">
 						<button class="outline w-full secondary" onclick="document.getElementById('heist-overlay').remove()">ABORT OPS</button>
-						<button id="heist-execute-btn" class="w-full danger" style="letter-spacing: 2px;">EXECUTE STRIKE</button>
+						<button id="heist-execute-btn" class="w-full danger btn-execute-strike">EXECUTE STRIKE</button>
 					</div>
 				</div>
 			</div>
@@ -735,7 +733,7 @@ export function updateHeistRiskAssessment(clubId) {
 
 	// UI Feedback
 	fill.style.width = `${riskPercent}%`;
-	text.innerHTML = `ESTIMATED SUCCESS: <b style="color: var(--color-neon-green); font-size: 1.2em;">${(successChance * 100).toFixed(0)}%</b>`;
+	text.innerHTML = `ESTIMATED SUCCESS: <b class="text-neon-green font-size-1-2em">${(successChance * 100).toFixed(0)}%</b>`;
 	secText.innerHTML = `TARGET SEC_LEVEL: ${securityLevel.toFixed(1)} [STAFF: ${securityStaff}]`;
 	
 	btn.disabled = false;
@@ -781,23 +779,23 @@ export function openKidnapSelectionOverlay(targetClubId) {
 	overlay.className = "overlay";
 	
 	overlay.innerHTML = `
-		<div class="criminality-panel glass-panel animate-slide-up" style="width: 450px; border-color: #ffa657;">
-			<div class="criminality-header" style="border-bottom-color: rgba(255, 166, 87, 0.3);">
-				<span class="criminality-title" style="color: #ffa657; text-shadow: 0 0 10px rgba(255, 166, 87, 0.5);">KIDNAP GAMBIT</span>
+		<div class="kidnap-selection-panel glass-panel animate-slide-up">
+			<div class="criminality-header">
+				<span class="criminality-title">KIDNAP GAMBIT</span>
 			</div>
 			
 			<div class="p-20 text-center">
-				<p style="font-size: 0.9em; opacity: 0.8;">The heist was so clean you've cornered a high-value asset of <b class="text-neon-purple">${club.name}</b>.</p>
+				<p>The heist was so clean you've cornered a high-value asset of <b class="text-neon-purple">${club.name}</b>.</p>
 				
 				<div class="hostage-card p-15 mt-20 mb-20 glass-panel">
-					<div style="font-size: 0.75em; opacity: 0.5; letter-spacing: 1px;">TARGET IDENTIFIED</div>
-					<b style="font-size: 1.2em; color: var(--color-error-red);">CLUB OWNER: ${club.owner_wallet.substring(0,12)}...</b>
-					<div class="mt-10 italic" style="font-size: 0.8em; opacity: 0.6;">"A hostage ensures they won't retaliate... or provides a secondary payday."</div>
+					<div class="label">TARGET IDENTIFIED</div>
+					<b class="owner-wallet">CLUB OWNER: ${club.owner_wallet.substring(0,12)}...</b>
+					<div class="quote mt-10 italic">"A hostage ensures they won't retaliate... or provides a secondary payday."</div>
 				</div>
 
 				<div class="flex-col gap-10">
 					<button class="outline w-full" onclick="document.getElementById('kidnap-selection-overlay').remove()">RELEASE & VANISH</button>
-					<button class="w-full" style="background: var(--color-error-red); color: white;" onclick="executeKidnap('${targetClubId}')">EXECUTE KIDNAPPING</button>
+					<button class="w-full btn-execute-kidnap" onclick="executeKidnap('${targetClubId}')">EXECUTE KIDNAPPING</button>
 				</div>
 			</div>
 		</div>
@@ -827,7 +825,7 @@ export function showKidnapOverlay(payload) {
     content.innerHTML = `
         <p>Your card <strong>${payload.card_name}</strong> has been kidnapped!</p>
         <p>Ransom: <span class="ransom-amount">${(ransomValue / 1000000).toFixed(2)} $VBV</span></p>
-        <p style="opacity:0.7; font-size:0.9em;">Kidnapper: ${perpWallet}</p>
+        <p class="kidnap-victim-info">Kidnapper: ${perpWallet}</p>
         <button class="pay-ransom-btn" onclick="payRansom(${payload.card_id}, '${perpWallet}', ${ransomValue})">Pay Ransom</button>
         <p class="insurance-timer">Insurance recovery in: <span id="recovery-timer">48:00:00</span></p>
     `;

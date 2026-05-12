@@ -7,7 +7,7 @@
     @include neon-glass-panel;
     padding: $spacing-lg;
     border-color: rgba($color-neon-blue, 0.3);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-blue, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-blue, 0.05) 0%, transparent 70%);
 }
 
 // Social Header
@@ -123,7 +123,7 @@
 
             &.unlocked {
                 border-color: rgba($color-gold, 0.3);
-                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-gold, 0.05) 0%, transparent 70%);
+                background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-gold, 0.05) 0%, transparent 70%);
                 box-shadow: 0 0 15px rgba($color-gold, 0.3);
             }
 
@@ -246,13 +246,13 @@
 
             &.current {
                 border-color: rgba($color-neon-cyan, 0.3);
-                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-cyan, 0.05) 0%, transparent 70%);
+                background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-cyan, 0.05) 0%, transparent 70%);
                 box-shadow: 0 0 15px rgba($color-neon-cyan, 0.3);
             }
 
             &.completed {
                 border-color: rgba($color-neon-green, 0.3);
-                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+                background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
             }
 
             &.locked {
@@ -308,7 +308,7 @@
                             display: inline-block;
                             margin-right: $spacing-md;
                             padding: $spacing-xs $spacing-sm;
-                            background: rgba(0, 0, 0, 0.2);
+                            background: rgba($color-bg-dark, 0.2);
                             border-radius: $border-radius-sm;
 
                             &.completed {
@@ -500,7 +500,7 @@
                 .summary-item {
                     text-align: center;
                     padding: $spacing-md;
-                    background: rgba(0, 0, 0, 0.2);
+                    background: rgba($color-bg-dark, 0.2);
                     border-radius: $border-radius-md;
 
                     .summary-label {
@@ -646,7 +646,7 @@
                     height: 30px;
                     border-radius: $border-radius-full;
                     border: 1px solid $glass-border-color;
-                    background: rgba(0, 0, 0, 0.2);
+                    background: rgba($color-bg-dark, 0.2);
                     color: $color-text-secondary;
                     display: flex;
                     align-items: center;

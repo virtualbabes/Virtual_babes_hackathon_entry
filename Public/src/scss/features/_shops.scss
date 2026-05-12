@@ -9,7 +9,7 @@
     text-align: center; // Aligned with index.html
     padding: $spacing-lg;
     border-color: rgba($color-neon-purple, 0.3);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-purple, 0.05) 0%, transparent 70%);
 }
 
 // Shops Header
@@ -60,7 +60,7 @@
     gap: $spacing-sm;
     margin-bottom: $spacing-xl;
     padding: $spacing-md;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba($color-bg-dark, 0.2);
     border-radius: $border-radius-lg;
     border: 1px solid $glass-border-color;
     overflow-x: auto;
@@ -68,7 +68,7 @@
     .category-tab {
         flex-shrink: 0;
         padding: $spacing-md $spacing-lg;
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba($color-bg-dark, 0.2);
         border: 1px solid $glass-border-color;
         border-radius: $border-radius-md;
         color: $color-text-secondary;
@@ -139,7 +139,7 @@
 
         &.owned {
             border-color: rgba($color-neon-green, 0.3);
-            background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+            background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
 
             &::after {
                 content: 'OWNED';
@@ -248,7 +248,7 @@
                 .stat {
                     text-align: center;
                     padding: $spacing-xs;
-                    background: rgba(0, 0, 0, 0.2);
+                    background: rgba($color-bg-dark, 0.2);
                     border-radius: $border-radius-sm;
 
                     .stat-label {
@@ -326,7 +326,7 @@
     gap: $spacing-md;
     margin-bottom: $spacing-xl;
     padding: $spacing-lg;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba($color-bg-dark, 0.2);
     border-radius: $border-radius-lg;
     border: 1px solid $glass-border-color;
 
@@ -357,7 +357,7 @@
 
             .filter-option {
                 padding: $spacing-xs $spacing-sm;
-                background: rgba(0, 0, 0, 0.3);
+                background: rgba($color-bg-dark, 0.3);
                 border: 1px solid $glass-border-color;
                 border-radius: $border-radius-sm;
                 color: $color-text-secondary;
@@ -492,7 +492,7 @@
 
                 &:hover {
                     background: $color-error-red;
-                    color: white;
+                    color: $color-text-main;
                     transform: scale(1.1);
                 }
             }
@@ -504,7 +504,7 @@
         justify-content: space-between;
         align-items: center;
         padding: $spacing-lg;
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba($color-bg-dark, 0.2);
         border-radius: $border-radius-md;
         border: 1px solid $glass-border-color;
         margin-bottom: $spacing-lg;
@@ -559,7 +559,7 @@
     @include neon-glass-panel;
     padding: $spacing-lg;
     border-color: rgba($color-gold, 0.3);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-gold, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-gold, 0.05) 0%, transparent 70%);
 
     .offers-header {
         text-align: center;
@@ -644,7 +644,7 @@
                         align-items: center;
                         gap: $spacing-xs;
                         padding: $spacing-xs $spacing-sm;
-                        background: rgba(0, 0, 0, 0.2);
+                        background: rgba($color-bg-dark, 0.2);
                         border-radius: $border-radius-sm;
                         font-size: $font-size-sm;
                         color: $color-text-main;

@@ -5,7 +5,7 @@
 .playing-card {
     width: $card-width;
     height: $card-height;
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9));
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9));
     border: 2px solid $color-neon-cyan;
     border-radius: $border-radius-lg;
     display: flex;
@@ -14,7 +14,7 @@
     justify-content: space-between;
     padding: $spacing-sm;
     box-sizing: border-box;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
+    box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
     position: relative;
     transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base;
     -webkit-backdrop-filter: blur($glass-blur);
@@ -22,7 +22,7 @@
 
     &:hover {
         transform: translateY(-8px) scale(1.05);
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px var(--arena-mood-color);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 0 20px var(--arena-mood-color);
         border-color: var(--arena-mood-color);
     }
 
@@ -31,13 +31,13 @@
 
         &:hover {
             transform: translateY(-10px) scale(1.05);
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 10px 30px rgba($color-neon-cyan, 0.6);
+            box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 10px 30px rgba($color-neon-cyan, 0.6);
         }
     }
 
     &.selected-card {
         box-shadow: 0 0 20px $color-neon-cyan, inset 0 0 20px rgba($color-neon-cyan, 0.3);
-        border-color: white;
+        border-color: $color-text-main;
         transform: translateY(-15px) scale(1.05);
     }
 
@@ -48,7 +48,7 @@
 
         &:hover {
             transform: none;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
+            box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
         }
     }
 }
@@ -57,7 +57,7 @@
     font-size: $font-size-xs;
     font-weight: bold;
     text-align: center;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba($color-bg-dark, 0.6);
     width: 100%;
     padding: $spacing-xs 0;
     border-radius: $border-radius-sm;
@@ -76,8 +76,8 @@
         ". bottom .";
     font-size: $font-size-lg;
     font-weight: bold;
-    color: white;
-    text-shadow: 1px 1px 2px black, 0 0 5px $color-neon-cyan;
+    color: $color-text-main;
+    text-shadow: 1px 1px 2px $color-bg-dark, 0 0 5px $color-neon-cyan;
     width: 80%;
     height: 60%;
     align-items: center;
@@ -106,22 +106,22 @@
 .playing-card {
     &.common {
         border-color: $color-text-secondary;
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-text-secondary, 0.2);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-text-secondary, 0.2);
     }
 
     &.rare {
         border-color: $color-neon-blue;
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-neon-blue, 0.3);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-blue, 0.3);
     }
 
     &.epic {
         border-color: $color-neon-purple;
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-neon-purple, 0.3);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-purple, 0.3);
     }
 
     &.legendary {
         border-color: $color-gold;
-        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8), 0 4px 15px rgba($color-gold, 0.4);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-gold, 0.4);
         background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-gold, 0.1) 0%, transparent 70%);
     }
 }
@@ -139,11 +139,11 @@
     justify-content: center;
     font-size: $font-size-xs;
     font-weight: bold;
-    color: white;
+    color: $color-text-main;
 
     &.fire { background: linear-gradient(45deg, #ff6b35, #f7931e); }
-    &.water { background: linear-gradient(45deg, #4facfe, #00f2fe); }
-    &.earth { background: linear-gradient(45deg, #43e97b, #38f9d7); }
+    &.water { background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan); }
+    &.earth { background: linear-gradient(45deg, var(--mood-grounded), #38f9d7); }
     &.air { background: linear-gradient(45deg, #fa709a, #fee140); }
     &.lightning { background: linear-gradient(45deg, #a8edea, #fed6e3); }
     &.dark { background: linear-gradient(45deg, #2c3e50, #34495e); }
@@ -155,7 +155,7 @@
     bottom: 30px;
     left: $spacing-sm;
     background: rgba($color-error-red, 0.8);
-    color: white;
+    color: $color-text-main;
     font-size: $font-size-xs;
     font-weight: bold;
     padding: $spacing-xs $spacing-sm;
@@ -302,10 +302,10 @@
 }
 .rarity-badge {
     position: absolute; top: 5px; right: 5px;
-    background: linear-gradient(135deg, gold, #ffae00);
-    color: black; font-size: 9px; font-weight: bold;
+    background: linear-gradient(135deg, $color-gold, darken($color-gold, 15%));
+    color: $color-bg-dark; font-size: 9px; font-weight: bold;
     padding: 2px 5px; border-radius: 4px;
-    border: 1px solid rgba(0,0,0,0.5);
+    border: 1px solid rgba($color-bg-dark, 0.5);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
     z-index: 10; pointer-events: none;
     font-family: 'Arial Black', sans-serif;
@@ -314,13 +314,13 @@
 /* Deck Manager */
 .deck-slot-btn {
     padding: 8px 12px; font-size: 11px; border: 1px solid $glass-border-color; 
-    background: rgba(0,0,0,0.5); border-radius: 6px; cursor: pointer; color: #888;
+    background: rgba($color-bg-dark, 0.5); border-radius: 6px; cursor: pointer; color: $color-text-muted;
 }
 .deck-slot-btn.active { border-color: $color-neon-cyan; color: $color-neon-cyan; box-shadow: 0 0 10px $color-neon-cyan; }
 .deck-slot-btn.locked { opacity: 0.4; cursor: not-allowed; }
 
 .card-mini {
-    width: 90px; height: 120px; background: #111; border: 1px solid $glass-border-color;
+    width: 90px; height: 120px; background: $color-bg-dark; border: 1px solid $glass-border-color;
     border-radius: 8px; cursor: grab; position: relative;
 }
 .card-mini:active { cursor: grabbing; }
@@ -341,7 +341,7 @@
 .rumor-board-container {
     margin-top: 15px;
     padding: 10px;
-    background: rgba(0,0,0,0.2);
+    background: rgba($color-bg-dark, 0.2);
     border-radius: 12px;
     border: 1px solid $glass-border-color;
     max-height: 200px; /* Limit height */
@@ -383,7 +383,7 @@
 
 .rumor-timer {
     font-size: 0.8em;
-    color: #888;
+    color: $color-text-muted;
     margin-left: 10px;
 }
 

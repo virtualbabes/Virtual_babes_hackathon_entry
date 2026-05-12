@@ -52,6 +52,29 @@
     }
 }
 
+.courthouse-panel {
+    width: 450px;
+    text-align: center;
+    border-color: $color-error-red;
+
+    h2 { letter-spacing: 3px; }
+    .infamy-status { font-size: $font-size-sm; opacity: 0.8; }
+    
+    .fine-display-box {
+        background: rgba($color-error-red, 0.1);
+        border-color: rgba($color-error-red, 0.3);
+        padding: $spacing-md;
+        margin: $spacing-lg;
+
+        .fine-label { font-size: $font-size-xs; opacity: 0.7; }
+        .fine-amount { font-size: 1.8em; color: $color-neon-green; display: block; }
+        .fine-subtext { font-size: $font-size-xs; opacity: 0.5; margin-top: $spacing-xs; }
+    }
+
+    .rehabilitation-text { font-size: $font-size-sm; opacity: 0.6; padding: 0 $spacing-lg; }
+    .btn-lurk { border-color: $color-text-secondary; color: $color-text-secondary; }
+}
+
 // Criminality Actions Grid
 .criminality-actions {
     display: grid;
@@ -628,6 +651,62 @@
     }
 }
 
+.security-sentry-panel {
+    width: 550px;
+    text-align: center;
+    border-color: $color-neon-cyan;
+
+    h2 { color: $color-neon-cyan; letter-spacing: 2px; }
+    .description { font-size: $font-size-sm; opacity: 0.7; margin-bottom: $spacing-lg; }
+    
+    .defense-section { text-align: left; margin-bottom: $spacing-lg; }
+    .section-label { color: $color-neon-cyan; font-weight: bold; opacity: 0.5; text-transform: uppercase; }
+    
+    .active-trap-item { padding: $spacing-sm $spacing-md; border-color: $color-neon-green; }
+    .trap-online-status { color: $color-neon-green; font-size: 10px; }
+
+    .available-hardware-section { text-align: left; }
+    .hardware-item { padding: $spacing-sm; margin: 0; }
+    .hardware-item .desc { font-size: $font-size-xs; opacity: 0.6; }
+    .hardware-item .count { font-size: 11px; opacity: 0.8; }
+    .btn-deploy-trap { font-size: 10px; padding: 5px 15px; }
+}
+
+.bounty-board-panel {
+    width: 500px;
+    text-align: center;
+    border-color: $color-gold;
+
+    h2 { color: $color-gold; letter-spacing: 3px; }
+    .description { font-size: $font-size-sm; opacity: 0.7; margin-bottom: $spacing-lg; }
+    .targets-scroll-list { max-height: 400px; overflow-y: auto; padding-right: 5px; }
+    
+    .bounty-target-item { padding: $spacing-md; border-color: $color-gold; }
+    .bounty-target-info { text-align: left; }
+    .bounty-target-name { color: $color-gold; }
+    .bounty-target-level { font-size: $font-size-xs; opacity: 0.6; }
+    .bounty-target-reward { text-align: right; }
+    .bounty-amount { color: $color-neon-green; font-weight: bold; }
+    .btn-hunt-target { font-size: 10px; padding: 6px 12px; border-color: $color-gold; color: $color-gold; }
+    .self-target-notice { font-size: 10px; color: $color-error-red; }
+}
+
+.rumor-mill-panel {
+    width: 600px;
+    text-align: center;
+
+    h2 { color: $color-neon-green; letter-spacing: 3px; }
+    .description { font-size: $font-size-sm; opacity: 0.7; margin-bottom: $spacing-lg; }
+    .targets-scroll-list { max-height: 400px; overflow-y: auto; padding-right: 5px; }
+
+    .rumor-target-item { padding: $spacing-sm; border-color: $glass-border-color; }
+    .rumor-target-info { text-align: left; }
+    .rumor-target-name { color: $color-neon-cyan; }
+    .rumor-target-stats { font-size: $font-size-xs; opacity: 0.6; }
+    .btn-rumor-positive { font-size: 9px; padding: 4px 8px; border-color: $color-neon-green; color: $color-neon-green; }
+    .btn-rumor-negative { font-size: 9px; padding: 4px 8px; border-color: $color-error-red; color: $color-error-red; }
+}
+
 // Criminality Risk Assessment
 .criminality-risk {
     @include neon-glass-panel;
@@ -754,6 +833,55 @@
     max-width: 400px;
     padding: 20px;
     border-color: $color-error-red;
+
+    .ransom-amount { color: $color-neon-cyan; font-weight: bold; }
+    .pay-ransom-btn { background: $color-error-red; &:hover { background: darken($color-error-red, 10%); } }
+    .kidnap-victim-info { opacity: 0.7; font-size: 0.9em; }
+}
+
+.criminality-panel.heist-terminal {
+    width: 700px;
+    max-height: 90vh;
+
+    .criminality-title { text-shadow: 0 0 15px rgba($color-error-red, 0.5); }
+    .stat-label-red { color: $color-error-red; opacity: 0.7; }
+    .stat-value-red { color: $color-error-red; }
+    .stat-label-cyan { color: $color-neon-cyan; opacity: 0.7; }
+    .stat-value-cyan { color: $color-neon-cyan; }
+
+    .targets-title { font-size: 0.85em; opacity: 0.6; letter-spacing: 2px; }
+    .targets-list-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; max-height: 300px; }
+    
+    .target-name { font-size: 1.1em; }
+    .detail-item.wealth { color: $color-neon-green; font-weight: bold; }
+    .detail-item.level { opacity: 0.6; font-size: 0.9em; }
+
+    .security-details { font-size: 0.75em; opacity: 0.5; }
+    .btn-execute-strike { letter-spacing: 2px; }
+}
+
+.kidnap-selection-panel {
+    @include neon-glass-panel;
+    width: 450px;
+    border-color: $color-warning-orange;
+
+    .criminality-header { border-bottom-color: rgba($color-warning-orange, 0.3); }
+    .criminality-title { color: $color-warning-orange; text-shadow: 0 0 10px rgba($color-warning-orange, 0.5); }
+    p { font-size: 0.9em; opacity: 0.8; }
+
+    .hostage-card {
+        border: 2px solid $color-error-red;
+        background: rgba($color-error-red, 0.1);
+        box-shadow: 0 0 10px rgba($color-error-red, 0.5);
+        padding: $spacing-md;
+        margin: $spacing-lg 0;
+
+        .label { font-size: $font-size-xs; opacity: 0.5; letter-spacing: 1px; }
+        .owner-wallet { font-size: 1.2em; color: $color-error-red; }
+        .quote { font-size: $font-size-sm; opacity: 0.6; }
+    }
+
+    .btn-execute-kidnap { background: $color-error-red; color: white; }
 }
 
 .hostage-card {
