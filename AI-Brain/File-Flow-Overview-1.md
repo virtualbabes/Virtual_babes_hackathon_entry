@@ -866,3 +866,76 @@ This category encompasses the core structural and styling files that define the 
     *   **Synergy**:
         *   **`Public/index.html`**: HTML elements are directly annotated with these utility classes (e.g., `flex-row`, `gap-15`, `mb-20`, `w-full`) to define their layout and spacing.
         *   **`Public/src/scss/base/_variables.scss`**: Relies on the `$spacing-scale` and other variables for consistent sizing.
+
+## 6. UI-Map
+graph TD
+    subgraph "SCSS Source (Modular Partials)"
+        VAR[base/_variables.scss] --> BASE
+        VAR --> COMP
+        VAR --> FEAT
+        VAR --> LAY
+        VAR --> UTIL
+        VAR --> THEME
+
+        subgraph "Base Layer"
+            BASE[base/_reset.scss<br/>base/_typography.scss]
+        end
+
+        subgraph "Thematic Mixins"
+            THEME[themes/_neon-glass.scss]
+        end
+
+        subgraph "Component Layer"
+            COMP[components/_buttons.scss<br/>components/_cards.scss<br/>components/_overlays.scss]
+        end
+
+        subgraph "Feature Specifics"
+            FEAT[features/_criminality.scss<br/>features/_economy.scss<br/>features/_shops.scss<br/>features/_social.scss<br/>features/_territory.scss]
+        end
+
+        subgraph "Structural Layouts"
+            LAY[layouts/_dashboard.scss<br/>layouts/_main-layout.scss]
+        end
+
+        subgraph "Utilities & Anim"
+            UTIL[utilities/_animations.scss<br/>utilities/_spacing.scss]
+        end
+
+        THEME -.->|@include neon-glass-panel| COMP
+        THEME -.->|@include neon-glass-panel| FEAT
+        THEME -.->|@include neon-glass-panel| LAY
+    end
+
+    %% Aggregation
+    BASE --> MAIN[main.scss]
+    COMP --> MAIN
+    FEAT --> MAIN
+    LAY --> MAIN
+    THEME --> MAIN
+    UTIL --> MAIN
+
+    subgraph "Build Process"
+        MAIN -- "Sass Compiler" --> CSS[styles.css]
+        MAIN -- "Generates" --> MAP[styles.css.map]
+    end
+
+    subgraph "Browser Execution"
+        HTML[index.html] -- "Links" --> CSS
+        CSS -- "References for Debugging" --> MAP
+        MAP -- "Maps back to" --> MAIN
+    end
+
+    %% Styling individual nodes for clarity
+    style MAIN fill:#00ffff,stroke:#333,stroke-width:2px,color:#000
+    style CSS fill:#ff00ff,stroke:#333,stroke-width:2px,color:#fff
+    style HTML fill:#ffff00,stroke:#333,stroke-width:2px,color:#000
+    style MAP fill:#888,stroke-dasharray: 5 5
+
+
+# Dependencies (_variables.scss): Every partial relies on the variables defined here for the "Neon-Glass" color palette and spacing scales.
+Thematic Integration (_neon-glass.scss): This file contains the neon-glass-panel mixin, which is applied across components, features, and layouts to ensure consistent glassmorphism and neon borders.
+Aggregation (main.scss): This acts as the manifest, importing all modular partials in a specific order (Variables > Base > Components > Features > Layouts > Utilities).
+The Artifacts:
+styles.css: The optimized, flat file actually used by the browser.
+styles.css.map: A JSON file that allows browser developer tools to show you exactly which .scss file and line number a style comes from, even though it's viewing the compiled .css.
+The Consumer (index.html): Links the compiled CSS in the <head>, which then styles the dynamic elements rendered by the JavaScript orchestrators (app.js, ui.js).
