@@ -644,3 +644,41 @@ graph TD
     
     
 ## 5. UI-File-sys-Flow
+The UI of Virtualbabes Arena is built with a strong emphasis on a "neon-glass" aesthetic, dynamic content, and responsiveness. It leverages a combination of static assets (images, videos), structural HTML, and a highly modular SCSS architecture to deliver an immersive user experience.
+
+A: Card_images (Public\Assets\Images\Cards\*.webp)
+Purpose: These .webp image files serve as the visual representation of the collectible game cards. Each file corresponds to a unique card character in the game, displaying their artwork.
+Flow: These images are loaded by the browser as <img> tags or as background-image properties for HTML elements. Their specific paths are determined dynamically by the client-side JavaScript (deck.js, game.js) based on card IDs or metadata received from the Go WASM engine or the backend.
+Hierarchy: These are low-level static visual assets, forming the core visual identity of the game's primary interactive elements (the cards).
+Synergy:
+Public/app.js, Public/js/game.js, Public/js/deck.js: These JavaScript modules are responsible for dynamically creating and updating the HTML elements that display these card images (e.g., in the player's hand, on the game board, or in the deck manager). They construct the image src attributes using these file paths.
+Public/main.wasm (Go WASM Engine): The WASM engine holds the game state, including which cards are in a player's hand or on the board. It provides card metadata (like card ID) to JavaScript, which then maps to the correct image file.
+Public/src/scss/components/_cards.scss: This SCSS file defines the visual styling for how these card images are presented, including their dimensions, borders, shadows, and animations (e.g., .playing-card, .card-mini).
+Backend (oracle_service.go): Fetches and provides metadata for these cards (including their image URLs) from blockchain indexers, ensuring that the client displays authenticated assets.
+B: Fan_fare_Avatars (Public\Assets\Images\portraits\*\*.mp4, *.webp, *.png)
+Purpose: This collection provides visual assets for player avatars and NPC portraits. It includes both static (.webp, .png) and animated (.mp4) formats to offer dynamic and expressive character representations. The different subdirectories (Boss, cute, Lady, Mini-Boss, Witch) categorize avatars by character type or role.
+Flow:
+Static images (.webp, .png): Loaded into <img> tags for display in various UI components (e.g., player profiles, leaderboards).
+Animated videos (.mp4): Loaded into <video> tags, typically configured for looping and autoplay, to provide dynamic flair for key characters or player selections.
+The deck.js module specifically handles the selection, preview, and cropping of these avatars during player setup.
+Hierarchy: These are static/animated visual assets representing player and NPC identities, used across various UI screens.
+Synergy:
+Public/app.js, Public/js/ui.js, Public/js/deck.js: These modules dynamically render avatars in elements like #p1-avatar, #p2-avatar, and the avatar selection grid in the setup overlay. deck.js manages the interactive cropping and selection process, potentially sending the chosen avatar URL to the backend.
+Public/main.wasm (Go WASM Engine): Stores the player's selected avatar URL as part of their profile, which JavaScript retrieves for display.
+Public/src/scss/components/_dashboard.scss (specifically .avatar-frame): Styles the display of avatars, including their circular frames, borders, and sizes.
+Backend (oracle_service.go, deck.go - if avatar registration is a backend call): Stores and retrieves the selected avatar URLs, and may handle the storage of custom-cropped avatars.
+C: Textures (Public\Assets\Textures\*.png)
+Purpose: These .png files provide background textures for the game arena, allowing the visual theme of the battleground to change dynamically based on the match context (e.g., standard, challenge, tournament).
+Flow: These images are typically set as background-image properties for specific HTML elements (e.g., the game board container). The choice of texture is dynamic, based on the current game mode.
+Hierarchy: Background visual assets, providing environmental context.
+Synergy:
+Public/app.js, Public/js/ui.js: The ui.js module (specifically the updateDynamicArenaFloor function, as indicated by its import in ui.js) is responsible for dynamically changing the background-image of the game board element in index.html based on the match type.
+Public/src/scss/layouts/_dashboard.scss: May define base styling for the arena floor element, which is then overridden or augmented by JavaScript to apply specific textures.
+D: UI_filesys
+This category encompasses the core structural and styling files that define the entire frontend user interface.
+
+Public\index.html
+Purpose: This is the single entry point for the Virtualbabes Arena web application. It defines the fundamental HTML structure, loads all essential scripts (WASM runtime, main JavaScript application, blockchain SDKs), and links the primary stylesheet. It contains static UI elements and placeholders (divs with IDs) where dynamic content will be injected by JavaScript.
+Flow: The browser first loads this file. It then sequentially loads styles.css, wasm_exec.js, app.js, and various external SDKs (Buffer, Algorand SDK, WalletConnect). It also contains inline onclick event handlers that trigger functions defined in app.js.
+Hierarchy: The root of the entire client-side application's DOM structure. All other UI components and scripts are loaded into or interact with elements defined here.
+Synergy
