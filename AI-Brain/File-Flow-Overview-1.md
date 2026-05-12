@@ -642,43 +642,227 @@ graph TD
     ORACLE -- Indexer Data --> TOURN
     ORACLE -- NFT Metadata --> TYPES
     
-    
+
 ## 5. UI-File-sys-Flow
+
 The UI of Virtualbabes Arena is built with a strong emphasis on a "neon-glass" aesthetic, dynamic content, and responsiveness. It leverages a combination of static assets (images, videos), structural HTML, and a highly modular SCSS architecture to deliver an immersive user experience.
 
-A: Card_images (Public\Assets\Images\Cards\*.webp)
-Purpose: These .webp image files serve as the visual representation of the collectible game cards. Each file corresponds to a unique card character in the game, displaying their artwork.
-Flow: These images are loaded by the browser as <img> tags or as background-image properties for HTML elements. Their specific paths are determined dynamically by the client-side JavaScript (deck.js, game.js) based on card IDs or metadata received from the Go WASM engine or the backend.
-Hierarchy: These are low-level static visual assets, forming the core visual identity of the game's primary interactive elements (the cards).
-Synergy:
-Public/app.js, Public/js/game.js, Public/js/deck.js: These JavaScript modules are responsible for dynamically creating and updating the HTML elements that display these card images (e.g., in the player's hand, on the game board, or in the deck manager). They construct the image src attributes using these file paths.
-Public/main.wasm (Go WASM Engine): The WASM engine holds the game state, including which cards are in a player's hand or on the board. It provides card metadata (like card ID) to JavaScript, which then maps to the correct image file.
-Public/src/scss/components/_cards.scss: This SCSS file defines the visual styling for how these card images are presented, including their dimensions, borders, shadows, and animations (e.g., .playing-card, .card-mini).
-Backend (oracle_service.go): Fetches and provides metadata for these cards (including their image URLs) from blockchain indexers, ensuring that the client displays authenticated assets.
-B: Fan_fare_Avatars (Public\Assets\Images\portraits\*\*.mp4, *.webp, *.png)
-Purpose: This collection provides visual assets for player avatars and NPC portraits. It includes both static (.webp, .png) and animated (.mp4) formats to offer dynamic and expressive character representations. The different subdirectories (Boss, cute, Lady, Mini-Boss, Witch) categorize avatars by character type or role.
-Flow:
-Static images (.webp, .png): Loaded into <img> tags for display in various UI components (e.g., player profiles, leaderboards).
-Animated videos (.mp4): Loaded into <video> tags, typically configured for looping and autoplay, to provide dynamic flair for key characters or player selections.
-The deck.js module specifically handles the selection, preview, and cropping of these avatars during player setup.
-Hierarchy: These are static/animated visual assets representing player and NPC identities, used across various UI screens.
-Synergy:
-Public/app.js, Public/js/ui.js, Public/js/deck.js: These modules dynamically render avatars in elements like #p1-avatar, #p2-avatar, and the avatar selection grid in the setup overlay. deck.js manages the interactive cropping and selection process, potentially sending the chosen avatar URL to the backend.
-Public/main.wasm (Go WASM Engine): Stores the player's selected avatar URL as part of their profile, which JavaScript retrieves for display.
-Public/src/scss/components/_dashboard.scss (specifically .avatar-frame): Styles the display of avatars, including their circular frames, borders, and sizes.
-Backend (oracle_service.go, deck.go - if avatar registration is a backend call): Stores and retrieves the selected avatar URLs, and may handle the storage of custom-cropped avatars.
-C: Textures (Public\Assets\Textures\*.png)
-Purpose: These .png files provide background textures for the game arena, allowing the visual theme of the battleground to change dynamically based on the match context (e.g., standard, challenge, tournament).
-Flow: These images are typically set as background-image properties for specific HTML elements (e.g., the game board container). The choice of texture is dynamic, based on the current game mode.
-Hierarchy: Background visual assets, providing environmental context.
-Synergy:
-Public/app.js, Public/js/ui.js: The ui.js module (specifically the updateDynamicArenaFloor function, as indicated by its import in ui.js) is responsible for dynamically changing the background-image of the game board element in index.html based on the match type.
-Public/src/scss/layouts/_dashboard.scss: May define base styling for the arena floor element, which is then overridden or augmented by JavaScript to apply specific textures.
-D: UI_filesys
+#### A: Card_images (`Public\Assets\Images\Cards\*.webp`)
+
+*   **Purpose**: These `.webp` image files serve as the visual representation of the collectible game cards. Each file corresponds to a unique card character in the game, displaying their artwork.
+*   **Flow**: These images are loaded by the browser as `<img>` tags or as `background-image` properties for HTML elements. Their specific paths are determined dynamically by the client-side JavaScript (`deck.js`, `game.js`) based on card IDs or metadata received from the Go WASM engine or the backend.
+*   **Hierarchy**: These are low-level static visual assets, forming the core visual identity of the game's primary interactive elements (the cards).
+*   **Synergy**:
+    *   **`Public/app.js`, `Public/js/game.js`, `Public/js/deck.js`**: These JavaScript modules are responsible for dynamically creating and updating the HTML elements that display these card images (e.g., in the player's hand, on the game board, or in the deck manager). They construct the image `src` attributes using these file paths.
+    *   **`Public/main.wasm` (Go WASM Engine)**: The WASM engine holds the game state, including which cards are in a player's hand or on the board. It provides card metadata (like card ID) to JavaScript, which then maps to the correct image file.
+    *   **`Public/src/scss/components/_cards.scss`**: This SCSS file defines the visual styling for how these card images are presented, including their dimensions, borders, shadows, and animations (e.g., `.playing-card`, `.card-mini`).
+    *   **Backend (`oracle_service.go`)**: Fetches and provides metadata for these cards (including their image URLs) from blockchain indexers, ensuring that the client displays authenticated assets.
+
+#### B: Fan_fare_Avatars (`Public\Assets\Images\portraits\*\*.mp4`, `*.webp`, `*.png`)
+
+*   **Purpose**: This collection provides visual assets for player avatars and NPC portraits. It includes both static (`.webp`, `.png`) and animated (`.mp4`) formats to offer dynamic and expressive character representations. The different subdirectories (`Boss`, `cute`, `Lady`, `Mini-Boss`, `Witch`) categorize avatars by character type or role.
+*   **Flow**:
+    *   Static images (`.webp`, `.png`): Loaded into `<img>` tags for display in various UI components (e.g., player profiles, leaderboards).
+    *   Animated videos (`.mp4`): Loaded into `<video>` tags, typically configured for looping and autoplay, to provide dynamic flair for key characters or player selections.
+    *   The `deck.js` module specifically handles the selection, preview, and cropping of these avatars during player setup.
+*   **Hierarchy**: These are static/animated visual assets representing player and NPC identities, used across various UI screens.
+*   **Synergy**:
+    *   **`Public/app.js`, `Public/js/ui.js`, `Public/js/deck.js`**: These modules dynamically render avatars in elements like `#p1-avatar`, `#p2-avatar`, and the avatar selection grid in the setup overlay. `deck.js` manages the interactive cropping and selection process, potentially sending the chosen avatar URL to the backend.
+    *   **`Public/main.wasm` (Go WASM Engine)**: Stores the player's selected avatar URL as part of their profile, which JavaScript retrieves for display.
+    *   **`Public/src/scss/layouts/_dashboard.scss` (specifically `.avatar-frame`)**: Styles the display of avatars, including their circular frames, borders, and sizes.
+    *   **Backend (`oracle_service.go`, `deck.go` - if avatar registration is a backend call)**: Stores and retrieves the selected avatar URLs, and may handle the storage of custom-cropped avatars.
+
+#### C: Textures (`Public\Assets\Textures\*.png`)
+
+*   **Purpose**: These `.png` files provide background textures for the game arena, allowing the visual theme of the battleground to change dynamically based on the match context (e.g., standard, challenge, tournament).
+*   **Flow**: These images are typically set as `background-image` properties for specific HTML elements (e.g., the game board container). The choice of texture is dynamic, based on the current game mode.
+*   **Hierarchy**: Background visual assets, providing environmental context.
+*   **Synergy**:
+    *   **`Public/app.js`, `Public/js/ui.js`**: The `ui.js` module (specifically the `updateDynamicArenaFloor` function, as indicated by its import in `ui.js`) is responsible for dynamically changing the `background-image` of the game board element in `index.html` based on the match type.
+    *   **`Public/src/scss/layouts/_dashboard.scss`**: May define base styling for the arena floor element, which is then overridden or augmented by JavaScript to apply specific textures.
+
+#### D: UI_filesys
+
 This category encompasses the core structural and styling files that define the entire frontend user interface.
 
-Public\index.html
-Purpose: This is the single entry point for the Virtualbabes Arena web application. It defines the fundamental HTML structure, loads all essential scripts (WASM runtime, main JavaScript application, blockchain SDKs), and links the primary stylesheet. It contains static UI elements and placeholders (divs with IDs) where dynamic content will be injected by JavaScript.
-Flow: The browser first loads this file. It then sequentially loads styles.css, wasm_exec.js, app.js, and various external SDKs (Buffer, Algorand SDK, WalletConnect). It also contains inline onclick event handlers that trigger functions defined in app.js.
-Hierarchy: The root of the entire client-side application's DOM structure. All other UI components and scripts are loaded into or interact with elements defined here.
-Synergy
+*   **`Public\index.html`**
+    *   **Purpose**: This is the single entry point for the Virtualbabes Arena web application. It defines the fundamental HTML structure, loads all essential scripts (WASM runtime, main JavaScript application, blockchain SDKs), and links the primary stylesheet. It contains static UI elements and placeholders (`div`s with IDs) where dynamic content will be injected by JavaScript.
+    *   **Flow**: The browser first loads this file. It then sequentially loads `styles.css`, `wasm_exec.js`, `app.js`, and various external SDKs (Buffer, Algorand SDK, WalletConnect). It also contains inline `onclick` event handlers that trigger functions defined in `app.js`.
+    *   **Hierarchy**: The root of the entire client-side application's DOM structure. All other UI components and scripts are loaded into or interact with elements defined here.
+    *   **Synergy**:
+        *   **`Public/app.js`**: The primary JavaScript file that manipulates the DOM elements defined in `index.html`. It populates dynamic content, attaches event listeners, and controls the visibility of various sections and overlays.
+        *   **`Public/styles.css`**: Provides the visual styling for all elements within `index.html`.
+        *   **`Public/wasm_exec.js`**: Loaded by `index.html` to enable the execution of the Go WASM game engine.
+        *   **`Public/js/wallet.js`, `Public/js/leaderboard.js`, `Public/js/deck.js`, `Public/js/economy.js`, `Public/js/criminality.js`, `Public/js/admin.js`, `Public/js/ui.js`**: These modules contain functions that directly interact with specific DOM elements (e.g., buttons, input fields, display areas) defined in `index.html` to render data, handle user input, and manage UI state.
+        *   **`Public/Assets/Images/portraits/*.svg` (inline in `wallet-selector-overlay`)**: The SVG data for wallet icons is directly embedded in the HTML, providing immediate visual feedback for wallet options.
+
+*   **`Public\styles.css`**
+    *   **Purpose**: This is the compiled CSS file that applies all the visual styling to the `index.html`. It's generated from the SCSS source files.
+    *   **Flow**: Loaded by `index.html` early in the page load process, ensuring that styles are applied before JavaScript renders dynamic content.
+    *   **Hierarchy**: The final output of the SCSS pre-processing, directly consumed by the browser.
+    *   **Synergy**:
+        *   **`Public/index.html`**: The target for all its styles.
+        *   **`Public/src/scss/*.scss`**: Its source code. Any changes to SCSS files are compiled into this `styles.css`.
+        *   **`Public/app.js`, `Public/js/ui.js`**: These JavaScript files might dynamically add or remove CSS classes (e.g., `hidden`, `active`, `error`, `success`) to HTML elements, which then trigger styles defined in `styles.css`.
+
+*   **`Public\src\scss\main.scss`**
+    *   **Purpose**: This is the main entry point for the SCSS compilation process. It imports all other SCSS partials, organizing them into a logical structure.
+    *   **Flow**: A SCSS pre-processor reads `main.scss`, resolves all `@import` statements, and compiles the entire stylesheet into a single `Public/styles.css` file.
+    *   **Hierarchy**: The root of the SCSS architecture, defining the order in which styles are processed.
+    *   **Synergy**:
+        *   **All other `Public/src/scss/*.scss` files**: It imports them, bringing all styling rules together.
+        *   **Build process (e.g., `npm run build-css` or similar script)**: This file is the input for the SCSS compiler.
+
+*   **`Public\src\scss\base\_reset.scss`**
+    *   **Purpose**: Provides a CSS reset to ensure consistent styling across different browsers and establishes fundamental base styles for common HTML elements (e.g., `body`, `h1-h6`, `p`, `a`, `ul`, `ol`, `button`, `img`, `table`). It also defines custom scrollbar styles for Webkit browsers.
+    *   **Flow**: Imported by `main.scss` early in the compilation process to apply foundational styles before more specific component or layout styles.
+    *   **Hierarchy**: Base-level styling, affecting the entire document.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Sets the default appearance for all raw HTML elements.
+        *   **`Public/src/scss/base/_variables.scss`**: Utilizes variables like `$font-body`, `$color-text-main`, `$spacing-md`, `$border-radius-md` for consistent theming.
+
+*   **`Public\src\scss\base\_typography.scss`**
+    *   **Purpose**: Defines specific typographic styles, including font families, sizes, weights, colors, and text transformations, with a focus on the "neon-glass" aesthetic. It includes utility classes for common text styles and responsive adjustments.
+    *   **Flow**: Imported by `main.scss` after `_reset.scss` to apply specific text styling rules.
+    *   **Hierarchy**: Base-level styling, focusing on text presentation.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Styles headings, paragraphs, and other text content.
+        *   **`Public/src/scss/base/_variables.scss`**: Heavily relies on variables for `$font-heading`, `$font-body`, `$color-neon-cyan`, `$font-size-xl`, etc.
+        *   **`Public/app.js`, `Public/js/ui.js`**: JavaScript might dynamically add utility classes (e.g., `text-neon-green`, `font-bold`) to text elements.
+
+*   **`Public\src\scss\base\_variables.scss`**
+    *   **Purpose**: Acts as the central repository for all design tokens and global constants, including color palettes, font definitions, spacing scales, border radii, shadows, z-indices, transitions, and breakpoints. It also defines component-specific variables like avatar and card sizes.
+    *   **Flow**: Imported by almost all other SCSS files. It must be imported first within any file that uses its variables.
+    *   **Hierarchy**: The absolute foundation of the visual design system.
+    *   **Synergy**:
+        *   **All other `Public/src/scss/*.scss` files**: Provides consistent values for styling throughout the application.
+        *   **`Public/app.js`**: Dynamically sets CSS variables like `--arena-mood-color` based on game state, which are then used in SCSS.
+
+*   **`Public\src\scss\components\_buttons.scss`**
+    *   **Purpose**: Defines the styling for all interactive buttons in the application, including base styles, primary glowing buttons, outline buttons, secondary buttons, and specific styles for success, danger, and warning actions. It also includes size variants and styles for wallet connection options.
+    *   **Flow**: Imported by `main.scss` to apply styling to button elements.
+    *   **Hierarchy**: Component-level styling, specific to buttons.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Buttons defined in the HTML (`<button>`) will automatically pick up these styles.
+        *   **`Public/app.js`, `Public/js/ui.js`, `Public/js/wallet.js`**: JavaScript controls button states (e.g., `disabled`, adding/removing classes like `active`, `loading`) which are styled here.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses color variables (`$color-neon-purple`, `$color-error-red`), spacing (`$spacing-md`), and border radii (`$border-radius-md`).
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: The `.wallet-option` uses the `neon-glass-panel` mixin.
+
+*   **`Public\src\scss\components\_cards.scss`**
+    *   **Purpose**: Styles the visual presentation of game cards, including their dimensions, appearance, rarity indicators, type icons, debuff badges, and interactive states (hover, selected, disabled). It also defines styles for card grids and tooltips.
+    *   **Flow**: Imported by `main.scss` to style card elements.
+    *   **Hierarchy**: Component-level styling, specific to game cards.
+    *   **Synergy**:
+        *   **`Public/app.js`, `Public/js/game.js`, `Public/js/deck.js`**: These JavaScript modules dynamically generate the HTML for cards using `renderCardHTML` and apply classes (e.g., `selected-card`, `disabled`, `common`, `rare`, `epic`, `legendary`) that are styled here.
+        *   **`Public/main.wasm` (Go WASM Engine)**: Provides card data (power, rarity, mood, artifact) that JavaScript uses to determine which classes to apply.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$card-width`, `$card-height`, `$color-neon-cyan`, `$glass-blur`, etc.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines keyframe animations (`card-enter`, `card-exit`, `card-flip`) used for card transitions.
+
+*   **`Public\src\scss\components\_overlays.scss`**
+    *   **Purpose**: Provides generic and specific styling for all modal overlays and pop-up windows in the application (e.g., settings, wallet selector, deck manager, admin panel, tournament bracket, match preview, kidnap gambit, Hall of Fame). It includes base overlay styles, content containers, headers, bodies, and footers.
+    *   **Flow**: Imported by `main.scss` to style overlay elements.
+    *   **Hierarchy**: Component-level styling, specific to overlays.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Defines the base HTML structure for all overlays (e.g., `<div class="overlay hidden">`).
+        *   **`Public/app.js`, `Public/js/ui.js`, and other feature-specific JS files**: JavaScript controls the visibility of these overlays by adding/removing the `hidden` class. It also dynamically populates their content.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$z-index-modal`, `$glass-blur`, `$spacing-lg`, `$border-radius-xl`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Heavily uses the `neon-glass-panel` mixin for the distinctive UI aesthetic.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines animations like `animate-modal` for overlay transitions.
+
+*   **`Public\src\scss\features\_criminality.scss`**
+    *   **Purpose**: Styles the UI elements related to the game's criminality features, such as the criminality panel, heist actions, target selection, risk assessment, and results display. It emphasizes a red/orange color palette to convey danger and warning.
+    *   **Flow**: Imported by `main.scss` to style criminality-specific UI.
+    *   **Hierarchy**: Feature-specific styling.
+    *   **Synergy**:
+        *   **`Public/js/criminality.js`**: This JavaScript module dynamically generates and manipulates the HTML for criminality features, applying classes and IDs that are styled here.
+        *   **`Public/app.js`**: Calls functions in `criminality.js` to open and manage these overlays.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$color-error-red`, `$color-warning-orange`, `$color-neon-purple`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines animations like `progress-shine` and `risk-pulse`.
+
+*   **`Public\src\scss\features\_economy.scss`**
+    *   **Purpose**: Styles the UI elements for economic features, including the economy panel, market ticker, auction gallery, second-hand store (loans), and black market. It uses green and cyan tones to represent wealth and digital interfaces.
+    *   **Flow**: Imported by `main.scss` to style economy-specific UI.
+    *   **Hierarchy**: Feature-specific styling.
+    *   **Synergy**:
+        *   **`Public/js/economy.js`**: This JavaScript module dynamically generates and manipulates the HTML for economic features, applying classes and IDs that are styled here.
+        *   **`Public/app.js`**: Calls functions in `economy.js` to open and manage these overlays.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$color-neon-green`, `$color-neon-cyan`, `$color-neon-purple`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines animations like `ticker-scroll`.
+
+*   **`Public\src\scss\features\_shops.scss`**
+    *   **Purpose**: Styles the UI for district shops, including shop panels, categories, item grids, filters, shopping cart, and special offers. It often uses purple and cyan tones.
+    *   **Flow**: Imported by `main.scss` to style shop-specific UI.
+    *   **Hierarchy**: Feature-specific styling.
+    *   **Synergy**:
+        *   **`Public/js/economy.js`**: This JavaScript module (specifically `openShopsOverlay`, `switchShopCategory`, `buyClubItem`) dynamically generates and manipulates the HTML for shop features, applying classes and IDs that are styled here.
+        *   **`Public/app.js`**: Calls functions in `economy.js` to open and manage these overlays.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$color-neon-purple`, `$color-neon-cyan`, `$color-gold`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin.
+
+*   **`Public\src\scss\features\_social.scss`**
+    *   **Purpose**: Styles the UI for social features, including the social panel, achievement system (trophies), career paths, entity portfolio, and social network connections. It uses a mix of gold, blue, and pink tones.
+    *   **Flow**: Imported by `main.scss` to style social-specific UI.
+    *   **Hierarchy**: Feature-specific styling.
+    *   **Synergy**:
+        *   **`Public/js/criminality.js` (for `openSocialPanelOverlay`, `switchSocialTab`)**: This JavaScript module dynamically generates and manipulates the HTML for social features, applying classes and IDs that are styled here.
+        *   **`Public/app.js`**: Calls functions in `criminality.js` to open and manage these overlays.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$color-gold`, `$color-neon-blue`, `$color-neon-pink`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines animations like `badge-glow`.
+
+*   **`Public\src\scss\features\_territory.scss`**
+    *   **Purpose**: Styles the UI for territory management, including the territory panel, 3D world map, districts, club foundry, regional governor status, and conflicts. It uses purple, cyan, and blue tones for a futuristic, strategic feel.
+    *   **Flow**: Imported by `main.scss` to style territory-specific UI.
+    *   **Hierarchy**: Feature-specific styling.
+    *   **Synergy**:
+        *   **`Public/app.js` (for `openTerritoryMapOverlay`, `adjustMapZoom`)**: This JavaScript module dynamically generates and manipulates the HTML for territory features, applying classes and IDs that are styled here.
+        *   **`Public/js/economy.js` (for `openClubFoundry`, `submitClubFoundry`, `openTerritoryView`)**: These functions interact with the territory UI.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$color-neon-purple`, `$color-neon-cyan`, `$color-neon-blue`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin.
+        *   **`Public/src/scss/utilities/_animations.scss`**: Defines animations like `contested-pulse`.
+
+*   **`Public\src\scss\layouts\_dashboard.scss`**
+    *   **Purpose**: Defines the layout and styling for the main game dashboard, including the overall container, columns, player lists, chat interface, matchmaking box, cooldown displays, tournament banners, action bars, and match history.
+    *   **Flow**: Imported by `main.scss` to structure the primary game screen.
+    *   **Hierarchy**: Layout-level styling, organizing major UI sections.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Provides the structural `div`s (e.g., `.dashboard`, `.column`) that these styles target.
+        *   **`Public/app.js`, `Public/js/game.js`, `Public/js/ui.js`**: JavaScript dynamically populates content within these layout elements (e.g., player names, chat messages, history items) and controls their visibility.
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$spacing-lg`, `$border-radius-lg`, `$color-neon-cyan`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin to various dashboard elements.
+
+*   **`Public\src\scss\layouts\_main-layout.scss`**
+    *   **Purpose**: Defines the overarching layout for the entire application, including the main game container and the top navigation bar.
+    *   **Flow**: Imported by `main.scss` to establish the highest-level structural styles.
+    *   **Hierarchy**: Global layout styling.
+    *   **Synergy**:
+        *   **`Public/index.html`**: Provides the root layout elements (`.main-game-container`, `.top-bar`).
+        *   **`Public/app.js`, `Public/js/ui.js`**: JavaScript controls elements within this layout (e.g., wallet connection button, maintenance bar visibility).
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$spacing-md`, `$glass-border-color`, `$glass-blur`, etc.
+        *   **`Public/src/scss/themes/_neon-glass.scss`**: Applies the `neon-glass-panel` mixin to elements like status widgets.
+
+*   **`Public\src\scss\themes\_neon-glass.scss`**
+    *   **Purpose**: Defines the core "neon-glass" aesthetic through a reusable mixin (`neon-glass-panel`) and applies it to base elements. It also includes a mixin for neon text glow.
+    *   **Flow**: Imported by `main.scss` and then explicitly `@include`d by other component and feature SCSS files to apply the glassmorphism effect.
+    *   **Hierarchy**: Thematic styling, providing a consistent visual language.
+    *   **Synergy**:
+        *   **`Public/src/scss/base/_variables.scss`**: Relies entirely on variables like `$glass-bg-color`, `$glass-border-color`, `$glass-blur`, `$glass-shadow` to define the glassmorphism properties.
+        *   **All other component/feature SCSS files**: Consumes the `neon-glass-panel` mixin to apply the theme.
+
+*   **`Public\src\scss\utilities\_animations.scss`**
+    *   **Purpose**: Provides a comprehensive set of CSS animations and keyframe definitions for various UI effects (fade, slide, scale, bounce, pulse, glow, shimmer, float, spin). It also includes utility classes for applying these animations and controlling their properties (duration, delay, fill mode).
+    *   **Flow**: Imported by `main.scss` to make animation classes available globally.
+    *   **Hierarchy**: Utility-level styling, providing reusable animation effects.
+    *   **Synergy**:
+        *   **`Public/app.js`, `Public/js/ui.js`, `Public/js/particles.js`**: JavaScript dynamically adds/removes animation classes to trigger visual effects (e.g., `animate-modal`, `animate-capture-burst`).
+        *   **`Public/src/scss/base/_variables.scss`**: Uses `$transition-base`, `$color-neon-cyan`, etc. for animation properties.
+
+*   **`Public\src\scss\utilities\_spacing.scss`**
+    *   **Purpose**: Provides a utility-first approach for common layout and spacing properties, including display types, flexbox, grid, margin, padding, gap, width, height, position, z-index, overflow, text alignment, font properties, opacity, visibility, borders, shadows, cursors, object-fit, transforms, and transitions. It also includes responsive utilities.
+    *   **Flow**: Imported by `main.scss` to provide a wide range of atomic utility classes.
+    *   **Hierarchy**: Utility-level styling, offering granular control over layout and appearance.
+    *   **Synergy**:
+        *   **`Public/index.html`**: HTML elements are directly annotated with these utility classes (e.g., `flex-row`, `gap-15`, `mb-20`, `w-full`) to define their layout and spacing.
+        *   **`Public/src/scss/base/_variables.scss`**: Relies on the `$spacing-scale` and other variables for consistent sizing.
