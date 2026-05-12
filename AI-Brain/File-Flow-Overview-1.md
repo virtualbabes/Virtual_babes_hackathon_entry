@@ -579,65 +579,68 @@ Synergy: Provides the client-side game engine, ensuring deterministic and respon
 
 ## 4. Go Backend-mermaidmap
 graph TD
-    subgraph Go Backend Server
-        Main(main.go)
-        API(server/api.go)
-        WS(server/websocket.go)
-        GAME(server/game.go)
-        WALLET(server/wallet.go)
-        LEDGER(server/ledger.go)
-        AUTH(server/auth.go)
-        CARD(server/card_verification.go)
-        CRIME(server/crime_game.go)
-        ECONOMY(server/economy.go)
-        COLLECTIVE_AI(server/collective_ai.go)
+    subgraph Entry & Routing
+        SVR(server.go)
     end
 
-    subgraph External Services
-        ALCHEMY(Alchemy API)
-        DEEPINFRA(DeepInfra AI)
-        DRAGONFLY(Dragonfly API)
-        ENVOI(Envoi API)
-        METADATA(IPFS/NFT Metadata Services)
-        WALLET_API(External Wallet Services)
+    subgraph Core Orchestration
+        LOBBY(lobby_manager.go)
+        TYPES(common_types.go)
+        REG(shop_registry.go)
     end
 
-    Main -- Starts HTTP Server --> API
-    Main -- Starts WebSocket Server --> WS
-    Main -- Runs --> LEDGER
-    Main -- Runs --> WALLET
-    Main -- Runs --> CARD
-    Main -- Runs --> CRIME
-    Main -- Runs --> ECONOMY
-    Main -- Runs --> COLLECTIVE_AI
+    subgraph Battle Systems
+        BATTLE(battle_service.go)
+        ITEM(item_service.go)
+        ACHIEVE(achievement_service.go)
+    end
 
-    API -- Handles HTTP Requests --> Auth(AUTH)
-    API -- Handles HTTP Requests --> Wallet(WALLET)
-    API -- Handles HTTP Requests --> Card(CARD)
-    API -- Handles HTTP Requests --> Crime(CRIME)
-    API -- Handles HTTP Requests --> Economy(ECONOMY)
-    API -- Handles HTTP Requests --> CollectiveAI(COLLECTIVE_AI)
+    subgraph Industrial Economy
+        ECON_S(economy_service.go)
+        FAUCET(faucet_service.go)
+        MARKET(market_service.go)
+        AUCTION(auction_service.go)
+        LOAN(loan_service.go)
+    end
 
-    WS -- Manages Connections --> GAME
-    WS -- Sends Game Updates --> Clients[Frontend Clients]
-    WS -- Receives Game Events --> Clients
-    WS -- Validates Actions --> Wallet(WALLET)
+    subgraph Criminality & Social
+        CLUB(club_service.go)
+        CRIM(handlers_criminality.go)
+        RUMOR(handlers_rumor.go)
+        COURT(courthouse_service.go)
+    end
 
-    Game -- Calls --> Card
-    Card -- Uses --> Alchemy
-    Card -- Uses --> METADATA
-    Wallet -- Uses --> Alchemy
-    Wallet -- Uses --> ENVOI
-    Wallet -- Uses --> WALLET_API
-    Crime -- Uses --> DragonFLY
-    Economy -- Uses --> Alchemy
-    Economy -- Uses --> LEDGER
-    CollectiveAI -- Uses --> DeepInfra
-    API -- Calls --> ENVOI
-    API -- Calls --> METADATA
-    API -- Calls --> WALLET_API
-    API -- Calls --> DRAGONFLY
-    API -- Calls --> ALCHEMY
-    API -- Calls --> LEDGER
+    subgraph Infrastructure
+        ORACLE(oracle_service.go)
+        ADMIN(handlers_admin.go)
+        TOURN(tournament_manager.go)
+    end
+
+    subgraph Client Determinism
+        WASM(main.go - WASM)
+    end
+
+    SVR -- Initializes --> LOBBY
+    SVR -- API Routes --> ADMIN
+    SVR -- API Routes --> FAUCET
+    
+    LOBBY -- State Loop --> BATTLE
+    LOBBY -- State Loop --> TOURN
+    LOBBY -- WS Switchboard --> CLUB
+    LOBBY -- WS Switchboard --> CRIM
+    
+    BATTLE -- Deterministic Sync --> WASM
+    BATTLE -- Power Penalties --> TYPES
+    
+    ECON_S -- Dynamic Scaling --> FAUCET
+    FAUCET -- Signature Auth --> ORACLE
+    
+    CLUB -- Revenue --> ECON_S
+    CRIM -- Fines --> COURT
+    COURT -- Redistribution --> CLUB
+    
+    ORACLE -- Indexer Data --> TOURN
+    ORACLE -- NFT Metadata --> TYPES
+    
     
 ## 5. UI-File-sys-Flow
