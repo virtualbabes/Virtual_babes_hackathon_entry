@@ -1,6 +1,6 @@
-# DIRECTORY INDEX & ARCHITECTURE
+#### DIRECTORY INDEX & ARCHITECTURE ####
 
-## 1. AI Development Context
+### 1. AI Development Context
 * `AI-Brain\A.I_memory.md`
 * `AI-Brain\DIR.md`
 * `AI-Brain\Game_expansion_plan.md`
@@ -10,9 +10,9 @@
 * `AI-Brain\ToDo.md`
 * `AI-Brain\What_is_this_repository.md`
 
-## 5. Public Audio Asset Files
+### 2. Public Audio Asset Files 
 
-### A: Single_player_Fanfare_Characters
+## A: Single_player_Fanfare_Characters
 * `Public\Assets\Audio\Boss\boo-and-laugh-7060.mp3`
 * `Public\Assets\Audio\Boss\creepy-laugh-97997.mp3`
 * `Public\Assets\Audio\Boss\evil-laugh-47891.mp3`
@@ -32,7 +32,7 @@
 * `Public\Assets\Audio\Witch\evil-witch-laugh-140135.mp3`
 * `Public\Assets\Audio\Witch\witch-laugh-95203.mp3`
 
-### B: Ambient
+## B: Ambient
 * `Public\Assets\Audio\2_player_ambient_1.mp3`
 * `Public\Assets\Audio\2_player_ambient_2.mp3`
 * `Public\Assets\Audio\2_player_ambient_3.mp3`
@@ -51,14 +51,14 @@
 * `Public\Assets\Audio\Tournament_game_ambient5.mp3`
 * `Public\Assets\Audio\Unbuilt_deck_ambient.mp3`
 
-### C: Interactions
+## C: Interactions
 * `Public\Assets\Audio\click.mp3`
 * `Public\Assets\Audio\Connected.mp3`
 * `Public\Assets\Audio\Disconnect.mp3`
 * `Public\Assets\Audio\Gear_up_shot.mp3`
 * `Public\Assets\Audio\Pay_out-in.mp3`
 
-### D: Game_Feedback
+## D: Game_Feedback
 * `Public\Assets\Audio\ehn.wav`
 * `Public\Assets\Audio\flip.mp3`
 * `Public\Assets\Audio\grah.wav`
@@ -88,9 +88,9 @@
 * `Public\Assets\Audio\ugh_3.wav`
 * `Public\Assets\Audio\Crowd\applause_player_win.mp3`
 
-## 6. Public Visuals
+### 3. Public Visuals
 
-### A: Card_images
+## A: Card_images
 * `Public\Assets\Images\Cards\Alana.webp`
 * `Public\Assets\Images\Cards\Bella.webp`
 * `Public\Assets\Images\Cards\Clohey.webp`
@@ -108,7 +108,7 @@
 * `Public\Assets\Images\Cards\Triz.webp`
 * `Public\Assets\Images\Cards\Xai.webp`
 
-### B: Fan_fare_Avatars
+## B: Fan_fare_Avatars
 * `Public\Assets\Images\portraits\Boss\The_architect\The_architect.mp4`
 * `Public\Assets\Images\portraits\Boss\The_architect\The_architect (2).mp4`
 * `Public\Assets\Images\portraits\Boss\The_architect\The_architect (3).mp4`
@@ -140,14 +140,14 @@
 * `Public\Assets\Images\portraits\Witch\Jackpot_jessica\jackpot_jessica.mp4`
 * `Public\Assets\Images\portraits\Witch\Jackpot_jessica\Jackpot_jessica.webp`
 
-### C: Textures
+## C: Textures
 * `Public\Assets\Textures\arena_floor.png`
 * `Public\Assets\Textures\arena_floor_challenge.png`
 * `Public\Assets\Textures\arena_floor_tournament.png`
 * `Public\Assets\Textures\arena_floor_tournament_semi_final.png`
 * `Public\Assets\Textures\arena_floor_tournament_final.png`
 
-### D: UI_filesys
+## D: UI_filesys
 * `Public\index.html`
 * `Public\styles.css`
 * `Public\src\scss\main.scss`
@@ -168,18 +168,30 @@
 * `Public\src\scss\utilities\_animations.scss`
 * `Public\src\scss\utilities\_spacing.scss`
 
-## 7. Public App Files
-* `Public\wasm_exec.js`
-* `Public\index.html`
-* `Public\collective-intelligence.js`
+### 4. Public-js-Scripts
 * `Public\app.js`
+* `Public\collective-intelligence.js`
+* `Public\js\admin.js`
+* `Public\js\audio.js`
+* `Public\js\config.js`
+* `Public\js\criminality.js`
+* `Public\js\deck.js`
+* `Public\js\economy.js`
+* `Public\js\game.js`
+* `Public\js\leaderboard.js`
+* `Public\js\network.js`
+* `Public\js\ui.js`
+* `Public\js\utils.js`
+* `Public\js\wallet.js`
+* `Public\wasm_exec.js`
 
-## 8. Root DIR
-* `.env.example`
-* `.gitattributes`
-* `.gitignore`
+### 5. Root DIR
+
+## A. .go-files
+
+# A1. Server
+
 * `achievement_service.go`
-* `ai_exclude`
 * `auction_service.go`
 * `battle_service.go`
 * `black_market_service.go`
@@ -188,30 +200,71 @@
 * `club_service.go`
 * `common_types.go`
 * `courthouse_service.go`
-* `deploy-wasm.yml`
-* `development_plan.md`
-* `Dockerfile`
 * `economy_processing.go`
 * `economy_service.go`
 * `employment_service.go`
 * `faucet_service.go`
-* `go.mod`
-* `go.sum`
 * `handlers_admin.go`
 * `handlers_criminality.go`
 * `handlers_public.go`
 * `handlers_rumor.go`
 * `item_service.go`
+* `jsconfig.json`
 * `loan_service.go`
 * `lobby_manager.go`
-* `main.go`
-* `main.wasm`
 * `market_service.go`
 * `onboarding_service.go`
 * `oracle_service.go`
-* `package.json`
-* `README.md`
 * `server.go`
 * `shop_registry.go`
 * `tournament_manager.go`
-* `virtualbabestt`
+
+# A2. Game-interaction
+
+* `main.go`
+
+## B. System-Root-system
+
+# B1. .go-doc
+
+* `go.mod`
+* `go.sum`
+
+# B2. .env
+
+* `.env.example`
+
+# B3. .gitignore
+
+* `.gitignore`
+
+# B4. .gitattributes
+
+* `.gitattributes`
+
+# B5. AI_exclude
+
+* `ai_exclude`
+
+# B6. .yaml
+
+* `deploy-wasm.yml`
+
+# B7. Docker-file
+
+* `Dockerfile`
+
+# B8. .json-files*
+
+* `networks.json`
+* `package-lock.json`
+* `package.json`
+
+# B9. server-bin
+
+* `server-bin`
+
+# C. root_documents 
+
+* `README.md`
+* `development_plan.md`
