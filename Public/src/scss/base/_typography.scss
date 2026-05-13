@@ -7,6 +7,7 @@ h1, h2, h3, .bracket-round-title, .preview-vs-container {
     text-transform: uppercase;
     letter-spacing: 2px;
     font-weight: 700;
+    line-height: $line-height-tight;
 }
 
 h1 {
@@ -46,21 +47,21 @@ h3 {
 .text-secondary { color: $color-text-secondary; }
 
 // Font Weight Utilities
-.font-light { font-weight: 300; }
-.font-normal { font-weight: 400; }
-.font-medium { font-weight: 500; }
-.font-semibold { font-weight: 600; }
-.font-bold { font-weight: 700; }
-.font-extrabold { font-weight: 800; }
+.font-light { font-weight: 300; line-height: inherit; }
+.font-normal { font-weight: 400; line-height: inherit; }
+.font-medium { font-weight: 500; line-height: inherit; }
+.font-semibold { font-weight: 600; line-height: inherit; }
+.font-bold { font-weight: 700; line-height: inherit; }
+.font-extrabold { font-weight: 800; line-height: inherit; }
 
 // Font Size Utilities
-.font-xs { font-size: $font-size-xs; }
-.font-sm { font-size: $font-size-sm; }
-.font-base { font-size: $font-size-base; }
-.font-lg { font-size: $font-size-lg; }
-.font-xl { font-size: $font-size-xl; }
-.font-2xl { font-size: $font-size-2xl; }
-.font-3xl { font-size: $font-size-3xl; }
+.font-xs { font-size: $font-size-xs; line-height: $line-height-normal; }
+.font-sm { font-size: $font-size-sm; line-height: $line-height-normal; }
+.font-base { font-size: $font-size-base; line-height: $line-height-normal; }
+.font-lg { font-size: $font-size-lg; line-height: $line-height-tight; }
+.font-xl { font-size: $font-size-xl; line-height: $line-height-tight; }
+.font-2xl { font-size: $font-size-2xl; line-height: $line-height-tight; }
+.font-3xl { font-size: $font-size-3xl; line-height: $line-height-tight; }
 
 // Letter Spacing Utilities
 .letter-spacing-tight { letter-spacing: -0.025em; }

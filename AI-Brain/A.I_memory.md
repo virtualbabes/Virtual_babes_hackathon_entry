@@ -37,10 +37,10 @@
 1. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
 
 ## Completed Tasks
-- **UI Hardening**: Resolved accessibility issues (labels/titles) and removed all illegal inline styles in `index.html`.
+- **UI Hardening**: Resolved accessibility issues (labels/titles/associations) and removed all illegal inline styles in `index.html`.
 - **A11y Audit**: Ensured all form elements in the Arena dashboard and Admin suite are WCAG compliant.
 - **SCSS Audit**: Fixed cross-browser compatibility for `text-size-adjust`, `scrollbar-width`, and `user-drag`.
-- **A11y Typography**: Hardened neon text glows and outlines for high-contrast legibility in `_typography.scss`.
+- **A11y Typography**: Hardened neon text contrast, outlines, and line-height accessibility in `_typography.scss` and `_spacing.scss`.
 - **SCSS Hardening**: Synchronized standard and Webkit scrollbar behaviors in `_reset.scss` for full Safari/Firefox/Chrome parity.
 - **SCSS Hardening**: Resolved "at-rule or selector expected" syntax error in `_overlays.scss`.
 - **UI Performance**: Optimized 3D map, dashboard, button, and card rendering by replacing expensive `transition: all` declarations with specific property lists and adding GPU hints.
@@ -59,6 +59,11 @@
 - **SCSS Hardening**: Refactored `_overlays.scss` to eliminate hardcoded margin and padding values, migrating them to the `$spacing` token scale.
 - **A11y Audit**: Improved contrast ratios for card type icons in `_cards.scss` by utilizing dark text on high-luminance backgrounds.
 - **A11y Audit**: Hardened button accessibility in `_buttons.scss` by implementing dark text on high-intensity neon backgrounds.
+- **A11y Audit**: Hardened button keyboard navigation in `_buttons.scss` by refining `focus-visible` styles across all variants.
+- **SCSS Hardening**: Standardized typography in `_overlays.scss` and `_shops.scss` by migrating all hardcoded font-sizes to the `$font-size` token scale.
+- **SCSS Hardening**: Verified `_territory.scss` token compliance and refactored related hardcoded styles in `app.js` and `index.html`.
+- **A11y Audit**: Hardened modal accessibility in `_overlays.scss` by adding focus indicators to close buttons, tabs, and interactive slots.
+- **A11y Audit**: Hardened card selection accessibility in `_cards.scss` by adding prominent `focus-visible` styles for the Deck Manager and Board.
 - **A11y Audit**: Hardened market ticker legibility in `_economy.scss` with increased opacity and motion-sensitivity overrides.
 - **A11y Audit**: Improved 3D map readability in `_territory.scss` by hardening label contrast and tokenizing legend text.
 - **A11y Audit**: Hardened social status indicator contrast and improved "Locked" state legibility in `_social.scss`.

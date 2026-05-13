@@ -2787,6 +2787,7 @@ window.openTerritoryMapOverlay = () => {
         tile.innerHTML = `
             <div class="tile-label">
                 <div style="font-size: 24px; margin-bottom: 5px;">${t.icon}</div>
+                <div class="tile-icon">${t.icon}</div>
                 <div class="tile-name">${t.name.toUpperCase()}</div>
                 <div class="tile-owner">${isOwned ? club.name : 'NEUTRAL ZONE'}</div>
                 ${isOwned ? `

@@ -22,8 +22,9 @@ button {
     overflow: hidden;
 
     &:focus-visible {
-        outline: 2px solid $color-neon-cyan;
-        outline-offset: 2px;
+        outline: 2px solid $color-text-main;
+        outline-offset: 3px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.3);
     }
 
     &:disabled {
@@ -70,6 +71,10 @@ button:not(.outline):not(.secondary):not(.danger):not(.success):not(.warning) {
 
     &:active:not(:disabled) {
         box-shadow: 0 2px 10px rgba($color-neon-cyan, 0.4);
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4), 0 4px 15px rgba($color-neon-purple, 0.3);
     }
 }
 
@@ -118,6 +123,10 @@ button.success {
     &:active:not(:disabled) {
         box-shadow: 0 2px 10px rgba($color-neon-green, 0.4);
     }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 4px rgba($color-neon-green, 0.4);
+    }
 }
 
 // Danger/Error Buttons
@@ -133,6 +142,10 @@ button.danger {
 
     &:active:not(:disabled) {
         box-shadow: 0 2px 10px rgba($color-error-red, 0.4);
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 4px rgba($color-error-red, 0.4);
     }
 }
 
@@ -152,6 +165,10 @@ button.warning {
 
     &:active:not(:disabled) {
         box-shadow: 0 2px 10px rgba($color-warning-orange, 0.4);
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 4px rgba($color-warning-orange, 0.4);
     }
 }
 
@@ -211,6 +228,12 @@ button.xlarge, .btn-xlarge {
     &:active {
         transform: translateY(0) scale(0.96);
         filter: brightness(0.8);
+    }
+
+    &:focus-visible {
+        outline: 2px solid $color-text-main;
+        outline-offset: 4px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4), $glass-shadow-hover;
     }
 
     img {

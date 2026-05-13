@@ -103,6 +103,12 @@
             color: $color-error-red;
             transform: scale(1.1);
         }
+
+        &:focus-visible {
+            outline: 2px solid $color-error-red;
+            outline-offset: 2px;
+            background: rgba($color-error-red, 0.1);
+        }
     }
 }
 
@@ -191,6 +197,11 @@
                 transform: scale(1.2);
                 box-shadow: 0 0 15px rgba($color-neon-cyan, 0.8);
             }
+
+            &:focus-visible {
+                outline: 2px solid $color-text-main;
+                outline-offset: 4px;
+            }
         }
 
         &::-moz-range-thumb {
@@ -219,6 +230,16 @@
             border-color: $color-neon-cyan;
             color: $color-neon-cyan;
         }
+
+            &.active:focus-visible {
+                outline: 2px solid $color-bg-dark;
+                outline-offset: -4px;
+            }
+
+            &:focus-visible:not(.active) {
+                outline: 2px solid $color-neon-cyan;
+                outline-offset: 2px;
+            }
     }
 }
 
@@ -248,6 +269,12 @@
             transform: translateY(-4px);
             box-shadow: $glass-shadow-hover;
             border-color: $color-neon-cyan;
+        }
+
+        &:focus-visible {
+            outline: 2px solid $color-text-main;
+            outline-offset: 4px;
+            box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4), $glass-shadow-hover;
         }
 
         img {
@@ -477,6 +504,12 @@
                         border-color: $color-neon-cyan;
                         background: rgba($color-neon-cyan, 0.2);
                         color: $color-neon-cyan;
+                    }
+
+                    &:focus-visible {
+                        outline: 2px solid $color-text-main;
+                        outline-offset: 2px;
+                        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.3);
                     }
 
                     &.locked {
@@ -1408,7 +1441,7 @@
 }
 
 #winner-text {
-    font-size: 2.5em;
+    font-size: $font-size-2xl;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1416,7 +1449,7 @@
 }
 
 #score-text {
-    font-size: 1.8em;
+    font-size: $font-size-xl;
     color: $color-text-main;
     margin-bottom: 30px;
 }
@@ -1442,7 +1475,7 @@
     box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4);
     animation: slideIn 0.3s ease-out;
     min-width: 280px;
-    font-size: 0.9em;
+    font-size: $font-size-sm;
 }
 
 .toast.success { border-color: $color-neon-green; box-shadow: 0 0 15px rgba($color-neon-green, 0.4); }
@@ -1533,7 +1566,7 @@
     justify-content: space-between;
     padding: 5px 10px;
     border-radius: 4px;
-    font-size: 0.85em;
+    font-size: $font-size-sm;
     background: rgba(0,0,0,0.2);
 }
 
@@ -1542,7 +1575,7 @@
 .bracket-round-title { text-align: center; font-weight: bold; color: $color-neon-purple; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid $color-neon-purple; }
 
 .vs-label {
-    font-size: 0.7em;
+    font-size: $font-size-xs;
     opacity: 0.5;
     text-align: center;
     margin: 2px 0;
@@ -1567,7 +1600,7 @@
     margin-bottom: $spacing-md;
 }
 .season-performers-label {
-    font-size: 0.7em;
+    font-size: $font-size-xs;
     letter-spacing: 1px;
     color: $color-neon-purple;
     margin-bottom: 10px;
@@ -1617,12 +1650,12 @@
     text-align: center; width: 200px;
 }
 .preview-rating {
-    font-size: 3em; font-weight: bold; color: $color-neon-cyan;
+    font-size: $font-size-3xl; font-weight: bold; color: $color-neon-cyan;
     text-shadow: 0 0 20px rgba($color-neon-cyan, 0.5);
     margin: $spacing-md 0;
 }
 .vs-divider {
-    font-size: 2em; font-weight: bold; font-style: italic;
+    font-size: $font-size-2xl; font-weight: bold; font-style: italic;
     color: $color-neon-purple;
     opacity: 0.8;
     text-shadow: 0 0 10px $color-neon-purple;
@@ -1929,11 +1962,11 @@
         gap: 10px;
     }
     .bracket-player {
-        font-size: 0.7em;
+        font-size: $font-size-xs;
         padding: 4px 6px;
     }
     .bracket-round-title {
-        font-size: 0.8em;
+        font-size: $font-size-sm;
         margin-bottom: $spacing-sm;
     }
     .preview-vs-container {
@@ -1941,11 +1974,11 @@
         margin: $spacing-lg 0;
     }
     .preview-side { width: 120px; }
-    .preview-rating { font-size: 2em; }
+    .preview-rating { font-size: $font-size-2xl; }
 
     /* Season History & Hall of Fame Mobile (< 480px) */
     .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
-    .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
+    .hof-tab { font-size: $font-size-xs; padding: 5px 10px; white-space: nowrap; }
 }
 // Modal Panel Header (General)
 .modal-panel-header {
@@ -1972,7 +2005,7 @@
 }
 
 .fine-amount {
-    font-size: 1.8em;
+    font-size: $font-size-xl;
     color: $color-neon-green;
     display: block;
 }

@@ -139,6 +139,12 @@
         .map-tile,
         .map-tile-3d {
             @include neon-glass-panel;
+
+            .tile-icon {
+                font-size: $font-size-xl;
+                margin-bottom: $spacing-xs;
+            }
+
             height: 100px;
             transform: translateZ(0); // Hardware acceleration
             backface-visibility: hidden;

@@ -307,6 +307,8 @@
             <div class="flex-row justify-center gap-20 mt-20">
                 <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span style="font-size: 10px;">NEUTRAL</span></div>
                 <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span style="font-size: 10px;">CLUB CONTROLLED</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span class="map-legend-text">NEUTRAL</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span class="map-legend-text">CLUB CONTROLLED</span></div>
             </div>
         </div>
     </div>
@@ -344,7 +346,7 @@
         <div id="hof-seasons-view" class="hof-container hidden overflow-y-auto">
             <!-- Season Filter Bar -->
             <div class="season-filter-bar">
-                <label style="font-size: 0.8em; opacity: 0.7; letter-spacing: 1px;">FILTER BY EPOCH:</label>
+                <label for="season-filter-input" style="font-size: 0.8em; opacity: 0.7; letter-spacing: 1px;">FILTER BY EPOCH:</label>
                 <input type="number" id="season-filter-input" class="glass-input" placeholder="All" style="width: 80px; padding: 5px 10px; font-weight: bold; color: var(--neon-cyan);" oninput="filterSeasonHistory()" aria-label="Filter by season number">
             </div>
             
@@ -455,12 +457,12 @@
                 <div class="glass-panel admin-section admin-section-rules">
                     <h2>Global Rules</h2>
                     <div class="flex-col gap-10 align-start">
-                        <label><input type="checkbox" id="rule-open"> Open</label>
-                        <label><input type="checkbox" id="rule-same"> Same</label>
-                        <label><input type="checkbox" id="rule-plus"> Plus</label>
+                        <label for="rule-open"><input type="checkbox" id="rule-open"> Open</label>
+                        <label for="rule-same"><input type="checkbox" id="rule-same"> Same</label>
+                        <label for="rule-plus"><input type="checkbox" id="rule-plus"> Plus</label>
                         <button onclick="adminUpdateRules()" class="w-full">Sync Global Rules</button>
                         <hr class="w-full my-10 border-0 border-bottom-glass">
-                        <label><input type="checkbox" id="dev-mode-toggle" onclick="adminToggleDevMode()"> Dev Mode (AI Loses)</label>
+                        <label for="dev-mode-toggle"><input type="checkbox" id="dev-mode-toggle" onclick="adminToggleDevMode()"> Dev Mode (AI Loses)</label>
                     </div>
                 </div>
 
@@ -566,7 +568,7 @@
                         </div>
                         
                         <hr class="w-full my-10 border-0 border-bottom-glass">
-                        <label>Reward Stack Management:</label>
+                        <label for="admin-add-asset">Reward Stack Management:</label>
                         <div id="admin-reward-list" class="mb-5 max-h-150 overflow-y-auto"></div>
                         <input type="number" id="admin-add-asset" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Asset ID" title="Reward Asset ID" aria-label="Reward asset id">
                         <input type="number" id="admin-add-amt" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Amount" title="Reward Amount" aria-label="Reward amount">
@@ -574,13 +576,13 @@
                     </div>
 
                     <hr class="w-full my-10 border-0 border-bottom-glass">
-                    <label>Tournament Simulation:</label>
+                    <label for="admin-sim-size">Tournament Simulation:</label>
                     <div class="display-flex gap-5 mb-5">
                         <select id="admin-sim-size" class="glass-input flex-1 font-sm" title="Simulation Player Count" aria-label="Simulation size">
                             <option value="8">8 Players</option>
                             <option value="16">16 Players</option>
                         </select>
-                        <label class="flex-row align-center gap-5"><input type="checkbox" id="admin-sim-buyin"> Buy-in</label>
+                        <label for="admin-sim-buyin" class="flex-row align-center gap-5"><input type="checkbox" id="admin-sim-buyin"> Buy-in</label>
                     </div>
                     <button onclick="adminSimulateTournament()" class="w-full bg-neon-purple">Simulate Tournament</button>
 
@@ -593,11 +595,11 @@
                 <div class="admin-log-filter-bar">
                     <input type="text" id="admin-log-filter" class="glass-input flex-1 min-w-200" placeholder="Filter logs (e.g., SECURITY)" title="Audit Log Filter" aria-label="Log filter">
                     <div class="display-flex gap-5 align-center">
-                        <label class="font-xs opacity-7">START:</label>
+                        <label for="admin-log-start" class="font-xs opacity-7">START:</label>
                         <input type="datetime-local" id="admin-log-start" class="glass-input font-sm p-1" title="Filter Start Date" aria-label="Log start date">
                     </div>
                     <div class="display-flex gap-5 align-center">
-                        <label class="font-xs opacity-7">END:</label>
+                        <label for="admin-log-end" class="font-xs opacity-7">END:</label>
                         <input type="datetime-local" id="admin-log-end" class="glass-input font-sm p-1" title="Filter End Date" aria-label="Log end date">
                     </div>
                     <button onclick="fetchAdminLogs()" class="outline p-2 font-xs">Apply Filters</button>

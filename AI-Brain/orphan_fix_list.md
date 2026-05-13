@@ -94,8 +94,15 @@
 - features/_economy.scss: [FIXED] Replaced hardcoded pixel widths with standardized `$panel-width-*` tokens.
 - components/_cards.scss: [FIXED] Implemented tactile `:active` states and selection glow animations for better haptic feedback.
 - components/_overlays.scss: [FIXED] Replaced remaining hardcoded margin and padding pixel values with standardized `$spacing-*` tokens.
+- components/_overlays.scss: [FIXED] Migrated hardcoded font-sizes to system tokens.
+- features/_territory.scss: [FIXED] Consolidated map tile icon scaling and legend typography into the token system, removing inline styles from `app.js`.
+- features/_shops.scss: [FIXED] Verified and hardened typography by ensuring all font-sizes utilize system design tokens.
+- components/_overlays.scss: [FIXED] Implemented focus indicators for modal navigation and close controls to support keyboard a11y.
 - components/_cards.scss: [FIXED] Hardened accessibility of type icons by implementing high-contrast text and shadows.
+- components/_buttons.scss: [FIXED] Enhanced focus-visible indicators for better keyboard navigation visibility.
 - components/_buttons.scss: [FIXED] Improved accessibility of Success and Warning buttons by using high-contrast dark text.
+- base/_typography.scss: [FIXED] Linked headings and font-size utilities to system line-height tokens for improved mobile readability.
+- utilities/_spacing.scss: [FIXED] Updated small text utilities to use `$line-height-normal` (1.5) to meet accessibility standards on high-density displays.
 - features/_economy.scss: [FIXED] Hardened ticker legibility and added `prefers-reduced-motion` support.
 - features/_territory.scss: [FIXED] Hardened map label contrast and tokenized legend text properties.
 - features/_social.scss: [FIXED] Improved status indicator contrast and locked-state legibility.
@@ -105,6 +112,7 @@
 - components/_buttons.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks.
 - base/_reset.scss: [FIXED] Synchronized global scrollbar support for Firefox and Safari.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.
+- index.html: [FIXED] Linked all dangling `<label>` elements to their respective inputs using the `for` attribute for screen reader compliance.
 - components/_overlays.scss: [FIXED] Resolved malformed media query and duplicate CSS block causing "at-rule or selector expected" error. Added Webkit scrollbar fallbacks.
 - components/_overlays.scss: [FIXED] Added `-webkit-scrollbar` styling for cross-browser scrollbar consistency; Corrected `user-drag` to `-webkit-user-drag`; Added new classes for Admin Control Panel styling.
 - app.js: [FIXED] Extracted CONFIG object to `js/config.js` and core WebSocket logic to `js/network.js`.

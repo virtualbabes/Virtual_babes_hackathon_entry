@@ -23,6 +23,12 @@
     -webkit-backdrop-filter: blur($glass-blur);
     backdrop-filter: blur($glass-blur);
 
+    &:focus-visible {
+        outline: 2px solid $color-text-main;
+        outline-offset: 4px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4), inset 0 0 10px rgba($color-bg-dark, 0.8);
+    }
+
     &:active:not(.disabled) {
         transform: translateY(-4px) scale(0.97);
         filter: brightness(0.9);
@@ -348,6 +354,12 @@
     &:active {
         transform: scale(0.97);
         filter: brightness(0.9);
+    }
+
+    &:focus-visible {
+        outline: 2px solid $color-text-main;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4);
     }
 }
 .card-mini:active { cursor: grabbing; }
