@@ -102,7 +102,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		// Add net loot to player's rewards
 		l.rewards[wallet] += uint64(netLoot * 1000000)
 
-		go l.unlockAchievement(wallet, "FIRST_HEIST")
+		// Achievement unlock uses the Locked variant since we already hold the lobby mutex.
+		l.unlockAchievementLocked(wallet, "FIRST_HEIST")
+
 	} else {
 		status = "failure"
 		playerStats.WantedLevel += 15
@@ -153,6 +155,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		"status":          status,
 		"wanted_level":    playerStats.WantedLevel,
 		"cunning":         playerStats.Cunning,
+		"effective_cunning": playerStats.GetEffectiveCunning(),
 		"playstyle":       playerStats.Playstyle,
 		"heist_attempts":  playerStats.HeistAttempts,
 		"kidnap_eligible": canKidnap,

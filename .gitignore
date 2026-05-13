@@ -24,4 +24,4 @@ main.wasm
 *ai_exclude
 
 # Modules .js
-node_modules
+*node_modules

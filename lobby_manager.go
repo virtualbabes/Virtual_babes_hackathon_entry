@@ -1000,7 +1000,9 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				wins = stats.Wins
 				reputation = stats.Reputation
 				wanted = stats.WantedLevel
-				cunning = stats.Cunning
+				// Alignment: Broadcast the Effective Cunning (including faceplate/penalty) 
+				// to ensure the UI heist heuristic matches the server calculation.
+				cunning = stats.GetEffectiveCunning()
 				nurturing = stats.Nurturing
 				jailedCards = stats.JailedCards
 				equippedFaceplate = stats.EquippedFaceplate

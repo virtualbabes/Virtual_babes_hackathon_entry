@@ -341,7 +341,7 @@ battle_service.go
 Hierarchy: Service.
 Purpose: Implements the core game combat logic, including server-side power calculation, capture mechanics (Same, Plus, Combo), win verification, and post-match processing (jailing, item buff expiration).
 Flow:
-getEffectiveServerPower() calculates a card's power, accounting for player stats (Wanted Level, Cunning, Nurturing), card stats (Fatigue, Loyalty, Mood), and active item buffs.
+getEffectiveServerPower() calculates a card's power, accounting for player stats (Wanted Level, Cunning, Nurturing), card stats (Fatigue, Loyalty, Mood), Faceplate bonuses (Mojo/Cunning), and active item buffs.
 serverCheckCaptures() simulates card captures on the server, returning flipped cards and their details.
 verifyWinner() determines the match outcome, handles Sudden Death, applies bounty rewards, processes item buff expirations, and triggers jailing rules (processFallenPenaltyJailLocked, processPrisonerRuleLocked).
 initiateSuddenDeath() shuffles and redistributes cards for tie-breakers.
