@@ -66,11 +66,18 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 	l.mutex.Lock()
 	stats.WantedLevel = 0
 	l.leaderboard[req.Wallet] = stats
-	l.faucetBalance += (costBase / 2.0) // Half of the fine returns to the global faucet pool
-	l.distributeCourthouseFineToClubsLocked(costBase / 2.0) // The other half is distributed to clubs
+
+	if len(l.clubs) > 0 {
+		l.faucetBalance += (costBase / 2.0)                    // Half returns to Faucet
+		l.distributeCourthouseFineToClubsLocked(costBase / 2.0) // Half to Clubs
+	} else {
+		// Industrial Loop fallback: Faucet absorbs the full fine if no clubs exist
+		l.faucetBalance += costBase
+	}
+
+	l.logAdminAuditLocked("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine", costBase))
 	l.mutex.Unlock()
 
-	l.logAdminAuditLocked("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine to reset Wanted Level", costBase))
 	go l.unlockAchievement(req.Wallet, "REHABILITATED")
 
 	// Update all clients with the new social standing

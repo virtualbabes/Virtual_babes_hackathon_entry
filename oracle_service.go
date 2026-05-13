@@ -700,8 +700,11 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	addrObj, _ := types.DecodeAddress(vaultAddr)
 
+	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	defer cancel()
+
 	// ARC-200 Balance is stored in an application box named by the account's public key bytes.
-	boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(context.Background())
+	boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
 	if err != nil {
 		log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
 		return
@@ -722,8 +725,18 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
+
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
-	info, _ := client.AccountInformation(l.vaultAddress).Do(context.Background())
+
+	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	defer cancel()
+
+	info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
+	if err != nil {
+		log.Printf("[ORACLE ERROR] Failed to fetch native vault balance: %v\n", err)
+		return
+	}
+
 	l.mutex.Lock()
 	
 	// CRITICAL GUARD: Ensure vault has at least 1 VOI for gas

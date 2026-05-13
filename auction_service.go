@@ -169,7 +169,7 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	if previousHighestBidder != "" {
 		l.rewards[previousHighestBidder] += previousHighestBid
 		// Notify previous bidder of refund
-		l.sendToClient(l.getClientIDFromWallet(previousHighestBidder), Envelope{
+		l.sendToClientLocked(l.getClientIDFromWalletLocked(previousHighestBidder), Envelope{
 			Type:    "admin_notification",
 			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>AUCTION REFUND:</b> Your bid of %.2f $VBV for auction %s has been refunded."}`, float64(previousHighestBid)/1000000.0, req.AuctionID)),
 		})
@@ -184,12 +184,15 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	// If bids are held by the auction contract, this would be different.
 	// For now, we simulate the funds moving into and out of the general reward pool.
 	l.faucetBalance += float64(req.Amount-previousHighestBid) / 1000000.0
-	l.applyDynamicScaling()
+	l.applyDynamicScalingLocked()
 
-	l.logAdminAudit("AUCTION_BID", req.Bidder, fmt.Sprintf("Auction: %s, Amount: %.2f, Previous Bidder: %s, Refunded: %.2f", req.AuctionID, float64(req.Amount)/1000000.0, previousHighestBidder, float64(previousHighestBid)/1000000.0))
+	l.logAdminAuditLocked("AUCTION_BID", req.Bidder, fmt.Sprintf("Auction: %s, Amount: %.2f", req.AuctionID, float64(req.Amount)/1000000.0))
+	msg := l.getLobbyUpdateMsgLocked()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Bid successfully placed."})
+
+	go func() { l.broadcast <- msg }()
 }
 
 // processAuctions handles auction expiration and settlement.

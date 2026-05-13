@@ -36,13 +36,13 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 	// Cost to spread a rumor: 500 $VBV (in micro-units)
 	const rumorCost = 500 * 1000000
 	if l.rewards[spreaderWallet] < rumorCost {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Insufficient $VBV to spread rumors."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Insufficient $VBV to spread rumors."}`)})
 		return
 	}
 
 	// Hardening: Sanity check for rumor metrics
 	if data.Strength < 0.1 || data.Strength > 2.0 {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Strength must be between 0.1 and 2.0."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Strength must be between 0.1 and 2.0."}`)})
 		return
 	}
 	if data.Duration <= 0 || data.Duration > 1440 { // Max 24 hours
@@ -51,19 +51,28 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 
 	targetWallet := strings.ToLower(data.TargetWallet)
 
-	// Validate target
+	// Validate target existence
 	if _, exists := l.leaderboard[targetWallet]; !exists {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Target not found in Arena."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Target not found in Arena."}`)})
 		return
 	}
 
-	// Deduct cost
+	// INDUSTRIAL LOOP: Recycle fee and update spreader Standing
 	l.rewards[spreaderWallet] -= rumorCost
+	l.faucetBalance += float64(rumorCost) / 1000000.0
+	l.applyDynamicScalingLocked()
 
-	// Update spreader's RumorCount
+	l.ensurePlayerStatsMapsInitialized(spreaderWallet)
 	spreaderStats := l.leaderboard[spreaderWallet]
 	spreaderStats.RumorCount++
+	spreaderStats.Reputation = l.CalculateReputation(spreaderStats)
 	l.leaderboard[spreaderWallet] = spreaderStats
+
+	// Refresh target Standing to reflect market volatility
+	l.ensurePlayerStatsMapsInitialized(targetWallet)
+	targetStats := l.leaderboard[targetWallet] 
+	targetStats.Reputation = l.CalculateReputation(targetStats)
+	l.leaderboard[targetWallet] = targetStats
 
 	// Create and add rumor
 	rumorID := fmt.Sprintf("RUMOR-%d", time.Now().UnixNano())
@@ -95,5 +104,6 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 	envelopeBytes, _ := json.Marshal(envelope)
 	l.broadcast <- envelopeBytes
 
-	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	msg := l.getLobbyUpdateMsgLocked()
+	go func() { l.broadcast <- msg }()
 }

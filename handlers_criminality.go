@@ -94,19 +94,26 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 		ExpiresAt:    time.Now().Add(48 * time.Hour),
 	}
 
-	l.logAdminAudit("KIDNAP_GAMBIT", perpWallet, fmt.Sprintf("Victim: %s, CardID: %d, Ransom: %d", victimWallet, targetCardID, data.RansomAmount))
+	// Update reputation for both parties immediately
+	victimStats.Reputation = l.CalculateReputation(victimStats)
+	l.leaderboard[victimWallet] = victimStats
+	perpStats.Reputation = l.CalculateReputation(perpStats)
+	l.leaderboard[perpWallet] = perpStats
+
+	l.logAdminAuditLocked("KIDNAP_GAMBIT", perpWallet, fmt.Sprintf("Victim: %s, CardID: %d, Ransom: %d", victimWallet, targetCardID, data.RansomAmount))
 
 	// Notify Victim
-	victimClientID := l.getClientIDFromWallet(victimWallet)
+	victimClientID := l.getClientIDFromWalletLocked(victimWallet)
 	if victimClientID != "" {
 		msg := fmt.Sprintf(`{"text":"🚨 <b>KIDNAP GAMBIT:</b> %s has kidnapped your card #%d! Ransom demanded: %.2f $VBV.", "card_id": %d, "perp_wallet": "%s", "ransom": %d}`, 
 			perpWallet, targetCardID, float64(data.RansomAmount)/1000000.0, targetCardID, perpWallet, data.RansomAmount)
-		l.sendToClient(victimClientID, Envelope{Type: "ransom_demand", Payload: json.RawMessage(msg)})
+		l.sendToClientLocked(victimClientID, Envelope{Type: "ransom_demand", Payload: json.RawMessage(msg)})
 	}
 
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"💼 <b>HOSTAGE SECURED:</b> The target card is now in your custody."}`)})
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"💼 <b>HOSTAGE SECURED:</b> The target card is now in your custody."}`)})
 	
-	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	msg := l.getLobbyUpdateMsgLocked()
+	go func() { l.broadcast <- msg }()
 }
 
 // handlePayRansom allows a victim to reclaim their card by paying the demanded VBV.

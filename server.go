@@ -221,51 +221,6 @@ func (l *Lobby) saveNetworkConfigs() {
 	os.WriteFile("networks.json", data, 0644)
 }
 
-// distributeShopRevenueLocked handles payout to club treasuries based on shop turnover.
-// Enforces 5-50% commission for consumable perishables.
-// This function assumes the Lobby mutex is already held by the caller.
-func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint64, itemID string) {
-	// Logic heuristic: Identify perishable consumables by ID keywords
-	isPerishable := strings.Contains(itemID, "stim") || strings.Contains(itemID, "catalyst") || strings.Contains(itemID, "pledge")
-
-	for _, club := range l.clubs {
-		hasTerritory := false
-		for _, t := range club.Territories {
-			if t == territoryID {
-				hasTerritory = true
-				break
-			}
-		}
-
-		if hasTerritory {
-			rate := club.Commission
-			if isPerishable {
-				// Enforce the 5% to 50% requirement
-				if rate < 0.05 {
-					rate = 0.05
-				}
-				if rate > 0.50 {
-					rate = 0.50
-				}
-			}
-			commission := (float64(amountMicro) / 1000000.0) * rate
-			club.Treasury += commission
-			club.LastActivity = time.Now()
-			log.Printf("[REVENUE] Club %s (%s) earned %.2f $VBV from shop turnover (Item: %s, Rate: %.1f%%)\n", club.Name, club.ID, commission, itemID, rate*100)
-		}
-	}
-}
-
-// distributeShopRevenue handles payout to club treasuries based on shop turnover.
-// Enforces 5-50% commission for consumable perishables.
-func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, itemID string) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	// Logic heuristic: Identify perishable consumables by ID keywords
-	l.distributeShopRevenueLocked(territoryID, amountMicro, itemID)
-}
-
 // distributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
 // Ensures only players who were members at the time of tournament registration qualify.
 func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time) {

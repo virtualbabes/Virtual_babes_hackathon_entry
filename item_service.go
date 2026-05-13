@@ -40,7 +40,10 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 		}
 		l.inventory[data.TargetCardID] = targetCard                                // Update global card cache
 		l.persistentCardCache[data.TargetCardID] = targetCard                      // Update persistent cache
-		l.updatePlayerPlaystyleTendencies(wallet, false, [2]int{}, []int{}, false) // Update playstyle on item use
+		l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false)
+
+		playerStats.Playstyle = l.leaderboard[wallet].Playstyle
+		playerStats.Reputation = l.CalculateReputation(*playerStats)
 
 	case "Elemental", "Tactical": // Mood Catalyst, Grounded Shield, Rule Breaker, Intel Report (affect MatchState)
 		if !inMatch {
@@ -49,7 +52,10 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 		// Delegate to battle_service for in-match effects
 		l.applyItemEffectToMatch(match, env.FromID, data.ItemID, data.TargetCardID, data.TargetGridIndex)
 		notificationText = fmt.Sprintf("✨ %s activated!", item.Name)
-		l.updatePlayerPlaystyleTendencies(wallet, true, [2]int{}, []int{}, false) // Update playstyle on item use in match
+		l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, false)
+
+		playerStats.Playstyle = l.leaderboard[wallet].Playstyle
+		playerStats.Reputation = l.CalculateReputation(*playerStats)
 
 	case "Hardware": // Traps: tripwire, sentry_turret, guard_dog
 		if playerStats.JobRole != "Security" || playerStats.EmployerClubID == "" {

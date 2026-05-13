@@ -15,13 +15,14 @@ func (l *Lobby) unlockAchievement(wallet, id string) {
 
 // unlockAchievementLocked checks if a player already has an achievement, assuming the lock is held.
 func (l *Lobby) unlockAchievementLocked(wallet, id string) {
-	wallet = strings.ToLower(wallet)
-	stats, exists := l.leaderboard[wallet]
+	targetWallet := strings.ToLower(wallet)
+	l.ensurePlayerStatsMapsInitialized(targetWallet)
+	stats, exists := l.leaderboard[targetWallet]
 	if !exists {
 		return
 	}
 
-	// Check for existing
+	// Prevention: Ensure achievement is only granted once
 	for _, a := range stats.Achievements {
 		if a == id {
 			return
@@ -30,9 +31,11 @@ func (l *Lobby) unlockAchievementLocked(wallet, id string) {
 
 	// Unlock trophy
 	stats.Achievements = append(stats.Achievements, id)
-	l.leaderboard[wallet] = stats
+	// Update reputation to reflect the social impact of the new achievement
+	stats.Reputation = l.CalculateReputation(stats)
+	l.leaderboard[targetWallet] = stats
 
-	l.logAdminAuditLocked("ACHIEVEMENT_UNLOCKED", wallet, id)
+	l.logAdminAuditLocked("ACHIEVEMENT_UNLOCKED", targetWallet, id)
 
 	// Notify all client sessions associated with this wallet
 	msg, _ := json.Marshal(map[string]string{
@@ -49,6 +52,7 @@ func (l *Lobby) unlockAchievementLocked(wallet, id string) {
 		}
 	}
 
-	// Broadcast lobby update to show new trophy counts/badges
-	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	// Broadcast lobby update using the Locked snapshot pattern
+	msg := l.getLobbyUpdateMsgLocked()
+	go func() { l.broadcast <- msg }()
 }

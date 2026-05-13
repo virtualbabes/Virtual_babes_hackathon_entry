@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"log"
 	"strings"
 	"time"
 )
@@ -43,8 +44,16 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
 	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
-	// Apply Trap Penalties from the Club's active buffs
-	for _, itemID := range targetClub.ActiveBuffs {
+	// Apply Trap Penalties from the Club's active buffs with lazy pruning
+	now := time.Now()
+	for trapID, itemID := range targetClub.ActiveBuffs {
+		// Check for trap expiration before applying modifiers
+		if expiry, exists := targetClub.BuffExpirations[trapID]; exists && now.After(expiry) {
+			delete(targetClub.ActiveBuffs, trapID)
+			delete(targetClub.BuffExpirations, trapID)
+			continue
+		}
+
 		if item, ok := GlobalShopRegistry[itemID]; ok && item.HeistSuccessModifier != 0 {
 			successChance += item.HeistSuccessModifier
 		}
@@ -61,8 +70,6 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	var status string
 	var netLoot, fenceFee float64
 	canKidnap := false
-
-	now := time.Now()
 
 	if roll < successChance {
 		// SUCCESSFUL HEIST
@@ -119,7 +126,14 @@ func (l *Lobby) handleHeist(env *Envelope) {
 					targetClub.Jail = make(map[int]ServerCard)
 				}
 				targetClub.Jail[rarestCard.ID] = rarestCard
-				delete(playerStats.Inventory, fmt.Sprintf("CARD-%d", rarestCard.ID))
+				
+				// Decrement instead of absolute deletion to handle duplicate card instances
+				cardKey := fmt.Sprintf("CARD-%d", rarestCard.ID)
+				playerStats.Inventory[cardKey]--
+				if playerStats.Inventory[cardKey] <= 0 {
+					delete(playerStats.Inventory, cardKey)
+				}
+
 				if playerStats.JailedCards == nil {
 					playerStats.JailedCards = make(map[int]string)
 				}
@@ -232,7 +246,7 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 
 	assetID := voiConfig.AssetID
 	verifyNet := "Voi"
-	if data.Network == "ALGO" {
+	if strings.ToUpper(data.Network) == "ALGO" || strings.HasPrefix(strings.ToUpper(data.Network), "ALGO") {
 		assetID = l.avoiAssetID
 		verifyNet = "Algorand"
 	}
@@ -333,7 +347,7 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	// RE-VERIFY: Ensure territory was not claimed while we were verifying the transaction
 	for _, existingClub := range l.clubs {
 		for _, t := range existingClub.Territories {
-			if t == data.TerritoryID {
+			if strings.EqualFold(t, data.TerritoryID) {
 				l.mutex.Unlock()
 				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: District claimed by another entity during verification."}`)})
 				return
@@ -431,6 +445,68 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 
 	l.logAdminAudit("CLUB_RESTOCK", ownerWallet, fmt.Sprintf("Club: %s, Item: %s, Qty: %d, Cost: %.2f", club.Name, data.ItemID, data.Quantity, totalCostBase))
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>RESTOCK COMPLETE:</b> Added %d units of %s to inventory."}`, data.Quantity, item.Name))})
+}
+
+// distributeShopRevenue handles payout to club treasuries based on shop turnover.
+func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, itemID string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.distributeShopRevenueLocked(territoryID, amountMicro, itemID)
+}
+
+// distributeShopRevenueLocked handles payout to club treasuries with Regional Taxation.
+func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint64, itemID string) {
+	now := time.Now()
+	isPerishable := strings.Contains(itemID, "stim") || strings.Contains(itemID, "catalyst") || strings.Contains(itemID, "pledge")
+
+	// 1. Identify the specific club owning this territory
+	var owningClub *Club
+	for _, club := range l.clubs {
+		for _, t := range club.Territories {
+			if t == territoryID {
+				owningClub = club
+				break
+			}
+		}
+		if owningClub != nil { break }
+	}
+	if owningClub == nil { return }
+
+	// 2. Identify all Regional Governors (Clubs owning 2+ territories)
+	var governors []*Club
+	for _, club := range l.clubs {
+		if len(club.Territories) >= 2 {
+			governors = append(governors, club)
+		}
+	}
+
+	// 3. Calculate total commission based on item type and club rate
+	rate := owningClub.Commission
+	if isPerishable {
+		if rate < 0.05 { rate = 0.05 }
+		if rate > 0.50 { rate = 0.50 }
+	}
+	totalCommission := (float64(amountMicro) / 1000000.0) * rate
+
+	// 4. Regional Governor Tax: 5% is distributed to all Governors.
+	regionalTaxPool := 0.0
+	if len(governors) > 0 {
+		regionalTaxPool = totalCommission * 0.05
+		taxPerGovernor := regionalTaxPool / float64(len(governors))
+		for _, govClub := range governors {
+			govClub.Treasury += taxPerGovernor
+			govClub.LastActivity = now 
+		}
+	}
+
+	// 5. Final Payout to the Territory Owner (Net after Regional Tax)
+	netCommission := totalCommission - regionalTaxPool
+	owningClub.Treasury += netCommission
+	owningClub.LastActivity = now
+
+	// INDUSTRIAL LOOP: Deduct commission from Faucet liquidity and re-scale
+	l.faucetBalance -= totalCommission
+	l.applyDynamicScalingLocked()
 }
 
 // distributeCourthouseFineToClubsLocked distributes a portion of the fine among clubs and governors.

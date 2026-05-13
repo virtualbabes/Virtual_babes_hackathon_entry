@@ -11,6 +11,7 @@ func (l *Lobby) processLoans() {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	now := time.Now()
+	anyProcessed := false
 
 	for id, loan := range l.loans {
 		if loan.Status == "active" && now.After(loan.DueAt) {
@@ -31,22 +32,35 @@ func (l *Lobby) processLoans() {
 				borrowerStats.Reputation = l.CalculateReputation(borrowerStats)
 				l.leaderboard[borrowerWallet] = borrowerStats
 
-				l.sendToClient(l.getClientIDFromWallet(borrowerWallet), Envelope{
+				l.sendToClientLocked(l.getClientIDFromWalletLocked(borrowerWallet), Envelope{
 					Type:    "admin_notification",
 					Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>LOAN DEFAULTED:</b> Collateral moved to Black Market. You received %.2f Market Tokens as equity."}`, float64(tokenReward)/1000000.0)),
 				})
 			}
 
+			// INDUSTRIAL LOOP: 5% Liquidation Fee to the Second-Hand Store district owner
+			owningClub := l.getClubByTerritoryID(loan.TerritoryID)
+			if owningClub != nil {
+				liquidationFee := float64(loan.LoanAmount) * 0.05 / 1000000.0
+				owningClub.Treasury += liquidationFee
+				owningClub.LastActivity = now
+				l.logAdminAuditLocked("LOAN_LIQUIDATION_FEE", loan.TerritoryID, fmt.Sprintf("Club %s earned %.2f $VBV liquidation fee", owningClub.Name, liquidationFee))
+			}
+
 			// Update playstyle on loan default (Internal call to avoid deadlock)
 			l.updatePlayerPlaystyleTendenciesLocked(borrowerWallet, false, [2]int{}, []int{}, false)
-			l.logAdminAudit("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
+			l.logAdminAuditLocked("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
 
 			// Add the defaulted loan to the black market
 			l.blackMarket = append(l.blackMarket, *loan)
 
 			delete(l.loans, id)
-			// Trigger UI sync to reflect changes in the black market and player stats
-			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+			anyProcessed = true
 		}
+	}
+
+	if anyProcessed {
+		msg := l.getLobbyUpdateMsgLocked()
+		go func() { l.broadcast <- msg }()
 	}
 }

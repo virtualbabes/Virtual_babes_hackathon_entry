@@ -465,7 +465,9 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 
 func (l *Lobby) broadcastTournamentState() {
 	payload, _ := json.Marshal(l.tournament)
-	l.broadcast <- jsonListEnvelope("tournament_update", payload)
+	go func() {
+		l.broadcast <- jsonListEnvelope("tournament_update", payload)
+	}()
 }
 
 func (l *Lobby) isWalletRegistered(wallet string) bool {

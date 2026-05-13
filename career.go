@@ -20,12 +20,32 @@ func (l *Lobby) startSalaryDispenser() {
 				if time.Since(stats.LastSalaryPayment) >= 24*time.Hour {
 					club, exists := l.clubs[stats.EmployerClubID]
 					if exists && club.Treasury >= float64(stats.Salary)/1000000.0 {
+						// Industrial Loop: Gross salary deducted from Club Treasury
 						club.Treasury -= float64(stats.Salary) / 1000000.0
-						l.rewards[wallet] += stats.Salary
+						club.LastActivity = time.Now()
+
+						// Outlaw Tax Logic: garnish earnings based on infamy
+						taxRate := 0.0
+						if stats.WantedLevel >= 5 {
+							taxRate = float64(stats.WantedLevel) * 0.02
+							if taxRate > 0.40 { taxRate = 0.40 }
+						}
+
+						taxAmountMicro := uint64(float64(stats.Salary) * taxRate)
+						netSalaryMicro := stats.Salary - taxAmountMicro
+
+						l.rewards[wallet] += netSalaryMicro
+						if taxAmountMicro > 0 {
+							l.faucetBalance += float64(taxAmountMicro) / 1000000.0
+							l.applyDynamicScalingLocked()
+						}
+
 						stats.LastSalaryPayment = time.Now()
 						l.leaderboard[wallet] = stats
-						l.logAdminAudit("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Amount: %.2f $VBV", club.Name, float64(stats.Salary)/1000000.0))
-						l.sendToClient(l.getClientIDFromWallet(wallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>SALARY PAID:</b> You received %.2f $VBV from %s!"}`, float64(stats.Salary)/1000000.0, club.Name))})
+
+						l.logAdminAuditLocked("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Net: %.2f, Tax: %.2f", club.Name, float64(netSalaryMicro)/1000000.0, float64(taxAmountMicro)/1000000.0))
+						notification := fmt.Sprintf(`{"text":"💰 <b>SALARY PAID:</b> You received %.2f $VBV from %s! (Outlaw Tax: %.2f $VBV)"}`, float64(netSalaryMicro)/1000000.0, club.Name, float64(taxAmountMicro)/1000000.0)
+						l.sendToClientLocked(l.getClientIDFromWalletLocked(wallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(notification)})
 					} else {
 						log.Printf("[CAREER] Club %s has insufficient funds to pay %s's salary or club not found.\n", stats.EmployerClubID, wallet)
 					}

@@ -131,12 +131,13 @@ func (l *Lobby) handleRefillVault(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mutex.Lock()
 	l.faucetBalance = req.Amount
-	l.applyDynamicScaling()
+	l.applyDynamicScalingLocked()
+
+	l.logAdminAuditLocked("REFILL_VAULT", "GLOBAL", fmt.Sprintf("Amount: %.2f", req.Amount))
+	msg := l.getLobbyUpdateMsgLocked()
 	l.mutex.Unlock()
-	update := Envelope{Type: "vault_update", FromID: "SERVER", Payload: json.RawMessage(fmt.Sprintf(`{"balance": %f}`, req.Amount))}
-	msg, _ := json.Marshal(update)
-	l.broadcast <- msg
-	l.logAdminAudit("REFILL_VAULT", "GLOBAL", fmt.Sprintf("Amount: %.2f", req.Amount))
+
+	go func() { l.broadcast <- msg }()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "new_balance": req.Amount})
 }
@@ -465,11 +466,13 @@ func (l *Lobby) handleUpdateBaseReward(w http.ResponseWriter, r *http.Request) {
 	l.baseReward = uint64(req.Amount * 1000000)
 	l.initialBaseReward = l.baseReward
 	l.initialRewards[l.rewardAssetID] = l.initialBaseReward
-	l.applyDynamicScaling()
+	l.applyDynamicScalingLocked()
 	l.saveSeasonMetadataLocked() // Ensure persistence
+	l.logAdminAuditLocked("UPDATE_REWARD", "GLOBAL", fmt.Sprintf("%.2f", req.Amount))
+	msg := l.getLobbyUpdateMsgLocked()
 	l.mutex.Unlock()
-	l.broadcast <- jsonListEnvelope("reward_update", json.RawMessage(fmt.Sprintf(`{"amount": %f}`, req.Amount)))
-	l.logAdminAudit("UPDATE_REWARD", "GLOBAL", fmt.Sprintf("%.2f", req.Amount))
+
+	go func() { l.broadcast <- msg }()
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success"})
 }
 

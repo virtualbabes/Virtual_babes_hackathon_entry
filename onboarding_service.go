@@ -124,10 +124,14 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	accountInfo, err := client.AccountInformation(targetWallet).Do(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	defer cancel()
+
+	accountInfo, err := client.AccountInformation(targetWallet).Do(ctx)
 	if err == nil && accountInfo.Amount >= 1000000 { // Check if account already has 1 VOI (1,000,000 microAlgos)
 		isSkip = true
 		w.WriteHeader(http.StatusNoContent) // User already has VOI, skip starter pack
+		vbvRefundNeeded = false             // No refund needed as VBV wasn't decremented
 		return
 	}
 
@@ -148,7 +152,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	_, stx1, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn1)
 	_, stx2, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn2)
 
-	txid, err := client.SendRawTransaction(append(stx1, stx2...)).Do(context.Background())
+	txid, err := client.SendRawTransaction(append(stx1, stx2...)).Do(ctx)
 	if err != nil {
 		log.Printf("[BRIDGE ERROR] Onboarding failed for %s: %v\n", targetWallet, err)
 		http.Error(w, "Bridge delivery failed", http.StatusInternalServerError)
@@ -163,5 +167,5 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	l.logAdminAudit("BRIDGE_ONBOARD", targetWallet, "1 VOI + 1 VBV dispatched")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Voi Starter Pack sent!", "txid": txid})
-	refundVBV = false // Transaction successful
+	vbvRefundNeeded = false // Transaction successful, no refund needed
 }
