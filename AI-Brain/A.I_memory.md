@@ -140,6 +140,8 @@
 - **Economic Precision**: Hardened `handleTakeLease` to recover rounding remainders into Club Treasuries.
 - **Market Hardening**: Refactored Portfolios to use persistent wallet keys; linked trades to `faucetBalance` to prevent inflation and ensure cross-session holdings.
 - **Continuity**: Hardened `InitialRewards` persistence via `season.json` to ensure economic state survives restarts.
+- **Git Repair**: Repository history flattened to resolve a 219MB blob rejection from GitHub; strictly enforced `*.vsix` exclusion in `.gitignore`.
+- **Continuity**: Verified that flattening history preserves all current domain-separated logic and security hardening.
 - **Sybil UI Feedback**: Frontend `app.js` now correctly informs users if Sybil protection is still warming up.
 - **Frontend Optimization**: `syncUI` in `app.js` now uses string comparison flicker guards and filter-aware partial updates.
 - **Identity Cache**: Implemented backend-side `envoiCache` and resolved potential recursive RLock deadlocks.
@@ -346,4 +348,5 @@
 - [x] Hardened Reward Flow: Implemented granular opt-in checks for all assets in the reward stack within `faucet_service.go`.
 - [x] Comprehensive UI/UX Audit: Validated "Neon-Glass" SCSS modularity and 3D territory map performance.
 - [x] SCSS Integration: Migrated particle effect styles to `_animations.scss`.
+- **Git Maintenance**: Troubleshooting `.vsix` history purge (219MB). Previous attempt failed due to missing `filter-repo` tool. Moving to manual `filter-branch` or tool installation.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

@@ -1,6 +1,7 @@
 # NFT Seduction Tasks
 
 ## Remaining Critical Launch Readiness
+- [x] Resolve Git push rejection by flattening repository history to purge large blobs.
 - [ ] Perform 16-player tournament stress tests.
 - [x] **Accessibility Audit**: Add `<label>` elements or `aria-label` attributes to all form inputs/selects in `index.html`.
 - [x] **A11y Metadata**: Ensure all interactive elements have `title` and/or `placeholder` attributes.
