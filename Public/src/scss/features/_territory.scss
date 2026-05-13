@@ -91,12 +91,17 @@
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: border-color $transition-fast, background-color $transition-fast, transform $transition-fast, color $transition-fast;
 
                     &:hover {
                         background: rgba($color-neon-cyan, 0.1);
                         border-color: $color-neon-cyan;
                         color: $color-neon-cyan;
+                    }
+
+                    &:active {
+                        transform: scale(0.9);
+                        filter: brightness(0.8);
                     }
 
                     &.zoom-in::before { content: '+'; }
@@ -166,6 +171,11 @@
                 &::before {
                     opacity: 1;
                 }
+            }
+
+            &:active {
+                transform: translateZ(5px) scale(0.98);
+                filter: brightness(0.9);
             }
 
             &.controlled {
@@ -306,7 +316,7 @@
             padding: $spacing-lg;
             border-color: rgba($color-neon-blue, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast, background-color $transition-fast;
             display: flex;
             flex-direction: column;
 
@@ -314,6 +324,11 @@
                 transform: translateY(-4px);
                 box-shadow: 0 8px 25px rgba($color-neon-blue, 0.3);
                 border-color: $color-neon-blue;
+            }
+
+            &:active {
+                transform: translateY(-2px) scale(0.98);
+                filter: brightness(0.9);
             }
 
             &.controlled {
@@ -447,7 +462,7 @@
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast, border-color $transition-fast, color $transition-fast;
 
                     &.claim {
                         background: linear-gradient(45deg, $color-neon-cyan, $color-neon-blue);
@@ -480,6 +495,11 @@
                             background: $color-neon-green;
                             color: white;
                         }
+                    }
+
+                    &:active {
+                        transform: scale(0.96);
+                        filter: brightness(0.8);
                     }
                 }
             }
@@ -718,12 +738,17 @@
                     text-transform: uppercase;
                     letter-spacing: 2px;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
                     box-shadow: 0 4px 15px rgba($color-neon-green, 0.3);
 
                     &:hover {
                         transform: translateY(-2px);
                         box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
+                    }
+
+                    &:active {
+                        transform: scale(0.97);
+                        filter: brightness(0.9);
                     }
                 }
 
@@ -738,10 +763,15 @@
                     text-transform: uppercase;
                     letter-spacing: 2px;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: background-color $transition-fast, transform $transition-fast;
 
                     &:hover {
                         background: rgba($color-text-main, 0.2);
+                    }
+
+                    &:active {
+                        transform: scale(0.97);
+                        filter: brightness(0.9);
                     }
                 }
             }
@@ -1062,6 +1092,11 @@
 .map-tile-3d.governor-controlled:hover {
     transform: translateZ(35px) scale(1.05); // Even more elevated on hover
     box-shadow: 0 0 40px rgba($color-neon-cyan, 0.8), inset 0 0 15px rgba($color-neon-cyan, 0.6);
+}
+
+.map-tile-3d.governor-controlled:active {
+    transform: translateZ(15px) scale(0.98);
+    filter: brightness(0.9);
 }
 
 .map-legend-text {

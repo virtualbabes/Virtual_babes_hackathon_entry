@@ -21,6 +21,9 @@ html {
     // Standard Scrollbar (Firefox & Chrome 121+)
     scrollbar-width: thin;
     scrollbar-color: $glass-border-color rgba(0, 0, 0, 0.3);
+
+    // Disable mobile tap highlight for a more native application feel
+    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -62,6 +65,8 @@ a {
     color: $color-neon-cyan;
     text-decoration: none;
     transition: color $transition-fast;
+    // Improve touch responsiveness by removing 300ms tap delay
+    touch-action: manipulation;
 
     &:hover {
         color: lighten($color-neon-cyan, 10%);
@@ -88,6 +93,12 @@ input, button, select, textarea {
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
+    // Normalize appearance and remove mobile browser defaults
+    &:not([type="checkbox"]):not([type="radio"]) {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+    }
 }
 
 button {
@@ -95,6 +106,8 @@ button {
     border: none;
     background: none;
     padding: 0;
+    // Improve touch responsiveness
+    touch-action: manipulation;
 }
 
 // Images

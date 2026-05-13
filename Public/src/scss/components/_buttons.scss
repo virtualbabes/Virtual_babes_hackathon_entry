@@ -47,6 +47,11 @@ button {
     &:hover:not(:disabled)::before {
         left: 100%;
     }
+
+    &:active:not(:disabled) {
+        transform: translateY(1px) scale(0.97);
+        filter: brightness(0.9);
+    }
 }
 
 // Primary Glowing Buttons
@@ -62,7 +67,6 @@ button:not(.outline):not(.secondary):not(.danger):not(.success) {
     }
 
     &:active:not(:disabled) {
-        transform: translateY(1px) scale(0.98);
         box-shadow: 0 2px 10px rgba($color-neon-cyan, 0.4);
     }
 }
@@ -78,10 +82,6 @@ button.outline {
         background: rgba($color-neon-cyan, 0.1);
         box-shadow: 0 0 15px rgba($color-neon-cyan, 0.4);
         transform: translateY(-2px);
-    }
-
-    &:active:not(:disabled) {
-        transform: translateY(1px) scale(0.98);
     }
 }
 
@@ -109,6 +109,10 @@ button.success {
         box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
         background: linear-gradient(45deg, darken($color-neon-green, 10%), $color-neon-green);
     }
+
+    &:active:not(:disabled) {
+        box-shadow: 0 2px 10px rgba($color-neon-green, 0.4);
+    }
 }
 
 // Danger/Error Buttons
@@ -121,6 +125,10 @@ button.danger {
         box-shadow: 0 6px 25px rgba($color-error-red, 0.6);
         background: linear-gradient(45deg, darken($color-error-red, 10%), $color-error-red);
     }
+
+    &:active:not(:disabled) {
+        box-shadow: 0 2px 10px rgba($color-error-red, 0.4);
+    }
 }
 
 // Warning Buttons
@@ -132,6 +140,10 @@ button.warning {
     &:hover:not(:disabled) {
         box-shadow: 0 6px 25px rgba($color-warning-orange, 0.6);
         background: linear-gradient(45deg, darken($color-warning-orange, 10%), $color-warning-orange);
+    }
+
+    &:active:not(:disabled) {
+        box-shadow: 0 2px 10px rgba($color-warning-orange, 0.4);
     }
 }
 
@@ -186,6 +198,11 @@ button.xlarge, .btn-xlarge {
         transform: translateY(-4px);
         box-shadow: $glass-shadow-hover;
         border-color: $color-neon-cyan;
+    }
+
+    &:active {
+        transform: translateY(0) scale(0.96);
+        filter: brightness(0.8);
     }
 
     img {

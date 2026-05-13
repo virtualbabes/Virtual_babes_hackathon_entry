@@ -95,7 +95,9 @@
             padding: $spacing-lg;
             border-radius: $border-radius-lg;
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            will-change: transform, box-shadow, border-color;
+            transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
             position: relative;
             overflow: hidden;
 
@@ -161,7 +163,9 @@
                 border: 2px solid rgba($color-gold, 0.3);
                 position: relative;
                 box-shadow: 0 0 15px rgba($color-gold, 0.3);
-                transition: all $transition-fast;
+                transform: translateZ(0);
+                will-change: box-shadow;
+                transition: transform $transition-fast, box-shadow $transition-fast;
 
                 &.unlocked {
                     animation: badge-glow 2s infinite;
@@ -413,7 +417,7 @@
             align-items: center;
             padding: $spacing-md;
             border-bottom: 1px solid rgba($color-neon-purple, 0.2);
-            transition: all $transition-fast;
+            transition: transform $transition-fast, background-color $transition-fast;
 
             &:last-child {
                 border-bottom: none;
@@ -562,7 +566,8 @@
             padding: $spacing-md;
             border-color: rgba($color-neon-pink, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            transition: transform $transition-fast, border-color $transition-fast, background-color $transition-fast;
             display: flex;
             align-items: center;
             gap: $spacing-md;
@@ -652,7 +657,7 @@
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: transform $transition-fast, border-color $transition-fast, background-color $transition-fast, color $transition-fast;
 
                     &:hover {
                         background: rgba($color-neon-pink, 0.1);
@@ -708,7 +713,8 @@
             padding: $spacing-lg;
             border-color: rgba($color-neon-cyan, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            transition: transform $transition-fast, border-color $transition-fast, background-color $transition-fast;
 
             &:hover {
                 border-color: $color-neon-cyan;
@@ -798,7 +804,7 @@
                     text-transform: uppercase;
                     letter-spacing: 1px;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: transform $transition-fast, box-shadow $transition-fast;
 
                     &:hover {
                         transform: translateY(-2px);
@@ -816,7 +822,7 @@
                     text-transform: uppercase;
                     letter-spacing: 1px;
                     cursor: pointer;
-                    transition: all $transition-fast;
+                    transition: background-color $transition-fast;
 
                     &:hover {
                         background: rgba($color-text-main, 0.2);

@@ -114,9 +114,21 @@ $grid-gutter: 1rem;
 $avatar-size-small: 40px;
 $avatar-size-medium: 60px;
 $avatar-size-large: 80px;
+
+// Card System Tokens
 $card-width: 100px;
 $card-height: 140px;
+$card-mini-width: 90px;
+$card-mini-height: 120px;
 $board-size: 300px;
+
+// Layout Component Tokens
+$panel-width-xs: 400px;
+$panel-width-sm: 450px;
+$panel-width-md: 600px;
+$panel-width-lg: 800px;
+$panel-width-xl: 1000px;
+$chat-height: 300px;
 
 // Dynamic CSS Variables for Runtime Theming
 :root {

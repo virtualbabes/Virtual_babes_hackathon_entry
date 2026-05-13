@@ -76,7 +76,7 @@
         text-transform: uppercase;
         letter-spacing: 1px;
         cursor: pointer;
-        transition: all $transition-fast;
+        transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast, transform $transition-fast, box-shadow $transition-fast;
         white-space: nowrap;
 
         &:hover {
@@ -84,6 +84,11 @@
             border-color: $color-neon-purple;
             color: $color-neon-purple;
             transform: translateY(-2px);
+        }
+
+        &:active {
+            transform: translateY(0) scale(0.97);
+            filter: brightness(0.9);
         }
 
         &.active {
@@ -109,7 +114,9 @@
         padding: $spacing-lg;
         border-color: rgba($color-text-secondary, 0.2);
         cursor: pointer;
-        transition: all $transition-fast;
+        transform: translateZ(0);
+        will-change: transform, box-shadow;
+        transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
         display: flex;
         flex-direction: column;
         position: relative;
@@ -135,6 +142,11 @@
             &::before {
                 opacity: 1;
             }
+        }
+
+        &:active {
+            transform: translateY(-2px) scale(0.98);
+            filter: brightness(0.9);
         }
 
         &.owned {
@@ -300,12 +312,17 @@
                 text-transform: uppercase;
                 letter-spacing: 1px;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast, color $transition-fast;
                 box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
 
                 &:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 6px 25px rgba($color-neon-purple, 0.6);
+                }
+
+                &:active {
+                    transform: scale(0.97);
+                    filter: brightness(0.9);
                 }
 
                 &:disabled {
@@ -363,12 +380,16 @@
                 color: $color-text-secondary;
                 font-size: $font-size-xs;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast, transform $transition-fast;
 
                 &:hover {
                     background: rgba($color-neon-purple, 0.1);
                     border-color: $color-neon-purple;
                     color: $color-neon-purple;
+                }
+
+                &:active {
+                    transform: scale(0.95);
                 }
 
                 &.active {
@@ -488,12 +509,16 @@
                 align-items: center;
                 justify-content: center;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: background-color $transition-fast, color $transition-fast, transform $transition-fast;
 
                 &:hover {
                     background: $color-error-red;
                     color: $color-text-main;
                     transform: scale(1.1);
+                }
+
+                &:active {
+                    transform: scale(0.9);
                 }
             }
         }
@@ -537,12 +562,17 @@
         text-transform: uppercase;
         letter-spacing: 2px;
         cursor: pointer;
-        transition: all $transition-fast;
+        transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
         box-shadow: 0 4px 15px rgba($color-neon-green, 0.3);
 
         &:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
+        }
+
+        &:active {
+            transform: scale(0.97);
+            filter: brightness(0.9);
         }
 
         &:disabled {
@@ -699,12 +729,17 @@
                 text-transform: uppercase;
                 letter-spacing: 2px;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
                 box-shadow: 0 4px 15px rgba($color-gold, 0.3);
 
                 &:hover {
                     transform: translateY(-2px);
                     box-shadow: 0 6px 25px rgba($color-gold, 0.6);
+                }
+
+                &:active {
+                    transform: scale(0.97);
+                    filter: brightness(0.9);
                 }
 
                 &:disabled {

@@ -12,6 +12,9 @@
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Audit `renderCardHTML` function in `ui.js` for performance bottlenecks and re-allocations.
 - [x] **A11y Typography**: Hardened neon text contrast and outlines in `_typography.scss`.
+- [x] **UI Performance**: Optimized achievement badge and social hub rendering in `_social.scss`.
+- [x] **UI Performance**: Optimized shop item grid rendering and transitions in `_shops.scss`.
+- [x] **UI Performance**: Optimized market ticker and auction gallery rendering in `_economy.scss`.
 - [x] Fix `CardID` escrow logic in `auction_service.go` and `economy_processing.go`.
 - [x] Audit `initWebSocket` message handler in `network.js` for high-frequency move overhead; implemented batching logic.
 - [x] Resolve Faceplate Residue: Implemented Mojo/Cunning bonuses for Faceplates.

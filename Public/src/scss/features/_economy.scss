@@ -110,12 +110,16 @@
                 border-radius: $border-radius-sm;
                 font-size: $font-size-xs;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: background-color $transition-fast, border-color $transition-fast, color $transition-fast;
 
                 &:hover {
                     background: rgba($color-neon-cyan, 0.1);
                     border-color: $color-neon-cyan;
                     color: $color-neon-cyan;
+                }
+
+                &:active {
+                    transform: scale(0.95);
                 }
 
                 &.active {
@@ -140,6 +144,7 @@
             border-radius: $border-radius-sm;
             margin-right: $spacing-md;
             white-space: nowrap;
+                will-change: transform;
             animation: ticker-scroll 20s linear infinite;
 
             .ticker-symbol {
@@ -227,7 +232,9 @@
             border-color: $color-neon-cyan;
             padding: $spacing-lg;
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            will-change: transform, box-shadow, border-color;
+            transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -253,6 +260,11 @@
                 &::before {
                     opacity: 1;
                 }
+            }
+
+            &:active {
+                transform: translateY(-2px) scale(0.98);
+                filter: brightness(0.9);
             }
 
             .item-image {
@@ -488,11 +500,18 @@
             padding: $spacing-lg;
             border-color: rgba($color-text-secondary, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            will-change: transform, border-color;
+            transition: transform $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
 
             &:hover {
                 border-color: $color-neon-blue;
                 transform: translateY(-2px);
+            }
+
+            &:active {
+                transform: translateY(0) scale(0.97);
+                filter: brightness(0.9);
             }
 
             .item-header {
@@ -627,7 +646,9 @@
             padding: $spacing-lg;
             border-color: rgba($color-error-red, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            will-change: transform, box-shadow, border-color;
+            transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -655,6 +676,11 @@
                 &::before {
                     opacity: 1;
                 }
+            }
+
+            &:active {
+                transform: translateY(-2px) scale(0.98);
+                filter: brightness(0.9);
             }
 
             .item-icon {

@@ -76,9 +76,21 @@
 - index.html: [FIXED] Added missing labels, titles, and placeholders on form elements; migrated all inline CSS styles to utility classes/external sheets.
 - index.html: [FIXED] Refactored `shops-overlay` and `territory-map-overlay` to use modular SCSS classes instead of inline styles and generic utility classes.
 - features/_shops.scss: [FIXED] Added `width`, `text-align`, `max-height`, and `overflow-y` properties to `.shops-panel` and `.shop-items` to align with `index.html` refactor.
+- features/_economy.scss: [FIXED] Eliminated 'transition: all' bottlenecks and implemented hardware acceleration for ticker and auction items.
+- features/_shops.scss: [FIXED] Implemented haptic `:active` feedback and eliminated 'transition: all' performance bottlenecks in the item grid.
 - features/_territory.scss: [FIXED] Optimized 3D rendering with `will-change` and replaced all hardcoded colors with tokens.
 - layouts/_dashboard.scss: [FIXED] Replaced expensive `transition: all` with specific properties to resolve performance bottlenecks.
 - components/_cards.scss: [FIXED] Eliminated 'transition: all' bottlenecks and implemented hardware acceleration for playing cards and avatars.
+- components/_overlays.scss: [FIXED] Eliminated 'transition: all' bottlenecks and implemented hardware acceleration for modal transitions.
+- components/_cards.scss: [FIXED] Replaced remaining hardcoded hex colors for legendary rarity and warnings with system variables.
+- features/_criminality.scss: [FIXED] Converted all hardcoded warning/error hex and RGB values to variables.
+- features/_criminality.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks in the tactical heist grid and target lists.
+- features/_social.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks and implemented hardware acceleration for achievement badges.
+- base/_reset.scss: [FIXED] Implemented mobile normalization (tap-highlight and touch-action) for interactive element responsiveness.
+- components/_buttons.scss: [FIXED] Refactored `:active` states for universal haptic feedback and glow-collapse effects.
+- base/_variables.scss: [FIXED] Introduced `$panel-width-*` scale and `$card-mini-*` tokens to eliminate hardcoded magic numbers in feature modules.
+- components/_cards.scss: [FIXED] Implemented tactile `:active` states and selection glow animations for better haptic feedback.
+- features/_territory.scss: [FIXED] Implemented haptic `:active` feedback and eliminated remaining 'transition: all' bottlenecks.
 - components/_buttons.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks.
 - base/_reset.scss: [FIXED] Synchronized global scrollbar support for Firefox and Safari.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.

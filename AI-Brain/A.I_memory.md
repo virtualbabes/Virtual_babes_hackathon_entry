@@ -44,6 +44,17 @@
 - **SCSS Hardening**: Synchronized standard and Webkit scrollbar behaviors in `_reset.scss` for full Safari/Firefox/Chrome parity.
 - **SCSS Hardening**: Resolved "at-rule or selector expected" syntax error in `_overlays.scss`.
 - **UI Performance**: Optimized 3D map, dashboard, button, and card rendering by replacing expensive `transition: all` declarations with specific property lists and adding GPU hints.
+- **SCSS Hardening**: Audited `_cards.scss` for hardcoded colors and synced card typography with the `$font-heading` token.
+- **SCSS Hardening**: Replaced all remaining hex and hardcoded RGB values in `_criminality.scss` with system design tokens.
+- **UI Performance**: Optimized Social Hub and Achievement badge animations by replacing `transition: all` and adding GPU hints to `_social.scss`.
+- **Mobile Normalization**: Suppressed tap highlights and eliminated 300ms tap delay in `_reset.scss` for better mobile responsiveness.
+- **Haptic Feedback**: Hardened `:active` states for all button variants in `_buttons.scss` to provide tactile visual feedback on touch devices.
+- **Haptic Feedback**: Implemented tactile `:active` states and selection glow animations for playing cards and miniatures in `_cards.scss`.
+- **Haptic Feedback**: Extended tactile `:active` states and optimized transitions for shop items, category tabs, and checkout controls in `_shops.scss`.
+- **Haptic Feedback**: Optimized transitions and added tactile `:active` feedback to market ticker, auctions, and black market items in `_economy.scss`.
+- **Haptic Feedback**: Extended tactile `:active` states and optimized transitions for map tiles, district cards, and foundry controls in `_territory.scss`.
+- **UI Performance**: Eliminated 'transition: all' performance bottlenecks and implemented GPU acceleration for modal overlays in `_overlays.scss`.
+- **Design Tokens**: Centralized magic numbers for panel widths, mini-cards, and layout heights into `_variables.scss` for global consistency.
 - **CSS Refactoring**: Migrated remaining inline styles from the Deck Manager and Admin Suite to modular SCSS (Admin Suite completed).
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.

@@ -7,7 +7,7 @@
     @include neon-glass-panel;
     padding: $spacing-lg;
     border-color: rgba($color-error-red, 0.3);
-    background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
 }
 
 // Criminality Header
@@ -87,7 +87,9 @@
         padding: $spacing-lg;
         border-color: rgba($color-error-red, 0.2);
         cursor: pointer;
-        transition: all $transition-fast;
+        transform: translateZ(0);
+        will-change: transform, box-shadow, border-color;
+        transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -249,7 +251,7 @@
         max-height: 300px;
         overflow-y: auto;
         padding: $spacing-md;
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba($color-bg-dark, 0.2);
         border-radius: $border-radius-md;
         border: 1px solid rgba($color-error-red, 0.1);
 
@@ -258,7 +260,9 @@
             padding: $spacing-md;
             border-color: rgba($color-text-secondary, 0.2);
             cursor: pointer;
-            transition: all $transition-fast;
+            transform: translateZ(0);
+            will-change: transform, border-color, background-color;
+            transition: transform $transition-fast, border-color $transition-fast, background-color $transition-fast, box-shadow $transition-fast;
             display: flex;
             align-items: center;
             gap: $spacing-md;
@@ -333,7 +337,7 @@
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
                 cursor: pointer;
-                transition: all $transition-fast;
+                transition: background-color $transition-fast, color $transition-fast;
 
                 &:hover {
                     background: $color-error-red;
@@ -373,7 +377,7 @@
     .progress-bar {
         width: 100%;
         height: 12px;
-        background: rgba(0, 0, 0, 0.3);
+        background: rgba($color-bg-dark, 0.3);
         border-radius: $border-radius-sm;
         border: 1px solid rgba($color-warning-orange, 0.2);
         overflow: hidden;
@@ -446,12 +450,12 @@
 
             &.success {
                 border-color: rgba($color-neon-green, 0.3);
-                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
+                background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-green, 0.05) 0%, transparent 70%);
             }
 
             &.failure {
                 border-color: rgba($color-error-red, 0.3);
-                background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(51, 51, 51, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
+                background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-error-red, 0.05) 0%, transparent 70%);
             }
 
             .result-icon {
@@ -537,7 +541,7 @@
             padding: $spacing-md $spacing-xl;
             border-radius: $border-radius-md;
             box-shadow: 0 4px 15px rgba($color-neon-cyan, 0.3);
-            transition: all $transition-fast;
+            transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
 
             &:hover {
                 transform: translateY(-2px);
@@ -580,7 +584,7 @@
         overflow-y: auto;
         border: 1px solid rgba($color-text-secondary, 0.1);
         border-radius: $border-radius-md;
-        background: rgba(0, 0, 0, 0.2);
+        background: rgba($color-bg-dark, 0.2);
 
         .history-item {
             display: flex;
@@ -751,7 +755,7 @@
         .risk-bar {
             width: 100%;
             height: 16px;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba($color-bg-dark, 0.3);
             border-radius: $border-radius-sm;
             border: 1px solid rgba($color-warning-orange, 0.2);
             overflow: hidden;
