@@ -170,12 +170,14 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 
 	// 7. Spreader Multiplier (Market Manipulation Reward)
 	// Active participants in the Rumor Mill gain Standing for their social influence.
+	// Hardening: Changed from a multiplier to an additive bonus to ensure players with
+	// zero wins still gain visible "Standing" from rumor activity.
 	if stats.RumorCount > 0 {
-		spreaderMult := 1.0 + (float64(stats.RumorCount) * 0.02)
-		if spreaderMult > 1.10 {
-			spreaderMult = 1.10
+		spreaderBonus := int(float64(stats.RumorCount) * 10) // 10 reputation points per rumor spread
+		if spreaderBonus > 100 { // Cap the bonus to prevent excessive reputation from rumors alone
+			spreaderBonus = 100
 		}
-		rep = int(float64(rep) * spreaderMult)
+		rep += spreaderBonus
 	}
 
 	if rep < 0 {

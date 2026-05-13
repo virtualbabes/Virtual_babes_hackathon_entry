@@ -26,7 +26,7 @@
 - [x] Implement 'equip_cosmetic' message type in `lobby_manager.go`.
 - [x] Audit `handleHeist` in `club_service.go` for `GetEffectiveCunning` integration.
 
-## Technical Debt & Refactoring (Completed)
+## Technical Debt & Refactoring (Completed / Hardened)
 - [x] Decompose `lobby_manager.go` into domain-specific service files.
 - [x] Audit `club_service.go` for concurrency issues (Treasury/Inventory).
 - [x] Implement partial state sync in WASM `GetGameState` (Go & JS).
@@ -112,6 +112,7 @@
 - [x] Audit the handleHeist logic in club_service.go to ensure the success probability matches the frontend heuristic exactly.
 - [ ] Mainnet Security: Final verification of mnemonic encryption and environment variable injection for production.
 - [ ] Production Readiness: Final UI polishing for mobile responsiveness and WalletConnect v2 finalization.
+- [x] Audit `CalculateReputation` in `economy_service.go` to ensure the Spreader Multiplier correctly applies to players with zero wins but high rumor activity. (Changed to additive bonus)
 - [x] Added missing SCSS variables: $font-size-5xl, $font-size-6xl, $line-height-tight, $line-height-normal, $line-height-relaxed, $border-radius-2xl, $border-radius-3xl, $shadow-2xl, $color-neon-pink to _variables.scss.
 - [x] Fixed server port conflict: Updated package.json start script to use PORT=8083 instead of default 8082 (conflicted with Algorand node).
 - [x] Fixed ES6 module loading: Added type="module" to app.js script tag in index.html.

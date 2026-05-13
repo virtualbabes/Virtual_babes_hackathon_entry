@@ -1714,6 +1714,15 @@ func (l *Lobby) processMojoDecay() {
 			decayOccurred = true
 
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
+
+			// PILLAR 1: Rippled Standing Decay. 
+			// Recalculate reputation for all employees whose standing relies on this club's Mojo.
+			for wallet, stats := range l.leaderboard {
+				if stats.EmployerClubID == club.ID {
+					stats.Reputation = l.CalculateReputation(stats)
+					l.leaderboard[wallet] = stats
+				}
+			}
 			// Reset clock to 'now' so decay is periodic (e.g., every 48h) rather than continuous
 			club.LastActivity = now 
 		}

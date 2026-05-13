@@ -114,6 +114,7 @@
 - **Faceplates**: Cosmetic items now provide functional Mojo/Cunning bonuses via `FaceplateRegistry`. Mojo bonuses boost Reputation.
 - **Criminality UI**: Wired the Kidnap Selection interface following successful heists using orphaned `_criminality.scss` styles.
 - **Heist Audit**: Aligned Heist success probabilities by broadcasting effective stats in lobby updates and fixing scope bugs in `club_service.go`.
+- **Reputation System**: Adjusted `CalculateReputation` to use an additive bonus for `RumorCount` instead of a multiplier, ensuring players with zero wins still gain standing from social influence.
 - **Documentation**: Merged `ReadMe.txt` into `README.md`.
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
 - **Validation**: Performed simulated 16-player tournament stress tests; verified bracket archival and kickback logic.
