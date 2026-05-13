@@ -21,7 +21,7 @@
     align-items: center;
     flex-shrink: 0;
     border-bottom: 1px solid $glass-border-color;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba($color-bg-dark, 0.4);
     -webkit-backdrop-filter: blur($glass-blur);
     backdrop-filter: blur($glass-blur);
     padding: $spacing-md;
@@ -70,7 +70,7 @@
 
 .payout-widget {
     cursor: pointer;
-    transition: all $transition-fast;
+    transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
     border-color: rgba($color-neon-cyan, 0.3);
 
     &:hover {
@@ -122,7 +122,7 @@
     padding: $spacing-xs $spacing-sm;
     border-radius: $border-radius-md;
     font-size: $font-size-sm;
-    transition: all $transition-fast;
+    transition: background-color $transition-fast, box-shadow $transition-fast;
 
     &:hover {
         background: rgba($color-neon-cyan, 0.2);
@@ -134,7 +134,7 @@
 #wallet-controls {
     button {
         background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
-        color: white;
+        color: $color-text-main;
         padding: $spacing-sm $spacing-lg;
         border-radius: $border-radius-md;
         font-weight: bold;
@@ -142,7 +142,7 @@
         text-transform: uppercase;
         letter-spacing: 1px;
         box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
-        transition: all $transition-fast;
+        transition: transform $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
 
         &:hover {
             transform: translateY(-2px);

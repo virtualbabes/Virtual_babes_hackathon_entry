@@ -55,6 +55,14 @@
 - **Haptic Feedback**: Extended tactile `:active` states and optimized transitions for map tiles, district cards, and foundry controls in `_territory.scss`.
 - **UI Performance**: Eliminated 'transition: all' performance bottlenecks and implemented GPU acceleration for modal overlays in `_overlays.scss`.
 - **Design Tokens**: Centralized magic numbers for panel widths, mini-cards, and layout heights into `_variables.scss` for global consistency.
+- **SCSS Hardening**: Standardized panel widths and card-mini dimensions across all feature modules using design tokens.
+- **SCSS Hardening**: Refactored `_overlays.scss` to eliminate hardcoded margin and padding values, migrating them to the `$spacing` token scale.
+- **A11y Audit**: Improved contrast ratios for card type icons in `_cards.scss` by utilizing dark text on high-luminance backgrounds.
+- **A11y Audit**: Hardened button accessibility in `_buttons.scss` by implementing dark text on high-intensity neon backgrounds.
+- **A11y Audit**: Hardened market ticker legibility in `_economy.scss` with increased opacity and motion-sensitivity overrides.
+- **A11y Audit**: Improved 3D map readability in `_territory.scss` by hardening label contrast and tokenizing legend text.
+- **A11y Audit**: Hardened social status indicator contrast and improved "Locked" state legibility in `_social.scss`.
+- **A11y Audit**: Hardened Heist Risk Meter contrast and motion accessibility in `_criminality.scss`.
 - **CSS Refactoring**: Migrated remaining inline styles from the Deck Manager and Admin Suite to modular SCSS (Admin Suite completed).
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.

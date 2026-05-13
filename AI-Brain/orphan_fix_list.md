@@ -89,8 +89,19 @@
 - base/_reset.scss: [FIXED] Implemented mobile normalization (tap-highlight and touch-action) for interactive element responsiveness.
 - components/_buttons.scss: [FIXED] Refactored `:active` states for universal haptic feedback and glow-collapse effects.
 - base/_variables.scss: [FIXED] Introduced `$panel-width-*` scale and `$card-mini-*` tokens to eliminate hardcoded magic numbers in feature modules.
+- features/_shops.scss: [FIXED] Replaced hardcoded pixel width with standardized `$panel-width-lg` token.
+- features/_criminality.scss: [FIXED] Replaced hardcoded pixel widths with standardized `$panel-width-*` tokens.
+- features/_economy.scss: [FIXED] Replaced hardcoded pixel widths with standardized `$panel-width-*` tokens.
 - components/_cards.scss: [FIXED] Implemented tactile `:active` states and selection glow animations for better haptic feedback.
-- features/_territory.scss: [FIXED] Implemented haptic `:active` feedback and eliminated remaining 'transition: all' bottlenecks.
+- components/_overlays.scss: [FIXED] Replaced remaining hardcoded margin and padding pixel values with standardized `$spacing-*` tokens.
+- components/_cards.scss: [FIXED] Hardened accessibility of type icons by implementing high-contrast text and shadows.
+- components/_buttons.scss: [FIXED] Improved accessibility of Success and Warning buttons by using high-contrast dark text.
+- features/_economy.scss: [FIXED] Hardened ticker legibility and added `prefers-reduced-motion` support.
+- features/_territory.scss: [FIXED] Hardened map label contrast and tokenized legend text properties.
+- features/_social.scss: [FIXED] Improved status indicator contrast and locked-state legibility.
+- features/_criminality.scss: [FIXED] Hardened heist risk meter contrast and added `prefers-reduced-motion` support.
+- features/_territory.scss: [FIXED] Optimized 3D rendering, replaced all hardcoded colors, and mapped primary width to standardized `$panel-width-lg` token.
+- layouts/_main-layout.scss: [FIXED] Eliminated 'transition: all' bottlenecks and replaced hardcoded hex colors with system variables.
 - components/_buttons.scss: [FIXED] Eliminated 'transition: all' performance bottlenecks.
 - base/_reset.scss: [FIXED] Synchronized global scrollbar support for Firefox and Safari.
 - base/_reset.scss: [FIXED] Added `-moz-` and `-webkit-` prefixes for `text-size-adjust`.

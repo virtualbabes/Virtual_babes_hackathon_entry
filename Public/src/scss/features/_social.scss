@@ -130,7 +130,7 @@
             }
 
             &.locked {
-                opacity: 0.5;
+                opacity: 0.7; // Increased from 0.5 for WCAG text contrast
                 border-color: rgba($color-text-muted, 0.2);
 
                 &:hover {
@@ -260,7 +260,7 @@
             }
 
             &.locked {
-                opacity: 0.5;
+                opacity: 0.7; // Increased for legibility
                 border-color: rgba($color-text-muted, 0.2);
             }
 
@@ -612,18 +612,24 @@
                 .connection-status {
                     font-size: $font-size-xs;
                     margin-top: $spacing-xs;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                    text-transform: uppercase;
 
                     &.online {
                         color: $color-neon-green;
+                        text-shadow: 0 0 5px rgba($color-neon-green, 0.3);
 
                         &::before {
                             content: '● ';
                             color: $color-neon-green;
+                            font-size: 1.2em;
                         }
                     }
 
                     &.offline {
                         color: $color-text-muted;
+                        text-shadow: none;
 
                         &::before {
                             content: '● ';
@@ -633,6 +639,7 @@
 
                     &.away {
                         color: $color-warning-orange;
+                        text-shadow: 0 0 5px rgba($color-warning-orange, 0.3);
 
                         &::before {
                             content: '● ';

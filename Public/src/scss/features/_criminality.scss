@@ -53,7 +53,7 @@
 }
 
 .courthouse-panel {
-    width: 450px;
+    width: $panel-width-sm;
     text-align: center;
     border-color: $color-error-red;
 
@@ -746,18 +746,25 @@
             justify-content: space-between;
             margin-bottom: $spacing-sm;
             font-size: $font-size-sm;
-            color: $color-text-secondary;
+            font-weight: 600;
+            letter-spacing: 0.5px;
 
-            .risk-low { color: $color-neon-green; }
-            .risk-high { color: $color-error-red; }
+            .risk-low { 
+                color: $color-neon-green;
+                text-shadow: 0 0 5px rgba($color-neon-green, 0.3);
+            }
+            .risk-high { 
+                color: $color-error-red;
+                text-shadow: 0 0 5px rgba($color-error-red, 0.3);
+            }
         }
 
         .risk-bar {
             width: 100%;
             height: 16px;
-            background: rgba($color-bg-dark, 0.3);
+            background: rgba($color-bg-dark, 0.6); // Increased for better fill isolation
             border-radius: $border-radius-sm;
-            border: 1px solid rgba($color-warning-orange, 0.2);
+            border: 1px solid rgba($color-warning-orange, 0.4); // Enhanced border contrast
             overflow: hidden;
 
             .risk-fill {
@@ -774,8 +781,13 @@
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+                    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
                     animation: risk-pulse 3s infinite;
+
+                    @media (prefers-reduced-motion: reduce) {
+                        animation: none;
+                        opacity: 0.3; // Static subtle highlight
+                    }
                 }
             }
         }
@@ -834,7 +846,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: $z-index-modal;
-    max-width: 400px;
+    max-width: $panel-width-xs;
     padding: 20px;
     border-color: $color-error-red;
 
@@ -844,7 +856,7 @@
 }
 
 .criminality-panel.heist-terminal {
-    width: 700px;
+    width: $panel-width-lg;
     max-height: 90vh;
 
     .criminality-title { text-shadow: 0 0 15px rgba($color-error-red, 0.5); }
@@ -866,7 +878,7 @@
 
 .kidnap-selection-panel {
     @include neon-glass-panel;
-    width: 450px;
+    width: $panel-width-sm;
     border-color: $color-warning-orange;
 
     .criminality-header { border-bottom-color: rgba($color-warning-orange, 0.3); }

@@ -12,6 +12,9 @@
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Audit `renderCardHTML` function in `ui.js` for performance bottlenecks and re-allocations.
 - [x] **A11y Typography**: Hardened neon text contrast and outlines in `_typography.scss`.
+- [x] **A11y Audit**: Hardened market ticker legibility and motion accessibility in `_economy.scss`.
+- [x] **A11y Audit**: Hardened heist risk meter color contrast and motion accessibility in `_criminality.scss`.
+- [x] **A11y Audit**: Hardened social status contrast and locked-state legibility in `_social.scss`.
 - [x] **UI Performance**: Optimized achievement badge and social hub rendering in `_social.scss`.
 - [x] **UI Performance**: Optimized shop item grid rendering and transitions in `_shops.scss`.
 - [x] **UI Performance**: Optimized market ticker and auction gallery rendering in `_economy.scss`.

@@ -149,15 +149,23 @@
     align-items: center;
     justify-content: center;
     font-size: $font-size-xs;
-    font-weight: bold;
-    color: $color-text-main;
+    font-weight: 800;
+    color: $color-bg-dark; // Default to dark text for contrast on bright neon backgrounds
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.3);
 
     &.fire { background: linear-gradient(45deg, #ff6b35, #f7931e); }
     &.water { background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan); }
     &.earth { background: linear-gradient(45deg, var(--mood-grounded), #38f9d7); }
-    &.air { background: linear-gradient(45deg, #fa709a, #fee140); }
-    &.lightning { background: linear-gradient(45deg, #a8edea, #fed6e3); }
-    &.dark { background: linear-gradient(45deg, #2c3e50, #34495e); }
+    &.air { background: linear-gradient(45deg, $color-accent-pink, $color-warning-orange); }
+    &.lightning { background: linear-gradient(45deg, #e0e0e0, $color-neon-cyan); }
+    &.dark { 
+        background: linear-gradient(45deg, #1a1a1a, $color-dark-grey); 
+        color: $color-text-main; // Dark background requires light text
+        border-color: rgba($color-neon-purple, 0.3);
+        text-shadow: 0 0 5px rgba($color-neon-purple, 0.5);
+    }
 }
 
 // Debuff Badge
@@ -333,7 +341,7 @@
 .deck-slot-btn.locked { opacity: 0.4; cursor: not-allowed; }
 
 .card-mini {
-    width: 90px; height: 120px; background: $color-bg-dark; border: 1px solid $glass-border-color;
+    width: $card-mini-width; height: $card-mini-height; background: $color-bg-dark; border: 1px solid $glass-border-color;
     border-radius: 8px; cursor: grab; position: relative;
     transition: transform $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
 
@@ -353,7 +361,7 @@
     .power-grid { font-size: 14px; }
 
     /* Deck Manager Layout Shift */
-    .card-mini { flex: 0 0 100px; height: 140px; }
+    .card-mini { flex: 0 0 $card-width; height: $card-height; }
 }
 
 /* --- Rumor Board Styles --- */

@@ -5,7 +5,7 @@
 // Shops Panel Base
 .shops-panel {
     @include neon-glass-panel;
-    width: 800px; // Aligned with index.html
+    width: $panel-width-lg; // Aligned with index.html
     text-align: center; // Aligned with index.html
     padding: $spacing-lg;
     border-color: rgba($color-neon-purple, 0.3);

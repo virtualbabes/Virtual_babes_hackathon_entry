@@ -55,12 +55,14 @@ button {
 }
 
 // Primary Glowing Buttons
-button:not(.outline):not(.secondary):not(.danger):not(.success) {
+button:not(.outline):not(.secondary):not(.danger):not(.success):not(.warning) {
     background: linear-gradient(45deg, $color-neon-purple, $color-neon-blue);
     color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     box-shadow: 0 4px 15px rgba($color-neon-purple, 0.3);
 
     &:hover:not(:disabled) {
+        color: $color-bg-dark; // Cyan/Blue gradient is very bright
         transform: translateY(-2px);
         box-shadow: 0 6px 25px rgba($color-neon-cyan, 0.6);
         background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan);
@@ -101,11 +103,14 @@ button.secondary {
 
 // Success Buttons
 button.success {
-    background: linear-gradient(45deg, $color-neon-green, darken($color-neon-green, 10%));
-    color: white;
+    background: linear-gradient(45deg, $color-neon-green, darken($color-neon-green, 5%));
+    color: $color-bg-dark; // High intensity Green requires dark text
+    font-weight: 700;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 15px rgba($color-neon-green, 0.3);
 
     &:hover:not(:disabled) {
+        color: $color-bg-dark;
         box-shadow: 0 6px 25px rgba($color-neon-green, 0.6);
         background: linear-gradient(45deg, darken($color-neon-green, 10%), $color-neon-green);
     }
@@ -133,11 +138,14 @@ button.danger {
 
 // Warning Buttons
 button.warning {
-    background: linear-gradient(45deg, $color-warning-orange, darken($color-warning-orange, 10%));
-    color: white;
+    background: linear-gradient(45deg, $color-warning-orange, darken($color-warning-orange, 5%));
+    color: $color-bg-dark; // High intensity Orange requires dark text
+    font-weight: 700;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 15px rgba($color-warning-orange, 0.3);
 
     &:hover:not(:disabled) {
+        color: $color-bg-dark;
         box-shadow: 0 6px 25px rgba($color-warning-orange, 0.6);
         background: linear-gradient(45deg, darken($color-warning-orange, 10%), $color-warning-orange);
     }
