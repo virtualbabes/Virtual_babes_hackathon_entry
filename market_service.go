@@ -24,18 +24,25 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	wallet, ok := l.wallets[env.FromID]
 	if !ok { return }
 
-	// Resolve target wallet: check active session map first, then fallback to direct address
-	targetWallet, targetExists := l.wallets[data.EntityID]
-	if !targetExists {
-		if strings.HasPrefix(data.EntityID, "voi") || strings.HasPrefix(data.EntityID, "0x") {
-			targetWallet = data.EntityID
-			targetExists = true
-		} else {
-			return
-		}
+	// Resolve target wallet: check active session map first, then leaderboard (NPCs/Offline), then fallback to direct address
+	var targetWallet string
+	if w, exists := l.wallets[data.EntityID]; exists {
+		targetWallet = w
+	} else if _, exists := l.leaderboard[strings.ToLower(data.EntityID)]; exists {
+		targetWallet = data.EntityID
+	} else if strings.HasPrefix(strings.ToLower(data.EntityID), "voi") || strings.HasPrefix(strings.ToLower(data.EntityID), "0x") {
+		targetWallet = data.EntityID
+	} else {
+		return
 	}
 	targetWallet = strings.ToLower(targetWallet)
+
+	l.ensurePlayerStatsMapsInitialized(targetWallet)
+
+	// REAL-TIME PRICING: Recalculate reputation to ensure Marketability Multipliers (Aggressiveness/Risk) are reflected.
 	targetStats := l.leaderboard[targetWallet]
+	targetStats.Reputation = l.CalculateReputation(targetStats)
+	l.leaderboard[targetWallet] = targetStats 
 
 	basePrice := float64((targetStats.Wins * 10) + int(float64(targetStats.Reputation)/2.0) + 100.0)
 	for _, rumor := range l.rumors {

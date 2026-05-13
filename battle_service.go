@@ -14,19 +14,32 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	// Determinism Sync: Artifact bonuses are added unconditionally to match main.go logic
 	base := c.Power[sideIdx] + c.Artifact
 
-	// Wanted Level Penalty: -5 power per Wanted Level point
-	// Hardening: Use snapshotted wallets from match state to survive session drops
-	wallet := match.P1Wallet
+	// Resolve Player Identity & Snapshotted Stats
+	pID := match.P1ID
+	wanted := match.P1WantedLevel
+	cunning := match.P1Cunning
+	nurturing := match.P1Nurturing
+
 	if c.Owner == 1 {
-		wallet = match.P2Wallet
+		pID = match.P2ID
+		wanted = match.P2WantedLevel
+		cunning = match.P2Cunning
+		nurturing = match.P2Nurturing
 	}
 
-	stats := l.leaderboard[wallet]
+	// Dynamic Buff Check: Re-apply global match-wide power boosts.
+	if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[pID] != nil {
+		if _, ok := match.ActiveItemBuffs[pID]["mood_catalyst"]; ok {
+			base += 50
+		}
+	}
 
 	// Apply Wanted Level Penalty (Mitigated by Cunning)
-	wantedPenalty := (stats.WantedLevel * 5)
+	wantedPenalty := (wanted * 5)
 	// Cunning mitigates penalty: every 1 point of Cunning reduces penalty by 2
-	mitigation := stats.GetEffectiveCunning() * 2
+	// Hardening: Use snapshotted values from the match state to ensure consistency.
+	// These values are captured in lobby_manager.go during initiatePairedMatch.
+	mitigation := cunning * 2
 	if mitigation > wantedPenalty { mitigation = wantedPenalty }
 	base -= (wantedPenalty - mitigation)
 
@@ -34,7 +47,7 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	if c.Fatigue > 50 {
 		fatiguePenalty := (c.Fatigue - 50)
 		// Nurturing reduces fatigue impact: 1 power back per Nurturing point
-		reduction := stats.Nurturing
+		reduction := nurturing
 		if reduction > fatiguePenalty { reduction = fatiguePenalty }
 		base -= (fatiguePenalty - reduction)
 	}
@@ -54,13 +67,8 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 				"Grounded": "Volatile",
 			}
 
-			// Check for "grounded_shield" buff for the card's owner.
-			// Hardening: Resolve the correct playerID from the match state using the owner index.
+			// Check for "grounded_shield" buff (Immunity to Mood Penalties)
 			var hasGroundedShield bool
-			pID := match.P1ID
-			if c.Owner == 1 {
-				pID = match.P2ID
-			}
 			if match.ActiveItemBuffs != nil && match.ActiveItemBuffs[pID] != nil {
 				if _, ok := match.ActiveItemBuffs[pID]["grounded_shield"]; ok {
 					hasGroundedShield = true
@@ -139,6 +147,12 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 				if neighbor.Owner == 1 {
 					originalOwnerWallet = match.P2Wallet
 				} // If neighbor was P2's card
+
+				// Fallen Penalty Rule: Captured cards lose 20 Artifact power (Deterministic Sync with WASM)
+				if match.Rules["Fallen_penalty"] {
+					neighbor.Artifact -= 20
+				}
+
 				neighbor.Owner = pIdx
 				totalFlips++
 				capturedCards = append(capturedCards, CapturedCardInfo{
@@ -147,6 +161,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					CapturingPlayerWallet: capturingPlayerWallet,
 					CaptureType:           "BASIC",
 					GridIndex:             nbIdx,
+					Round:                 match.Round,
 				})
 			}
 		}
@@ -161,6 +176,12 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					if match.Board[idx].Owner == 1 {
 						originalOwnerWallet = match.P2Wallet
 					}
+
+					// Fallen Penalty Rule: Captured cards lose 20 Artifact power
+					if match.Rules["Fallen_penalty"] {
+						match.Board[idx].Artifact -= 20
+					}
+
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
@@ -169,6 +190,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						CapturingPlayerWallet: capturingPlayerWallet,
 						CaptureType:           "SAME",
 						GridIndex:             idx,
+						Round:                 match.Round,
 					})
 					comboQueue = append(comboQueue, idx)
 				}
@@ -183,6 +205,12 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					if match.Board[idx].Owner == 1 {
 						originalOwnerWallet = match.P2Wallet
 					}
+
+					// Fallen Penalty Rule: Captured cards lose 20 Artifact power
+					if match.Rules["Fallen_penalty"] {
+						match.Board[idx].Artifact -= 20
+					}
+
 					match.Board[idx].Owner = pIdx
 					totalFlips++
 					capturedCards = append(capturedCards, CapturedCardInfo{
@@ -191,6 +219,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						CapturingPlayerWallet: capturingPlayerWallet,
 						CaptureType:           "POWER_UP",
 						GridIndex:             idx,
+						Round:                 match.Round,
 					})
 					comboQueue = append(comboQueue, idx)
 				}
@@ -211,12 +240,18 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 				nPower := getEffectiveServerPower(l, match, neighbor, n.neighborPowerIdx, nbIdx)
 
 				if neighbor.Owner != pIdx && cPower > nPower {
+
+					// Fallen Penalty Rule: Captured cards lose 20 Artifact power
+					if match.Rules["Fallen_penalty"] {
+						neighbor.Artifact -= 20
+					}
+
 					neighbor.Owner = pIdx
 					// Only add to capturedCards if it wasn't already flipped by a direct capture or rule
 					// This prevents double-counting for jailing
 					alreadyCaptured := false
 					for _, cc := range capturedCards {
-						if cc.CardID == neighbor.ID {
+						if cc.GridIndex == nbIdx {
 							alreadyCaptured = true
 							break
 						}
@@ -232,6 +267,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 							CapturingPlayerWallet: capturingPlayerWallet,
 							CaptureType:           "COMBO",
 							GridIndex:             nbIdx,
+							Round:                 match.Round,
 						})
 					}
 					totalFlips++
@@ -285,6 +321,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		Timestamp:        time.Now(),
 		TournamentMatchID: match.TournamentMatchID,
 		IsBountyMatch:    match.IsBountyMatch,
+		ActiveItemBuffs:  match.ActiveItemBuffs, // Snapshot item effects into history for archival
+		CapturedCards:    match.CapturedCards,   // Preserve detailed capture log for audit
 	}
 
 	if p1 > p2 {
@@ -354,6 +392,7 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 	var p1NewDeck []int
 	var p2NewDeck []int
+	match.Round++ // Increment round for capture instance isolation
 
 	// Reconstruct hands based on current board ownership to handle tie-breakers.
 	// Hardening: We must handle duplicate card IDs correctly to prevent unplayed cards from being lost.
@@ -411,6 +450,8 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 		"text":    "⚔️ <b>SUDDEN DEATH!</b> The board has cleared. Decks have been redistributed based on card ownership.",
 		"p1_deck": p1NewDeck,
 		"p2_deck": p2NewDeck,
+		"active_item_buffs": match.ActiveItemBuffs, // Sync active buffs to client UI
+		"rules":             match.Rules,             // Sync authoritative rules
 	})
 
 	l.sendToClient(match.P1ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
@@ -429,7 +470,7 @@ func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history M
 
 			// Achievement: Arena Legend (100 Wins)
 			if s.Wins == 100 {
-				l.unlockAchievement(wallet, "ARENA_LEGEND")
+				l.unlockAchievementLocked(wallet, "ARENA_LEGEND")
 			}
 
 			if l.isBetterRating(rating, s.BestRating) {
@@ -514,7 +555,10 @@ func (l *Lobby) updateLeaderboard(wallet string, isTournamentWin bool, scores [2
 	stats := l.leaderboard[wallet]
 	stats.Wins++
 	stats.DisconnectStreak = 0
-	l.updatePlayerPlaystyleTendencies(wallet, true, scores, deck, isBountyWin) // Update playstyle on win
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, true, scores, deck, isBountyWin) // Update playstyle on win
+
+	// REFRESH: Fetch updated Playstyle from the map to prevent clobbering behavioral data.
+	stats.Playstyle = l.leaderboard[wallet].Playstyle
 	stats.Reputation = l.CalculateReputation(stats)                            // Ensure reputation is updated
 	l.leaderboard[wallet] = stats
 }
@@ -526,7 +570,10 @@ func (l *Lobby) incrementDNF(wallet string) {
 	if stats.DisconnectStreak > 3 {
 		stats.BanExpires = time.Now().Add(24 * time.Hour)
 	}
-	l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF (no match context)
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF
+
+	// REFRESH: Sync local stats with the newly calculated playstyle before calculating Standing.
+	stats.Playstyle = l.leaderboard[wallet].Playstyle
 	stats.Reputation = l.CalculateReputation(stats)                            // Update the map with modified stats
 	l.leaderboard[wallet] = stats
 	go l.recordDNFOnChain(wallet)
@@ -589,6 +636,7 @@ func (l *Lobby) processPrisonerRuleLocked(match *MatchState, loserWallet, winner
 	}
 	owningClub.Jail[rarestCard.ID] = rarestCard
 
+	owningClub.LastActivity = time.Now() // Industrial Loop: Turf defense refreshes club activity
 	// Remove from loser's inventory
 	loserStats := l.leaderboard[loserWallet]
 	delete(loserStats.Inventory, fmt.Sprintf("CARD-%d", rarestCard.ID))
@@ -615,10 +663,13 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		return
 	}
 
-	jailedThisMatch := make(map[int]bool) // Track processed cards to prevent double-penalty in chain reactions
+	// High-Fidelity Jailing: Use Round and GridIndex to ensure each capture event is handled,
+	// preventing collisions during Sudden Death or when players use duplicate card archetypes.
+	jailedThisMatch := make(map[string]bool) 
 
 	for _, captured := range capturedCards {
-		if jailedThisMatch[captured.CardID] {
+		jailKey := fmt.Sprintf("%d-%d", captured.Round, captured.GridIndex)
+		if jailedThisMatch[jailKey] {
 			continue
 		}
 
@@ -666,16 +717,25 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 			continue
 		}
 
-		card, cardExists := l.inventory[captured.CardID]
-		if !cardExists {
+		// Use the card instance from the board, which contains the Artifact reductions applied during the match.
+		// This ensures the "Fallen_penalty" power loss is captured for persistence.
+		cardPtr := match.Board[captured.GridIndex]
+		if cardPtr == nil || cardPtr.ID != captured.CardID {
 			continue
 		}
+		card := *cardPtr
+
+		// INDUSTRIAL LOOP: Persist the "Battle Scars" (Artifact reduction) to the global cache.
+		// This makes the power loss permanent for this card archetype in the Arena ecosystem.
+		l.inventory[card.ID] = card
+		l.persistentCardCache[card.ID] = card
 
 		// Transfer card to Club Jail
 		if owningClub.Jail == nil {
 			owningClub.Jail = make(map[int]ServerCard)
 		}
 		owningClub.Jail[card.ID] = card
+		owningClub.LastActivity = time.Now() // Defensive success prevents Mojo decay
 
 		// Remove from original owner's inventory (Decrementing instead of absolute deletion)
 		originalOwnerStats.Inventory[cardKey]--
@@ -688,7 +748,7 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		}
 		originalOwnerStats.JailedCards[card.ID] = owningClub.ID
 		l.leaderboard[captured.OriginalOwnerWallet] = originalOwnerStats
-		jailedThisMatch[card.ID] = true
+		jailedThisMatch[jailKey] = true
 
 		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s.\n", 
 			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)
@@ -734,14 +794,8 @@ func (l *Lobby) applyItemEffectToMatch(match *MatchState, playerID string, itemI
 	case "Elemental":
 		switch itemID {
 		case "mood_catalyst": // +50 Mood Bonus (3 Matches)
-			if targetGridIndex >= 0 && targetGridIndex < 9 && match.Board[targetGridIndex] != nil {
-				card := match.Board[targetGridIndex]
-				if card.Owner == pIdx {
-					card.Artifact += 50                         // Apply as artifact bonus for simplicity in power calculation
-					match.ActiveItemBuffs[playerID][itemID] = 3 // Track for 3 matches
-					log.Printf("[BATTLE] Player %s used Mood Catalyst on card %d at grid %d. Artifact +50.\n", playerID, card.ID, targetGridIndex)
-				}
-			}
+			match.ActiveItemBuffs[playerID][itemID] = 3 // Track for 3 matches
+			log.Printf("[BATTLE] Player %s activated Mood Catalyst. +50 Power for 3 matches.\n", playerID)
 		case "grounded_shield": // Immunity to Mood Penalties (5 Matches)
 			// This would typically be a rule override. For now, we track it.
 			match.ActiveItemBuffs[playerID][itemID] = 5 // Track for 5 matches

@@ -553,6 +553,13 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 
+		// FINANCIAL VERIFICATION: Ensure player has enough rewards to cover the price
+		if l.rewards[wallet] < data.Price {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Purchase Failed: Insufficient reward balance."}`)})
+			return
+		}
+
 		// 1. Find the Club managing this territory
 		var targetClub *Club
 		for _, club := range l.clubs {
@@ -571,18 +578,22 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 
 		// 2. Fulfillment: Deduct from Club, Grant to Player
+		l.rewards[wallet] -= data.Price
 		targetClub.Inventory[data.ItemID]--
-
 		targetClub.LastActivity = time.Now()
+
+		// INDUSTRIAL LOOP: Purchase proceeds return to Faucet liquidity
+		l.faucetBalance += float64(data.Price) / 1000000.0
+
 		if stats.Inventory == nil {
 			stats.Inventory = make(map[string]int)
 		}
 		stats.Inventory[data.ItemID]++
 		l.leaderboard[wallet] = stats
-		l.mutex.Unlock()
 
-		// 3. Process Revenue (Existing logic)
+		// 3. Process Revenue (Internal call requires mutex)
 		l.distributeShopRevenueLocked(data.TerritoryID, data.Price, data.ItemID)
+		l.mutex.Unlock()
 
 		l.logAdminAudit("ITEM_PURCHASE", wallet, fmt.Sprintf("Item: %s, Territory: %s", data.ItemID, data.TerritoryID))
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>PURCHASE COMPLETE:</b> %s added to inventory."}`, data.ItemID))})
@@ -1207,15 +1218,32 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		return false
 	}
 
+	p1Wallet := l.wallets[id1]
+	p2Wallet := l.wallets[id2]
+	p1Stats := l.leaderboard[p1Wallet]
+	p2Stats := l.leaderboard[p2Wallet]
+
 	match := &MatchState{
 		P1ID:            id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
-		P1Wallet:        l.wallets[id1],
-		P2Wallet:        l.wallets[id2],
+		P1Wallet:        p1Wallet,
+		P2Wallet:        p2Wallet,
 		Rules:           map[string]bool{"Open": true},             // Default rules
-		P1WantedLevel:   l.leaderboard[l.wallets[id1]].WantedLevel, // Wanted levels from leaderboard
-		P2WantedLevel:   l.leaderboard[l.wallets[id2]].WantedLevel,
-		TerritoryID:     l.assignMatchTerritory(), // Assign a territory to the match
+		P1WantedLevel:   p1Stats.WantedLevel,
+		P2WantedLevel:   p2Stats.WantedLevel,
+		P1Cunning:       p1Stats.GetEffectiveCunning(),
+		P1Nurturing:     p1Stats.Nurturing,
+		P2Cunning:       p2Stats.GetEffectiveCunning(),
+		P2Nurturing:     p2Stats.Nurturing,
+		TerritoryID:     l.assignMatchTerritoryLocked(), // Assign a territory to the match
 	}
+
+	if c1, ok := l.clients[id1]; ok {
+		match.P1Avatar, match.P1Gloat = c1.avatarURL, c1.gloat
+	}
+	if c2, ok := l.clients[id2]; ok {
+		match.P2Avatar, match.P2Gloat = c2.avatarURL, c2.gloat
+	}
+
 	l.matches[id1], l.matches[id2] = match, match
 
 	p1Sync, _ := json.Marshal(Envelope{
@@ -1239,17 +1267,24 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	return true
 }
 
-// assignMatchTerritory assigns a territory ID to a new match.
-// For now, it picks a random territory. In the future, this could be based on
-// player location, club challenges, or tournament settings.
-func (l *Lobby) assignMatchTerritory() string {
-	l.mutex.RLock()
-	defer l.mutex.RUnlock()
-	territories := []string{"the_lab", "casino", "arena_center", "north_district", "south_slums", "east_gate", "west_port", "the_archive", "data_haven"}
-	if len(territories) == 0 {
-		return ""
+// assignMatchTerritoryLocked assigns a territory ID based on current Club ownership.
+// This prioritizes owned territories to trigger Industrial Loop mechanics (jailing/revenue).
+func (l *Lobby) assignMatchTerritoryLocked() string {
+	// 1. Compile pool of territories currently claimed by Clubs
+	var ownedTerritories []string
+	for _, club := range l.clubs {
+		ownedTerritories = append(ownedTerritories, club.Territories...)
 	}
-	return territories[rand.Intn(len(territories))]
+
+	// 2. INDUSTRIAL LOOP Priority: High chance to fight on Club Turf
+	if len(ownedTerritories) > 0 && rand.Float64() < 0.70 {
+		// Pick a random territory that a club has actually invested in
+		return ownedTerritories[rand.Intn(len(ownedTerritories))]
+	}
+
+	// 3. Fallback: Standard neutral grounds if no clubs exist or for variety
+	neutralPool := []string{"the_lab", "casino", "arena_center", "north_district", "south_slums", "east_gate", "west_port", "the_archive", "data_haven"}
+	return neutralPool[rand.Intn(len(neutralPool))]
 }
 
 // isWalletConnected checks if the given wallet address is currently associated with an active connection.
@@ -1677,7 +1712,8 @@ func (l *Lobby) processMojoDecay() {
 			decayOccurred = true
 
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
-			club.LastActivity = now // Reset stagnation clock to prevent Mojo collapse; decay is now periodic.
+			// Reset clock to 'now' so decay is periodic (e.g., every 48h) rather than continuous
+			club.LastActivity = now 
 		}
 	}
 

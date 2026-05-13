@@ -139,6 +139,8 @@
 - **Lease UI**: Implemented `openClubLeaseBoard` in `app.js` with region-aware sorting based on player employment.
 - **Economic Precision**: Hardened `handleTakeLease` to recover rounding remainders into Club Treasuries.
 - **Market Hardening**: Refactored Portfolios to use persistent wallet keys; linked trades to `faucetBalance` to prevent inflation and ensure cross-session holdings.
+- **Git Maintenance**: Purged large `.vsix` file (219MB) and flattened history.
+- **Emergency Restoration**: Restored critical economic hardening, reputation multipliers, and state clobbering fixes lost during history flattening.
 - **Continuity**: Hardened `InitialRewards` persistence via `season.json` to ensure economic state survives restarts.
 - **Git Repair**: Repository history flattened to resolve a 219MB blob rejection from GitHub; strictly enforced `*.vsix` exclusion in `.gitignore`.
 - **Continuity**: Verified that flattening history preserves all current domain-separated logic and security hardening.

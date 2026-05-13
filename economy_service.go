@@ -73,8 +73,12 @@ func (l *Lobby) sendNoteTx(note string) (string, error) {
 	appID, _ := strconv.ParseUint(voiConfig.AppID, 10, 64)
 	txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, nil, nil, nil, sp, senderAddr, []byte(note), types.Digest{}, [32]byte{}, types.Address{})
 	_, stxn, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
-	client.SendRawTransaction(stxn).Do(context.Background())
-	return crypto.GetTxID(txn), nil
+	txid, err := client.SendRawTransaction(stxn).Do(context.Background())
+	if err != nil {
+		log.Printf("[ECONOMY ERROR] sendNoteTx failed: %v\n", err)
+		return "", err
+	}
+	return txid, nil
 }
 
 func (l *Lobby) recordWinOnChain(winnerWallet string, history MatchHistory) {
@@ -128,9 +132,11 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// 3. Achievement Weighting
 	rep += (len(stats.Achievements) * 50)
 
-	// 4. Playstyle Tendencies (Aggressiveness & Risk rewarded as "Marketable Traits")
-	playstyleBonus := (stats.Playstyle.Aggressiveness * 100.0) + (stats.Playstyle.RiskTolerance * 100.0)
-	rep += int(playstyleBonus)
+	// 4. Marketability Multiplier (Aggressiveness & Risk rewarded as "Marketable Traits")
+	// Instead of a flat bonus, playstyle now acts as a multiplier to scale with player performance.
+	// Aggressiveness: Max +15%, Risk Tolerance: Max +10% (Total potential: 1.25x)
+	marketabilityMult := 1.0 + (stats.Playstyle.Aggressiveness * 0.15) + (stats.Playstyle.RiskTolerance * 0.10)
+	rep = int(float64(rep) * marketabilityMult)
 
 	// 5. Employment Multiplier (Social Trust from high-Mojo Clubs)
 	if stats.EmployerClubID != "" {
@@ -146,12 +152,30 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 		}
 	}
 
-	// 6. Cosmetic Prestige (Faceplates)
-	// High-tier faceplates provide status boosts that manifest as Reputation.
+	// 6. Cosmetic Prestige Multiplier (Faceplates)
+	// For Standard players, faceplates provide a flat Reputation boost to aid their climb.
+	// For Diamond Tier (Rep >= 500) players, cosmetics provide a "Prestige Multiplier".
 	if stats.EquippedFaceplate != "" {
 		if fp, exists := FaceplateRegistry[stats.EquippedFaceplate]; exists {
-			rep += (fp.MojoBonus * 10) // 1 Mojo point from cosmetics = 10 Reputation points
+			if rep >= 500 {
+				// Diamond Tier: 1 Mojo point = 0.5% prestige multiplier (Max +25% for Governor)
+				prestigeMult := 1.0 + (float64(fp.MojoBonus) * 0.005)
+				rep = int(float64(rep) * prestigeMult)
+			} else {
+				// Standard: Additive bonus (1 Mojo = 10 Reputation points)
+				rep += (fp.MojoBonus * 10)
+			}
 		}
+	}
+
+	// 7. Spreader Multiplier (Market Manipulation Reward)
+	// Active participants in the Rumor Mill gain Standing for their social influence.
+	if stats.RumorCount > 0 {
+		spreaderMult := 1.0 + (float64(stats.RumorCount) * 0.02)
+		if spreaderMult > 1.10 {
+			spreaderMult = 1.10
+		}
+		rep = int(float64(rep) * spreaderMult)
 	}
 
 	if rep < 0 {
