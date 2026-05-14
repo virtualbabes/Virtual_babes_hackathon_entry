@@ -18,6 +18,11 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	}
 	if err := json.Unmarshal(env.Payload, &data); err != nil { return }
 
+	if data.Amount <= 0 {
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Error: Trade amount must be positive."}`)})
+		return
+	}
+
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -60,7 +65,10 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	if data.Action == "buy" {
 		if l.rewards[wallet] >= totalValueMicro {
 			l.rewards[wallet] -= totalValueMicro
-			stats.Portfolio[targetWallet] += data.Amount
+			
+			if stats.Portfolio == nil { stats.Portfolio = make(map[string]float64) }
+			currentShares := stats.Portfolio[targetWallet]
+			stats.Portfolio[targetWallet] = currentShares + data.Amount
 			
 			// Industrial Loop: Investment returns to Faucet
 			l.faucetBalance += totalValueBase
@@ -79,6 +87,12 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			}
 
 			stats.Portfolio[targetWallet] -= data.Amount
+
+			// Share Dust Cleanup: remove mapping if amount is effectively zero to prevent state bloat
+			if stats.Portfolio[targetWallet] < 1e-9 {
+				delete(stats.Portfolio, targetWallet)
+			}
+
 			l.rewards[wallet] += totalValueMicro
 
 			// Industrial Loop: Payout from Faucet

@@ -198,13 +198,13 @@ export function openConsignmentOverlay() {
     overlay.id = "consignment-overlay";
     overlay.className = "overlay";
 
-    const listableItems = Object.entries(state.inventory || {}).filter(([id, qty]) => qty > 0);
+    const listableItems = Object.entries(state.inventory || {}).filter(([id, qty]) => qty > 0 && id.startsWith("CARD-"));
 
     overlay.innerHTML = `
         <div class="economy-panel consignment-panel medium">
             <div class="market-header">
                 <span class="market-title text-neon-purple">ASSET CONSIGNMENT</span>
-                <div class="access-level">GALLERY PROTOCOL</div>
+                <div class="access-level">GALLERY PROTOCOL: CARDS ONLY</div>
             </div>
 
             <div class="p-20">
@@ -525,23 +525,65 @@ export function switchPortfolioTab(tab) {
     const state = window.GetGameState();
     if (tab === 'portfolio') {
         const entries = Object.entries(state.portfolio || {});
-        container.innerHTML = entries.length ? `
-            <div class="portfolio-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                ${entries.map(([id, amt]) => `
-                    <div class="portfolio-item glass-panel p-10">
-                        <div class="flex-row justify-between">
-                            <b class="text-neon-cyan">${id.substring(0,8)}...</b>
-                            <span class="text-neon-green">${amt.toFixed(2)} SH</span>
-                        </div>
-                        <div class="flex-row gap-5 mt-10">
-                            <button class="outline btn-small" style="flex: 1;" onclick="tradeShares('${id}', 'buy', 10)">BUY</button>
-                            <button class="outline btn-small" style="flex: 1;" onclick="tradeShares('${id}', 'sell', 10)">SELL</button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>` : "<div class='opacity-5 py-40 italic'>No entity holdings detected.</div>";
-    } else {
-        container.innerHTML = "<div class='opacity-3 py-40 italic'>Accessing encrypted records...</div>";
+        if (entries.length === 0) {
+            container.innerHTML = `<div class="opacity-3 py-40 italic">No entity holdings detected.</div>`;
+            return;
+        }
+        await Promise.all(entries.map(([w]) => resolveEnvoiName(w)));
+        container.innerHTML = `
+            <div class="portfolio-grid" style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                ${entries.map(([id, amt]) => {
+                    const p = lastLobbyPlayers.find(pl => pl.wallet?.toLowerCase() === id.toLowerCase());
+                    const price = p ? ((p.wins * 10) + (p.reputation / 2) + 100) : 100;
+                    return `
+                        <div class="portfolio-item glass-panel m-0 flex-row justify-between align-center p-15">
+                            <div class="text-left">
+                                <b class="text-neon-cyan">${getCachedEnvoiName(id)}</b>
+                                <div class="font-size-0-75em opacity-5">${amt.toFixed(2)} SHARES</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-neon-green font-bold">${(amt * price).toFixed(1)} $VBV</div>
+                                <button class="outline x-small border-error mt-5" onclick="tradeShares('${id}', 'sell', ${amt})">LIQUIDATE</button>
+                            </div>
+                        </div>`;
+                }).join('')}
+            </div>`;
+    } else if (tab === 'jailed') {
+        const jailed = state.jailed_cards || {};
+        const entries = Object.entries(jailed);
+        container.innerHTML = entries.length ? entries.map(([cardId, clubId]) => `
+            <div class="player-item border-error p-15">
+                <div class="text-left">
+                    <b class="text-error">CARD #${cardId}</b>
+                    <div class="font-size-0-75em opacity-6">Held by: ${globalClubs[clubId]?.name || 'Unknown Entity'}</div>
+                </div>
+                <button class="outline btn-small border-neon-green text-neon-green" onclick="window.initiateBail(${cardId}, '${clubId}')">PAY BAIL (200 $VBV)</button>
+            </div>`).join('') : `<div class="opacity-3 py-40 italic">No cards in sector custody.</div>`;
+    } else if (tab === 'kidnapped') {
+        const kidnapped = state.kidnapped_cards || {};
+        const entries = Object.entries(kidnapped);
+        if (entries.length > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
+        container.innerHTML = entries.length ? entries.map(([cardId, victimWallet]) => `
+            <div class="player-item border-warning p-15" style="border-color: #ffa500;">
+                <div class="text-left">
+                    <b style="color: #ffa500;">CARD #${cardId}</b>
+                    <div class="font-size-0-75em opacity-6">Victim: ${getCachedEnvoiName(victimWallet)}</div>
+                </div>
+                <button class="outline btn-small border-gold text-gold" onclick="window.releaseHostage(${cardId})">RELEASE</button>
+            </div>`).join('') : `<div class="opacity-3 py-40 italic">No hostages in your custody.</div>`;
+    } else if (tab === 'hostage') {
+        const heldHostage = state.held_hostage_cards || {};
+        const entries = Object.entries(heldHostage);
+        if (entries.length > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
+        container.innerHTML = entries.length ? entries.map(([cardId, perpWallet]) => `
+            <div class="player-item border-gold p-15">
+                <div class="text-left">
+                    <b class="text-gold">CARD #${cardId}</b>
+                    <div class="font-size-0-75em opacity-6">Kidnapper: ${getCachedEnvoiName(perpWallet)}</div>
+                </div>
+                <button class="outline btn-small border-error text-error" onclick="window.payRansom(${cardId}, '${perpWallet}')">PAY RANSOM</button>
+            </div>`).join('') + `<div class="mt-10 p-10 border-top-glass opacity-5 italic font-size-0-75em text-center">Insurance recovery active: 48h cycle.</div>` 
+            : `<div class="opacity-3 py-40 italic">No assets currently held for ransom.</div>`;
     }
 }
 

@@ -121,4 +121,10 @@
 - [FIXED] Hardened `.flip-capture` animation in `app.js` to reliably re-trigger during rapid state updates by forcing DOM reflow.
  - [FIXED] Purged redundant global function definitions from `app.js` (buildEmptyBoard, renderCardHTML, etc.) to enforce modular sub-file authority.
 - [FIXED] Migrated `openConsignmentOverlay`, `buyClubItem`, `submitConsignment`, and `promptBid` from `app.js` redundant block to `js/economy.js`.
+- [FIXED] Restored missing logic for Jailed/Kidnapped/Hostage tabs in `switchPortfolioTab` within `Public/js/economy.js`.
 - [FIXED] Filtered claimed territories in `openClubFoundry` to prevent invalid organization founding attempts.
+- [FIXED] Resolved inflation leak in `handleSellMarketTokens` by deducting VBV gains from `faucetBalance` and applying the scavenger tax to the pool.
+- [FIXED] Hardened `handleBuyBlackMarket` with micro-unit precision rounding and state-clobbering protection.
+- [FIXED] Hardened `handleHeist` in `club_service.go` with micro-unit precision rounding for looting and Fence Fees.
+- [FIXED] Hardened `distributeShopRevenueLocked` in `club_service.go` with micro-unit precision rounding for Regional Governor Taxes.
+- [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

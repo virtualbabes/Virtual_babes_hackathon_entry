@@ -152,8 +152,9 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 
 	l.rewards[victimWallet] -= data.RansomAmount
 
-	// INDUSTRIAL LOOP: 20% "Laundering Tax" returns to the Faucet Pool to maintain liquidity
-	arenaFeeMicro := uint64(float64(data.RansomAmount) * 0.20)
+	// INDUSTRIAL LOOP: 20% "Laundering Tax" returns to the Faucet Pool.
+	// Use integer math with rounding to the nearest micro-unit to prevent dust leaks.
+	arenaFeeMicro := (data.RansomAmount*20 + 50) / 100
 	perpShareMicro := data.RansomAmount - arenaFeeMicro
 	l.rewards[data.PerpWallet] += perpShareMicro
 	l.faucetBalance += float64(arenaFeeMicro) / 1000000.0

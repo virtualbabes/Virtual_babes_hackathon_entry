@@ -79,28 +79,34 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}
 
 		// Calculate Loot: 10% of target club's treasury, capped at 500 VBV
-		loot := targetClub.Treasury * 0.10
-		if loot > 500 {
-			loot = 500
+		// Use micro-units for internal precision logic
+		maxLootMicro := uint64(500 * 1000000)
+		lootMicro := uint64(targetClub.Treasury * 0.10 * 1000000)
+		if lootMicro > maxLootMicro {
+			lootMicro = maxLootMicro
 		}
 
 		// INDUSTRIAL LOOP: 10% "Fence Fee" returns to the Faucet Pool
-		fenceFee = loot * 0.10
-		netLoot = loot - fenceFee
-		if fenceFee > 0 {
+		// Integer math with rounding to nearest micro-unit
+		fenceFeeMicro := (lootMicro*10 + 50) / 100
+		netLootMicro := lootMicro - fenceFeeMicro
+		fenceFee = float64(fenceFeeMicro) / 1000000.0
+		netLoot = float64(netLootMicro) / 1000000.0
+
+		if fenceFeeMicro > 0 {
 			l.faucetBalance += fenceFee
 			l.applyDynamicScalingLocked()
 		} 
 		playerStats.Playstyle.RiskTolerance += 0.05
 		playerStats.HeistAttempts++
-		targetClub.Treasury -= loot
+		targetClub.Treasury -= float64(lootMicro) / 1000000.0
 		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
 		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.Cunning += 1 // Successful heists improve Cunning
 
 		// Add net loot to player's rewards
-		l.rewards[wallet] += uint64(netLoot * 1000000)
+		l.rewards[wallet] += netLootMicro
 
 		// Achievement unlock uses the Locked variant since we already hold the lobby mutex.
 		l.unlockAchievementLocked(wallet, "FIRST_HEIST")
@@ -490,26 +496,31 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 		if rate < 0.05 { rate = 0.05 }
 		if rate > 0.50 { rate = 0.50 }
 	}
-	totalCommission := (float64(amountMicro) / 1000000.0) * rate
+
+	// Use micro-unit precision for all distribution logic to prevent dust leaks
+	totalCommissionMicro := uint64(float64(amountMicro)*rate + 0.5)
+	totalCommissionBase := float64(totalCommissionMicro) / 1000000.0
 
 	// 4. Regional Governor Tax: 5% is distributed to all Governors.
-	regionalTaxPool := 0.0
+	var totalDistributedToGovsMicro uint64
 	if len(governors) > 0 {
-		regionalTaxPool = totalCommission * 0.05
-		taxPerGovernor := regionalTaxPool / float64(len(governors))
+		regionalTaxPoolMicro := (totalCommissionMicro*5 + 50) / 100
+		taxPerGovernorMicro := regionalTaxPoolMicro / uint64(len(governors))
+
 		for _, govClub := range governors {
-			govClub.Treasury += taxPerGovernor
+			govClub.Treasury += float64(taxPerGovernorMicro) / 1000000.0
 			govClub.LastActivity = now 
 		}
+		totalDistributedToGovsMicro = taxPerGovernorMicro * uint64(len(governors))
 	}
 
 	// 5. Final Payout to the Territory Owner (Net after Regional Tax)
-	netCommission := totalCommission - regionalTaxPool
-	owningClub.Treasury += netCommission
+	netCommissionMicro := totalCommissionMicro - totalDistributedToGovsMicro
+	owningClub.Treasury += float64(netCommissionMicro) / 1000000.0
 	owningClub.LastActivity = now
 
 	// INDUSTRIAL LOOP: Deduct commission from Faucet liquidity and re-scale
-	l.faucetBalance -= totalCommission
+	l.faucetBalance -= totalCommissionBase
 	l.applyDynamicScalingLocked()
 }
 

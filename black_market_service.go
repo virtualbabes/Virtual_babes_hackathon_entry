@@ -50,9 +50,21 @@ func (l *Lobby) handleSellMarketTokens(w http.ResponseWriter, r *http.Request) {
 
 	// Exchange rate: 1 Market Token = 0.8 VBV (Scavenger tax)
 	vbvGainMicro := uint64(float64(req.Amount) * 0.8)
+	vbvGainBase := float64(vbvGainMicro) / 1000000.0
+
+	// Industrial Loop: Check Faucet Liquidity for payout
+	if l.faucetBalance < vbvGainBase {
+		l.sendToClientLocked(l.getClientIDFromWalletLocked(wallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Error: The Arena Faucet has insufficient liquidity for this liquidation."}`)})
+		return
+	}
+
 	stats.MarketTokens -= req.Amount
 	l.rewards[wallet] += vbvGainMicro
 	l.leaderboard[wallet] = stats
+
+	// Industrial Loop: Deduct payout from Faucet and trigger scaling
+	l.faucetBalance -= vbvGainBase
+	l.applyDynamicScalingLocked()
 
 	l.logAdminAudit("TOKEN_LIQUIDATION", wallet, fmt.Sprintf("Sold %d tokens for %.2f $VBV", req.Amount, float64(vbvGainMicro)/1000000.0))
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
@@ -90,8 +102,15 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	loan := l.blackMarket[idx]
-	// Scavenger Price: 75% of the original repayment amount
-	scavengePrice := uint64(float64(loan.RepaymentAmount) * 0.75)
+
+	stats, exists := l.leaderboard[wallet]
+	if !exists {
+		http.Error(w, "Player records not found", http.StatusInternalServerError)
+		return
+	}
+
+	// Scavenger Price: 75% of the original repayment amount (Rounded to nearest micro-unit)
+	scavengePrice := (loan.RepaymentAmount*75 + 50) / 100
 
 	if l.rewards[wallet] < scavengePrice {
 		http.Error(w, "Insufficient reward balance to scavenge this bundle", http.StatusPaymentRequired)
@@ -105,7 +124,6 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 	l.faucetBalance += float64(scavengePrice) / 1000000.0
 	l.applyDynamicScalingLocked() // Prevent deadlock since lock is already held
 
-	stats := l.leaderboard[wallet]
 	if stats.Inventory == nil {
 		stats.Inventory = make(map[string]int)
 	}

@@ -24,6 +24,8 @@
 6. Complete: Implemented Club Lease Board overlay with regional prioritization logic.# A.I. Memory: Virtualbabes Arena
 7. Complete: Optimized `handleServerMessage` in `network.js` by batching UI sync calls via `requestAnimationFrame` and removing high-frequency console logs.
 8. Complete: Hardened `syncUI` in `app.js` with DOM caching and non-blocking asynchronous asset resolution.
+9. Complete: Hardened `processLoans` in `economy_processing.go` to synchronize liquidation fees with Faucet dynamic scaling.
+10. Complete: Hardened `handleSellMarketTokens` in `black_market_service.go` to deduct payouts from the Faucet balance and trigger dynamic scaling.
 
 ## Critical Logic Patterns
 - **Switchboard Pattern**: Server-side signing for faucet rewards; client-side proof of intent.
@@ -374,4 +376,9 @@
 - [x] Comprehensive UI/UX Audit: Validated "Neon-Glass" SCSS modularity and 3D territory map performance.
 - [x] SCSS Integration: Migrated particle effect styles to `_animations.scss`.
 - **Git Maintenance**: Troubleshooting `.vsix` history purge (219MB). Previous attempt failed due to missing `filter-repo` tool. Moving to manual `filter-branch` or tool installation.
+9. Complete: Hardened Portfolio UI in `economy.js` to correctly render Jailed, Kidnapped, and Hostage card states with associated tactical actions.
+11. Complete: Hardened `handleBuyBlackMarket` in `black_market_service.go` with integer-based precision rounding and player state existence guards.
+12. Complete: Hardened `handleHeist` in `club_service.go` with integer-based precision rounding for looting and Fence Fees.
+13. Complete: Hardened `handlePayRansom` in `handlers_criminality.go` with integer-based precision rounding for Laundering Taxes.
+14. Complete: Hardened `distributeShopRevenueLocked` in `club_service.go` with integer-based precision rounding for Regional Governor Taxes.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

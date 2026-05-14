@@ -43,6 +43,10 @@ func (l *Lobby) processLoans() {
 			if owningClub != nil {
 				liquidationFee := float64(loan.LoanAmount) * 0.05 / 1000000.0
 				owningClub.Treasury += liquidationFee
+				
+				// INDUSTRIAL LOOP: Deduct distributed fee from liquid faucet balance
+				l.faucetBalance -= liquidationFee
+				
 				owningClub.LastActivity = now
 				l.logAdminAuditLocked("LOAN_LIQUIDATION_FEE", loan.TerritoryID, fmt.Sprintf("Club %s earned %.2f $VBV liquidation fee", owningClub.Name, liquidationFee))
 			}
@@ -60,6 +64,8 @@ func (l *Lobby) processLoans() {
 	}
 
 	if anyProcessed {
+		// Trigger global scaling recalculation to reflect the shift in liquid reserves
+		l.applyDynamicScalingLocked()
 		msg := l.getLobbyUpdateMsgLocked()
 		go func() { l.broadcast <- msg }()
 	}
