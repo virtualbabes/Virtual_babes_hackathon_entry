@@ -83,6 +83,7 @@ func newLobby() (*Lobby, error) {
 		onboardingSemaphore:  make(chan struct{}, 5), // Limit concurrent bridge operations
 		envoiCache:           make(map[string]string),
 		vaultAddress:         os.Getenv("VAULT_ADDRESS"),
+		WCProjectID:          os.Getenv("WC_PROJECT_ID"), // Load WalletConnect Project ID
 		maxFaucetCapacity:    10000.0,
 		adminFocusNetwork:    "Voi Mainnet",
 	}
@@ -274,12 +275,12 @@ func serveWs(lobby *Lobby, w http.ResponseWriter, r *http.Request) {
 		Type:   "identity",
 		ToID:   client.id,
 		FromID: "SERVER",
-		Payload: json.RawMessage(fmt.Sprintf(`{
-			"vault":"%s",
-			"vbv":"%s",
-			"avoi":"%s",
-			"primary_network": "Voi Mainnet"
-		}`, lobby.vaultAddress, lobby.rewardAssetID, lobby.avoiAssetID)),
+		Payload: json.RawMessage(fmt.Sprintf(`{"vault":"%s","vbv":"%s","avoi":"%s","wc_project_id":"%s","primary_network": "Voi Mainnet"}`,
+			lobby.vaultAddress,
+			lobby.rewardAssetID,
+			lobby.avoiAssetID,
+			lobby.WCProjectID, // Include the WalletConnect Project ID
+		)),
 	}
 	msg, _ := json.Marshal(identityMsg)
 	client.send <- msg

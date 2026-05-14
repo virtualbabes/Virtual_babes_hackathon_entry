@@ -7,7 +7,7 @@ import { globalClubs, availableNetworks } from './admin.js';
 import { lastLobbyPlayers } from './game.js';
 import { collectiveIntelligence } from '../collective-intelligence.js';
 
-const algosdk = window.algosdk; // Assuming algosdk is globally available
+const algosdk = window.algosdk;
 
 export let tickerItems = [];
 export let tickerOffset = 0;
@@ -56,7 +56,7 @@ export function updateMarketTicker(players) {
             val: finalPrice.toFixed(2),
             trend: (p.wins > 0) ? "▲" : "─",
             color: (p.wins > 0) ? "#3fb950" : "#888",
-            isNPC: collectiveIntelligence.personalities[p.id] !== undefined || p.id === "Vbabe Bot"
+            isNPC: (collectiveIntelligence.personalities && collectiveIntelligence.personalities[p.id] !== undefined) || p.id === "Vbabe Bot"
         });
     });
 
@@ -199,16 +199,16 @@ export async function submitClubFoundry() {
 
     try {
         const state = window.GetGameState();
-        const amountMicro = 5000 * 1000000;
-        let txid = "SIM_TX_" + Date.now(); // Replace with actual signing logic
+        let txid = "SIM_TX_" + Date.now(); 
         socket.send(JSON.stringify({ type: "create_club", payload: { name, type, territory_id: territory, txid, network: state.network } }));
         document.getElementById("club-foundry-overlay").remove();
-        window.triggerFoundryFusion(type); // Trigger dynamic particle effect based on club type
+        if (window.triggerFoundryFusion) window.triggerFoundryFusion(type);
     } catch (err) { showToast(`Founding Failed: ${err.message}`, "error"); }
 }
 
 export function openShopsOverlay(category = 'Elemental') {
-    document.getElementById("shops-overlay").classList.remove("hidden");
+    const el = document.getElementById("shops-overlay");
+    if (el) el.classList.remove("hidden");
     switchShopCategory(category);
 }
 
@@ -225,97 +225,79 @@ export function switchShopCategory(category) {
 }
 
 export async function openPortfolioView(initialTab = 'portfolio') {
-    document.getElementById("portfolio-view-overlay")?.classList.remove("hidden");
+    const el = document.getElementById("portfolio-view-overlay");
+    if (el) el.classList.remove("hidden");
     switchPortfolioTab(initialTab);
 }
 
 export function switchPortfolioTab(tab) {
     const container = document.getElementById("portfolio-content-area");
     if (!container) return;
+
+    document.querySelectorAll('.portfolio-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+
     const state = window.GetGameState();
     if (tab === 'portfolio') {
         const entries = Object.entries(state.portfolio || {});
-        container.innerHTML = entries.length ? entries.map(([id, amt]) => `<div class="portfolio-item glass-panel"><b>${id.substring(0,8)}</b>: ${amt.toFixed(2)} Shares</div>`).join('') : "No holdings.";
+        container.innerHTML = entries.length ? `
+            <div class="portfolio-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                ${entries.map(([id, amt]) => `
+                    <div class="portfolio-item glass-panel p-10">
+                        <div class="flex-row justify-between">
+                            <b class="text-neon-cyan">${id.substring(0,8)}...</b>
+                            <span class="text-neon-green">${amt.toFixed(2)} SH</span>
+                        </div>
+                        <div class="flex-row gap-5 mt-10">
+                            <button class="outline btn-small" style="flex: 1;" onclick="tradeShares('${id}', 'buy', 10)">BUY</button>
+                            <button class="outline btn-small" style="flex: 1;" onclick="tradeShares('${id}', 'sell', 10)">SELL</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>` : "<div class='opacity-5 py-40 italic'>No entity holdings detected.</div>";
     } else {
-        container.innerHTML = "Accessing encrypted records...";
+        container.innerHTML = "<div class='opacity-3 py-40 italic'>Accessing encrypted records...</div>";
     }
 }
 
 export function tradeShares(entityId, action, amount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: "trade_shares", payload: { entity_id: entityId, action, amount } }));
+    showToast(`🛰️ Processing ${action} order for ${amount} shares...`, "info");
 }
 
 export function openClubLeaseBoard() {
-    document.getElementById("lease-board-overlay")?.classList.remove("hidden");
+    const el = document.getElementById("lease-board-overlay");
+    if (el) el.classList.remove("hidden");
 }
 
 export function takeLease(clubId, leaseId) {
-    socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } }));
-    document.getElementById("lease-board-overlay")?.remove();
-}
-    const spacing = 60;
-    let tickerContainer = document.getElementById("market-ticker");
-    if (!tickerContainer) {
-        tickerContainer = document.createElement("div");
-        tickerContainer.id = "market-ticker";
-        tickerContainer.className = "market-ticker-container";
-        tickerContainer.innerHTML = `<div class="ticker-label">LIVE MARKET:</div><canvas id="market-ticker-canvas" style="flex: 1; height: 30px;"></canvas>`;
-        document.body.prepend(tickerContainer);
-    }
-    // Implementation uses canvas drawing for performance (hoisted from app.js)
-    // ...
-}
-
-export function openTerritoryMapOverlay() {
-    document.getElementById("territory-map-overlay").classList.remove("hidden");
-}
-
-export function adjustMapZoom(delta) {
-    const grid = document.getElementById("map-3d-grid");
-    if (grid) {
-        let zoom = parseFloat(grid.dataset.zoom || 1.0) + delta;
-        zoom = Math.min(2, Math.max(0.5, zoom));
-        grid.dataset.zoom = zoom;
-        grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${zoom})`;
-    }
-}
-
-export function openClubLeaseBoard() {
-    document.getElementById("lease-board-overlay")?.classList.remove("hidden");
-}
-
-export function takeLease(clubId, leaseId) {
-    socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } }));
-}
-
-export function openShopsOverlay(category = 'Elemental') {
-    document.getElementById("shops-overlay").classList.remove("hidden");
-    switchShopCategory(category);
-}
-
-export async function openPortfolioView(initialTab = 'portfolio') {
-    document.getElementById("portfolio-view-overlay")?.classList.remove("hidden");
-    switchPortfolioTab(initialTab);
-}
-
-export function switchPortfolioTab(tab) {
-    const container = document.getElementById("portfolio-content-area");
-    if (!container) return;
-    container.innerHTML = "Refreshing data...";
-    // implementation details migrated from app.js
-}
-    }
-}
-
-export function tradeShares(entityId, action, amount) { // Exported for use in app.js
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-
-    socket.send(JSON.stringify({
-    }));
-
-    document.getElementById("portfolio-view-overlay")?.remove();
+    socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } }));
+    document.getElementById("lease-board-overlay")?.classList.add("hidden");
 }
 
 export async function openBlackMarket() {
     const state = window.GetGameState();
+    const el = document.getElementById("black-market-overlay");
+    if (el) el.classList.remove("hidden");
+}
+
+export function buyBlackMarketItem(itemId, price) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "buy_black_market", payload: { item_id: itemId, price: price } }));
+}
+
+window.updateMarketTicker = updateMarketTicker;
+window.adjustMapZoom = adjustMapZoom;
+window.openTerritoryMapOverlay = openTerritoryMapOverlay;
+window.openClubFoundry = openClubFoundry;
+window.submitClubFoundry = submitClubFoundry;
+window.openShopsOverlay = openShopsOverlay;
+window.switchShopCategory = switchShopCategory;
+window.openPortfolioView = openPortfolioView;
+window.switchPortfolioTab = switchPortfolioTab;
+window.tradeShares = tradeShares;
+window.openClubLeaseBoard = openClubLeaseBoard;
+window.takeLease = takeLease;
+window.openBlackMarket = openBlackMarket;
+window.buyBlackMarketItem = buyBlackMarketItem;

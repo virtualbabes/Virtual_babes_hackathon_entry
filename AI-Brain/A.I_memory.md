@@ -34,7 +34,7 @@
 # A.I. Memory: Virtualbabes Arena
 
 ## Active Priorities
-1. **Production Finalization**: Finalizing WalletConnect Project ID and Node/Indexer redundancy.
+1. **Deployment Hardening**: Finalizing Render + GitHub Asset sync for launch via vbvfaucet.carrd.co.
 
 ## Completed Tasks
 - **UI Hardening**: Resolved accessibility issues (labels/titles/associations) and removed all illegal inline styles in `index.html`.

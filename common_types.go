@@ -465,5 +465,6 @@ type Lobby struct {
 	envoiCache           map[string]string // Wallet -> Envoi Name Cache
 	envoiMutex           sync.RWMutex      // Dedicated lock for name resolution
 	SybilSyncComplete    bool // Indicates historical claim state is fully restored
+	WCProjectID          string // WalletConnect Project ID from environment variable
 	mutex                sync.RWMutex
 }

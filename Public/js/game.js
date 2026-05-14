@@ -323,7 +323,8 @@ export function sendChallenge(targetId) {
     };
 
     socket.send(JSON.stringify(envelope));
-    alert(`Challenge sent to ${targetId}`);
+    if (window.playChallengeWaitSFX) window.playChallengeWaitSFX();
+    showToast(`🛰️ Challenge sent to ${targetId}. Waiting for response...`, "info");
 }
 
 export function triggerToggleNetwork() {

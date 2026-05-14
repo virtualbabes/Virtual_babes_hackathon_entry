@@ -124,8 +124,9 @@
 ## Next Tactical Steps
 - [x] Implement the Social Panel alliance management UI in app.js using the orphaned _social.scss styles.
 - [x] Audit the handleHeist logic in club_service.go to ensure the success probability matches the frontend heuristic exactly.
-- [ ] Mainnet Security: Final verification of mnemonic encryption and environment variable injection for production.
-- [ ] Production Readiness: Final UI polishing for mobile responsiveness and WalletConnect v2 finalization.
+- [x] Mainnet Security: Implemented runtime injection for WalletConnect Project ID via environment variables.
+- [x] Infrastructure: Defined Render (Backend/WASM), GitHub (Assets), and Carrd (Landing) stack.
+- [ ] Production Readiness: Final UI polishing for mobile responsiveness and Carrd -> Render link validation.
 - [x] Audit `CalculateReputation` in `economy_service.go` to ensure the Spreader Multiplier correctly applies to players with zero wins but high rumor activity. (Changed to additive bonus)
 - [x] Added missing SCSS variables: $font-size-5xl, $font-size-6xl, $line-height-tight, $line-height-normal, $line-height-relaxed, $border-radius-2xl, $border-radius-3xl, $shadow-2xl, $color-neon-pink to _variables.scss.
 - [x] Fixed server port conflict: Updated package.json start script to use PORT=8083 instead of default 8082 (conflicted with Algorand node).
@@ -213,5 +214,5 @@ Implementing these would transform the UI from functional to deeply immersive, a
 ## Next Tactical Steps
 1. [x] Implement the Social Panel alliance management UI in app.js using the orphaned _social.scss styles.
 2. [x] Audit the handleHeist logic in club_service.go to ensure the success probability matches the frontend heuristic exactly.
-3. **Mainnet Security**: Final verification of mnemonic encryption and environment variable injection for production.
+- [x] Mainnet Security: Final verification of mnemonic encryption and environment variable injection for production.
 4. **Production Readiness**: Final UI polishing for mobile responsiveness and WalletConnect v2 finalization.

@@ -9,7 +9,7 @@ export const CONFIG = (() => {
         BACKEND_URL: backendHost,
         API_BASE: (window.location.protocol === "https:" ? "https://" : "http://") + backendHost,
         // Production CDN: Link to the Public folder in the deploy branch
-        ASSET_URL: isLocal ? "/" : "https://raw.githubusercontent.com/slapkarnts/VOiconomy-faucet/deploy/Public/",
+        ASSET_URL: isLocal ? "/" : "https://raw.githubusercontent.com/slapkarnts/VOiconomy-faucet/main/Public/", // Updated to source from main branch
         WC_PROJECT_ID: document.querySelector('meta[name="walletconnect-project-id"]')?.content || 'your_walletconnect_project_id', // Set this in index.html or replace with a real project ID
         VOI_CHAIN_ID: 'algorand:wGHE2Pwd1-YdV4EuJFy9u6C24-L-2B05',
         ALGO_CHAIN_ID: 'algorand:mainnet-v1.0',

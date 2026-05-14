@@ -1,3 +1,12 @@
+ ### Snapshot:
+ * `JS sends a move to the Backend.`
+* `Backend validates the move and calculates captures.`
+* `Backend broadcasts the result to all clients.`
+* `JS receives the result and feeds it into the WASM Engine.`
+* `WASM Engine updates the local state.`
+* `JS calls syncUI, and the SCSS/CSS layer triggers a .flip-capture`
+* `animation with particle sparks.`
+
  ## high-level overview of how the .go, .js, .scss, .css, .html, and Dockerfile files work together to create the Virtualbabes Arena application.
 
 High-Level Synergy: Virtualbabes Arena Architecture

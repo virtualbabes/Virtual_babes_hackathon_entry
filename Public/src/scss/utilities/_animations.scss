@@ -507,6 +507,11 @@ $animation-easing-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
     100% { background-position: 1000px 0; }
 }
 
+@keyframes pulse-red {
+    0% { opacity: 0.2; }
+    100% { opacity: 0.6; }
+}
+
 .animate-shimmer {
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
     background-size: 1000px 100%;

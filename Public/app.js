@@ -141,10 +141,13 @@ export async function syncUI(scope = "all") {
     if (state.phase !== undefined) {
         if (state.phase === "Active") {
             const isCriminal = (state.p1_wanted_level || 0) > 10;
-            document.documentElement.style.setProperty('--neon-accent', isCriminal ? '#ff0844' : '#00f2fe');
+            const moodColor = isCriminal ? '#ff0844' : '#00f2fe';
+            document.documentElement.style.setProperty('--arena-mood-color', moodColor);
+            document.documentElement.style.setProperty('--arena-glow-intensity', isCriminal ? '1.5' : '1');
             document.body.classList.toggle('criminal-activity', isCriminal);
         } else {
-            document.documentElement.style.setProperty('--neon-accent', '#00f2fe');
+            document.documentElement.style.setProperty('--arena-mood-color', '#00f2fe');
+            document.documentElement.style.setProperty('--arena-glow-intensity', '1');
         }
     }
 

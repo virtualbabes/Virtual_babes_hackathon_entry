@@ -24,8 +24,9 @@ export const setLinkedWallets = (wallets) => { linkedWallets = wallets; };
 
 // --- WalletConnect Initialization ---
 export async function initWalletConnect() {
+    if (signClient) return; // Prevent multiple initializations
     const projectId = (CONFIG.WC_PROJECT_ID || "").toString().trim();
-    if (!projectId || projectId.toLowerCase().includes('your_walletconnect_project_id')) {
+    if (!projectId || projectId.toLowerCase().includes('project_id')) {
         console.warn("[WC] WalletConnect Project ID not configured.");
         showToast("WalletConnect is not configured. Set walletconnect-project-id in index.html.", "warning");
         return;

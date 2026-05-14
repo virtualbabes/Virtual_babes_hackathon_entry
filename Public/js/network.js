@@ -2,7 +2,7 @@
 
 import { CONFIG } from './config.js';
 import { showToast, setTransactionStatus } from './ui.js';
-import { updateWalletUI, disconnectUserWallet } from './wallet.js';
+import { updateWalletUI, disconnectUserWallet, initWalletConnect } from './wallet.js';
 import { handleTournamentUI, setSeasonEnd, startSeasonTimer } from './leaderboard.js';
 import { updatePlayerList } from './game.js';
 import { updateMarketTicker, buyBlackMarketItem } from './economy.js';
@@ -124,7 +124,9 @@ export function handleServerMessage(msg) {
                 CONFIG.VAULT_ADDRESS = msg.payload.vault;
                 CONFIG.VBV_ASSET_ID = msg.payload.vbv;
                 CONFIG.AVOI_ASSET_ID = msg.payload.avoi;
+                CONFIG.WC_PROJECT_ID = msg.payload.wc_project_id;
                 console.log("[CONFIG] Authoritative environment synced from server.");
+                initWalletConnect();
             }
             // syncUI("all"); // This will be handled by app.js
             break;
@@ -181,6 +183,8 @@ export function handleServerMessage(msg) {
             } else if (action === "accept") {
                 // Challenger side: Receive acceptor's deck and send own deck back
                 console.log("[MATCH] Challenge accepted. Syncing decks..."); 
+                if (window.stopChallengeWaitSFX) window.stopChallengeWaitSFX();
+                if (window.playChallengeAcceptedSFX) window.playChallengeAcceptedSFX();
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(0);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
@@ -194,9 +198,12 @@ export function handleServerMessage(msg) {
                 if (window.playBattleStartSFX) window.playBattleStartSFX();
                 requestBatchedSync("combat");
             } else if (action === "decline") {
-                alert(`Challenge declined by ${msg.from_id}.`);
+                if (window.stopChallengeWaitSFX) window.stopChallengeWaitSFX();
+                if (window.playChallengeDeclinedSFX) window.playChallengeDeclinedSFX();
+                showToast(`❌ Challenge declined by ${msg.from_id}.`, "error");
             } else if (action === "sync_back") {
                 // Acceptor side: Receive challenger's deck and start
+                if (window.playChallengeAcceptedSFX) window.playChallengeAcceptedSFX();
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(1);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);

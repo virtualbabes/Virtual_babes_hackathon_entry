@@ -182,9 +182,71 @@ export async function playSFX(path) {
     source.start(0);
 }
 
+// --- Challenge Audio Handlers ---
+let activeChallengeWaitSource = null;
+
+/**
+ * Plays the challenge wait loop for the sender while awaiting a response.
+ */
+export async function playChallengeWaitSFX() {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+    if (activeChallengeWaitSource) return;
+
+    if (!audioCtx) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buffer = await getSFXBuffer('Challenge_wait.mp3');
+    if (!buffer || !audioCtx) return;
+
+    activeChallengeWaitSource = audioCtx.createBufferSource();
+    activeChallengeWaitSource.buffer = buffer;
+    activeChallengeWaitSource.loop = true;
+    activeChallengeWaitSource.connect(sfxGainNode);
+    activeChallengeWaitSource.start(0);
+}
+
+/**
+ * Stops the active challenge wait loop.
+ */
+export function stopChallengeWaitSFX() {
+    if (activeChallengeWaitSource) {
+        try {
+            activeChallengeWaitSource.stop();
+        } catch (e) {
+            // Source might have already stopped or not started
+        }
+        activeChallengeWaitSource = null;
+    }
+}
+
+/**
+ * Plays the challenge accepted sound.
+ */
+export function playChallengeAcceptedSFX() {
+    playSFX('Challenge_accepted.mp3');
+}
+
+/**
+ * Plays a randomized challenge declined sound variant.
+ */
+export function playChallengeDeclinedSFX() {
+    const variants = [
+        'Chalenge_declined.mp3',
+        'Chalenge_declined1.mp3',
+        'Chalenge_declined2.mp3',
+        'Chalenge_declined3.mp3'
+    ];
+    const randomVariant = variants[Math.floor(Math.random() * variants.length)];
+    playSFX(randomVariant);
+}
+
 window.PlaySound = playSFX;
 window.initAudioContext = initAudioContext;
 window.playMoodMoteSFX = playMoodMoteSFX;
 window.playCharacterVoiceLine = playCharacterVoiceLine;
 window.playConnectionSFX = playConnectionSFX;
 window.playBattleStartSFX = playBattleStartSFX;
+window.playChallengeWaitSFX = playChallengeWaitSFX;
+window.stopChallengeWaitSFX = stopChallengeWaitSFX;
+window.playChallengeAcceptedSFX = playChallengeAcceptedSFX;
+window.playChallengeDeclinedSFX = playChallengeDeclinedSFX;
