@@ -4,6 +4,7 @@ import { showToast, hideAllOverlays, showMatchPreview, renderCardHTML, movePower
 import { userAddress, walletProvider, signClient } from './wallet.js';
 import { collectiveIntelligence } from '../collective-intelligence.js';
 import { getCachedEnvoiName, resolveEnvoiName } from './utils.js';
+import { initAudioContext } from './audio.js';
 
 // --- Game State Variables ---
 export let activeCardId = null; // Tracks the card you clicked in your hand
@@ -42,6 +43,8 @@ export function buildEmptyBoard() {
 
 export function toggleMatchmakingQueue() {
     if (!userAddress) { showToast("Connect wallet first", "error"); return; }
+    initAudioContext();
+
     const state = window.GetGameState();
     if (state.deck.length < 5) { showToast("Deck must have 5 cards", "error"); return; }
 
@@ -293,6 +296,7 @@ export function sendSpectate(targetId) {
 
 export function proceedToWarRoom() {
     if (!spectatorMatchState) return;
+    initAudioContext();
     
     document.getElementById("match-preview-overlay").classList.add("hidden");
     window.ResetGame();
@@ -303,6 +307,7 @@ export function proceedToWarRoom() {
 
 export function sendChallenge(targetId) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    initAudioContext();
 
     const state = window.GetGameState();
     const envelope = {

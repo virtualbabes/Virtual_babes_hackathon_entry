@@ -3,8 +3,8 @@
 ### 1. AI Development Context
 * `AI-Brain\A.I_memory.md`
 * `AI-Brain\DIR.md`
+* `AI-Brain\File-Flow-Overview-1.md`
 * `AI-Brain\Game_expansion_plan.md`
-* `AI-Brain\orphan_fix_list copy.md`
 * `AI-Brain\orphan_fix_list.md`
 * `AI-Brain\Rules.md`
 * `AI-Brain\ToDo.md`
@@ -87,6 +87,7 @@
 * `Public\Assets\Audio\Toggle_bip.mp3`
 * `Public\Assets\Audio\ugh_3.wav`
 * `Public\Assets\Audio\Crowd\applause_player_win.mp3`
+* `Public\Assets\Audio\Start_intense.mp3`
 
 ### 3. Public Visuals
 
@@ -180,6 +181,7 @@
 * `Public\js\game.js`
 * `Public\js\leaderboard.js`
 * `Public\js\network.js`
+* `Public\js\particles.js`
 * `Public\js\ui.js`
 * `Public\js\utils.js`
 * `Public\js\wallet.js`
@@ -209,7 +211,6 @@
 * `handlers_public.go`
 * `handlers_rumor.go`
 * `item_service.go`
-* `jsconfig.json`
 * `loan_service.go`
 * `lobby_manager.go`
 * `market_service.go`
@@ -229,6 +230,7 @@
 
 * `go.mod`
 * `go.sum`
+* `jsconfig.json`
 
 # B2. .env
 
@@ -254,7 +256,7 @@
 
 * `Dockerfile`
 
-# B8. .json-files*
+# B8. System Configs (.json)
 
 * `networks.json`
 * `package-lock.json`
@@ -263,6 +265,7 @@
 # B9. server-bin
 
 * `server-bin`
+* `season.json`
 
 # C. root_documents 
 

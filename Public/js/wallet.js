@@ -5,6 +5,7 @@ import { showToast, setTransactionStatus, hideAllOverlays, showMainGameContainer
 import { getNetworkConfig } from './utils.js';
 import { socket, setNonceResolver } from './network.js';
 import { fetchUserNFTs } from './deck.js';
+import { initAudioContext } from './audio.js';
 
 export let userAddress = null;
 export let isVerified = false;
@@ -195,6 +196,9 @@ export async function connectWith(provider) {
     showToast(`Connecting to ${provider}...`, "info");
     
     try {
+        // Initialize high-performance audio context on user gesture to satisfy browser policies
+        initAudioContext();
+
         let address = null;
         if (provider === 'nautilus') {
             if (!window.algo) throw new Error("Nautilus not installed");

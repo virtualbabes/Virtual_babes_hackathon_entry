@@ -1500,9 +1500,11 @@ func flipCard(idx int, newOwner int, reason string) bool {
 	c.Owner = newOwner
 	c.IsCombo = (reason == "COMBO" || reason == "SAME" || reason == "POWER_UP")
 
+	// Visual Feedback: Trigger capture sparks for all capture events
+	triggerCaptureParticlesInternal(idx, newOwner)
+
 	if Game.Rules["Fallen_penalty"] {
 		c.Artifact -= 20 // Permanent debuff for being captured
-		triggerCaptureParticlesInternal(idx, newOwner) // Trigger particle effect on capture
 	}
 	return true
 }
@@ -2343,7 +2345,6 @@ func registerFunctions() {
 	js.Global().Set("SetLocalPlayerIndex", js.FuncOf(SetLocalPlayerIndex))
 	js.Global().Set("ImportARC72Card", js.FuncOf(ImportARC72Card))
 	js.Global().Set("ApplyArtifactToBoard", js.FuncOf(ApplyArtifactToBoard))
-	js.Global().Set("PlayCaptureEffect", js.FuncOf(PlayCaptureEffect))
 }
 
 // GetTournamentArchiveBadge returns a stylized HTML badge based on verification status

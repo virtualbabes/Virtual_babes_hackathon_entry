@@ -203,6 +203,7 @@ export async function submitClubFoundry() {
         let txid = "SIM_TX_" + Date.now(); // Replace with actual signing logic
         socket.send(JSON.stringify({ type: "create_club", payload: { name, type, territory_id: territory, txid, network: state.network } }));
         document.getElementById("club-foundry-overlay").remove();
+        window.triggerFoundryFusion(type); // Trigger dynamic particle effect based on club type
     } catch (err) { showToast(`Founding Failed: ${err.message}`, "error"); }
 }
 

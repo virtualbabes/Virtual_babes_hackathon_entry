@@ -11,14 +11,18 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 | **Combat Engine** | Complete | WASM-based rules (Same, Plus, Combo) with authoritative server validation. |
 | **Infamy System** | Complete | Wanted Levels, Heists, and Courthouse fines (100 $VBV/point). |
 | **Entity Market** | Complete | Stock trading of player/NPC shares using internal $VBV reward balances. |
-| **Clubs/Territories** | Functional | Club founding, joining, and basic revenue loops (Shop turnover/Kickbacks). |
-| **Achievements** | Functional | Persistent trophy system (Outlaw Slayer, Perfect Game, etc.). |
+| **Clubs/Territories** | Complete | Club founding, joining, and complex revenue loops (Leases/Kickbacks/Rerouting). |
+| **Achievements** | Complete | Persistent trophy system (Valor) influencing market multipliers. |
 | **X-Chain Oracle** | Complete | Multi-chain NFT discovery (AVM, EVM, Solana) with power-scaling. |
+| **Industrial Leases** | Complete | Internal rental market with Lender/Club/Faucet revenue splits. |
+| **Jailing & Ransom** | Complete | Tactical capture consequences and Insurance Recovery cycles. |
+| **Tactical Heists** | Complete | Risk-based looting with deployable security hardware (Traps/Dogs). |
+| **Social Hub** | Complete | Unified UI for Alliances, Careers, and Achievement showcase. |
 
 ---
 
 ## 3. Pillar 1: The Industrial & Trust Layer
-**Goal:** Create a social hierarchy through employment, property, and regional dominance.
+**Status:** Implemented (Beta)
 
 ### A. In-Game Employment & Careers
 *   **Roles:** Club Owners can hire other players into specialized roles:
@@ -32,11 +36,11 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 *   **Logic:** 50% returns to the Faucet pool; 50% is distributed equally among active Club Treasuries.
 *   **Narrative:** Clubs act as the "Security Guilds" of the Arena.
 
-### B. Club Mojo & Tiered Unlocks
+### C. Club Mojo & Tiered Unlocks
 *   **Mechanism:** Clubs earn "Mojo" through successful tournament placements of members and high shop turnover.
 *   **Unlock:** High-Mojo clubs unlock specialized items in their shops (e.g., Rare Mood Catalysts, Anti-Fatigue Stims).
 
-### C. Regional Expansion
+### D. Regional Expansion
 *   **Mechanism:** Once a Club (or alliance) owns **2 Territories**, they form a **Region**.
 *   **Buff:** Regions grant a global +5% power boost to all members within that district and unlock "Master" tier items.
 *   **Governor:** The Club Owner becomes a Regional Governor, earning a small tax from all Courthouse fines paid by players caught within their region.
@@ -44,7 +48,7 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 ---
 
 ## 4. Pillar 2: The High-Finance & Market Layer
-**Goal:** Port the deep economic loops from the build resources to the server.
+**Status:** Implemented (Beta)
 
 ### A. Art Gallery: Auctions & Consignments
 *   **Mechanism:** Players can list specialized **Card Bundles** (Card + Weapon + Faceplate) for $VBV auction.
@@ -56,13 +60,13 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 *   **Underworld:** High-cunning players can buy these defaulted cards from the "Black Market" at a discount, but they carry a "Stolen" tag that increases Wanted Level while held.
 
 ### C. Rumor Mill & Market Manipulation
-*   **Mechanism:** Players can pay "The Salon" or "Hot Spot" managers to spread rumors.
+*   **Mechanism:** Players pay to spread Positive/Negative rumors about entities.
 *   **Effect:** Positive/Negative rumors apply multipliers to an entity's Share Price for a limited time.
 
 ---
 
 ## 5. Pillar 3: Criminality & Intelligence
-**Goal:** Expand high-risk/high-reward gameplay.
+**Status:** Implemented (Beta)
 
 ### A. Kidnapping & Ransom
 *   **Mechanism:** Successful high-stakes heists can lead to a **Kidnap Gambit**.
@@ -75,12 +79,10 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 ---
 
 ## 6. Pillar 4: Performative Market & Social Flex
-**Goal:** Turn player performance into a liquid asset.
-
-
+**Status:** Implemented (Beta)
 
 ### A. Enhanced Portfolio View
-*   **UI Update:** Display Achievement Badges (Trophies) next to player names in the Market Ticker and Portfolio list.
+*   **Mechanism:** Display Achievement Badges (Trophies) next to player names in the Market Ticker and Portfolio list.
 *   **Valuation Logic:** Achievement counts should act as a multiplier for Share Price, rewarding "Decorated Veterans."
 
 ### B. Social Sharing (X/Twitter)
@@ -88,8 +90,8 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 
 ---
 
-## 5. Pillar 3: Deep RPG Mechanics
-**Goal:** Increase card usage strategy via persistence.
+## 7. Pillar 5: Deep RPG Mechanics
+**Status:** Implemented (Beta)
 
 ### A. The Fatigue/Loyalty Loop
 *   **Fatigue:** Overused cards lose power (-1 per match above 50 usage).
@@ -102,13 +104,13 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 
 ---
 
-## 6. Technical Roadmap
+## 8. Technical Roadmap
 
-### Phase 1: Commercialization (Next)
+### Phase 1: Commercialization (COMPLETE)
 *   Implement specialized inventory and Staffing slots for the three Club Types.
 *   Refine `CalculateReputation` to include Mojo and Achievement counts.
 
-### Phase 2: Seasonality
+### Phase 2: Seasonality (IN PROGRESS)
 *   Implement automated "Season Rollover" in `lobby_manager.go`.
 *   Persistent Hall of Fame (HoF) archives recorded on-chain via transaction notes.
 
@@ -118,7 +120,7 @@ To evolve Virtualbabes Arena from a tactical card battler into a high-stakes **S
 
 ---
 
-## 7. Economic Guardrails
+## 9. Economic Guardrails
 *   **Anti-Inflation:** All $VBV remains within the loop (Faucet -> Players -> Clubs -> Shops -> Faucet).
 *   **Sybil Protection:** Continue utilizing historical Indexer checks for Bridge/Onboarding rewards.
 *   **Governance:** Club Managers set commission rates within a regulated 5-50% window.
@@ -139,7 +141,7 @@ Pillar 1: The Industrial & Trust Layer
 **Current Status:**
 In-Game Employment & Careers: Implemented.
 Courthouse Rerouting: Implemented. $VBV fines are now distributed to active Club Treasuries, making Clubs the "Security Guilds."
-Club Mojo & Tiered Unlocks: Mojo exists, but its direct impact on tiered shop unlocks is pending.
+Club Mojo & Tiered Unlocks: Implemented.
 Regional Expansion: Implemented. Clubs owning 2+ territories become "Regional Governors," gaining a 15% tax on Courthouse fines from their region. Territory acquisition is also implemented.
 Pillar 2: The High-Finance & Market Layer
 
@@ -149,7 +151,7 @@ Current Status:
 Art Gallery: Auctions & Consignments: Implemented. Players can list card bundles for $VBV auction, with Club commissions.
 Second-Hand Store: Loans & Collateral: Implemented. Players can take $VBV loans using NFT card bundles as collateral. Automated default processing is in place.
 Market Token Liquidation & Black Market: Implemented. Defaulted collateral is moved to the Black Market, and borrowers receive Market Tokens. The Black Market UI is also implemented, gated by Wanted Level and Cunning.
-Rumor Mill & Market Manipulation: Pending.
+Rumor Mill & Market Manipulation: Implemented.
 Pillar 3: Criminality & Intelligence
 
 Goal: Expand high-risk/high-reward gameplay, adding layers of intrigue and consequence.

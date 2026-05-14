@@ -15,6 +15,17 @@
 - [x] Implement canvas-based 'sparks' particle effects and integrate into SCSS.
 - [x] Audit `renderCardHTML` function in `ui.js` for performance bottlenecks and re-allocations.
 - [x] **A11y Typography**: Hardened neon text contrast and outlines in `_typography.scss`.
+- [x] **Documentation Sync**: Synchronized `Game_expansion_plan.md` with implementation reality to establish the Beta baseline.
+- [x] **Particle Immersion**: Hardened `particles.js` with dynamic behavior shifting based on Cunning, Mojo, and Club Industry types.
+- [x] **Foundry Visuals**: Integrated dynamic `triggerFoundryFusion` call in `economy.js` for Club Industry types.
+- [x] **Ambient Immersion**: Implemented tile mood motes in `particles.js` and throttled audio cues in `audio.js`, triggered by the `board_moods` state in `ui.js`.
+- [x] **Performance Audio**: Enhanced `audio.js` with `AudioContext` for low-latency SFX and polyphonic support.
+- [x] **Combat Feedback**: Integrated `triggerConnectionPulse` and `playConnectionSFX` for multiplayer match initialization in `network.js`.
+- [x] **Audio Integration**: Wired `syncSFXGain` into `app.js` to normalize Web Audio gain during volume changes.
+- [x] **Audio Policy**: Wired `initAudioContext` to user gestures in `wallet.js` for autoplay compliance.
+- [x] **Audio Fallbacks**: Integrated `initAudioContext` into high-traffic match and entry gestures in `app.js` and `game.js`.
+- [x] **Ambient Immersion**: Integrated `syncBoardParticles` into `app.js:syncUI` for continuous ambient board effects.
+- [x] **Combat Feedback**: Integrated `triggerConnectionPulse` for multiplayer match initialization in `network.js`.
 - [x] **A11y Audit**: Hardened market ticker legibility and motion accessibility in `_economy.scss`.
 - [x] **A11y Audit**: Hardened heist risk meter color contrast and motion accessibility in `_criminality.scss`.
 - [x] **A11y Audit**: Hardened social status contrast and locked-state legibility in `_social.scss`.

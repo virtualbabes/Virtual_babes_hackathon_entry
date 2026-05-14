@@ -116,6 +116,20 @@
 - **Heist Audit**: Aligned Heist success probabilities by broadcasting effective stats in lobby updates and fixing scope bugs in `club_service.go`.
 - **Reputation System**: Adjusted `CalculateReputation` to use an additive bonus for `RumorCount` instead of a multiplier, ensuring players with zero wins still gain standing from social influence.
 - **Documentation**: Merged `ReadMe.txt` into `README.md`.
+- **Hardening**: Completed comprehensive documentation synchronization. Updated `Game_expansion_plan.md` to establish the implemented Production-Ready Beta as the new baseline for future expansion milestones.
+- **Audit**: Synchronized `DIR.md` with physical `Public/js` inventory; identified and restored missing `particles.js` entry.
+- **Visuals**: Hardened `particles.js` with dynamic, state-aware physics. Heists scale with Cunning, Rewards scale with Mojo, and Foundry effects adapt to Club Industry types for personalized immersion.
+- **Visuals**: Integrated dynamic `triggerFoundryFusion` call in `economy.js` to reflect Club Industry type.
+- **Visuals**: Implemented ambient tile mood motes in `particles.js` and wired via `ui.js:syncBoardParticles` (with throttled audio cues in `audio.js`) to enhance board immersion.
+- **Audio**: Refactored SFX engine in `audio.js` to use `AudioContext` for low-latency polyphony; implemented `PlaySound` override to support overlapping combat effects.
+- **Audio**: Integrated `syncSFXGain` into `app.js:setMasterVolume` to ensure low-latency gain adjustment for the Web Audio subsystem.
+- **Audio**: Integrated `syncSFXGain` into `app.js:setSfxVolume` to ensure gain parity for the low-latency SFX engine during volume adjustments.
+- **Audio**: Integrated `playConnectionSFX` in `audio.js` and wired to `network.js` to provide auditory feedback for the connection pulse.
+- **Audio Hardening**: Migrated volume assignments to centralized setters in `audio.js` to ensure consistent persistence and prevent ESM binding errors.
+- **Audio Hardening**: Wired `initAudioContext` to the wallet connection gesture in `wallet.js` to satisfy browser autoplay policies.
+- **Audio Hardening**: Implemented `initAudioContext` fallbacks in `app.js` (Avatar Confirm) and `game.js` (Matchmaking/Challenges) to ensure robust SFX activation.
+- **Visuals**: Integrated `syncBoardParticles` into `app.js:syncUI` for continuous ambient board effects during active gameplay.
+- **Visuals**: Implemented `triggerConnectionPulse` in `particles.js` and wired into the `network.js` challenge handshake for tactical match-start feedback.
 - **Hardening**: Applied `sync.RWMutex` to `main.go` (Plan F) and refactored async fetch logic.
 - **Validation**: Performed simulated 16-player tournament stress tests; verified bracket archival and kickback logic.
 - **Rewards**: Hardened Top 5 placement identification and implemented atomic multi-asset distribution.

@@ -1,6 +1,6 @@
 import { CONFIG } from './js/config.js';
 import { initWebSocket, handleServerMessage } from './js/network.js';
-import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML } from './js/ui.js';
+import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles } from './js/ui.js';
 import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress } from './js/wallet.js';
 import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket } from './js/leaderboard.js';
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, showPowerTooltip, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
@@ -8,7 +8,7 @@ import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, 
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
 import { openShopsOverlay, openClubFoundry, openArtGalleryOverlay, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
 import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, releaseHostage, payRansom } from './js/criminality.js';
-import { setMasterVolume, setMusicVolume, setSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume } from './js/audio.js';
+import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext } from './js/audio.js';
 import { initParticleSystem } from './js/particles.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './js/utils.js';
 
@@ -146,6 +146,11 @@ export async function syncUI(scope = "all") {
         } else {
             document.documentElement.style.setProperty('--neon-accent', '#00f2fe');
         }
+    }
+
+    // --- Ambient Board Particles ---
+    if (state.phase === "Active") {
+        syncBoardParticles(state);
     }
 
     // Update Deck Rating in UI
@@ -2379,6 +2384,9 @@ window.setupCropEvents = () => {
     frame.ontouchend = () => isDragging = false;
 
     confirmBtn.onclick = () => {
+        // Fallback: Ensure AudioContext is initialized on "Enter Arena" gesture
+        initAudioContext();
+
         if (window.SetAvatar && currentAvatarUrl) {
             const gloat = document.getElementById("gloat-message-input").value.trim();
             localStorage.setItem("vbabes_gloat_msg", gloat);
@@ -2701,20 +2709,20 @@ window.closeSettingsOverlay = () => { // Imported from ui.js
 }
 
 window.setMasterVolume = (value) => { // Imported from audio.js
-    masterVolume = parseFloat(value); // Imported from audio.js
-    window.SetMasterVolume(masterVolume);
+    updateMasterVolume(value);
+    window.SetMasterVolume(parseFloat(value));
     syncUI();
 }
 
 window.setMusicVolume = (value) => {
-    musicVolume = parseFloat(value);
-    window.SetMusicVolume(musicVolume);
+    updateMusicVolume(value);
+    window.SetMusicVolume(parseFloat(value));
     syncUI();
 }
 
 window.setSfxVolume = (value) => {
-    sfxVolume = parseFloat(value);
-    window.SetSfxVolume(sfxVolume);
+    updateSfxVolume(value);
+    window.SetSfxVolume(parseFloat(value));
     syncUI();
 }
 
@@ -2733,9 +2741,9 @@ window.toggleMuteMusic = () => {
 }
 
 window.toggleMuteSfx = () => {
-    sfxVolume = sfxVolume === 0 ? 0.5 : 0;
-    document.getElementById("sfx-volume").value = sfxVolume;
-    setSfxVolume(sfxVolume);
+    const newVal = sfxVolume === 0 ? 0.5 : 0;
+    document.getElementById("sfx-volume").value = newVal;
+    window.setSfxVolume(newVal);
 }
 
 // Global function to manage transaction status display // Imported from ui.js

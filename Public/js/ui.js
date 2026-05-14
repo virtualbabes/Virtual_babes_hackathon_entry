@@ -105,6 +105,24 @@ export function handleMaintenanceUI(active, targetTimestamp) {
     maintenanceTicker = setInterval(tick, 1000);
 }
 
+/**
+ * Orchestrates ambient board effects (Mood Motes) based on tile state.
+ * Throttled to ensure subtlety and prevent performance degradation.
+ */
+export function syncBoardParticles(state) {
+    if (state.phase !== "Active" || !state.board_moods) return;
+
+    state.board_moods.forEach((mood, idx) => {
+        if (mood && mood !== "Neutral") {
+            // Ambient Trigger: Only spawn on ~15% of sync cycles to keep the effect sparse
+            if (Math.random() > 0.85) {
+                if (window.triggerMoodMote) window.triggerMoodMote(idx, mood);
+                if (window.playMoodMoteSFX) window.playMoodMoteSFX(mood);
+            }
+        }
+    });
+}
+
 export function showTournamentTransition(roundNumber) {
     const overlay = document.getElementById("tournament-transition-overlay");
     if (!overlay) return;

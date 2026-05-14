@@ -189,6 +189,8 @@ export function handleServerMessage(msg) {
                 window.SyncOpponentDeck(1, msg.payload.deck);
                 sendMatchSync(msg.from_id);
                 window.StartMatch(true);
+                if (window.triggerConnectionPulse) window.triggerConnectionPulse();
+                if (window.playConnectionSFX) window.playConnectionSFX();
                 requestBatchedSync("combat");
             } else if (action === "decline") {
                 alert(`Challenge declined by ${msg.from_id}.`);
@@ -201,6 +203,8 @@ export function handleServerMessage(msg) {
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(0, msg.payload.deck);
                 window.StartMatch(true);
+                if (window.triggerConnectionPulse) window.triggerConnectionPulse();
+                if (window.playConnectionSFX) window.playConnectionSFX();
                 requestBatchedSync("combat");
             }
             break;
