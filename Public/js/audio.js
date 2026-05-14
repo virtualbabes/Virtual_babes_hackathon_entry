@@ -109,6 +109,14 @@ export function playConnectionSFX() {
 }
 
 /**
+ * Plays a high-intensity battle start audio cue.
+ * Accompanies the transition to the active combat phase.
+ */
+export function playBattleStartSFX() {
+    playSFX('Start_intense.mp3');
+}
+
+/**
  * Unified low-latency play function.
  * Overrides the legacy window.PlaySound to provide polyphony and better performance.
  */
@@ -141,3 +149,4 @@ window.PlaySound = playSFX;
 window.initAudioContext = initAudioContext;
 window.playMoodMoteSFX = playMoodMoteSFX;
 window.playConnectionSFX = playConnectionSFX;
+window.playBattleStartSFX = playBattleStartSFX;

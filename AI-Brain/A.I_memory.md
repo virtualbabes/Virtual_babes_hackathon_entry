@@ -125,6 +125,7 @@
 - **Audio**: Integrated `syncSFXGain` into `app.js:setMasterVolume` to ensure low-latency gain adjustment for the Web Audio subsystem.
 - **Audio**: Integrated `syncSFXGain` into `app.js:setSfxVolume` to ensure gain parity for the low-latency SFX engine during volume adjustments.
 - **Audio**: Integrated `playConnectionSFX` in `audio.js` and wired to `network.js` to provide auditory feedback for the connection pulse.
+- **Audio**: Integrated `playBattleStartSFX` in `audio.js` and wired to `network.js` to provide high-intensity feedback for match starts.
 - **Audio Hardening**: Migrated volume assignments to centralized setters in `audio.js` to ensure consistent persistence and prevent ESM binding errors.
 - **Audio Hardening**: Wired `initAudioContext` to the wallet connection gesture in `wallet.js` to satisfy browser autoplay policies.
 - **Audio Hardening**: Implemented `initAudioContext` fallbacks in `app.js` (Avatar Confirm) and `game.js` (Matchmaking/Challenges) to ensure robust SFX activation.

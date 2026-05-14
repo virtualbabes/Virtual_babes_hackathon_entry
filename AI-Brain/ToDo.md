@@ -20,7 +20,7 @@
 - [x] **Foundry Visuals**: Integrated dynamic `triggerFoundryFusion` call in `economy.js` for Club Industry types.
 - [x] **Ambient Immersion**: Implemented tile mood motes in `particles.js` and throttled audio cues in `audio.js`, triggered by the `board_moods` state in `ui.js`.
 - [x] **Performance Audio**: Enhanced `audio.js` with `AudioContext` for low-latency SFX and polyphonic support.
-- [x] **Combat Feedback**: Integrated `triggerConnectionPulse` and `playConnectionSFX` for multiplayer match initialization in `network.js`.
+- [x] **Combat Feedback**: Integrated `triggerConnectionPulse`, `playConnectionSFX`, and `playBattleStartSFX` for multiplayer match initialization in `network.js`.
 - [x] **Audio Integration**: Wired `syncSFXGain` into `app.js` to normalize Web Audio gain during volume changes.
 - [x] **Audio Policy**: Wired `initAudioContext` to user gestures in `wallet.js` for autoplay compliance.
 - [x] **Audio Fallbacks**: Integrated `initAudioContext` into high-traffic match and entry gestures in `app.js` and `game.js`.

@@ -191,6 +191,7 @@ export function handleServerMessage(msg) {
                 window.StartMatch(true);
                 if (window.triggerConnectionPulse) window.triggerConnectionPulse();
                 if (window.playConnectionSFX) window.playConnectionSFX();
+                if (window.playBattleStartSFX) window.playBattleStartSFX();
                 requestBatchedSync("combat");
             } else if (action === "decline") {
                 alert(`Challenge declined by ${msg.from_id}.`);
@@ -205,6 +206,7 @@ export function handleServerMessage(msg) {
                 window.StartMatch(true);
                 if (window.triggerConnectionPulse) window.triggerConnectionPulse();
                 if (window.playConnectionSFX) window.playConnectionSFX();
+                if (window.playBattleStartSFX) window.playBattleStartSFX();
                 requestBatchedSync("combat");
             }
             break;
