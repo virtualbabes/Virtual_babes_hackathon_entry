@@ -9,6 +9,7 @@ import { fetchUserNFTs } from './deck.js';
 export let userAddress = null;
 export let isVerified = false;
 export let linkedWallets = JSON.parse(localStorage.getItem("vbabes_linked_wallets") || "[]");
+export let payoutAddress = localStorage.getItem("vbabes_payout_address") || null;
 
 export let walletProvider = null;      // Current active provider (nautilus, kibisis, etc.)
 export let signClient = null; // WalletConnect State
@@ -76,6 +77,95 @@ export async function initWalletConnect() {
         console.error("[WC] Initialization Failed:", err);
         showToast("WalletConnect failed to initialize.", "error");
     }
+}
+
+export async function checkVoiReadiness(address) {
+    console.log("[BRIDGE] Checking Voi readiness for Algorand wallet...");
+    setTransactionStatus("Checking Voi onboarding status...", "info");
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/bridge/onboard`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet: address })
+        });
+        if (response.ok && response.status !== 204) {
+            const data = await response.json();
+            let message = `🌉 ${data.message}`;
+            if (data.txid) {
+                const netCfg = getNetworkConfig("Voi Mainnet");
+                if (netCfg && netCfg.explorer_url) {
+                    message += `<br><a href="${netCfg.explorer_url}/tx/${data.txid}" target="_blank" style="color: var(--neon-green); text-decoration: underline;">View Transaction</a>`;
+                }
+            }
+            showToast(message, "success", 10000);
+        }
+    } catch (err) { console.warn("[BRIDGE] Onboarding check failed", err); }
+    finally { setTransactionStatus(null); }
+}
+
+export function openPayoutSettings() {
+    document.getElementById("payout-settings-overlay").classList.remove("hidden");
+    document.getElementById("payout-address-input").value = payoutAddress || "";
+}
+
+export function savePayoutAddress() {
+    const addr = document.getElementById("payout-address-input").value.trim();
+    if (addr && addr.length === 58) {
+        payoutAddress = addr;
+        localStorage.setItem("vbabes_payout_address", addr);
+        showToast("✅ Voi payout address updated", "success");
+        updatePayoutUI();
+        hideAllOverlays();
+    } else {
+        showToast("❌ Invalid Voi Address", "error");
+    }
+}
+
+export function updatePayoutUI() {
+    const display = document.getElementById("payout-address-display");
+    if (display) {
+        display.innerText = payoutAddress ? (payoutAddress.substring(0, 6) + "..." + payoutAddress.substring(54)) : "Default Wallet";
+    }
+}
+
+export async function processRewardPayout(payloadStr) {
+    const payload = JSON.parse(payloadStr);
+    showToast("🛰️ Requesting secure nonce from server...", "info");
+    try {
+        const nonce = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error("Nonce timed out")), 10000);
+            setNonceResolver((n) => { clearTimeout(timeout); resolve(n); });
+            socket.send(JSON.stringify({ type: "nonce_request" }));
+        });
+
+        const tx = { from: userAddress, to: userAddress, amount: 0, note: new TextEncoder().encode(nonce), type: 'pay' };
+        let signedTx = null;
+        payload.claimant = payload.recipient; 
+        payload.recipient = payoutAddress || payload.recipient; 
+
+        if (walletProvider === 'nautilus') {
+            const result = await window.algo.signTxn([{ txn: algosdk.encodeObj(tx), signers: [payload.claimant] }]);
+            signedTx = result[0];
+        } else if (walletProvider === 'walletconnect' && signClient) {
+            const response = await signClient.request({
+                topic: signClient.session.getAll()[0].topic,
+                chainId: CONFIG.VOI_CHAIN_ID,
+                request: { method: "algo_signTxn", params: [[{ txn: btoa(String.fromCharCode(...algosdk.encodeObj(tx))), signers: [payload.claimant] }]] }
+            });
+            signedTx = new Uint8Array(atob(response[0]).split("").map(c => c.charCodeAt(0)));
+        }
+
+        if (!signedTx) throw new Error("Signature failed.");
+        payload.signed_tx = Array.from(signedTx);
+
+        const response = await fetch(`${CONFIG.API_BASE}/api/reward`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(await response.text());
+        showToast("✅ Reward Sent!", "success");
+    } catch (err) { showToast("⚠️ Payout Failed: " + err.message, "error"); }
 }
 
 export async function handleWalletAction() {

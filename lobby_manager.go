@@ -970,6 +970,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Reputation        int            `json:"reputation"`
 		WantedLevel       int            `json:"wanted_level"`
 		Cunning           int            `json:"cunning"`
+		Mojo              int            `json:"mojo"`
 		Nurturing         int            `json:"nurturing"`
 		JailedCards       map[int]string `json:"jailed_cards"`       // Added for UI display
 		SocialRank        string         `json:"social_rank"`        // Added for UI display
@@ -986,7 +987,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	for _, client := range l.clients {
 		hasMardon := false
 		var banExpires time.Time
-		wins, reputation, wanted, cunning, nurturing := 0, 0, 0, 0, 0
+		wins, reputation, wanted, cunning, nurturing, mojo := 0, 0, 0, 0, 0, 0
 		var jailedCards map[int]string
 		var equippedFaceplate string
 		var socialRank string
@@ -999,6 +1000,8 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				banExpires = stats.BanExpires
 				wins = stats.Wins
 				reputation = stats.Reputation
+				// UI Sync: Use Effective Mojo (including faceplate) for Career Path display
+				mojo = stats.GetEffectiveMojo()
 				wanted = stats.WantedLevel
 				// Alignment: Broadcast the Effective Cunning (including faceplate/penalty) 
 				// to ensure the UI heist heuristic matches the server calculation.
@@ -1020,7 +1023,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
 			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation, 
-			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing,
+			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			JailedCards: jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,
 			JobRole: jobRole, EmployerID: employerID,

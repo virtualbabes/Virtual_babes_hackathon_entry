@@ -185,6 +185,7 @@
 - **Market Ticker**: Hardened NPC identification in `updateMarketTicker` and synchronized canvas rendering with `.npc-taunt` purple/italic styles.
 - **Combat Visuals**: Hardened `.flip-capture` animation trigger in `app.js` with reflow forcing to ensure reliable re-triggering during chain reactions.
 - **Club Management**: Hardened `openClubFoundry` in `app.js` to dynamically filter out claimed territories from the selection dropdown and added a11y attributes.
+- **Criminality UI**: Completed `renderRumorBoard` in `criminality.js` with functional real-time MM:SS countdown timers and robust ingestion logic.
 
 ## Technical Notes
 - **Economy**: `economy_processing.go` handles temporal cleanup (loans/auctions) independently of main handlers.

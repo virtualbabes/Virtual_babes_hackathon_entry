@@ -1,22 +1,74 @@
-import { updateActiveRumors, renderRumorBoard } from './criminality.js';
 import { CONFIG } from './config.js';
-import { socket, myClientId } from './network.js';
+import { socket, myClientId, setNonceResolver } from './network.js';
 import { showToast, hideAllOverlays } from './ui.js';
 import { userAddress, walletProvider, signClient } from './wallet.js'; // Removed payoutAddress as it's not used here
-import { getCachedEnvoiName, getNetworkConfig } from './utils.js';
+import { getCachedEnvoiName, getNetworkConfig, resolveEnvoiName } from './utils.js';
 import { globalClubs } from './admin.js'; // globalClubs is now in admin.js
 import { lastLobbyPlayers, myPlayerIndex, setCurrentOpponentId, setMyPlayerIndex } from './game.js'; // lastLobbyPlayers is now in game.js
 import { syncUI } from '../app.js'; // syncUI is still in app.js
 
 export let rumorTimers = {};
-export let activeRumors = [];
+export let activeRumors = {};
 
 const algosdk = window.algosdk; // Assuming algosdk is globally available
 
 export function updateActiveRumors(rumorsData) {
-    // Clear existing timers
-        timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }, 1000);
+    if (!rumorsData) return;
+    // Robust Ingestion: Handle whole maps or single rumor updates
+    if (rumorsData.id) {
+        activeRumors[rumorsData.id] = rumorsData;
+    } else {
+        activeRumors = rumorsData;
+    }
+    renderRumorBoard();
+}
+
+export function renderRumorBoard() {
+    const container = document.getElementById("rumor-board-container");
+    if (!container) return;
+
+    // Clear all existing rumor intervals to prevent leaks
+    Object.values(rumorTimers).forEach(clearInterval);
+    rumorTimers = {};
+
+    const rumors = Object.values(activeRumors);
+    if (rumors.length === 0) {
+        container.innerHTML = `<div class="opacity-3 italic py-10 font-size-0-8em text-center">No active intel circulating.</div>`;
+        return;
+    }
+
+    container.innerHTML = rumors.map(r => `
+        <div class="rumor-item ${r.type === 'positive' ? 'rumor-positive' : 'rumor-negative'} animate-slide-up">
+            <span class="rumor-text">${r.type === 'positive' ? '📈' : '📉'} ${getCachedEnvoiName(r.target_wallet)}: ${r.strength.toFixed(2)}x</span>
+            <span class="rumor-timer font-mono" id="rumor-timer-${r.id}">--:--</span>
+        </div>
+    `).join('');
+    
+    rumors.forEach(r => {
+        const updateTick = () => {
+            const el = document.getElementById(`rumor-timer-${r.id}`);
+            if (!el) {
+                clearInterval(rumorTimers[r.id]);
+                return;
+            }
+
+            const remaining = new Date(r.expires_at) - new Date();
+            if (remaining <= 0) {
+                clearInterval(rumorTimers[r.id]);
+                delete activeRumors[r.id];
+                delete rumorTimers[r.id];
+                renderRumorBoard(); // Re-render to clear the item
+                return;
+            }
+
+            const mins = Math.floor(remaining / 60000);
+            const secs = Math.floor((remaining % 60000) / 1000);
+            el.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        updateTick(); // Initial sync
+        rumorTimers[r.id] = setInterval(updateTick, 1000);
+    });
 }
 
 export function openCourthouse() {
@@ -284,6 +336,7 @@ export async function openBountyBoard() {
     const state = window.GetGameState();
     const myWanted = state.wanted_level || 0;
     const isHunter = myWanted <= 2;
+    const outlaws = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
     
     const overlay = document.createElement("div");
     overlay.id = "bounty-board-overlay";
@@ -325,6 +378,20 @@ export async function openBountyBoard() {
             <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 20px;">High-infamy outlaws currently in the lobby. Hunters (Wanted ≤ 2) earn 50 $VBV per Wanted point on victory.</p>
             <div class="flex-col gap-10" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">${targetsHtml}</div>
             <button class="outline mt-20 w-full" onclick="document.getElementById('bounty-board-overlay').remove()">CLOSE BOARD</button>
+        <div class="glass-panel w-500 border-gold">
+            <h2 class="text-gold">🎯 BOUNTY BOARD</h2>
+            <div class="flex-col gap-10 mt-20 max-h-400 overflow-y-auto">
+                ${outlaws.length === 0 ? '<div class="opacity-5 py-40">No active bounties in sector.</div>' : 
+                    outlaws.map(p => `
+                        <div class="player-item border-gold">
+                            <div class="text-left"><b class="text-gold">${p.id}</b><br><small>Wanted: ${p.wanted_level}</small></div>
+                            <div class="text-right">
+                                <b class="text-neon-green">${p.wanted_level * 50} $VBV</b>
+                                ${isHunter && p.id !== myClientId ? `<button class="outline btn-small border-gold mt-5" onclick="window.sendChallenge('${p.id}'); hideAllOverlays();">HUNT</button>` : ''}
+                            </div>
+                        </div>`).join('')}
+            </div>
+            <button class="outline w-full mt-20" onclick="document.getElementById('bounty-board-overlay').remove()">CLOSE</button>
         </div>`;
     document.body.appendChild(overlay);
 }
@@ -333,6 +400,8 @@ export async function openRumorMill() {
     const state = window.GetGameState();
     const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
     const rumorCost = 500; // Matches server-side cost
+    const rumorCost = 500;
+    const others = lastLobbyPlayers.filter(p => p.id !== myClientId);
 
     if (playerRewards < rumorCost) {
         showToast(`❌ Insufficient $VBV. Spreading a rumor costs ${rumorCost} $VBV.`, "error");
@@ -364,6 +433,14 @@ export async function openRumorMill() {
                             <b class="rumor-target-name">${targetName}</b>
                             <div class="rumor-target-stats">${p.reputation} REP | ${p.wins} WINS</div>
                         </div>
+    overlay.innerHTML = `
+        <div class="criminality-panel glass-panel w-600">
+            <h2>RUMOR MILL</h2>
+            <p class="font-size-0-8em opacity-7">Influence market sentiment for <b class="text-neon-green">${rumorCost} $VBV</b>.</p>
+            <div class="flex-col gap-10 mt-20 max-h-400 overflow-y-auto">
+                ${others.map(p => `
+                    <div class="player-item">
+                        <div class="text-left"><b>${p.id}</b><br><small>${p.reputation} REP</small></div>
                         <div class="flex-row gap-5">
                             <button class="outline btn-rumor-positive" onclick="spreadRumor('${p.wallet}', 'positive', 1.1, 60)">+ POSITIVE</button>
                             <button class="outline btn-rumor-negative" onclick="spreadRumor('${p.wallet}', 'negative', 0.9, 60)">- NEGATIVE</button>
@@ -380,11 +457,14 @@ export async function openRumorMill() {
             <p class="description">Influence market sentiment. Cost: <b class="text-neon-green">${rumorCost} $VBV</b></p>
             <div class="targets-scroll-list flex-col gap-10">
                 ${targetsHtml}
+                    </div>`).join('')}
             </div>
             <button class="outline mt-20" onclick="document.getElementById('rumor-mill-overlay').remove()">CLOSE</button>
         </div>
     `;
 
+            <button class="outline w-full mt-20" onclick="document.getElementById('rumor-mill-overlay').remove()">CLOSE</button>
+        </div>`;
     document.body.appendChild(overlay);
 }
 
@@ -420,11 +500,17 @@ export async function spreadRumor(targetWallet, type, strength, durationMinutes)
     } catch (err) {
         showToast(`❌ Failed to spread rumor: ${err.message}`, "error");
     }
+    socket.send(JSON.stringify({
+        type: "spread_rumor",
+        payload: { target_wallet: targetWallet, type, strength, duration_minutes: durationMinutes }
+    }));
+    document.getElementById("rumor-mill-overlay")?.remove();
 }
 
 export function openTrophyView() {
     openSocialPanelOverlay('achievements');
 }
+export function openTrophyView() { openSocialPanelOverlay('achievements'); }
 
 /**
  * Opens the integrated Social Hub featuring Alliances, Career paths, and Achievements.
@@ -438,6 +524,7 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
 
     overlay.innerHTML = `
         <div class="social-panel glass-panel">
+        <div class="social-panel glass-panel w-550">
             <div class="social-header">
                 <span class="social-title">NEON SOCIAL HUB</span>
                 <div class="social-stats">
@@ -449,6 +536,8 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
                         <div class="stat-label">REP</div>
                         <div class="stat-value">${state.reputation || 0}</div>
                     </div>
+                    <div class="stat-item"><small>MOJO</small><b>${state.mojo || 0}</b></div>
+                    <div class="stat-item"><small>REP</small><b>${state.reputation || 0}</b></div>
                 </div>
             </div>
 
@@ -456,6 +545,9 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
                 <button id="social-tab-alliances" class="tab-btn ${initialTab === 'alliances' ? 'active' : ''}" onclick="switchSocialTab('alliances')">🤝 ALLIANCES</button>
                 <button id="social-tab-career" class="tab-btn ${initialTab === 'career' ? 'active' : ''}" onclick="switchSocialTab('career')">💼 CAREER</button>
                 <button id="social-tab-achievements" class="tab-btn ${initialTab === 'achievements' ? 'active' : ''}" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
+                <button id="social-tab-alliances" class="tab-btn" onclick="switchSocialTab('alliances')">🤝 ALLIANCES</button>
+                <button id="social-tab-career" class="tab-btn" onclick="switchSocialTab('career')">💼 CAREER</button>
+                <button id="social-tab-achievements" class="tab-btn" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
             </div>
 
             <div id="social-content-hub" class="content-hub-scroll flex-col gap-15">
@@ -466,6 +558,9 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
         </div>
     `;
 
+            <div id="social-content-hub" class="flex-col gap-15 max-h-400 overflow-y-auto"></div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('social-hub-overlay').remove()">CLOSE</button>
+        </div>`;
     document.body.appendChild(overlay);
     switchSocialTab(initialTab);
 }
@@ -479,6 +574,7 @@ export async function switchSocialTab(tab) {
     const tabBtn = document.getElementById(`social-tab-${tab}`);
     if (tabBtn) tabBtn.classList.add('active');
 
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `social-tab-${tab}`));
     const state = window.GetGameState();
     container.innerHTML = `<div class="loading-text">Decrypting social datastreams...</div>`;
 
@@ -536,6 +632,12 @@ export async function switchSocialTab(tab) {
                     </div>
                 </div>
             </div>`;
+        const others = lastLobbyPlayers.filter(p => p.id !== myClientId);
+        container.innerHTML = others.map(p => `
+            <div class="connection-item glass-panel m-0">
+                <div class="connection-info"><b>${p.id}</b><br><small>${p.social_rank}</small></div>
+                <button class="outline btn-small border-cyan" onclick="window.sendChallenge('${p.id}'); hideAllOverlays();">DUEL</button>
+            </div>`).join('') || "No other entities detected.";
     } else if (tab === 'career') {
         const tiers = [
             { name: "Iron", mojo: 0, desc: "A nobody in the neon gutter.", icon: "🌑" },
@@ -543,6 +645,9 @@ export async function switchSocialTab(tab) {
             { name: "Silver", mojo: 300, desc: "Gaining recognition in the sector.", icon: "🥈" },
             { name: "Gold", mojo: 600, desc: "An icon of the regional circuit.", icon: "🥇" },
             { name: "Diamond", mojo: 1000, desc: "Arena legend. The elite respect you.", icon: "💎" }
+            { name: "Iron", mojo: 0, icon: "🌑" }, { name: "Bronze", mojo: 100, icon: "🥉" },
+            { name: "Silver", mojo: 300, icon: "🥈" }, { name: "Gold", mojo: 600, icon: "🥇" },
+            { name: "Diamond", mojo: 1000, icon: "💎" }
         ];
 
         container.innerHTML = `
@@ -574,6 +679,13 @@ export async function switchSocialTab(tab) {
                 </div>
             </div>
         `;
+        container.innerHTML = `<div class="career-path">${tiers.map(t => {
+            const isCurrent = (state.mojo || 0) >= t.mojo;
+            return `<div class="career-tier ${isCurrent ? 'current' : 'locked'}">
+                <div class="tier-icon">${t.icon}</div>
+                <div class="tier-info"><b>${t.name}</b><br><small>Req: ${t.mojo} Mojo</small></div>
+            </div>`;
+        }).join('')}</div>`;
     } else if (tab === 'achievements') {
         const unlocked = new Set(state.achievements || []);
         const trophyCatalog = [
@@ -584,13 +696,37 @@ export async function switchSocialTab(tab) {
             { id: "ARENA_LEGEND", name: "Arena Legend", description: "Achieve legendary status in the arena.", tier: 3 },
             { id: "REHABILITATED", name: "Rehabilitated", description: "Pay off your courthouse fine and reset wanted level.", tier: 2 },
             { id: "GOVERNOR", name: "Governor", description: "Control 2+ territories as a club leader.", tier: 3 }
+        const catalog = [
+            { id: "FIRST_VICTORY", name: "First Victory" }, { id: "FIRST_HEIST", name: "First Heist" },
+            { id: "OUTLAW_SLAYER", name: "Outlaw Slayer" }, { id: "ARENA_LEGEND", name: "Arena Legend" }
         ];
+        container.innerHTML = `<div class="achievements-grid">${catalog.map(t => `
+            <div class="trophy-badge ${unlocked.has(t.id) ? 'unlocked' : 'locked'}">
+                <div class="badge-icon">${unlocked.has(t.id) ? '🏆' : '🔒'}</div>
+                <div class="badge-name">${t.name}</div>
+            </div>`).join('')}</div>`;
+    }
+}
 
         container.innerHTML = `
             <div class="achievement-system">
                 <div class="achievements-header">
                     <span class="achievements-title">HALL OF VALOR</span>
                     <div class="achievements-progress">UNLOCKED: <span class="progress-text">${unlocked.size}/${trophyCatalog.length}</span></div>
+export function openHeistPlanningOverlay() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "heist-overlay";
+    overlay.className = "overlay";
+    const clubs = Object.values(globalClubs).filter(c => c.id !== state.employer_id);
+    
+    overlay.innerHTML = `
+        <div class="criminality-panel heist-terminal glass-panel animate-modal w-800">
+            <div class="criminality-header">
+                <span class="criminality-title">HEIST PLANNING TERMINAL</span>
+                <div class="criminality-stats">
+                    <div class="stat-item"><small>WANTED</small><b class="text-error">${state.wanted_level || 0}</b></div>
+                    <div class="stat-item"><small>CUNNING</small><b class="text-neon-cyan">${state.cunning || 0}</b></div>
                 </div>
                 <div class="achievements-grid">
                     ${trophyCatalog.map(trophy => {
@@ -603,10 +739,29 @@ export async function switchSocialTab(tab) {
                             </div>
                         `;
                     }).join('')}
+            </div>
+            <div class="p-20">
+                <div class="criminality-targets mb-20">
+                    <div class="targets-list grid-cols-2 gap-10 max-h-300 overflow-y-auto">
+                        ${clubs.map(c => `<div class="target-item glass-panel m-0 p-15" onclick="updateHeistRiskAssessment('${c.id}')">
+                            <b class="text-neon-purple">${c.name.toUpperCase()}</b><br>
+                            <small class="text-neon-green">${c.treasury.toFixed(2)} $VBV</small>
+                        </div>`).join('') || "No external clubs detected."}
+                    </div>
+                </div>
+                <div id="heist-risk-section" class="criminality-risk invisible mt-10 p-20 glass-panel">
+                    <div class="risk-bar"><div id="heist-risk-fill" class="risk-fill" style="width: 0%;"></div></div>
+                    <div id="heist-chance-text" class="mt-10 font-bold"></div>
+                    <div class="flex-row gap-15 mt-20">
+                        <button class="outline w-full secondary" onclick="document.getElementById('heist-overlay').remove()">ABORT</button>
+                        <button id="heist-execute-btn" class="w-full danger">EXECUTE STRIKE</button>
+                    </div>
                 </div>
             </div>
         `;
     }
+        </div>`;
+    document.body.appendChild(overlay);
 }
 
 export function openHeistPlanningOverlay() {
@@ -701,8 +856,18 @@ export function updateHeistRiskAssessment(clubId) {
 	const text = document.getElementById("heist-chance-text");
 	const secText = document.getElementById("heist-security-details");
 	const btn = document.getElementById("heist-execute-btn");
+    const state = window.GetGameState();
+    const club = globalClubs[clubId];
+    const fill = document.getElementById("heist-risk-fill");
+    const text = document.getElementById("heist-chance-text");
+    const btn = document.getElementById("heist-execute-btn");
+    if (!club || !fill) return;
 
 	if (!club || !section) return;
+    document.getElementById("heist-risk-section").classList.remove("invisible");
+    let securityStaff = 0;
+    if (club.staff) Object.values(club.staff).forEach(role => { if(role === "Security") securityStaff++; });
+    const securityLevel = (club.club_mojo / 10) + (securityStaff * 15);
 
 	// Visual activation
 	section.classList.remove("invisible");
@@ -714,6 +879,9 @@ export function updateHeistRiskAssessment(clubId) {
 	if (club.staff) Object.values(club.staff).forEach(role => { if(role === "Security") securityStaff++; });
 	
 	const securityLevel = (club.club_mojo / 10) + (securityStaff * 15);
+    const trapModifiers = { "tripwire": -0.10, "sentry_turret": -0.25, "guard_dog": -0.05 };
+    let trapPenalty = 0;
+    if (club.active_buffs) Object.values(club.active_buffs).forEach(id => trapPenalty += (trapModifiers[id] || 0));
 
 	// Registry-aligned Trap Modifiers
 	const trapModifiers = {
@@ -738,6 +906,10 @@ export function updateHeistRiskAssessment(clubId) {
 	
 	btn.disabled = false;
 	btn.onclick = () => executeHeistStrike(clubId);
+    const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100 + trapPenalty));
+    fill.style.width = `${(1 - successChance) * 100}%`;
+    text.innerHTML = `ESTIMATED SUCCESS: <b class="text-neon-green">${(successChance * 100).toFixed(0)}%</b>`;
+    btn.onclick = () => executeHeistStrike(clubId);
 }
 
 /**
@@ -752,6 +924,9 @@ export function executeHeistStrike(clubId) {
 		payload: { target_club_id: clubId }
 	}));
 	document.getElementById("heist-overlay")?.remove();
+    showToast("🔪 Operatives deployed...", "warning");
+    socket.send(JSON.stringify({ type: "heist", payload: { target_club_id: clubId } }));
+    document.getElementById("heist-overlay")?.remove();
 }
 
 export function handleHeistResult(payload) {
@@ -764,6 +939,9 @@ export function handleHeistResult(payload) {
 	if (payload.status === "success" && payload.kidnap_eligible) {
 		setTimeout(() => openKidnapSelectionOverlay(payload.target_club_id), 1500);
 	}
+    const isSuccess = payload.status === "success";
+    showToast(`<b>HEIST ${isSuccess ? 'SUCCESS' : 'FAILED'}</b><br>${isSuccess ? 'Looted!' : 'Escaped!'}`, isSuccess ? "success" : "error");
+    if (isSuccess && payload.kidnap_eligible) setTimeout(() => openKidnapSelectionOverlay(payload.target_club_id), 1500);
 }
 
 /**
@@ -801,6 +979,19 @@ export function openKidnapSelectionOverlay(targetClubId) {
 		</div>
 	`;
 	document.body.appendChild(overlay);
+    const club = globalClubs[targetClubId];
+    if (!club) return;
+    const overlay = document.createElement("div");
+    overlay.id = "kidnap-selection-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="criminality-panel glass-panel w-400">
+            <h2 class="text-warning">KIDNAP GAMBIT</h2>
+            <p>Cornered high-value asset of <b class="text-neon-purple">${club.name}</b>.</p>
+            <button class="w-full danger mt-20" onclick="executeKidnap('${targetClubId}')">EXECUTE KIDNAPPING</button>
+            <button class="outline w-full mt-10" onclick="document.getElementById('kidnap-selection-overlay').remove()">RELEASE</button>
+        </div>`;
+    document.body.appendChild(overlay);
 }
 
 export function executeKidnap(targetClubId) {
@@ -812,6 +1003,8 @@ export function executeKidnap(targetClubId) {
 		payload: { target_club_id: targetClubId }
 	}));
 	document.getElementById("kidnap-selection-overlay")?.remove();
+    socket.send(JSON.stringify({ type: "kidnap_request", payload: { target_club_id: targetClubId } }));
+    document.getElementById("kidnap-selection-overlay")?.remove();
 }
 
 export function showKidnapOverlay(payload) {
@@ -828,6 +1021,9 @@ export function showKidnapOverlay(payload) {
         <p class="kidnap-victim-info">Kidnapper: ${perpWallet}</p>
         <button class="pay-ransom-btn" onclick="payRansom(${payload.card_id}, '${perpWallet}', ${ransomValue})">Pay Ransom</button>
         <p class="insurance-timer">Insurance recovery in: <span id="recovery-timer">48:00:00</span></p>
+        <p>Card <strong>#${payload.card_id}</strong> kidnapped!</p>
+        <p>Ransom: <b class="text-neon-cyan">${(payload.ransom / 1000000).toFixed(2)} $VBV</b></p>
+        <button class="w-full danger" onclick="payRansom(${payload.card_id}, '${payload.perp_wallet}', ${payload.ransom})">PAY RANSOM</button>
     `;
     overlay.classList.remove("hidden");
 
@@ -857,6 +1053,9 @@ export function payRansom(cardId, perpWallet, ransomAmount) {
         type: "pay_ransom",
         payload: { card_id: cardId, perp_wallet: perpWallet, ransom_amount: ransomAmount }
     }));
+export async function payRansom(cardId, perpWallet, ransomAmount) {
+    socket.send(JSON.stringify({ type: "pay_ransom", payload: { card_id: cardId, perp_wallet: perpWallet, ransom_amount: ransomAmount } }));
+    hideAllOverlays();
 }
 
 export function releaseHostage(cardId) {
@@ -867,6 +1066,8 @@ export function releaseHostage(cardId) {
         type: "release_hostage",
         payload: { card_id: cardId }
     }));
+    if (!confirm(`Release Card #${cardId}?`)) return;
+    socket.send(JSON.stringify({ type: "release_hostage", payload: { card_id: cardId } }));
 }
 
 export function startRecoveryTimer(expiresAt) {
@@ -885,5 +1086,11 @@ export function startRecoveryTimer(expiresAt) {
         const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
         timerEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        const diff = new Date(expiresAt) - new Date();
+        if (diff <= 0) { clearInterval(interval); timerEl.innerText = "00:00:00"; return; }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        timerEl.innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }, 1000);
 }
