@@ -6,7 +6,7 @@ import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBr
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
-import { openShopsOverlay, openClubFoundry, openArtGalleryOverlay, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
+import { openShopsOverlay, buyClubItem, openClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
 import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
 import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext, playCharacterVoiceLine } from './js/audio.js';
 import { initParticleSystem, triggerCaptureParticles } from './js/particles.js';
@@ -79,6 +79,7 @@ window.registerForTournament = registerForTournament;
 window.openTournamentBracket = openTournamentBracket;
 window.openDeckManager = openDeckManager;
 window.openShopsOverlay = openShopsOverlay;
+window.buyClubItem = buyClubItem;
 window.openTerritoryMapOverlay = openTerritoryMapOverlay;
 window.openSocialPanelOverlay = openSocialPanelOverlay;
 window.ToggleLeaderboard = () => { window.ToggleLeaderboard(); syncUI(); };
@@ -109,6 +110,10 @@ window.openPortfolioView = openPortfolioView;
 window.tradeShares = tradeShares;
 window.openBlackMarket = openBlackMarket;
 window.openArtGalleryOverlay = openArtGalleryOverlay;
+window.openConsignmentOverlay = openConsignmentOverlay;
+window.selectConsignmentItem = selectConsignmentItem;
+window.submitConsignment = submitConsignment;
+window.promptBid = promptBid;
 window.openClubLeaseBoard = openClubLeaseBoard;
 window.takeLease = takeLease;
 window.adjustMapZoom = adjustMapZoom;
@@ -840,79 +845,6 @@ window.openClubFoundry = () => {
         </div>
     `;
     document.body.appendChild(overlay);
-}
-
-/**
- * Populates and displays the district shops overlay using synchronized club inventory.
- * Now utilizes the high-fidelity _shops.scss styles and category filtering.
- */
-window.openShopsOverlay = async (initialCategory = 'Elemental') => {
-	document.getElementById("shops-overlay").classList.remove("hidden");
-	switchShopCategory(initialCategory);
-}
-
-function switchShopCategory(category) {
-	const container = document.getElementById("shops-container");
-	if (!container) return;
-
-	// Update Tab State
-	document.querySelectorAll('.category-tab').forEach(tab => {
-		tab.classList.toggle('active', tab.dataset.category === category);
-	});
-
-	container.innerHTML = `<div class="grid-span-all opacity-5 py-40 italic">Scanning district stock for ${category} hardware...</div>`;
-
-	// Client-side item metadata registry (mirrors shop_registry.go)
-	const itemRegistry = {
-		"mood_catalyst": { name: "Mood Catalyst", desc: "+50 Mood Bonus (3 Matches)", price: 100 },
-		"grounded_shield": { name: "Grounded Shield", desc: "Immunity to Mood Penalties (5 Matches)", price: 250 },
-		"rule_breaker": { name: "Rule Breaker", desc: "Force PLUS trigger (1 Match)", price: 150 },
-		"intel_report": { name: "Intel Report", desc: "See Opponent Hand (3 Matches)", price: 300 },
-		"stamina_stim": { name: "Stamina Stim", desc: "-20 Fatigue Immediately", price: 100 },
-		"loyalty_pledge": { name: "Loyalty Pledge", desc: "+10 Loyalty Immediately", price: 500 },
-		"tripwire": { name: "Laser Tripwire", desc: "+10% Heist Failure", price: 500 },
-		"sentry_turret": { name: "Sentry Turret", desc: "+25% Heist Failure", price: 1200 },
-		"guard_dog": { name: "Bio-Guard Dog", desc: "Forces Jail on Failure", price: 2000 }
-	};
-
-	const clubs = Object.values(globalClubs).filter(c => c.type === category);
-	let itemsHTML = "";
-
-	clubs.forEach(club => {
-		Object.entries(club.inventory || {}).forEach(([itemId, qty]) => {
-			if (qty <= 0) return;
-			const meta = itemRegistry[itemId] || { name: itemId.replace(/_/g, ' '), desc: "Tactical Enhancement", price: 100 };
-			
-			itemsHTML += `
-				<div class="shop-item animate-slide-up" onclick="buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}')">
-					<div class="item-image">
-						<img src="Assets/Images/portraits/placeholder.webp" alt="Hardware">
-						<div class="item-badge">${club.name}</div>
-					</div>
-					<div class="item-info">
-						<div class="item-title">${meta.name.toUpperCase()}</div>
-						<div class="item-description">${meta.desc}</div>
-						<div class="item-stats">
-							<div class="stat">
-								<div class="stat-label">STOCK</div>
-								<div class="stat-value">${qty}</div>
-							</div>
-						</div>
-					</div>
-					<div class="item-footer">
-						<div class="item-price">${meta.price}</div>
-						<button class="buy-button">PURCHASE</button>
-					</div>
-				</div>
-			`;
-		});
-	});
-
-	if (itemsHTML === "") {
-		container.innerHTML = `<div class="grid-span-all opacity-3 py-40 italic">Sector is currently dry for ${category} assets.</div>`;
-	} else {
-		container.innerHTML = itemsHTML;
-	}
 }
 
 window.mapZoom = 1.0;
