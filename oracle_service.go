@@ -895,14 +895,30 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 	if assetIDStr == "" || assetIDStr == "0" {
 		return true, 0, nil
 	}
+
+	// 1. Authoritative Network Key Resolution (Deterministic Case Sync)
+	netKey := l.mapChainToNetworkName(network)
+	if netKey == "" {
+		netKey = network // Fallback for direct full-name usage
+	}
+
 	l.mutex.RLock()
-	netConfig, _ := l.availableNetworks[network+" Mainnet"]
+	netConfig, ok := l.availableNetworks[netKey]
 	l.mutex.RUnlock()
+
+	if !ok {
+		return false, 0, fmt.Errorf("network configuration not found: %s", netKey)
+	}
+
 	client, _ := algod.MakeClient(netConfig.NodeURL, "")
-	if network == "VOI" {
+
+	// 2. VOI / ARC-200 Pattern: Verify Balance Box existence
+	if strings.Contains(strings.ToLower(netKey), "voi") {
 		assetID, _ := strconv.ParseUint(assetIDStr, 10, 64)
 		addr, _ := types.DecodeAddress(wallet)
-		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(context.Background()) 
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx) 
 		if err != nil {
 			// If the error contains "404" or "not found", the user is definitely not opted in.
 			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
@@ -914,6 +930,7 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 		return true, 0, nil
 	}
 
+	// 3. ALGORAND / ASA Pattern: Indexer Account Asset Scan
 	url := fmt.Sprintf("%s/v2/accounts/%s", netConfig.IndexerURL, wallet)
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	defer cancel()

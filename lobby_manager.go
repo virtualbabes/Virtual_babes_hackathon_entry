@@ -219,7 +219,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				DeckRating: data.DeckRating, JoinedAt: time.Now(), // FavoriteCardID is not part of QueueEntry
 			})
 			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck} // Initialize match state
-			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false) // Update playstyle based on deck
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false, false) // Update playstyle based on deck
 
 			go l.generateNPCCommentary(env.FromID, "MATCH_START")
 		}
@@ -463,7 +463,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				}
 				notificationText = fmt.Sprintf("💖 %s's Loyalty increased by 10!", targetCard.Name)
 			}
-			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false)                                      // Update playstyle on item use
+			// Vitality items are generally non-combat or out-of-match-high-stakes
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false, false) 
 			l.inventory[data.TargetCardID] = targetCard                                                                     // Update global card cache
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
 			l.persistentCardCache[data.TargetCardID] = targetCard                                                           // Update persistent cache
@@ -475,7 +476,8 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			}
 			// Delegate to battle_service for in-match effects
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
-			l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, false)                                       // Update playstyle on item use in match
+			// In-match items reflect tactical intent: use match context for weighting
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, match.IsBountyMatch, match.TournamentMatchID != "")
 			l.applyItemEffectToMatch(match, env.FromID, data.ItemID, data.TargetCardID, data.TargetGridIndex)
 			notificationText = fmt.Sprintf("✨ %s activated!", item.Name)
 
@@ -846,7 +848,7 @@ func (l *Lobby) handleUnregister(client *Client) {
 					}
 				}
 				if wallet, ok := l.wallets[client.id]; ok {
-					l.incrementDNF(wallet)
+					l.incrementDNF(wallet, match.TournamentMatchID != "") // Pass tournament context
 				}
 				delete(l.matches, opponentID)
 			}
@@ -1230,18 +1232,38 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	p1Stats := l.leaderboard[p1Wallet]
 	p2Stats := l.leaderboard[p2Wallet]
 
+	// PILLAR 3: Environment Authorization.
+	// Determine territory and authoritative moods before match initialization.
+	territoryID := l.assignMatchTerritoryLocked()
+	matchRules := map[string]bool{
+		"Open": true, "Power_copy": false, "Power_up": false, 
+		"Elemental_sync": true, "Fallen_penalty": true, "Sudden_death": true,
+	}
+
+	var boardMoods [9]string
+	moodTypes := []string{"Volatile", "Serene", "Spirited", "Grounded"}
+	for i := 0; i < 9; i++ {
+		if rand.Intn(10) > 7 { // 20% chance for a tile mood
+			boardMoods[i] = moodTypes[rand.Intn(len(moodTypes))]
+		} else {
+			boardMoods[i] = "Neutral"
+		}
+	}
+
 	match := &MatchState{
 		P1ID:            id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
 		P1Wallet:        p1Wallet,
 		P2Wallet:        p2Wallet,
-		Rules:           map[string]bool{"Open": true},             // Default rules
+		Rules:           matchRules,
+		BoardMoods:      boardMoods,
 		P1WantedLevel:   p1Stats.WantedLevel,
 		P2WantedLevel:   p2Stats.WantedLevel,
 		P1Cunning:       p1Stats.GetEffectiveCunning(),
 		P1Nurturing:     p1Stats.Nurturing,
 		P2Cunning:       p2Stats.GetEffectiveCunning(),
 		P2Nurturing:     p2Stats.Nurturing,
-		TerritoryID:     l.assignMatchTerritoryLocked(), // Assign a territory to the match
+		TerritoryID:     territoryID,
+		ActiveItemBuffs: make(map[string]map[string]int),
 	}
 
 	if c1, ok := l.clients[id1]; ok {
@@ -1441,23 +1463,28 @@ func (l *Lobby) addOrUpdateLinkedWallet(primaryAVM, linkedAddr, linkedChain stri
 }
 
 // updatePlayerPlaystyleTendencies calculates and updates a player's observed playstyle, including rule and card preferences.
-func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool) {
+func (l *Lobby) updatePlayerPlaystyleTendencies(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool, isTournament bool) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	l.updatePlayerPlaystyleTendenciesLocked(wallet, inMatchContext, scores, deck, isBountyMatch)
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, inMatchContext, scores, deck, isBountyMatch, isTournament)
 }
 
 // updatePlayerPlaystyleTendenciesLocked is the internal version that assumes the mutex is already held.
-func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool) {
+func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchContext bool, scores [2]int, deck []int, isBountyMatch bool, isTournament bool) {
 
 	stats, exists := l.leaderboard[wallet]
 	if !exists {
 		return
 	}
 
-	// Pillar 3: EMA (Exponential Moving Average) Logic
-	// Alpha = 0.2 (Recent matches represent 20% of the tendency)
-	const alpha = 0.2
+	// PILLAR 3: Dynamic Intensity Weighting.
+	// Tournament matches reveal core "clutch" behaviors and carry double weight.
+	alpha := 0.2
+	if isTournament {
+		alpha = 0.4
+	} else if isBountyMatch {
+		alpha = 0.3
+	}
 
 	// Initialize and Decay
 	if stats.Playstyle.PreferredRules == nil {
@@ -1488,7 +1515,7 @@ func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchCont
 	// Preferred Rules (if in match context)
 	if inMatchContext {
 		// Get the match state for the player
-		match, matchExists := l.matches[l.getClientIDFromWallet(wallet)]
+		match, matchExists := l.matches[l.getClientIDFromWalletLocked(wallet)] // FIXED: Deadlock risk
 		if matchExists {
 			for ruleName, isActive := range match.Rules {
 				if isActive {
@@ -1548,18 +1575,36 @@ func (l *Lobby) processPlaystyleDecay() {
 	defer l.mutex.Unlock()
 
 	for wallet, stats := range l.leaderboard {
-		// Decay rates
-		const decayFactor = 0.95 // 5% decay per tick (e.g., per minute)
+		// PILLAR 3: Behavioral Relevance logic.
+		// Adjusted Decay (0.99 per minute) ensures "Trends" persist over several hours (~50% half-life).
+		const decayFactor = 0.99
+		const cleanupThreshold = 0.05 // Deletes entries below this to prevent state bloat
 
-		for ruleName := range stats.Playstyle.PreferredRules {
-			stats.Playstyle.PreferredRules[ruleName] *= decayFactor
+		// 1. Preference Decay with State Pruning
+		// Refactored into a reusable helper to handle rules, moods, and items.
+		decayAndPrune := func(m map[string]float64) {
+			if m == nil { return }
+			for k, v := range m {
+				newVal := v * decayFactor
+				if newVal < cleanupThreshold {
+					delete(m, k)
+				} else {
+					m[k] = newVal
+				}
+			}
 		}
-		for mood := range stats.Playstyle.PreferredCardMoods {
-			stats.Playstyle.PreferredCardMoods[mood] *= decayFactor
-		}
-		for itemID := range stats.Playstyle.PreferredItems {
-			stats.Playstyle.PreferredItems[itemID] *= decayFactor
-		}
+
+		decayAndPrune(stats.Playstyle.PreferredRules)
+		decayAndPrune(stats.Playstyle.PreferredCardMoods)
+		decayAndPrune(stats.Playstyle.PreferredItems)
+
+		// 2. Trait Normalization (Aggressiveness & Risk Tolerance)
+		// Instead of decaying to zero, we decay towards a neutral 0.5 baseline.
+		// This ensures inactive players' commentary eventually reverts to "Standard" behavior
+		// rather than retaining "Extreme" taunts from days-old matches.
+		stats.Playstyle.Aggressiveness = 0.5 + (stats.Playstyle.Aggressiveness-0.5)*decayFactor
+		stats.Playstyle.RiskTolerance = 0.5 + (stats.Playstyle.RiskTolerance-0.5)*decayFactor
+
 		l.leaderboard[wallet] = stats
 	}
 }
@@ -1711,7 +1756,12 @@ func (l *Lobby) processMojoDecay() {
 		}
 
 		if now.Sub(club.LastActivity) > stagnationThreshold {
-			decayAmount := 5 // Flat decay
+			// PILLAR 1: Dynamic Decay Scaling. 
+			// Larger clubs lose more Mojo to maintain competitive churn.
+			// 2% of current Mojo or a minimum of 5 points.
+			decayAmount := int(float64(club.Mojo) * 0.02)
+			if decayAmount < 5 { decayAmount = 5 }
+
 			club.Mojo -= decayAmount
 			if club.Mojo < 0 {
 				club.Mojo = 0

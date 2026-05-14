@@ -38,6 +38,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	} else if strings.HasPrefix(strings.ToLower(data.EntityID), "voi") || strings.HasPrefix(strings.ToLower(data.EntityID), "0x") {
 		targetWallet = data.EntityID
 	} else {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Error: Target entity not found in Arena records."}`)})
 		return
 	}
 	targetWallet = strings.ToLower(targetWallet)
@@ -105,6 +106,9 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 		}
 	}
 
+	// REPUTATION SYNC: Ensure the trader's Standing reflects the current world state post-trade.
+	stats.Reputation = l.CalculateReputation(stats)
+
 	l.leaderboard[wallet] = stats
 	portfolioPayload, _ := json.Marshal(stats.Portfolio)
 	l.sendToClientLocked(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
@@ -150,10 +154,43 @@ func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
 
 	if !ok || !exists || time.Since(global.UpdatedAt) > 1*time.Hour { return }
 
+	// Identify the global "Meta" rule (most heavily weighted across all players)
+	metaRule := ""
+	maxMetaWeight := 0.0
+	for r, w := range global.DominantRules {
+		if w > maxMetaWeight {
+			maxMetaWeight = w
+			metaRule = r
+		}
+	}
+
 	message := ""
 	if trigger == "LOBBY_ENTRY" {
 		if stats.Playstyle.RiskTolerance > global.AvgRiskTolerance*1.5 {
 			message = fmt.Sprintf("Back for more, %s? Your reckless placements are becoming legendary.", clientID)
+		} else if stats.Playstyle.Aggressiveness > global.AvgAggressiveness*1.4 {
+			message = fmt.Sprintf("Make way! %s is here. I can smell the thirst for captures from across the sector.", clientID)
+		}
+	} else if trigger == "MATCH_START" {
+		// Identify player's specialty
+		playerTopRule := ""
+		pMax := 0.0
+		for r, w := range stats.Playstyle.PreferredRules {
+			if w > pMax {
+				pMax = w
+				playerTopRule = r
+			}
+		}
+
+		// Meta-aware commentary
+		if playerTopRule != "" && playerTopRule == metaRule {
+			message = fmt.Sprintf("Attention spectators: %s is a specialist in the current %s meta. A surgical display expected.", clientID, playerTopRule)
+		} else if stats.Playstyle.Aggressiveness > global.AvgAggressiveness*1.3 {
+			message = fmt.Sprintf("Watch your flanks. %s plays like a predator in the neon deep.", clientID)
+		} else if stats.Playstyle.RiskTolerance > global.AvgRiskTolerance*1.3 {
+			message = fmt.Sprintf("%s is known for high-infamy gambits. This should be interesting.", clientID)
+		} else if playerTopRule != "" && playerTopRule != metaRule {
+			message = fmt.Sprintf("%s is sticking to %s. A bold choice against the crowd.", clientID, playerTopRule)
 		}
 	}
 

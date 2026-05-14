@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
@@ -131,8 +132,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	if err == nil && accountInfo.Amount >= 1000000 { // Check if account already has 1 VOI (1,000,000 microAlgos)
 		isSkip = true
 		w.WriteHeader(http.StatusNoContent) // User already has VOI, skip starter pack
-		vbvRefundNeeded = false             // No refund needed as VBV wasn't decremented
-		return
+		return // refundVBV remains true, so the defer will restore the balance
 	}
 
 	// 3. Dispatch Starter Pack (1 VOI + 1 VBV)
@@ -145,7 +145,22 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	txn1, _ := transaction.MakePaymentTxn(vaultAddr, targetWallet, 1000000, []byte("VBT_ONBOARD:GAS"), "", sp)
 	rewardAsset, _ := strconv.ParseUint(voiConfig.AssetID, 10, 64)
 	senderAddr, _ := types.DecodeAddress(vaultAddr)
-	txn2, _ := transaction.MakeApplicationNoOpTx(rewardAsset, nil, nil, nil, nil, sp, senderAddr, []byte("VBT_ONBOARD:TOKEN"), types.Digest{}, [32]byte{}, types.Address{})
+	recipientAddr, _ := types.DecodeAddress(targetWallet)
+
+	// ARC-200 Protocol: transfer(address,uint256)
+	// Selector: 0x2b426dec
+	methodSelector := []byte{0x2b, 0x42, 0x6d, 0xec}
+	amountMicro := big.NewInt(1000000)
+	amountBytes := make([]byte, 32)
+	amountMicro.FillBytes(amountBytes)
+
+	appArgs := [][]byte{
+		methodSelector,
+		recipientAddr[:],
+		amountBytes,
+	}
+
+	txn2, _ := transaction.MakeApplicationNoOpTx(rewardAsset, appArgs, nil, nil, nil, sp, senderAddr, []byte("VBT_ONBOARD:TOKEN"), types.Digest{}, [32]byte{}, types.Address{})
 
 	gid, _ := crypto.ComputeGroupID([]types.Transaction{txn1, txn2})
 	txn1.Group, txn2.Group = gid, gid
@@ -167,5 +182,5 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	l.logAdminAudit("BRIDGE_ONBOARD", targetWallet, "1 VOI + 1 VBV dispatched")
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "success", "message": "Voi Starter Pack sent!", "txid": txid})
-	vbvRefundNeeded = false // Transaction successful, no refund needed
+	refundVBV = false // Transaction successful, no refund needed
 }

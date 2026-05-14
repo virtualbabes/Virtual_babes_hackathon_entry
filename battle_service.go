@@ -246,6 +246,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 						neighbor.Artifact -= 20
 					}
 
+					oldOwner := neighbor.Owner
 					neighbor.Owner = pIdx
 					// Only add to capturedCards if it wasn't already flipped by a direct capture or rule
 					// This prevents double-counting for jailing
@@ -258,7 +259,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					}
 					if !alreadyCaptured {
 						originalOwnerWallet := match.P1Wallet
-						if neighbor.Owner == 1 {
+						if oldOwner == 1 {
 							originalOwnerWallet = match.P2Wallet
 						}
 						capturedCards = append(capturedCards, CapturedCardInfo{
@@ -311,6 +312,12 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	// SUDDEN DEATH TRIGGER: If 5-5 Draw and rule is enabled (or it's a tournament match)
 	if p1 == 5 && p2 == 5 && (match.Rules["Sudden_death"] || match.TournamentMatchID != "") {
+		// PILLAR 3: Prevent Capture Amnesty. Jail cards flipped before the tie-breaker.
+		if match.Rules["Fallen_penalty"] && len(match.CapturedCards) > 0 {
+			l.processFallenPenaltyJailLocked(match, match.CapturedCards)
+			match.CapturedCards = []CapturedCardInfo{} // Clear queue to prevent double-jailing
+		}
+
 		l.initiateSuddenDeath(match)
 		return
 	}
@@ -454,8 +461,8 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 		"rules":             match.Rules,             // Sync authoritative rules
 	})
 
-	l.sendToClient(match.P1ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
-	l.sendToClient(match.P2ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
+	l.sendToClientLocked(match.P1ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
+	l.sendToClientLocked(match.P2ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
 	log.Printf("[BATTLE] Sudden Death tie-breaker initiated for match %s vs %s\n", match.P1ID, match.P2ID)
 }
 
@@ -555,7 +562,7 @@ func (l *Lobby) updateLeaderboard(wallet string, isTournamentWin bool, scores [2
 	stats := l.leaderboard[wallet]
 	stats.Wins++
 	stats.DisconnectStreak = 0
-	l.updatePlayerPlaystyleTendenciesLocked(wallet, true, scores, deck, isBountyWin) // Update playstyle on win
+	l.updatePlayerPlaystyleTendenciesLocked(wallet, true, scores, deck, isBountyWin, isTournamentWin) // Pass tournament context
 
 	// REFRESH: Fetch updated Playstyle from the map to prevent clobbering behavioral data.
 	stats.Playstyle = l.leaderboard[wallet].Playstyle
@@ -749,6 +756,7 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		originalOwnerStats.JailedCards[card.ID] = owningClub.ID
 		l.leaderboard[captured.OriginalOwnerWallet] = originalOwnerStats
 		jailedThisMatch[jailKey] = true
+		match.Board[captured.GridIndex] = nil // Seized cards leave the arena immediately
 
 		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s.\n", 
 			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)

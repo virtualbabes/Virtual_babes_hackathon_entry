@@ -381,4 +381,16 @@
 12. Complete: Hardened `handleHeist` in `club_service.go` with integer-based precision rounding for looting and Fence Fees.
 13. Complete: Hardened `handlePayRansom` in `handlers_criminality.go` with integer-based precision rounding for Laundering Taxes.
 14. Complete: Hardened `distributeShopRevenueLocked` in `club_service.go` with integer-based precision rounding for Regional Governor Taxes.
+15. Complete: Hardened `processMojoDecay` in `lobby_manager.go` with percentage-based dynamic scaling for high-ranking clubs.
+16. Complete: Hardened Sybil protection and VBV accounting in `onboarding_service.go` by fixing variable mismatches and refund logic.
+11. Complete: Updated `txn2` construction in `onboarding_service.go` to correctly execute an ARC-200 transfer of 1 VBV and fixed refund variable typos.
+17. Complete: Hardened `checkAssetOptIn` in `oracle_service.go` with case-insensitive network mapping and timeout contexts for Voi box lookups.
+18. Complete: Hardened `handleTradeShares` in `market_service.go` with post-trade reputation recalculation and target resolution error handling.
+19. Complete: Hardened NPC intelligence in `market_service.go` by expanding `generateNPCCommentary` to handle Aggressiveness and Meta-aware taunts.
+20. Complete: Hardened `processPlaystyleDecay` in `lobby_manager.go` with behavioral normalization and state-bloat pruning to maintain tactical relevance.
+21. Complete: Hardened `updatePlayerPlaystyleTendenciesLocked` with dynamic intensity weighting for tournaments and resolved potential recursive deadlock.
+22. Complete: Hardened AI potential evaluation in `main.go` by fixing rule name alignment and ensuring simulation logic correctly accounts for ownership shifts during combo chain reactions.
+23. Complete: Hardened `serverCheckCaptures` in `battle_service.go` by fixing an attribution bug where combo captures were incorrectly identified after the flip.
+24. Complete: Hardened `verifyWinner` in `battle_service.go` to prevent 'Capture Amnesty' by triggering Fallen Penalty jailing before Sudden Death redistribution.
+25. Complete: Hardened `initiatePairedMatch` in `lobby_manager.go` to authoritative snapshot BoardMoods, Rules, and Player Attributes for spectator accuracy.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

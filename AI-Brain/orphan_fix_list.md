@@ -127,4 +127,16 @@
 - [FIXED] Hardened `handleBuyBlackMarket` with micro-unit precision rounding and state-clobbering protection.
 - [FIXED] Hardened `handleHeist` in `club_service.go` with micro-unit precision rounding for looting and Fence Fees.
 - [FIXED] Hardened `distributeShopRevenueLocked` in `club_service.go` with micro-unit precision rounding for Regional Governor Taxes.
+- [FIXED] Hardened `processMojoDecay` logic to use dynamic 2% scaling, preventing elite club stagnation.
+- [FIXED] Resolved variable mismatch (refundVBV) and logic error in `onboarding_service.go` ensuring VBV is refunded when bridge requests are skipped for existing balance.
+- [FIXED] Hardened `handleVoiOnboarding` in `onboarding_service.go` with correct ARC-200 transfer arguments (transfer(address,uint256)).
+- [FIXED] Expanded NPC narrative logic in `market_service.go` to utilize meta-trends and aggressiveness metrics for match-start taunts.
+- [FIXED] Resolved case-sensitivity mismatch in `checkAssetOptIn` network lookup and implemented timeout contexts for ARC-200 opt-in verification.
+- [FIXED] Resolved recursive deadlock risk in `updatePlayerPlaystyleTendenciesLocked` and implemented intensity-aware EMA scaling for tournament matches.
+- [FIXED] Hardened `main.go` (WASM) simulation logic to ensure AI correctly values Same/Plus setups by tracking ownership shifts in temporary board snapshots.
+- [FIXED] Resolved attribution bug in `battle_service.go` where recursive combo captures incorrectly identified the original owner during jailing evaluation.
+- [FIXED] Prevented 'Capture Amnesty' by triggering Fallen Penalty jailing before Sudden Death redistribution in `battle_service.go`.
+- [FIXED] Hardened `initiatePairedMatch` in `lobby_manager.go` to ensure all critical player and environmental attributes are snapshotted for spectators.
+- [FIXED] Ensured trader reputation is recalculated post-trade in `handleTradeShares` to reconcile Standing with current Mojo and Rumor multipliers.
+- [FIXED] Hardened `processPlaystyleDecay` logic to normalize behavioral traits (Aggressiveness/Risk) towards a neutral baseline and prune expired preference metadata.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

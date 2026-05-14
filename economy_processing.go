@@ -52,7 +52,7 @@ func (l *Lobby) processLoans() {
 			}
 
 			// Update playstyle on loan default (Internal call to avoid deadlock)
-			l.updatePlayerPlaystyleTendenciesLocked(borrowerWallet, false, [2]int{}, []int{}, false)
+			l.updatePlayerPlaystyleTendenciesLocked(borrowerWallet, false, [2]int{}, []int{}, false, false)
 			l.logAdminAuditLocked("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
 
 			// Add the defaulted loan to the black market
