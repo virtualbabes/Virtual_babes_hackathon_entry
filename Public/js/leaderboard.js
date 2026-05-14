@@ -19,7 +19,6 @@ export async function fetchLeaderboard() {
     leaderboardList.innerHTML = `<div class="chat-msg system">Fetching top players...</div>`;
 
     }
-}
 
 export let seasonTimerInterval = null; // Moved here from app.js
 export function startSeasonTimer() { // Exported for use in network.js
@@ -34,22 +33,18 @@ export function startSeasonTimer() { // Exported for use in network.js
 export function switchHofTab(tab) {
     document.getElementById("hof-rankings-view").classList.add("hidden");
     }
-}
 
 export function toggleTournamentDetails(id) { // Exported for use in app.js
     const details = document.getElementById(`details-${id}`);
     if (!details) return;
     details.classList.toggle("hidden");
     }
-}
 
 export async function registerForTournament() { // Exported for use in app.js
     const regBtn = document.getElementById("tournament-reg-btn");
     if (!userAddress) { showToast("Connect wallet first", "error"); return; }
     const state = window.GetGameState();
     }
-}
-
 export function openTournamentBracket() { // Exported for use in app.js
     window.SetPhase("TournamentLobby");
     window.syncUI();

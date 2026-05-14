@@ -23,6 +23,7 @@
 5. Complete: Displayed Cunning and Nurturing values in the `syncUI` profile overlay with Cyberpunk styling.
 6. Complete: Implemented Club Lease Board overlay with regional prioritization logic.# A.I. Memory: Virtualbabes Arena
 7. Complete: Optimized `handleServerMessage` in `network.js` by batching UI sync calls via `requestAnimationFrame` and removing high-frequency console logs.
+8. Complete: Hardened `syncUI` in `app.js` with DOM caching and non-blocking asynchronous asset resolution.
 
 ## Critical Logic Patterns
 - **Switchboard Pattern**: Server-side signing for faucet rewards; client-side proof of intent.

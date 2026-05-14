@@ -59,10 +59,10 @@
     border-radius: $border-radius-xl;
     position: relative;
 
-    &.small { max-width: 400px; }
-    &.medium { max-width: 600px; }
-    &.large { max-width: 800px; }
-    &.xlarge { max-width: 1000px; }
+    &.small { max-width: $panel-width-xs; }
+    &.medium { max-width: $panel-width-md; }
+    &.large { max-width: $panel-width-lg; }
+    &.xlarge { max-width: $panel-width-xl; }
 }
 
 // Overlay Header

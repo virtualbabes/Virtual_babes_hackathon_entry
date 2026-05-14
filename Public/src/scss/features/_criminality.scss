@@ -656,7 +656,7 @@
 }
 
 .security-sentry-panel {
-    width: 550px;
+    width: $panel-width-md;
     text-align: center;
     border-color: $color-neon-cyan;
 
@@ -677,7 +677,7 @@
 }
 
 .bounty-board-panel {
-    width: 500px;
+    width: $panel-width-sm;
     text-align: center;
     border-color: $color-gold;
 
@@ -696,7 +696,7 @@
 }
 
 .rumor-mill-panel {
-    width: 600px;
+    width: $panel-width-md;
     text-align: center;
 
     h2 { color: $color-neon-green; letter-spacing: 3px; }

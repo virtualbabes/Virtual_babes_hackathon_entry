@@ -518,7 +518,7 @@ export function openHeistPlanningOverlay() {
 }
 
 export function updateHeistRiskAssessment(clubId) {
-    const state = window.GetGameState();
+    const state = window.GetGameState("combat"); // Use scoped fetch for performance
     const club = globalClubs[clubId];
     const fill = document.getElementById("heist-risk-fill");
     const text = document.getElementById("heist-chance-text");

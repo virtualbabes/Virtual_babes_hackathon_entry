@@ -10,7 +10,7 @@ import { updateActiveRumors, renderRumorBoard } from './criminality.js';
 import { startSeasonTimer, seasonEnd, setSeasonEnd } from './leaderboard.js';
 import { getAssetSymbol } from './utils.js';
 
-export let tooltipEl = null;
+export let tooltipEl = document.getElementById("power-tooltip");
 export let maintenanceTicker = null;
 
 // PERFORMANCE OPTIMIZATION: Move static maps outside the render loop to prevent re-allocation
@@ -97,8 +97,8 @@ export function handleMaintenanceUI(active, targetTimestamp) {
         }
 
         const mins = Math.floor(diff / 60000);
-        const secs = Math.floor((diff % 60000) / 1000);
-        timerDisplay.innerText = `${String(mins).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        const secs = Math.floor((diff % 60000) / 1000); // FIXED: minutes was undefined
+        timerDisplay.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     };
 
     tick();

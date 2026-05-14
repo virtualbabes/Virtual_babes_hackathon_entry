@@ -119,4 +119,5 @@
 - app.js: [FIXED] Removed redundant `initWebSocket` and `handleServerMessage` definitions and associated global variables.
 - index.html: [FIXED] Eliminated all remaining inline styles from the Admin Control Panel.
 - [FIXED] Hardened `.flip-capture` animation in `app.js` to reliably re-trigger during rapid state updates by forcing DOM reflow.
+ - [FIXED] Purged redundant global function definitions from `app.js` (buildEmptyBoard, renderCardHTML, etc.) to enforce modular sub-file authority.
 - [FIXED] Filtered claimed territories in `openClubFoundry` to prevent invalid organization founding attempts.

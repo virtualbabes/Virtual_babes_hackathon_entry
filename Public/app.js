@@ -3,14 +3,15 @@ import { initWebSocket, handleServerMessage } from './js/network.js';
 import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles } from './js/ui.js';
 import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress } from './js/wallet.js';
 import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket } from './js/leaderboard.js';
-import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, showPowerTooltip, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
+import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
 import { openShopsOverlay, openClubFoundry, openArtGalleryOverlay, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
-import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
+import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
 import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext, playCharacterVoiceLine } from './js/audio.js';
-import { initParticleSystem } from './js/particles.js';
+import { initParticleSystem, triggerCaptureParticles } from './js/particles.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './js/utils.js';
+import { showPowerTooltip, movePowerTooltip, hidePowerTooltip } from './js/ui.js';
 
 let lastBoardMoods = Array(9).fill(null);
 // 1. Initialize Go WASM Engine
@@ -68,8 +69,6 @@ window.onload = async () => {
 
 // Expose HTML event handlers for inline onclicks in module mode
 // Function mappings migrated to domains
-window.handleWalletAction = handleWalletAction;
-window.closeWalletSelector = () => document.getElementById("wallet-selector-overlay").classList.add("hidden");
 window.hideAllOverlays = hideAllOverlays;
 window.openPayoutSettings = openPayoutSettings;
 window.savePayoutAddress = savePayoutAddress;
@@ -116,20 +115,42 @@ window.adjustMapZoom = adjustMapZoom;
 window.setMasterVolume = setMasterVolume;
 window.setMusicVolume = setMusicVolume;
 window.setSfxVolume = setSfxVolume;
-window.addXChainWallet = async () => {
 window.updateMarketTicker = updateMarketTicker;
+window.renderCardHTML = renderCardHTML;
+window.showPowerTooltip = showPowerTooltip;
+window.movePowerTooltip = movePowerTooltip;
+window.hidePowerTooltip = hidePowerTooltip;
+window.triggerCaptureParticles = triggerCaptureParticles;
+window.updateHeistRiskAssessment = updateHeistRiskAssessment;
+window.executeHeistStrike = executeHeistStrike;
+window.handleHeistResult = handleHeistResult;
+window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
+window.executeKidnap = executeKidnap;
 
 // 4. THE RENDER LOOP (The Camera fetching Go State)
-export async function syncUI(scope = "all") {
-    if (!window.GetGameState) return; // Ensure Go function exists
-    // Partial state sync: only update sections present in the current state snapshot
+/**
+ * THE RENDER LOOP (The Camera fetching Go State)
+ * Optimized with synchronous execution, strict scope isolation, and cached DOM lookups.
+ */
+const UI_CACHE = new Map();
+const getEl = (id) => {
+    if (!UI_CACHE.has(id)) UI_CACHE.set(id, document.getElementById(id));
+    return UI_CACHE.get(id);
+};
+
+export function syncUI(scope = "all") {
+    if (!window.GetGameState) return;
     const state = window.GetGameState(scope);
-    
-    // TACTICAL REFRESH: If the territory map is open, re-render to update attack/developing status
-    const mapOverlay = document.getElementById("territory-map-overlay");
-    if (mapOverlay && !mapOverlay.classList.contains("hidden")) {
-        // Note: We avoid clearing the grid here to prevent losing current rotation/zoom state
-        updateMapStatusIndicators(); 
+    if (!state) return;
+
+    const isAll = scope === "all";
+
+    // Scope: Territory Map
+    if (isAll || scope === "meta") {
+        const mapOverlay = getEl("territory-map-overlay");
+        if (mapOverlay && !mapOverlay.classList.contains("hidden")) {
+            updateMapStatusIndicators(); 
+        }
     }
 
     // --- Update Dynamic Environment ---
@@ -167,39 +188,35 @@ export async function syncUI(scope = "all") {
         mojoEl.innerHTML = `MOJO: ${state.mojo || 0} [${state.social_rank || 'Nobody'}] <span style="font-size: 0.7em; opacity: 0.7; margin-left: 10px;">RUMORS: ${state.rumor_count || 0}</span>`;
     }
 
-    // 0. Resolve missing reward symbols concurrently to prevent UI flickering
-    if (state.rewards) { // This will be moved to economy.js or utils.js
-        const rewardIds = Object.keys(state.rewards || {});
-        const missingSymbols = rewardIds.filter(id => !assetCache[id]);
-        if (missingSymbols.length > 0) {
-            await Promise.all(missingSymbols.map(id => resolveAssetSymbol(id)));
+    // ASYNC RESOLUTION: Trigger symbol resolution without blocking the render frame
+    if ((isAll || scope === "economy") && state.rewards) {
+        const missing = Object.keys(state.rewards).filter(id => !assetCache[id]);
+        if (missing.length > 0) {
+            Promise.all(missing.map(id => resolveAssetSymbol(id))).then(() => syncUI("economy"));
         }
     }
     
     // --- Update Dashboard ---
     // Overlay Management
-    if (state.phase !== undefined || state.show_leaderboard !== undefined) {
-        hideAllOverlays();
-        const mainContainer = document.getElementById("main-game-container");
-        mainContainer.classList.add('hidden'); // Hide main game by default
+    if ((isAll || scope === "meta") && (state.phase !== undefined || state.show_leaderboard !== undefined)) {
+        const mainContainer = getEl("main-game-container");
+        if (mainContainer) {
+            hideAllOverlays();
+            mainContainer.classList.add('hidden');
 
-        if (state.show_leaderboard) {
-            document.getElementById("leaderboard-overlay").classList.remove("hidden");
-        } else if (state.phase === "TournamentLobby") {
-            document.getElementById("tournament-overlay").classList.remove("hidden");
-            // Populate bracket visualization if data exists
-            if (state.tournament) {
-                await renderTournamentBracket(state.tournament);
+            if (state.show_leaderboard) {
+                getEl("leaderboard-overlay")?.classList.remove("hidden");
+            } else if (state.phase === "TournamentLobby") {
+                getEl("tournament-overlay")?.classList.remove("hidden");
+                if (state.tournament) renderTournamentBracket(state.tournament);
+            } else if (state.phase === "Setup" && userAddress) {
+                getEl("setup-overlay")?.classList.remove("hidden");
+            } else if (!userAddress) {
+                getEl("wallet-selector-overlay")?.classList.remove("hidden");
+                renderRumorBoard();
+            } else {
+                mainContainer.classList.remove('hidden');
             }
-        } else if (state.phase === "Setup" && userAddress) {
-            document.getElementById("setup-overlay").classList.remove("hidden");
-        } else if (!userAddress) { // Check if userAddress is null or empty
-            // If no wallet connected, show wallet selector
-            document.getElementById("wallet-selector-overlay").classList.remove("hidden");
-            renderRumorBoard(); // Ensure rumor board is rendered even if no wallet is connected
-        } else {
-            // Default to showing main game container if no specific overlay is needed
-            mainContainer.classList.remove('hidden');
         }
     }
 
@@ -590,7 +607,7 @@ window.renderCardHTML = (card) => {
     // Artifact / Bonus Display
     let artifactHTML = '';
     if (card.artifact > 0) {
-        artifactHTML = `<div class="artifact-badge" style="position: absolute; bottom: 30px; right: 5px; color: var(--neon-cyan); font-size: 9px; font-weight: bold; text-shadow: 0 0 5px var(--neon-cyan);">+${card.artifact}</div>`;
+        artifactHTML = `<div class="artifact-badge" style="position: absolute; bottom: 30px; right: 5px; font-size: 9px; font-weight: bold;">+${card.artifact}</div>`;
     } else if (card.artifact < 0) {
         artifactHTML = `<div class="debuff-badge">PRISONER ${card.artifact}</div>`;
     }
@@ -630,7 +647,7 @@ window.showPowerTooltip = (e, card, index, state) => {
     const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
     const moodWeaknesses = { "Volatile": "Serene", "Serene": "Spirited", "Spirited": "Grounded", "Grounded": "Volatile" };
     
-    let html = `<div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">${card.name.toUpperCase()} DATA</div>`;
+    let html = `<div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">${card.name.toUpperCase()} DATA</div>`;
     
     const sides = ["TOP", "RIGHT", "BOTTOM", "LEFT"];
     
@@ -676,19 +693,19 @@ window.showPowerTooltip = (e, card, index, state) => {
         // Build the HTML for modifiers
         let modifiersHtml = '';
         if (artifactBonus !== 0) {
-            modifiersHtml += `<span style="color: ${artifactBonus > 0 ? 'var(--neon-cyan)' : '#ff4b4b'}">${artifactBonus > 0 ? '+' : ''}${artifactBonus}A</span> `;
+            modifiersHtml += `<span class="${artifactBonus > 0 ? 'text-neon-cyan' : 'text-error'}">${artifactBonus > 0 ? '+' : ''}${artifactBonus}A</span> `;
         }
         if (moodModifier !== 0) {
-            modifiersHtml += `<span style="color: ${moodModifier > 0 ? 'var(--neon-green)' : '#ff4b4b'}">${moodModifier > 0 ? '+' : ''}${moodModifier}M</span> `;
+            modifiersHtml += `<span class="${moodModifier > 0 ? 'text-neon-green' : 'text-error'}">${moodModifier > 0 ? '+' : ''}${moodModifier}M</span> `;
         }
         if (netFatiguePenalty !== 0) {
-            modifiersHtml += `<span style="color: #ff4b4b">${netFatiguePenalty}F</span> `;
+            modifiersHtml += `<span class="text-error">${netFatiguePenalty}F</span> `;
         }
         if (loyaltyBonus !== 0) {
-            modifiersHtml += `<span style="color: var(--neon-cyan)">+${loyaltyBonus}L</span> `;
+            modifiersHtml += `<span class="text-neon-cyan">+${loyaltyBonus}L</span> `;
         }
         if (netWantedPenalty !== 0) {
-            modifiersHtml += `<span style="color: #ff4b4b">${netWantedPenalty}W</span> `;
+            modifiersHtml += `<span class="text-error">${netWantedPenalty}W</span> `;
         }
 
         html += `
@@ -698,7 +715,7 @@ window.showPowerTooltip = (e, card, index, state) => {
                     <span>${base}</span>
                     ${modifiersHtml ? `<span style="font-size: 0.8em; opacity: 0.8;">(${modifiersHtml.trim()})</span>` : ''}
                     <span>=</span>
-                    <b style="color: var(--neon-cyan)">${totalEffectivePower} (${grade})</b>
+                    <b class="text-neon-cyan">${totalEffectivePower} (${grade})</b>
                 </span>
             </div>
         `;
@@ -796,8 +813,8 @@ window.openClubFoundry = () => {
     overlay.id = "club-foundry-overlay";
     overlay.className = "overlay";
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 450px; text-align: center;">
-            <h2 style="color: var(--neon-purple);">CLUB FOUNDRY</h2>
+        <div class="glass-panel medium" style="text-align: center;">
+            <h2 class="text-neon-purple">CLUB FOUNDRY</h2>
             <p style="font-size: 0.9em; opacity: 0.8;">Founding a club costs a fortune (5,000 $VBV).<br>Owners earn commissions from relative buffs sold in their territory.</p>
             
             <div class="flex-col gap-10 mt-20">
@@ -1053,16 +1070,16 @@ window.openTerritoryView = (territoryId) => {
 
     if (club) {
         header = `
-            <h2 style="color: var(--neon-cyan); margin-bottom: 5px;">${club.name}</h2>
+            <h2 class="text-neon-cyan" style="margin-bottom: 5px;">${club.name}</h2>
             <div style="font-size: 0.8em; opacity: 0.6; margin-bottom: 15px;">Controlled by: ${club.owner_wallet.substring(0,8)}...</div>
             <div class="flex-row justify-center gap-15 mb-20">
                 <div class="glass-panel p-10 m-0" style="min-width: 120px;">
                     <div style="font-size: 0.7em; opacity: 0.5;">TREASURY</div>
-                    <b style="color: var(--neon-green);">${club.treasury.toFixed(2)} $VBV</b>
+                    <b class="text-neon-green">${club.treasury.toFixed(2)} $VBV</b>
                 </div>
                 <div class="glass-panel p-10 m-0" style="min-width: 120px;">
                     <div style="font-size: 0.7em; opacity: 0.5;">MOJO</div>
-                    <b style="color: var(--neon-purple);">${club.club_mojo}</b>
+                    <b class="text-neon-purple">${club.club_mojo}</b>
                 </div>
             </div>
         `;
@@ -1101,7 +1118,7 @@ window.openTerritoryView = (territoryId) => {
     }
 
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 500px; text-align: center;">
+        <div class="glass-panel medium" style="text-align: center;">
             ${header}
             ${body}
             <div class="mt-20">
@@ -1152,8 +1169,8 @@ window.openPortfolioView = async (initialTab = 'portfolio') => { // Imported fro
     overlay.className = "overlay";
     
     overlay.innerHTML = `
-        <div class="glass-panel" style="width: 500px; text-align: center;">
-            <h2 style="color: var(--neon-cyan);">ENTITY PORTFOLIO</h2>
+        <div class="glass-panel medium" style="text-align: center;">
+            <h2 class="text-neon-cyan">ENTITY PORTFOLIO</h2>
             <div class="flex-row justify-center gap-10 mt-10 mb-20">
                 <button id="tab-holdings" class="tab-btn ${initialTab === 'portfolio' ? 'active' : ''}" onclick="switchPortfolioTab('portfolio')">📈 HOLDINGS</button>
                 <button id="tab-jailed" class="tab-btn ${initialTab === 'jailed' ? 'active' : ''}" onclick="switchPortfolioTab('jailed')">⛓️ JAILED (${Object.keys(myJailedCards).length})</button>
@@ -1256,7 +1273,7 @@ window.switchPortfolioTab = async (tab) => {
             html += `
                 <div class="player-item" style="padding: 15px; border-color: #ff4b4b;">
                     <div style="text-align: left;">
-                        <b style="color: #ff4b4b;">ID: #${cardId}</b>
+                        <b class="text-error">ID: #${cardId}</b>
                         <div style="font-size: 0.75em; opacity: 0.6;">Held by: ${club.name}</div>
                     </div>
                     <div style="text-align: right;">
@@ -1303,7 +1320,7 @@ window.switchPortfolioTab = async (tab) => {
             html += `
                 <div class="player-item" style="padding: 15px; border-color: #ffd700;">
                     <div style="text-align: left;">
-                        <b style="color: #ffd700;">ID: #${cardId}</b>
+                        <b class="text-gold">ID: #${cardId}</b>
                         <div style="font-size: 0.75em; opacity: 0.6;">Kidnapper: ${perpWallet}</div>
                     </div>
                     <div style="text-align: right;">
@@ -3028,17 +3045,17 @@ window.openHeistPlanningOverlay = () => { // Imported from criminality.js
 	const clubs = Object.values(globalClubs).filter(c => c.id !== state.employer_id);
 	
 	overlay.innerHTML = `
-		<div class="criminality-panel glass-panel animate-modal" style="width: 700px; max-height: 90vh;">
+		<div class="criminality-panel glass-panel animate-modal large" style="max-height: 90vh;">
 			<div class="criminality-header">
-				<span class="criminality-title" style="text-shadow: 0 0 15px rgba(255, 75, 75, 0.5);">HEIST PLANNING TERMINAL</span>
+				<span class="criminality-title">HEIST PLANNING TERMINAL</span>
 				<div class="criminality-stats">
 					<div class="stat-item">
-						<div class="stat-label" style="color: var(--color-error-red); opacity: 0.7;">WANTED</div>
-						<div class="stat-value" style="color: var(--color-error-red);">${state.wanted_level || 0}</div>
+						<div class="stat-label stat-label-red">WANTED</div>
+						<div class="stat-value stat-value-red">${state.wanted_level || 0}</div>
 					</div>
 					<div class="stat-item">
-						<div class="stat-label" style="color: var(--color-neon-cyan); opacity: 0.7;">CUNNING</div>
-						<div class="stat-value" style="color: var(--color-neon-cyan);">${state.cunning || 0}</div>
+						<div class="stat-label stat-label-cyan">CUNNING</div>
+						<div class="stat-value stat-value-cyan">${state.cunning || 0}</div>
 					</div>
 				</div>
 			</div>
@@ -3053,9 +3070,9 @@ window.openHeistPlanningOverlay = () => { // Imported from criminality.js
 							clubs.map(club => `
 								<div class="target-item glass-panel m-0 p-15 hover-lift" onclick="updateHeistRiskAssessment('${club.id}')">
 									<div class="target-info">
-										<div class="target-name font-bold text-neon-purple" style="font-size: 1.1em;">${club.name.toUpperCase()}</div>
+										<div class="target-name font-bold text-neon-purple">${club.name.toUpperCase()}</div>
 										<div class="target-details mt-5">
-											<span class="detail-item wealth" style="color: var(--color-neon-green); font-weight: bold;">${club.treasury.toFixed(2)} $VBV</span>
+											<span class="detail-item wealth text-neon-green font-bold">${club.treasury.toFixed(2)} $VBV</span>
 											<span class="detail-item level" style="opacity: 0.6; font-size: 0.9em;">MOJO: ${club.club_mojo}</span>
 										</div>
 									</div>
@@ -3141,7 +3158,7 @@ window.updateHeistRiskAssessment = (clubId) => {
 
 	// UI Feedback
 	fill.style.width = `${riskPercent}%`;
-	text.innerHTML = `ESTIMATED SUCCESS: <b style="color: var(--color-neon-green); font-size: 1.2em;">${(successChance * 100).toFixed(0)}%</b>`;
+	text.innerHTML = `ESTIMATED SUCCESS: <b class="text-neon-green" style="font-size: 1.2em;">${(successChance * 100).toFixed(0)}%</b>`;
 	secText.innerHTML = `TARGET SEC_LEVEL: ${securityLevel.toFixed(1)} [STAFF: ${securityStaff}]`;
 	
 	btn.disabled = false;
@@ -3186,9 +3203,9 @@ window.openKidnapSelectionOverlay = (targetClubId) => {
 	overlay.className = "overlay";
 	
 	overlay.innerHTML = `
-		<div class="criminality-panel glass-panel animate-slide-up" style="width: 450px; border-color: #ffa657;">
+		<div class="criminality-panel glass-panel animate-slide-up medium" style="border-color: #ffa657;">
 			<div class="criminality-header" style="border-bottom-color: rgba(255, 166, 87, 0.3);">
-				<span class="criminality-title" style="color: #ffa657; text-shadow: 0 0 10px rgba(255, 166, 87, 0.5);">KIDNAP GAMBIT</span>
+				<span class="criminality-title">KIDNAP GAMBIT</span>
 			</div>
 			
 			<div class="p-20 text-center">
@@ -3196,7 +3213,7 @@ window.openKidnapSelectionOverlay = (targetClubId) => {
 				
 				<div class="hostage-card p-15 mt-20 mb-20 glass-panel">
 					<div style="font-size: 0.75em; opacity: 0.5; letter-spacing: 1px;">TARGET IDENTIFIED</div>
-					<b style="font-size: 1.2em; color: var(--color-error-red);">CLUB OWNER: ${club.owner_wallet.substring(0,12)}...</b>
+					<b class="text-error" style="font-size: 1.2em;">CLUB OWNER: ${club.owner_wallet.substring(0,12)}...</b>
 					<div class="mt-10 italic" style="font-size: 0.8em; opacity: 0.6;">"A hostage ensures they won't retaliate... or provides a secondary payday."</div>
 				</div>
 

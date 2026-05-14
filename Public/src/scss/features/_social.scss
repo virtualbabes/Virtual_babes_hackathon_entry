@@ -7,6 +7,7 @@
     @include neon-glass-panel;
     padding: $spacing-lg;
     border-color: rgba($color-neon-blue, 0.3);
+    width: $panel-width-lg;
     background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9)), radial-gradient(circle at center, rgba($color-neon-blue, 0.05) 0%, transparent 70%);
 }
 
