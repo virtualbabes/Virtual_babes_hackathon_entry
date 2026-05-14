@@ -82,6 +82,14 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// SECURITY AUDIT: Verify that the claimant wallet matches the wallet registered to this session ID.
+	actualWinnerWallet, walletOk := l.wallets[req.ClientID]
+	if !walletOk || !strings.EqualFold(actualWinnerWallet, req.Claimant) {
+		l.mutex.Unlock()
+		http.Error(w, "Unauthorized: Identity mismatch.", http.StatusUnauthorized)
+		return
+	}
+
 	// Score mismatch check to prevent tampering
 	if req.ClientScore[0] != history.Scores[0] || req.ClientScore[1] != history.Scores[1] {
 		l.mutex.Unlock()
@@ -243,6 +251,13 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 			continue
 		}
 		amt := uint64(float64(baseAmt) * multiplier)
+
+		// PILLAR 4: Bounty System Integration.
+		// Add the calculated bounty from MatchHistory if this is the primary Arena asset.
+		if appIDStr == l.rewardAssetID && history.BountyReward > 0 {
+			amt += uint64(history.BountyReward * 1000000)
+			log.Printf("[FAUCET] Bounty payout of %.2f included for %s", history.BountyReward, recipient)
+		}
 
 		// NEW: Granular Opt-in Verification
 		// Check if the recipient has a balance box/opt-in for this specific asset in the stack.

@@ -137,6 +137,9 @@
 - [FIXED] Resolved attribution bug in `battle_service.go` where recursive combo captures incorrectly identified the original owner during jailing evaluation.
 - [FIXED] Prevented 'Capture Amnesty' by triggering Fallen Penalty jailing before Sudden Death redistribution in `battle_service.go`.
 - [FIXED] Hardened `initiatePairedMatch` in `lobby_manager.go` to ensure all critical player and environmental attributes are snapshotted for spectators.
+- [FIXED] Resolved data gap in `MatchHistory` struct and implemented board-card fatigue persistence in `battle_service.go`.
+- [FIXED] Integrated `BountyReward` from `MatchHistory` into the `dispatchReward` flow within `faucet_service.go`.
 - [FIXED] Ensured trader reputation is recalculated post-trade in `handleTradeShares` to reconcile Standing with current Mojo and Rumor multipliers.
+- [FIXED] Resolved inflation leak in `tournament_manager.go` by synchronizing tournament payouts with `faucetBalance` and applying Reputation bonuses.
 - [FIXED] Hardened `processPlaystyleDecay` logic to normalize behavioral traits (Aggressiveness/Risk) towards a neutral baseline and prune expired preference metadata.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

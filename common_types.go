@@ -237,6 +237,7 @@ type CapturedCardInfo struct {
 	CapturingPlayerWallet string // Wallet of the player who captured the card
 	CaptureType           string // "BASIC", "SAME", "POWER_UP", "COMBO"
 	GridIndex             int
+	Round                 int
 }
 
 // MatchHistory stores the result of a completed game for reward verification.
@@ -249,6 +250,14 @@ type MatchHistory struct {
 	WinnerIndex      int       `json:"winner_index"` // 0 for P1, 1 for P2
 	IsBountyMatch    bool      `json:"is_bounty_match,omitempty"`
 	BountyReward     float64   `json:"bounty_reward,omitempty"`
+	P1WantedLevel    int       `json:"p1_wanted_level"`
+	P2WantedLevel    int       `json:"p2_wanted_level"`
+	P1Cunning        int       `json:"p1_cunning"`
+	P2Cunning        int       `json:"p2_cunning"`
+	P1Nurturing      int       `json:"p1_nurturing"`
+	P2Nurturing      int       `json:"p2_nurturing"`
+	ActiveItemBuffs  map[string]map[string]int `json:"active_item_buffs,omitempty"`
+	CapturedCards    []CapturedCardInfo        `json:"captured_cards,omitempty"`
 }
 
 // PlayerStats tracks the performance and reliability of a player.

@@ -392,5 +392,8 @@
 22. Complete: Hardened AI potential evaluation in `main.go` by fixing rule name alignment and ensuring simulation logic correctly accounts for ownership shifts during combo chain reactions.
 23. Complete: Hardened `serverCheckCaptures` in `battle_service.go` by fixing an attribution bug where combo captures were incorrectly identified after the flip.
 24. Complete: Hardened `verifyWinner` in `battle_service.go` to prevent 'Capture Amnesty' by triggering Fallen Penalty jailing before Sudden Death redistribution.
+25. Complete: Hardened `MatchHistory` and `verifyWinner` to archive snapshotted player attributes and implemented card fatigue persistence.
+26. Complete: Hardened `handleReward` in `faucet_service.go` with identity verification and integrated Bounty payouts into the `dispatchReward` atomic group.
+27. Complete: Hardened `tournament_manager.go` by applying reputation multipliers to payouts and implementing full Faucet reconciliation.
 25. Complete: Hardened `initiatePairedMatch` in `lobby_manager.go` to authoritative snapshot BoardMoods, Rules, and Player Attributes for spectator accuracy.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

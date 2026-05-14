@@ -324,12 +324,18 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	match.IsFinished = true
 	history := MatchHistory{
-		Scores:           [2]int{p1, p2},
-		Timestamp:        time.Now(),
+		Scores:            [2]int{p1, p2},
+		Timestamp:         time.Now(),
 		TournamentMatchID: match.TournamentMatchID,
-		IsBountyMatch:    match.IsBountyMatch,
-		ActiveItemBuffs:  match.ActiveItemBuffs, // Snapshot item effects into history for archival
-		CapturedCards:    match.CapturedCards,   // Preserve detailed capture log for audit
+		IsBountyMatch:     match.IsBountyMatch,
+		P1WantedLevel:     match.P1WantedLevel,
+		P2WantedLevel:     match.P2WantedLevel,
+		P1Cunning:         match.P1Cunning,
+		P2Cunning:         match.P2Cunning,
+		P1Nurturing:       match.P1Nurturing,
+		P2Nurturing:       match.P2Nurturing,
+		ActiveItemBuffs:   match.ActiveItemBuffs,
+		CapturedCards:     match.CapturedCards,
 	}
 
 	if p1 > p2 {
@@ -376,6 +382,10 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		}
 	}
 
+	// PILLAR 3: Economic Consequence.
+	// Increment fatigue for all cards played to the board during this match.
+	l.processMatchFatigueLocked(match)
+
 	// Decrement and remove expired item buffs for both players
 	l.processItemBuffExpiration(match)
 
@@ -393,6 +403,22 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 	delete(l.matches, match.P1ID)
 	delete(l.matches, match.P2ID)
+}
+
+// processMatchFatigueLocked increases the wear-and-tear of cards used in combat.
+func (l *Lobby) processMatchFatigueLocked(match *MatchState) {
+	for _, card := range match.Board {
+		if card == nil {
+			continue
+		}
+
+		card.Fatigue += 5 // Fixed fatigue cost per match deployment
+		if card.Fatigue > 100 { card.Fatigue = 100 }
+
+		// INDUSTRIAL LOOP: Persist fatigue to global and disk cache
+		l.inventory[card.ID] = *card
+		l.persistentCardCache[card.ID] = *card
+	}
 }
 
 // initiateSuddenDeath shuffles and redistributes remaining hand cards for a high-stakes tie-breaker.

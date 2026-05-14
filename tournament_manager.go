@@ -385,7 +385,15 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	activeRewards := l.rewards
 	rewardAsset := l.rewardAssetID
+	stats, hasStats := l.leaderboard[recipient]
 	l.mutex.RUnlock()
+
+	// PILLAR 4: Reputation Bonus Integration.
+	// Apply 1.1x multiplier for high-standing players (Diamond Tier / Rep 500+).
+	multiplier := 1.0
+	if hasStats && stats.Reputation >= 500 {
+		multiplier = 1.1
+	}
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
@@ -396,6 +404,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	var skippedAssets []string
 	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
 	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"rank\":%d,\"pot_share\":%d}", rank, potShareMicro))
+	var totalUnits float64
 
 	// Build Atomic Group for all active reward assets
 	for appIDStr, baseAmt := range activeRewards {
@@ -404,10 +413,10 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 			continue
 		}
 
-		amt := baseAmt
+		amt := uint64(float64(baseAmt) * multiplier)
 		// Add the tournament pot share if this is the primary asset
 		if appIDStr == rewardAsset {
-			amt += potShareMicro
+			amt += uint64(float64(potShareMicro) * multiplier)
 		}
 
 		// NEW: Granular Opt-in Verification to prevent group failure
@@ -435,6 +444,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 			}
 		}
 
+		totalUnits += float64(amt) / 1000000.0
 		// Build NoOp call for ARC-200 with winner as account argument and placement note
 		txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, []string{recipient}, nil, nil, sp, vaultAddrObj, note, types.Digest{}, [32]byte{}, types.Address{})
 		txns = append(txns, txn)
@@ -460,6 +470,13 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	if _, err := client.SendRawTransaction(signedGroup).Do(context.Background()); err != nil {
 		return "", skippedAssets, err
 	}
+
+	// INDUSTRIAL LOOP: Deduct payout from liquid faucet balance and trigger scaling.
+	l.mutex.Lock()
+	l.faucetBalance -= totalUnits
+	l.applyDynamicScalingLocked()
+	l.mutex.Unlock()
+
 	return firstTxID, skippedAssets, nil
 }
 
