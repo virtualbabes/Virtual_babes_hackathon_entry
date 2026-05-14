@@ -29,6 +29,21 @@ var FaceplateRegistry = map[string]FaceplateStats{
 	"faceplate_placeholder": {MojoBonus: 0, CunningBonus: 0},
 }
 
+// Club represents a player-owned organization mirrored for client-side state.
+type Club struct {
+	ID              string               `json:"id"`
+	Name            string               `json:"name"`
+	OwnerWallet     string               `json:"owner_wallet"`
+	Type            string               `json:"type"`
+	Territories     []string             `json:"territories"`
+	RegionName      string               `json:"region_name,omitempty"`
+	Treasury        float64              `json:"treasury"`
+	Mojo            int                  `json:"club_mojo"`
+	LastActivity    time.Time            `json:"last_activity"`
+	LastHeistAt     time.Time            `json:"last_heist_at"` // Immersion Hook
+	CreatedAt       time.Time            `json:"created_at"`
+}
+
 // TournamentMatch represents a single duel within the bracket.
 // This mirrors the server's TournamentMatch for client-side display.
 type TournamentMatch struct {
@@ -193,6 +208,7 @@ type Engine struct {
 	Latency             int                       // WebSocket ping in milliseconds
 	NetworkHealth       string                    // "Excellent", "Good", "Poor", "Critical"
 	Tournament          TournamentState           `json:"tournament"` // Current bracket info
+	Clubs               map[string]*Club          `json:"clubs"`      // Global club registry
 	linkedWallets       map[string]WalletLinkInfo // Key: Primary AVM Wallet Address
 	mutex               sync.RWMutex              // Protects Engine state from concurrent WASM/JS events
 }
@@ -253,6 +269,7 @@ var Game = Engine{
 	NetworkHealth:  "Excellent",
 	ApiBase:        "", // Default to relative
 	AssetBase:      "", // Default to relative, can be set via SetAssetBase
+	Clubs:          make(map[string]*Club),
 }
 
 // -----------------------------------------------------------------------------
@@ -543,6 +560,24 @@ func SetPlayerReady(this js.Value, args []js.Value) interface{} {
 
 	// Trigger UI Start Button if both are ready
 	updateStartButton()
+	return true
+}
+
+// SyncClubs ingests the global club registry from the server to support UI map immersion.
+func SyncClubs(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		return false
+	}
+	jsonStr := js.Global().Get("JSON").Call("stringify", args[0]).String()
+
+	var clubs map[string]*Club
+	if err := json.Unmarshal([]byte(jsonStr), &clubs); err != nil {
+		return false
+	}
+
+	Game.mutex.Lock()
+	Game.Clubs = clubs
+	Game.mutex.Unlock()
 	return true
 }
 
@@ -1950,6 +1985,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["network_health"] = Game.NetworkHealth
 		state["api_base"] = Game.ApiBase
 		state["network"] = Game.Network
+		state["clubs"] = Game.Clubs
 		state["server_load_color"] = calculateLoadColor(Game.ServerLoad)
 		state["master_volume"] = Game.MasterVolume
 		state["music_volume"] = Game.MusicVolume
@@ -2294,6 +2330,7 @@ func registerFunctions() {
 	js.Global().Set("SyncRules", js.FuncOf(SyncRules))
 	js.Global().Set("SyncRewards", js.FuncOf(SyncRewards))
 	js.Global().Set("SyncVaultBalance", js.FuncOf(SyncVaultBalance))
+	js.Global().Set("SyncClubs", js.FuncOf(SyncClubs))
 	js.Global().Set("SetMaintenanceState", js.FuncOf(SetMaintenanceState))
 	js.Global().Set("ForceActive", js.FuncOf(ForceActive))
 	js.Global().Set("SetBoardState", js.FuncOf(SetBoardState))

@@ -111,6 +111,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.Playstyle.RiskTolerance += 0.10
 		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.HeistAttempts++
+		targetClub.LastHeistAt = now // Trigger visual "Under Attack" state
 		targetClub.LastActivity = now // Defense engagement counts as activity
 
 		hasGuardDog := false

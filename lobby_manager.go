@@ -1039,6 +1039,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Rumors            map[string]*Rumor        `json:"rumors"` // Added for UI display
 		AdminFocusNetwork string                   `json:"admin_focus_network"`
 		BannedAvatars     map[string]time.Time     `json:"banned_avatars"`
+		BlackMarket       []Loan                   `json:"black_market"` // Added for real-time economy feel
 	}{
 		Players: players, MaintenanceActive: l.maintenanceMode,
 		Clubs:   l.clubs,
@@ -1047,6 +1048,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		AvailableNetworks: l.availableNetworks, AdminFocusNetwork: l.adminFocusNetwork,
 		Rumors: l.rumors,
 		BannedAvatars:     l.bannedAvatars,
+		BlackMarket:       l.blackMarket,
 	}
 
 	payload, _ := json.Marshal(update)

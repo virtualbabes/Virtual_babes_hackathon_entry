@@ -181,6 +181,10 @@
 - **Insurance Recovery**: Fixed `processInsuranceRecovery` to correctly return recovered cards to the victim's inventory.
 - **UI Textures**: Implemented dynamic arena floor textures based on game phase and tournament status.
 - **Faceplates**: Cosmestic items now provide functional Mojo/Cunning bonuses via `FaceplateRegistry`. Mojo bonuses boost Reputation.
+- **Network Sync**: Hardened `handleServerMessage` in `network.js` to call `window.SyncClubs` for real-time territory state alignment.
+- **Market Ticker**: Hardened NPC identification in `updateMarketTicker` and synchronized canvas rendering with `.npc-taunt` purple/italic styles.
+- **Combat Visuals**: Hardened `.flip-capture` animation trigger in `app.js` with reflow forcing to ensure reliable re-triggering during chain reactions.
+- **Club Management**: Hardened `openClubFoundry` in `app.js` to dynamically filter out claimed territories from the selection dropdown and added a11y attributes.
 
 ## Technical Notes
 - **Economy**: `economy_processing.go` handles temporal cleanup (loans/auctions) independently of main handlers.

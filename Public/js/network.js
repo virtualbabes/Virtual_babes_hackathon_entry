@@ -150,6 +150,7 @@ export function handleServerMessage(msg) {
 
             if (msg.payload.faucet_balance !== undefined) window.SyncVaultBalance(msg.payload.faucet_balance);
             if (msg.payload.rewards !== undefined) window.SyncRewards(msg.payload.rewards);
+            if (window.SyncClubs) window.SyncClubs(msg.payload.clubs);
             
             if (msg.payload.available_networks) {
                 setAvailableNetworks(msg.payload.available_networks);

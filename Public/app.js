@@ -17,6 +17,8 @@ let activeRumors = []; // Global array to hold active rumors
 
 // --- Ticker State ---
 let tickerItems = [];
+let tickerOffset = 0;
+let tickerAnimId = null;
 
 let myPlayerIndex = 0;          // 0 for P1, 1 for P2
 let matchHistorySaved = false;
@@ -1103,7 +1105,8 @@ window.updateMarketTicker = (players) => {
             badge: (p.achievements && p.achievements.length > 0) ? "🏆" : "",
             val: finalPrice.toFixed(2),
             trend: (p.wins > 0) ? "▲" : "─",
-            color: (p.wins > 0) ? "#3fb950" : "#888"
+            color: (p.wins > 0) ? "#3fb950" : "#888",
+            isNPC: collectiveIntelligence.personalities[p.id] !== undefined || p.id === "Vbabe Bot"
         });
     });
 
@@ -1111,8 +1114,9 @@ window.updateMarketTicker = (players) => {
     const canvas = document.getElementById("market-ticker-canvas");
     const ctx = canvas ? canvas.getContext('2d') : null;
     if (ctx) {
-        ctx.font = "bold 12px 'Rajdhani', sans-serif";
         tickerItems = newItems.map(item => {
+            // TACTICAL SYNC: Measurement must use the correct font variant (Italic for NPCs)
+            ctx.font = item.isNPC ? "italic bold 12px 'Rajdhani', sans-serif" : "bold 12px 'Rajdhani', sans-serif";
             const str = `${item.symbol}${item.badge ? ' ' + item.badge : ''} ${item.val} ${item.trend}`;
             item.width = ctx.measureText(str).width + spacing;
             return item;
@@ -1162,7 +1166,15 @@ window.startTickerAnimation = () => {
 
                 if (x + itemWidth > 0 && x < width) {
                     let curX = x;
-                    ctx.fillStyle = "#00f2fe"; // Neon Cyan
+                    
+                    // Apply .npc-taunt aesthetics (Neon Purple + Italic) if flagged
+                    if (item.isNPC) {
+                        ctx.fillStyle = "#9b51e0"; // $color-neon-purple
+                        ctx.font = "italic bold 12px 'Rajdhani', sans-serif";
+                    } else {
+                        ctx.fillStyle = "#00f2fe"; // Neon Cyan
+                        ctx.font = "bold 12px 'Rajdhani', sans-serif";
+                    }
                     ctx.fillText(item.symbol, curX, height / 2);
                     curX += ctx.measureText(item.symbol).width;
 
@@ -1172,6 +1184,8 @@ window.startTickerAnimation = () => {
                         curX += ctx.measureText(" " + item.badge).width;
                     }
 
+                    // Reset font for standard numeric values
+                    ctx.font = "bold 12px 'Rajdhani', sans-serif";
                     ctx.fillStyle = "#ffffff";
                     ctx.fillText(" " + item.val, curX, height / 2);
                     curX += ctx.measureText(" " + item.val).width;
@@ -2015,6 +2029,13 @@ export async function syncUI(scope = "all") {
     // Partial state sync: only update sections present in the current state snapshot
     const state = window.GetGameState(scope);
     
+    // TACTICAL REFRESH: If the territory map is open, re-render to update attack/developing status
+    const mapOverlay = document.getElementById("territory-map-overlay");
+    if (mapOverlay && !mapOverlay.classList.contains("hidden")) {
+        // Note: We avoid clearing the grid here to prevent losing current rotation/zoom state
+        updateMapStatusIndicators(); 
+    }
+
     // --- Update Dynamic Environment ---
     if (state.phase !== undefined || state.multiplayer !== undefined || state.tournament !== undefined) {
         updateDynamicArenaFloor(state);
@@ -2349,6 +2370,8 @@ export async function syncUI(scope = "all") {
 
                     // Apply flip animation if captured
                     if (isCaptured) {
+                        cardDiv.classList.remove("flip-capture");
+                        void cardDiv.offsetWidth; // Force reflow to ensure animation re-triggers
                         cardDiv.classList.add("flip-capture");
                         // Remove after animation to allow re-triggering
                         cardDiv.addEventListener('animationend', () => {
@@ -2394,6 +2417,25 @@ export async function syncUI(scope = "all") {
     // --- Render Player Hand ---
     // Hand rendering logic remains in app.js for now, as it's tightly coupled with activeCardId and selectCard
     // which are currently in app.js. This will be moved to game.js later.
+}
+
+/**
+ * Updates the status lights on the 3D map without re-rendering the entire grid.
+ * Prevents losing map rotation/zoom during lobby updates.
+ */
+function updateMapStatusIndicators() {
+    const tiles = document.querySelectorAll('.map-tile-3d');
+    tiles.forEach(tile => {
+        const tileName = tile.querySelector('.tile-name')?.innerText.toLowerCase().replace(' ', '_');
+        const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(tileName));
+        const statusLight = tile.querySelector('.tile-status');
+        
+        if (club && statusLight) {
+            const lastHeistTime = new Date(club.last_heist_at).getTime();
+            const isUnderAttack = (Date.now() - lastHeistTime) < 300000;
+            statusLight.className = `tile-status ${isUnderAttack ? 'under-attack' : (club.region_name ? 'developing' : '')}`;
+        }
+    });
 }
 
 // --- Initial UI State --- // Imported from ui.js
@@ -2636,16 +2678,16 @@ window.openClubFoundry = () => {
             <div class="flex-col gap-10 mt-20">
                 <input type="text" id="foundry-club-name" class="glass-input w-full" placeholder="Enter Club Name (max 20 chars)" maxlength="20">
                 
-                <select id="foundry-shop-type" class="glass-input w-full">
+                <select id="foundry-shop-type" class="glass-input w-full" aria-label="Select Shop Specialization" title="Shop Type">
                     <option value="Elemental">Elemental Forge (Mood Buffs)</option>
                     <option value="Tactical">Tactical Syndicate (Rule Mastery)</option>
                     <option value="Vitality">Vitality Lab (Health/Loyalty)</option>
                 </select>
                 
-                <select id="foundry-territory" class="glass-input w-full">
-                    <option value="the_lab">The Lab</option>
-                    <option value="casino">The Casino</option>
-                    <option value="arena_center">The Central Arena</option>
+                <select id="foundry-territory" class="glass-input w-full" ${available.length === 0 ? 'disabled' : ''} aria-label="Select territory to claim" title="District Selection">
+                    ${available.length > 0 ? 
+                        available.map(t => `<option value="${t.id}">${t.name}</option>`).join('') :
+                        '<option value="">NO DISTRICTS AVAILABLE</option>'}
                 </select>
             </div>
 
@@ -2771,6 +2813,12 @@ window.openTerritoryMapOverlay = () => {
         const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id));
         const isOwned = !!club;
         const isGovernor = isOwned && club.region_name;
+
+        let isUnderAttack = false;
+        if (isOwned && club.last_heist_at) {
+            const lastHeistTime = new Date(club.last_heist_at).getTime();
+            isUnderAttack = (Date.now() - lastHeistTime) < 300000; // 5 minute window
+        }
         
         let tileClasses = `map-tile-3d accelerated`;
         if (isGovernor) tileClasses += " governor-controlled";
@@ -2780,6 +2828,7 @@ window.openTerritoryMapOverlay = () => {
         const tile = document.createElement("div");
         tile.className = tileClasses;
         tile.onclick = () => {
+            window.mapZoom = 1.0; // Reset zoom on transition
             hideAllOverlays();
             openTerritoryView(t.id);
         };
@@ -2796,7 +2845,7 @@ window.openTerritoryMapOverlay = () => {
                     <span class="stat defense" title="Club Mojo">${club.club_mojo}</span>
                 </div>` : ''}
             </div>
-            ${isGovernor ? '<div class="tile-status developing"></div>' : ''}
+            <div class="tile-status ${isUnderAttack ? 'under-attack' : (isGovernor ? 'developing' : '')}"></div>
         `;
         grid.appendChild(tile);
     });

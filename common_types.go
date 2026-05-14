@@ -56,6 +56,7 @@ type Club struct {
 	Mojo            int                  `json:"club_mojo"`        // Unlocks higher tier items
 	Jail            map[int]ServerCard   `json:"jail"`             // CardID -> ServerCard (captured cards)
 	LastActivity    time.Time            `json:"last_activity"`    // For Mojo decay tracking
+	LastHeistAt     time.Time            `json:"last_heist_at"`    // Hook for UI .under-attack status
 	CreatedAt       time.Time            `json:"created_at"`
 }
 
