@@ -7,8 +7,8 @@ import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
 import { openShopsOverlay, openClubFoundry, openArtGalleryOverlay, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
-import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, releaseHostage, payRansom } from './js/criminality.js';
-import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext } from './js/audio.js';
+import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
+import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext, playCharacterVoiceLine } from './js/audio.js';
 import { initParticleSystem } from './js/particles.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './js/utils.js';
 
@@ -240,6 +240,12 @@ export async function syncUI(scope = "all") {
             const localPIdx = state.local_player_index !== undefined ? state.local_player_index : myPlayerIndex;
             const isWinner = state.winner === localPIdx;
             const isDraw = state.winner === 2;
+
+            // Determine character type for NPC matches (null for multiplayer)
+            const characterType = state.multiplayer ? null : state.special_fanfare;
+
+            // Play character-based voice lines or generic sounds
+            if (!isDraw) playCharacterVoiceLine(characterType, isWinner, state.multiplayer);
 
             if (isDraw) {
                 title = "DRAW";
@@ -2796,7 +2802,7 @@ window.showTournamentTransition = (roundNumber) => {
     setTimeout(() => overlay.classList.add("hidden"), 3000); // Hide after 3 seconds
 }
 
-// Show kidnap overlay with ransom demand
+// Show kidnap overlay with ransom demand // Imported from criminality.js
 window.showKidnapOverlay = (payload) => {
     const overlay = document.getElementById("kidnap-overlay");
     const content = document.getElementById("kidnap-content");
@@ -2818,7 +2824,7 @@ window.showKidnapOverlay = (payload) => {
     startRecoveryTimer(payload.expires_at);
 }
 
-function payRansom(cardId, perpWallet, ransomAmount) {
+window.payRansom = (cardId, perpWallet, ransomAmount) => { // Imported from criminality.js
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (!perpWallet) {
         showToast("Unable to pay ransom: missing kidnapper wallet.", "error");
@@ -2842,7 +2848,7 @@ function payRansom(cardId, perpWallet, ransomAmount) {
     }));
 }
 
-window.releaseHostage = (cardId) => {
+window.releaseHostage = (cardId) => { // Imported from criminality.js
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     if (!confirm(`Release Card #${cardId} back to its victim?`)) return;
 
@@ -2852,7 +2858,7 @@ window.releaseHostage = (cardId) => {
     }));
 }
 
-function startRecoveryTimer(expiresAt) {
+window.startRecoveryTimer = (expiresAt) => { // Imported from criminality.js
     const timerEl = document.getElementById("recovery-timer");
     if (!timerEl) return;
 
@@ -2871,7 +2877,7 @@ function startRecoveryTimer(expiresAt) {
     }, 1000);
 }
 
-async function openClubLeaseBoard() {
+window.openClubLeaseBoard = async () => { // Imported from economy.js
     const state = window.GetGameState();
     const overlay = document.createElement("div");
     overlay.id = "lease-board-overlay";
@@ -2944,7 +2950,7 @@ async function openClubLeaseBoard() {
     document.body.appendChild(overlay);
 }
 
-window.takeLease = async (clubId, leaseId, price) => {
+window.takeLease = async (clubId, leaseId, price) => { // Imported from economy.js
     if (!userAddress) return showToast("Connect wallet first", "error"); // Imported from ui.js
     if (!confirm(`Rent this card for ${price} $VBV?\n\nProceeding will commit funds from your victory balance.`)) return; // Imported from ui.js
     socket.send(JSON.stringify({ type: "take_lease", payload: { club_id: clubId, lease_id: leaseId } })); // Imported from network.js
@@ -3093,7 +3099,7 @@ window.openHeistPlanningOverlay = () => { // Imported from criminality.js
 	document.body.appendChild(overlay);
 }
 window.updateHeistRiskAssessment = (clubId) => {
-	const state = window.GetGameState(); // This will be moved to criminality.js
+	const state = window.GetGameState(); // Imported from criminality.js
 	const club = globalClubs[clubId];
 	const section = document.getElementById("heist-risk-section");
 	const fill = document.getElementById("heist-risk-fill");
@@ -3139,7 +3145,7 @@ window.updateHeistRiskAssessment = (clubId) => {
 	btn.onclick = () => executeHeistStrike(clubId);
 }
 /**
- * Dispatches the heist request to the server.
+ * Dispatches the heist request to the server. // Imported from criminality.js
  */
 window.executeHeistStrike = (clubId) => {
 	if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -3152,7 +3158,7 @@ window.executeHeistStrike = (clubId) => {
 	document.getElementById("heist-overlay")?.remove();
 }
 
-window.handleHeistResult = (payload) => {
+window.handleHeistResult = (payload) => { // Imported from criminality.js
 	const title = payload.status === "success" ? "HEIST SUCCESS" : "HEIST FAILED";
 	const type = payload.status === "success" ? "success" : "error";
 	const msg = payload.status === "success" ? `Successfully looted the treasury! Infamy increased.` : `The alarm was triggered! You barely escaped.`;

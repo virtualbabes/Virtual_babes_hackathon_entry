@@ -22,6 +22,7 @@
 - [x] **Performance Audio**: Enhanced `audio.js` with `AudioContext` for low-latency SFX and polyphonic support.
 - [x] **Combat Feedback**: Integrated `triggerConnectionPulse`, `playConnectionSFX`, and `playBattleStartSFX` for multiplayer match initialization in `network.js`.
 - [x] **Audio Integration**: Wired `syncSFXGain` into `app.js` to normalize Web Audio gain during volume changes.
+- [x] **Audio Feedback**: Implemented character-based victory/defeat voice lines for match conclusions.
 - [x] **Audio Policy**: Wired `initAudioContext` to user gestures in `wallet.js` for autoplay compliance.
 - [x] **Audio Fallbacks**: Integrated `initAudioContext` into high-traffic match and entry gestures in `app.js` and `game.js`.
 - [x] **Ambient Immersion**: Integrated `syncBoardParticles` into `app.js:syncUI` for continuous ambient board effects.

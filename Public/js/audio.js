@@ -117,6 +117,43 @@ export function playBattleStartSFX() {
 }
 
 /**
+ * Plays character-specific victory/defeat voice lines or generic sounds.
+ * @param {string} characterType - The NPC archetype (e.g., "Witch", "Boss", "Lady", "cute", "Mini-Boss").
+ * @param {boolean} isPlayerVictory - True if the player won, false if the opponent (NPC or human) won.
+ * @param {boolean} isMultiplayer - True if it's a multiplayer match, false for single-player vs NPC.
+ */
+export function playCharacterVoiceLine(characterType, isPlayerVictory, isMultiplayer) {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+
+    let audioFile = '';
+
+    if (isPlayerVictory) {
+        // Player wins (either vs NPC or Human)
+        audioFile = 'Crowd/applause_player_win.mp3';
+    } else {
+        // Opponent wins (either NPC or Human)
+        if (isMultiplayer) {
+            // Generic opponent win sound for human vs human
+            audioFile = 'opponent_win.wav';
+        } else {
+            // NPC wins vs Player
+            switch (characterType) {
+                case "Witch": audioFile = 'Witch/evil-witch-laugh-140135.mp3'; break;
+                case "Boss": audioFile = 'Boss/evil-laugh-47891.mp3'; break;
+                case "Lady": audioFile = 'Lady/soft-laughing-6445.mp3'; break;
+                case "cute": audioFile = 'cute/hehehehe-288404.mp3'; break;
+                case "Mini-Boss": audioFile = 'Mini-Boss/sinister-laugh-146634.mp3'; break;
+                default: audioFile = 'opponent_win.wav'; // Fallback generic NPC win
+            }
+        }
+    }
+
+    if (audioFile) {
+        playSFX(audioFile);
+    }
+}
+
+/**
  * Unified low-latency play function.
  * Overrides the legacy window.PlaySound to provide polyphony and better performance.
  */
@@ -148,5 +185,6 @@ export async function playSFX(path) {
 window.PlaySound = playSFX;
 window.initAudioContext = initAudioContext;
 window.playMoodMoteSFX = playMoodMoteSFX;
+window.playCharacterVoiceLine = playCharacterVoiceLine;
 window.playConnectionSFX = playConnectionSFX;
 window.playBattleStartSFX = playBattleStartSFX;
