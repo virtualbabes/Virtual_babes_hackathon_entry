@@ -224,9 +224,15 @@ func (l *Lobby) saveNetworkConfigs() {
 
 // distributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
 // Ensures only players who were members at the time of tournament registration qualify.
-func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time) {
+func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	// PILLAR 3: Dynamic Precision Recovery.
+	divisor := 1000000.0 // Default fallback
+	if cfg, ok := l.availableNetworks[network+" Mainnet"]; ok && cfg.PowerDivisor > 0 {
+		divisor = cfg.PowerDivisor
+	}
 
 	for _, club := range l.clubs {
 		joinedAt, isMember := club.Members[strings.ToLower(playerWallet)]
@@ -239,7 +245,7 @@ func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint6
 				rate = 0.05
 			}
 
-			kickback := (float64(feeMicro) / 1000000.0) * rate
+			kickback := (float64(feeMicro) / divisor) * rate
 			club.Treasury += kickback
 			club.LastActivity = time.Now()
 

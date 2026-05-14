@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"sort"
@@ -592,7 +592,9 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 		}
 		if json.NewDecoder(resp.Body).Decode(&res) == nil {
 			for _, t := range res.Tokens {
-				var meta struct{ Name string `json:"name"` }
+				var meta struct {
+					Name string `json:"name"`
+				}
 				if json.Unmarshal([]byte(t.Metadata), &meta) == nil && strings.HasSuffix(strings.ToLower(meta.Name), ".voi") {
 					l.envoiMutex.Lock()
 					l.envoiCache[address] = meta.Name
@@ -612,15 +614,22 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 }
 
 func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset string, sender, vaultAddr string) (bool, int64, error) {
-	l.mutex.RLock()
-	netConfig, ok := l.availableNetworks[network+" Mainnet"]
-	l.mutex.RUnlock()
-	if !ok {
-		return false, 0, fmt.Errorf("network error")
+	// 1. Authoritative Network Key Resolution (Deterministic Case Sync)
+	netKey := l.mapChainToNetworkName(network)
+	if netKey == "" {
+		netKey = network // Fallback for direct usage
 	}
 
-	// Branch logic based on Network Type
-	if strings.Contains(strings.ToLower(network), "voi") {
+	l.mutex.RLock()
+	netConfig, ok := l.availableNetworks[netKey]
+	l.mutex.RUnlock()
+
+	if !ok {
+		return false, 0, fmt.Errorf("network configuration not found for: %s", netKey)
+	}
+
+	// 2. Branch logic based on Network Type
+	if strings.Contains(strings.ToLower(netKey), "voi") {
 		// VOI Logic: Custom ARC-200 Indexer
 		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
 		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
@@ -661,18 +670,27 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 		var res struct {
 			Transaction struct {
-				AssetTransfer struct {
+				AssetTransfer *struct {
 					Receiver string `json:"receiver"`
 					Amount   uint64 `json:"amount"`
 					AssetID  uint64 `json:"asset-id"`
-				} `json:"asset-transfer-transaction"`
+				} `json:"asset-transfer-transaction,omitempty"`
+				Payment *struct {
+					Receiver string `json:"receiver"`
+					Amount   uint64 `json:"amount"`
+				} `json:"payment-transaction,omitempty"`
 				Sender    string `json:"sender"`
 				RoundTime int64  `json:"round-time"`
 			} `json:"transaction"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			t := res.Transaction
-			if strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == expectedAsset {
+			// Handle ASA Transfers
+			if t.AssetTransfer != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == expectedAsset {
+				return true, t.RoundTime, nil
+			}
+			// Handle Native Payments (Asset ID "0" or empty)
+			if (expectedAsset == "" || expectedAsset == "0") && t.Payment != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.Payment.Receiver, vaultAddr) && t.Payment.Amount >= expectedAmt {
 				return true, t.RoundTime, nil
 			}
 		}
@@ -738,7 +756,7 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 	}
 
 	l.mutex.Lock()
-	
+
 	// CRITICAL GUARD: Ensure vault has at least 1 VOI for gas
 	if info.Amount < 1000000 {
 		log.Printf("[CRITICAL] Vault is low on gas! Balance: %d microVOI", info.Amount)
@@ -918,7 +936,7 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 		addr, _ := types.DecodeAddress(wallet)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx) 
+		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
 		if err != nil {
 			// If the error contains "404" or "not found", the user is definitely not opted in.
 			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {

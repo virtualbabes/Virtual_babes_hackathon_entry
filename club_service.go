@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"log"
 	"strings"
 	"time"
 )
@@ -96,14 +95,14 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		if fenceFeeMicro > 0 {
 			l.faucetBalance += fenceFee
 			l.applyDynamicScalingLocked()
-		} 
+		}
 		playerStats.Playstyle.RiskTolerance += 0.05
 		playerStats.HeistAttempts++
 		targetClub.Treasury -= float64(lootMicro) / 1000000.0
 		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
 		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
-		playerStats.Cunning += 1 // Successful heists improve Cunning
+		playerStats.Cunning += 1                                    // Successful heists improve Cunning
 
 		// Add net loot to player's rewards
 		l.rewards[wallet] += netLootMicro
@@ -117,7 +116,12 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.Playstyle.RiskTolerance += 0.10
 		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.HeistAttempts++
-		targetClub.LastHeistAt = now // Trigger visual "Under Attack" state
+
+		// MOJO GAIN: Reward the club for successful defense
+		mojoGain := l.calculateMojoGain(targetClub, "DEFENSE", 0)
+		targetClub.Mojo += mojoGain
+
+		targetClub.LastHeistAt = now  // Trigger visual "Under Attack" state
 		targetClub.LastActivity = now // Defense engagement counts as activity
 
 		hasGuardDog := false
@@ -135,7 +139,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 					targetClub.Jail = make(map[int]ServerCard)
 				}
 				targetClub.Jail[rarestCard.ID] = rarestCard
-				
+
 				// Decrement instead of absolute deletion to handle duplicate card instances
 				cardKey := fmt.Sprintf("CARD-%d", rarestCard.ID)
 				playerStats.Inventory[cardKey]--
@@ -159,14 +163,14 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	}
 
 	response, _ := json.Marshal(map[string]interface{}{
-		"status":          status,
-		"wanted_level":    playerStats.WantedLevel,
-		"cunning":         playerStats.Cunning,
+		"status":            status,
+		"wanted_level":      playerStats.WantedLevel,
+		"cunning":           playerStats.Cunning,
 		"effective_cunning": playerStats.GetEffectiveCunning(),
-		"playstyle":       playerStats.Playstyle,
-		"heist_attempts":  playerStats.HeistAttempts,
-		"kidnap_eligible": canKidnap,
-		"target_club_id":  data.TargetClubID,
+		"playstyle":         playerStats.Playstyle,
+		"heist_attempts":    playerStats.HeistAttempts,
+		"kidnap_eligible":   canKidnap,
+		"target_club_id":    data.TargetClubID,
 	})
 	l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
 
@@ -342,12 +346,24 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	purchaseCost := 2500.0
 	assetID := voiConfig.AssetID
 	verifyNet := "Voi"
-	if data.Network == "ALGO" {
+
+	if strings.EqualFold(data.Network, "ALGO") || strings.HasPrefix(strings.ToUpper(data.Network), "ALGO") {
 		assetID = l.avoiAssetID
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*1000000), assetID, ownerWallet, vaultAddr)
+	// PILLAR 3: Dynamic Precision.
+	// Fetch specific network config to get the correct micro-unit divisor for the purchase asset.
+	l.mutex.RLock()
+	netCfg, hasCfg := l.availableNetworks[verifyNet+" Mainnet"]
+	l.mutex.RUnlock()
+
+	divisor := 1000000.0 // Fallback to standard 6 decimals (VBV/AVoi)
+	if hasCfg && netCfg.PowerDivisor > 0 {
+		divisor = netCfg.PowerDivisor
+	}
+
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*divisor), assetID, ownerWallet, vaultAddr)
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Payment verification failed."}`)})
 		return
@@ -408,7 +424,7 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	if !exists {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Restock Failed: Club not found."}`)})
 		return
-	}	
+	}
 
 	isOwner := strings.EqualFold(club.OwnerWallet, ownerWallet)
 	isManager := club.Staff[strings.ToLower(ownerWallet)] == "Manager"
@@ -478,9 +494,13 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 				break
 			}
 		}
-		if owningClub != nil { break }
+		if owningClub != nil {
+			break
+		}
 	}
-	if owningClub == nil { return }
+	if owningClub == nil {
+		return
+	}
 
 	// 2. Identify all Regional Governors (Clubs owning 2+ territories)
 	var governors []*Club
@@ -493,13 +513,21 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 	// 3. Calculate total commission based on item type and club rate
 	rate := owningClub.Commission
 	if isPerishable {
-		if rate < 0.05 { rate = 0.05 }
-		if rate > 0.50 { rate = 0.50 }
+		if rate < 0.05 {
+			rate = 0.05
+		}
+		if rate > 0.50 {
+			rate = 0.50
+		}
 	}
 
 	// Use micro-unit precision for all distribution logic to prevent dust leaks
 	totalCommissionMicro := uint64(float64(amountMicro)*rate + 0.5)
 	totalCommissionBase := float64(totalCommissionMicro) / 1000000.0
+
+	// MOJO GAIN: Progress the club's social standing based on shop turnover
+	mojoGain := l.calculateMojoGain(owningClub, "REVENUE", float64(amountMicro)/1000000.0)
+	owningClub.Mojo += mojoGain
 
 	// 4. Regional Governor Tax: 5% is distributed to all Governors.
 	var totalDistributedToGovsMicro uint64
@@ -509,7 +537,7 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 
 		for _, govClub := range governors {
 			govClub.Treasury += float64(taxPerGovernorMicro) / 1000000.0
-			govClub.LastActivity = now 
+			govClub.LastActivity = now
 		}
 		totalDistributedToGovsMicro = taxPerGovernorMicro * uint64(len(governors))
 	}
@@ -522,6 +550,37 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 	// INDUSTRIAL LOOP: Deduct commission from Faucet liquidity and re-scale
 	l.faucetBalance -= totalCommissionBase
 	l.applyDynamicScalingLocked()
+}
+
+// calculateMojoGain computes the Mojo increase for a club based on economic or defensive events.
+// It weights the gain based on territory ownership and Regional Governor status.
+func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int {
+	gain := 0
+	switch reason {
+	case "REVENUE":
+		// Earn 1 Mojo for every 50 $VBV in turnover (Value is in base units)
+		gain = int(value / 50.0)
+	case "DEFENSE":
+		// Successful heist defense yields a flat Mojo boost
+		gain = 15
+	}
+
+	if gain <= 0 && reason == "REVENUE" {
+		// Minimum gain for any revenue event to ensure progress
+		gain = 1
+	}
+
+	// PILLAR 1: Territory Weighting.
+	// Ownership signifies infrastructure. Each additional territory increases Mojo efficiency by 25%.
+	efficiencyMult := 1.0 + (float64(len(club.Territories)-1) * 0.25)
+
+	// PILLAR 1: Regional Governor Bonus.
+	// Governors (2+ territories) receive a flat +50% synergy bonus to all Mojo gains.
+	if len(club.Territories) >= 2 {
+		efficiencyMult *= 1.5
+	}
+
+	return int(float64(gain) * efficiencyMult)
 }
 
 // distributeCourthouseFineToClubsLocked distributes a portion of the fine among clubs and governors.
@@ -575,10 +634,14 @@ func (l *Lobby) handleCreateLease(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	wallet, ok := l.wallets[env.FromID]
-	if !ok { return }
+	if !ok {
+		return
+	}
 
 	club, exists := l.clubs[data.ClubID]
-	if !exists { return }
+	if !exists {
+		return
+	}
 
 	// Verify membership
 	if _, isMember := club.Members[strings.ToLower(wallet)]; !isMember {
@@ -597,7 +660,9 @@ func (l *Lobby) handleCreateLease(env *Envelope) {
 	stats.Inventory[cardKey]--
 	l.leaderboard[wallet] = stats
 
-	if club.Leases == nil { club.Leases = make(map[string]*Lease) }
+	if club.Leases == nil {
+		club.Leases = make(map[string]*Lease)
+	}
 	leaseID := fmt.Sprintf("LEASE-%d", time.Now().UnixNano())
 	card, _ := l.inventory[data.CardID]
 
@@ -619,16 +684,22 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 		ClubID  string `json:"club_id"`
 		LeaseID string `json:"lease_id"`
 	}
-	if err := json.Unmarshal(env.Payload, &data); err != nil { return }
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
 	borrowerWallet, ok := l.wallets[env.FromID]
-	if !ok { return }
+	if !ok {
+		return
+	}
 
 	club, exists := l.clubs[data.ClubID]
-	if !exists || club.Leases[data.LeaseID] == nil { return }
+	if !exists || club.Leases[data.LeaseID] == nil {
+		return
+	}
 
 	lease := club.Leases[data.LeaseID]
 	if lease.Borrower != "" || strings.EqualFold(lease.LenderWallet, borrowerWallet) {
@@ -671,9 +742,11 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	// Execute lease
 	lease.Borrower = borrowerWallet
 	lease.ExpiresAt = time.Now().Add(time.Duration(lease.DurationHours) * time.Hour)
-	
+
 	borrowerStats := l.leaderboard[borrowerWallet]
-	if borrowerStats.Inventory == nil { borrowerStats.Inventory = make(map[string]int) }
+	if borrowerStats.Inventory == nil {
+		borrowerStats.Inventory = make(map[string]int)
+	}
 	borrowerStats.Inventory[fmt.Sprintf("CARD-%d", lease.CardID)]++
 	l.leaderboard[borrowerWallet] = borrowerStats
 
@@ -693,11 +766,15 @@ func (l *Lobby) processLeaseExpirations() {
 			if lease.Borrower != "" && now.After(lease.ExpiresAt) {
 				bStats := l.leaderboard[lease.Borrower]
 				cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
-				if bStats.Inventory[cardKey] > 0 { bStats.Inventory[cardKey]-- }
+				if bStats.Inventory[cardKey] > 0 {
+					bStats.Inventory[cardKey]--
+				}
 				l.leaderboard[lease.Borrower] = bStats
 
 				lStats := l.leaderboard[lease.LenderWallet]
-				if lStats.Inventory == nil { lStats.Inventory = make(map[string]int) }
+				if lStats.Inventory == nil {
+					lStats.Inventory = make(map[string]int)
+				}
 				lStats.Inventory[cardKey]++
 				l.leaderboard[lease.LenderWallet] = lStats
 

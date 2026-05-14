@@ -396,4 +396,13 @@
 26. Complete: Hardened `handleReward` in `faucet_service.go` with identity verification and integrated Bounty payouts into the `dispatchReward` atomic group.
 27. Complete: Hardened `tournament_manager.go` by applying reputation multipliers to payouts and implementing full Faucet reconciliation.
 25. Complete: Hardened `initiatePairedMatch` in `lobby_manager.go` to authoritative snapshot BoardMoods, Rules, and Player Attributes for spectator accuracy.
+28. Complete: Hardened `determineTop5` in `tournament_manager.go` with reputation-based tie-breakers for ranking losers of the same round.
+29. Complete: Hardened tournament bracket progression by removing connection requirements for advancement and implementing DNF/Draw resolution safety.
+30. Complete: Hardened tournament buy-in verification in `tournament_manager.go` by utilizing dynamic `PowerDivisor` from network configurations for asset decimal precision.
+31. Complete: Hardened `distributeTournamentKickback` in `server.go` to utilize network-specific precision divisors and synchronized all call sites.
+32. Complete: Hardened `verifyBuyInTransaction` in `oracle_service.go` with case-insensitive network resolution and support for native payment verification.
+33. Complete: Hardened `handlePurchaseTerritory` in `club_service.go` with dynamic precision divisors and robust network resolution for district acquisitions.
+34. Complete: Implemented `calculateMojoGain` in `club_service.go` to reward shop turnover and heist defense with Governor-weighted scaling.
+35. Complete: Hardened `refreshRegionalRoles` in `lobby_manager.go` to trigger the GOVERNOR achievement upon reaching the 2-territory threshold.
+36. Complete: Hardened `CalculateReputation` in `economy_service.go` by implementing variable-weight bonuses for milestone achievements like GOVERNOR and ARENA_LEGEND.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

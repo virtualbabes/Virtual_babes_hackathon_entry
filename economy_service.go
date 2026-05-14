@@ -29,8 +29,12 @@ func (l *Lobby) applyDynamicScalingLocked() {
 		return
 	}
 	ratio := l.faucetBalance / l.maxFaucetCapacity
-	if ratio > 1.0 { ratio = 1.0 }
-	if ratio < 0.1 { ratio = 0.1 }
+	if ratio > 1.0 {
+		ratio = 1.0
+	}
+	if ratio < 0.1 {
+		ratio = 0.1
+	}
 
 	// 1. Scale the primary base reward (for internal tracking/legacy logic)
 	l.baseReward = uint64(float64(l.initialBaseReward) * ratio)
@@ -130,7 +134,18 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	rep -= (stats.WantedLevel * 20)
 
 	// 3. Achievement Weighting
-	rep += (len(stats.Achievements) * 50)
+	for _, id := range stats.Achievements {
+		bonus := 50 // Standard achievement
+		switch id {
+		case "GOVERNOR":
+			bonus = 250 // Regional influence milestone
+		case "ARENA_LEGEND":
+			bonus = 150 // Career veteran milestone
+		case "REHABILITATED", "OUTLAW_SLAYER":
+			bonus = 75 // Specialized mid-tier achievements
+		}
+		rep += bonus
+	}
 
 	// 4. Marketability Multiplier (Aggressiveness & Risk rewarded as "Marketable Traits")
 	// Instead of a flat bonus, playstyle now acts as a multiplier to scale with player performance.
@@ -174,7 +189,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// zero wins still gain visible "Standing" from rumor activity.
 	if stats.RumorCount > 0 {
 		spreaderBonus := int(float64(stats.RumorCount) * 10) // 10 reputation points per rumor spread
-		if spreaderBonus > 100 { // Cap the bonus to prevent excessive reputation from rumors alone
+		if spreaderBonus > 100 {                             // Cap the bonus to prevent excessive reputation from rumors alone
 			spreaderBonus = 100
 		}
 		rep += spreaderBonus

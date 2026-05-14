@@ -138,8 +138,17 @@
 - [FIXED] Prevented 'Capture Amnesty' by triggering Fallen Penalty jailing before Sudden Death redistribution in `battle_service.go`.
 - [FIXED] Hardened `initiatePairedMatch` in `lobby_manager.go` to ensure all critical player and environmental attributes are snapshotted for spectators.
 - [FIXED] Resolved data gap in `MatchHistory` struct and implemented board-card fatigue persistence in `battle_service.go`.
+- [FIXED] Resolved tournament bracket stalls by awarding wins on player DNF and implementing a reputation-based tie-breaker fallback for draws in `battle_service.go`.
 - [FIXED] Integrated `BountyReward` from `MatchHistory` into the `dispatchReward` flow within `faucet_service.go`.
+- [FIXED] Hardened `determineTop5` in `tournament_manager.go` by implementing reputation-based sorting for semi and quarter-finalist rankings to ensure fair payout distribution.
 - [FIXED] Ensured trader reputation is recalculated post-trade in `handleTradeShares` to reconcile Standing with current Mojo and Rumor multipliers.
 - [FIXED] Resolved inflation leak in `tournament_manager.go` by synchronizing tournament payouts with `faucetBalance` and applying Reputation bonuses.
+- [FIXED] Hardened `distributeTournamentKickback` in `server.go` to utilize network-specific precision divisors instead of hardcoded 6-decimal assumptions.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with case-insensitive network mapping and native payment (Asset ID 0) verification support.
+- [FIXED] Hardened `handlePurchaseTerritory` in `club_service.go` to utilize network-specific precision divisors instead of hardcoded 6-decimal assumptions.
 - [FIXED] Hardened `processPlaystyleDecay` logic to normalize behavioral traits (Aggressiveness/Risk) towards a neutral baseline and prune expired preference metadata.
+- [FIXED] Hardened tournament buy-in verification in `tournament_manager.go` to utilize network-specific precision divisors instead of hardcoded 6-decimal assumptions.
+- [FIXED] Implemented missing `calculateMojoGain` function in `club_service.go` to complete the Mojo lifecycle specified in the expansion plan.
+- [FIXED] Integrated the `GOVERNOR` achievement trigger into `refreshRegionalRoles` in `lobby_manager.go` to reward multi-district territory expansion.
+- [FIXED] Hardened `CalculateReputation` in `economy_service.go` to provide variable Standing bonuses for milestone achievements.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

@@ -10,8 +10,8 @@ import (
 	"math/big"
 	"net/http"
 	"os"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,14 +65,22 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 
 	// Identify Elite Status
 	l.mutex.RLock()
-	type entry struct { wallet string; wins int }
+	type entry struct {
+		wallet string
+		wins   int
+	}
 	var hof []entry
-	for wallet, stats := range l.leaderboard { hof = append(hof, entry{wallet: wallet, wins: stats.Wins}) }
+	for wallet, stats := range l.leaderboard {
+		hof = append(hof, entry{wallet: wallet, wins: stats.Wins})
+	}
 	l.mutex.RUnlock()
 	sort.Slice(hof, func(i, j int) bool { return hof[i].wins > hof[j].wins })
 	isElite := false
 	for i := 0; i < len(hof) && i < 10; i++ {
-		if hof[i].wallet == req.Wallet { isElite = true; break }
+		if hof[i].wallet == req.Wallet {
+			isElite = true
+			break
+		}
 	}
 
 	var actualRegistrationTime time.Time
@@ -97,14 +105,28 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 			verifyNetwork = "Algorand"
 		}
 
+		// PILLAR 3: Dynamic Precision.
+		// Fetch specific network config to get the correct micro-unit divisor for the buy-in asset.
+		l.mutex.RLock()
+		netCfg, hasCfg := l.availableNetworks[verifyNetwork+" Mainnet"]
+		l.mutex.RUnlock()
+
+		divisor := 1000000.0 // Fallback to standard 6 decimals (VBV/AVoi)
+		if hasCfg && netCfg.PowerDivisor > 0 {
+			divisor = netCfg.PowerDivisor
+		}
+
 		// verifyBuyInTransaction expects a prefix that matches "Network Mainnet" keys
-		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*1000000), buyInAsset, req.Wallet, l.vaultAddress)
+		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, req.Wallet, l.vaultAddress)
 		if err != nil || !verified || txUnixTime < openTime.Unix() {
 			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", req.Wallet, verifyNetwork, err)
 			http.Error(w, "Payment verification failed or transaction too old", http.StatusPaymentRequired)
 			return
 		}
 		actualRegistrationTime = time.Unix(txUnixTime, 0)
+
+		// Process Club Kickback (Tournament Revenue Loop) using the correct network precision
+		l.distributeTournamentKickback(req.Wallet, uint64(buyInAmt*divisor), actualRegistrationTime, verifyNetwork)
 	}
 
 	l.mutex.Lock()
@@ -116,11 +138,6 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}
 	l.mutex.Unlock()
 
-	// Process Club Kickback (Tournament Revenue Loop)
-	if !isElite {
-		l.distributeTournamentKickback(req.Wallet, uint64(buyInAmt*1000000), actualRegistrationTime)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "is_elite": isElite})
 }
@@ -130,14 +147,16 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
 
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500", 
+	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress, l.vaultAddress)
 
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	defer resp.Body.Close()
 
 	var res struct {
@@ -146,7 +165,7 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 			Metadata      string `json:"metadata"`
 		} `json:"transfers"`
 	}
-	
+
 	uniqueSummaries := make(map[string]TournamentSummary)
 	chunkMap := make(map[string][]TournamentMatch)
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
@@ -156,7 +175,10 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_SUMM:")), &s)
 				uniqueSummaries[s.ID] = s
 			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_DATA:") {
-				var chunk struct { ID string; Matches []TournamentMatch `json:"m"` }
+				var chunk struct {
+					ID      string
+					Matches []TournamentMatch `json:"m"`
+				}
 				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_DATA:")), &chunk)
 				chunkMap[tx.TransactionID] = chunk.Matches
 			}
@@ -202,12 +224,15 @@ func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
 			break
 		}
 	}
-	if !found { return }
+	if !found {
+		return
+	}
 
 	roundComplete := true
 	for _, m := range l.tournament.Matches {
 		if m.Round == l.tournament.CurrentRound && m.Winner == "" {
-			roundComplete = false; break
+			roundComplete = false
+			break
 		}
 	}
 	if roundComplete {
@@ -221,7 +246,7 @@ func (l *Lobby) advanceTournamentRound() {
 	var roundWinners []string
 	for _, m := range l.tournament.Matches {
 		if m.Round == l.tournament.CurrentRound && m.Winner != "" {
-			if l.isWalletConnected(m.Winner) { roundWinners = append(roundWinners, m.Winner) }
+			roundWinners = append(roundWinners, m.Winner)
 		}
 	}
 
@@ -254,7 +279,6 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 	}
 	top5 = append(top5, winner)
 
-	// Identify the final round number
 	maxRound := 0
 	for _, m := range matches {
 		if m.Round > maxRound {
@@ -265,46 +289,61 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 	// 2nd Place: Loser of the final
 	for _, m := range matches {
 		if m.Round == maxRound {
-			if m.P1 == winner {
-				top5 = append(top5, m.P2)
-			} else {
-				top5 = append(top5, m.P1)
+			runnerUp := m.P1
+			if strings.EqualFold(m.P1, winner) {
+				runnerUp = m.P2
+			}
+			if runnerUp != "" && !strings.EqualFold(runnerUp, "BYE") {
+				top5 = append(top5, runnerUp)
 			}
 			break
 		}
 	}
 
-	// 3rd & 4th: Losers of semi-finals
+	// 3rd & 4th: Losers of semi-finals (Sorted by Reputation)
+	semiLosers := []string{}
 	for _, m := range matches {
 		if m.Round == maxRound-1 && maxRound > 1 {
 			var loser string
-			if m.Winner == m.P1 {
+			if strings.EqualFold(m.Winner, m.P1) {
 				loser = m.P2
 			} else {
 				loser = m.P1
 			}
-			if loser != "" && loser != "BYE" {
-				top5 = append(top5, loser)
+			if loser != "" && !strings.EqualFold(loser, "BYE") {
+				semiLosers = append(semiLosers, loser)
 			}
 		}
 	}
+	// PILLAR 1: Performance Tie-breaker
+	sort.Slice(semiLosers, func(i, j int) bool {
+		return l.leaderboard[semiLosers[i]].Reputation > l.leaderboard[semiLosers[j]].Reputation
+	})
+	top5 = append(top5, semiLosers...)
 
-	// 5th: First found loser of quarter-finals
+	// 5th: Losers of quarter-finals (Sorted by Reputation)
 	if len(top5) < 5 {
+		quartLosers := []string{}
 		for _, m := range matches {
 			if m.Round == maxRound-2 && maxRound > 2 {
 				var loser string
-				if m.Winner == m.P1 {
+				if strings.EqualFold(m.Winner, m.P1) {
 					loser = m.P2
 				} else {
 					loser = m.P1
 				}
-				if loser != "" && loser != "BYE" {
-					top5 = append(top5, loser)
-					if len(top5) >= 5 {
-						break
-					}
+				if loser != "" && !strings.EqualFold(loser, "BYE") {
+					quartLosers = append(quartLosers, loser)
 				}
+			}
+		}
+		sort.Slice(quartLosers, func(i, j int) bool {
+			return l.leaderboard[quartLosers[i]].Reputation > l.leaderboard[quartLosers[j]].Reputation
+		})
+		for _, lsr := range quartLosers {
+			top5 = append(top5, lsr)
+			if len(top5) >= 5 {
+				break
 			}
 		}
 	}
@@ -329,10 +368,10 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			if i >= len(payoutPercentages) {
 				break
 			}
-			
+
 			// Calculate Pot Share (Primary Asset)
 			shareMicro := uint64(l.tournament.Pot * payoutPercentages[i] * 1000000)
-			
+
 			// Dispatch grouped rewards in background goroutine
 			go func(p string, rank int, amt uint64) {
 				txid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
@@ -365,11 +404,19 @@ func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
 
 	if len(matchBytes) > 800 {
 		for i := 0; i < len(summary.Matches); i += 4 {
-			end := i + 4; if end > len(summary.Matches) { end = len(summary.Matches) }
-			chunk := struct { ID string `json:"id"`; Matches []TournamentMatch `json:"m"` }{ID: summary.ID, Matches: summary.Matches[i:end]}
+			end := i + 4
+			if end > len(summary.Matches) {
+				end = len(summary.Matches)
+			}
+			chunk := struct {
+				ID      string            `json:"id"`
+				Matches []TournamentMatch `json:"m"`
+			}{ID: summary.ID, Matches: summary.Matches[i:end]}
 			chunkJSON, _ := json.Marshal(chunk)
 			txid, err := l.sendNoteTx(fmt.Sprintf("VBT_TOURN_DATA:%s", string(chunkJSON)))
-			if err == nil { childLinks = append(childLinks, txid) }
+			if err == nil {
+				childLinks = append(childLinks, txid)
+			}
 		}
 		summary.Matches = nil
 	}
@@ -464,7 +511,9 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		txns[i].Group = gid
 		txid, stxn, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txns[i])
 		signedGroup = append(signedGroup, stxn...)
-		if i == 0 { firstTxID = txid }
+		if i == 0 {
+			firstTxID = txid
+		}
 	}
 
 	if _, err := client.SendRawTransaction(signedGroup).Do(context.Background()); err != nil {
@@ -489,7 +538,9 @@ func (l *Lobby) broadcastTournamentState() {
 
 func (l *Lobby) isWalletRegistered(wallet string) bool {
 	for _, p := range l.paidParticipants {
-		if p == wallet { return true }
+		if p == wallet {
+			return true
+		}
 	}
 	return false
 }

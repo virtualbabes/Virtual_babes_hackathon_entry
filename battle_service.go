@@ -354,7 +354,25 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 	} else { // Draw
 		history.WinnerID, history.WinnerIndex = "", 2 // 2 for Draw
 		history.Opponent = "DRAW"
-		// No specific player wins, so no leaderboard update for a draw winner
+
+		// PILLAR 1: Bracket Integrity.
+		// If Sudden Death was bypassed or disabled in a tournament, resolve via Reputation to prevent stall.
+		if match.TournamentMatchID != "" {
+			p1Stats := l.leaderboard[match.P1Wallet]
+			p2Stats := l.leaderboard[match.P2Wallet]
+			
+			log.Printf("[BATTLE] Tournament Draw safety trigger. Resolving via Reputation for %s vs %s\n", match.P1Wallet, match.P2Wallet)
+			
+			if p1Stats.Reputation >= p2Stats.Reputation {
+				history.WinnerID, history.WinnerIndex = match.P1ID, 0
+				history.Opponent = match.P2Wallet
+				l.finalizeMatchResultLocked(match.P1ID, match.P1Deck, history)
+			} else {
+				history.WinnerID, history.WinnerIndex = match.P2ID, 1
+				history.Opponent = match.P1Wallet
+				l.finalizeMatchResultLocked(match.P2ID, match.P2Deck, history)
+			}
+		}
 	}
 
 	// BOUNTY SYSTEM: Check for Hunter/Outlaw reward triggers

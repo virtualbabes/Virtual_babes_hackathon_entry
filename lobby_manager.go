@@ -850,6 +850,15 @@ func (l *Lobby) handleUnregister(client *Client) {
 				if wallet, ok := l.wallets[client.id]; ok {
 					l.incrementDNF(wallet, match.TournamentMatchID != "") // Pass tournament context
 				}
+
+				// PILLAR 3: Tournament Disconnection Protocol.
+				// If a player leaves during a tournament match, award the advancement to the opponent.
+				if match.TournamentMatchID != "" {
+					if oppWallet, ok := l.wallets[opponentID]; ok {
+						log.Printf("[TOURNAMENT] Awarding win to %s due to opponent DNF.\n", oppWallet)
+						l.processTournamentResult(match.TournamentMatchID, oppWallet)
+					}
+				}
 				delete(l.matches, opponentID)
 			}
 			delete(l.matches, client.id)
@@ -1631,7 +1640,7 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 			l.paidParticipants = append(l.paidParticipants, mockWallet)
 			l.faucetBalance += (50.0 / 2.0) // Simulate half buy-in to pot
 			l.tournamentPotBonus += (50.0 / 2.0)
-			l.distributeTournamentKickback(mockWallet, uint64(50*1000000), time.Now())
+			l.distributeTournamentKickback(mockWallet, uint64(50*1000000), time.Now(), "Voi")
 		}
 	}
 
@@ -1891,6 +1900,10 @@ func (l *Lobby) refreshRegionalRoles() {
 			if club.RegionName == "" {
 				club.RegionName = "Governor"
 			}
+
+			// PILLAR 1: Achievement Integration.
+			// Grant the GOVERNOR trophy to the club owner for expanded regional influence.
+			l.unlockAchievementLocked(strings.ToLower(club.OwnerWallet), "GOVERNOR")
 		} else {
 			// Remove governor status if they no longer control 2+ territories
 			club.RegionName = ""
