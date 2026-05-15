@@ -35,6 +35,12 @@ RUN addgroup -S arena && adduser -S arenabot -G arena
 
 WORKDIR /app
 
+# Create a data directory for persistent volumes (Render support)
+RUN mkdir -p /app/data && chown -R arenabot:arena /app/data
+
+# Set Environment Variable for the data directory
+ENV DATA_DIR=/app/data
+
 # Copy only the compiled binary from the builder stage
 COPY --from=builder --chown=arenabot:arena /app/server-bin .
 

@@ -61,7 +61,7 @@ func (l *Lobby) saveSeasonMetadataLocked() {
 		log.Printf("[ECONOMY ERROR] Failed to marshal season metadata: %v\n", err)
 		return
 	}
-	os.WriteFile("season.json", conf, 0644)
+	os.WriteFile(l.getDataPath("season.json"), conf, 0644)
 }
 
 func (l *Lobby) sendNoteTx(note string) (string, error) {

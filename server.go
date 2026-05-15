@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,14 @@ import (
 
 // Global constants for resilience
 const indexerTimeout = 10 * time.Second
+
+// getDataPath constructs a full path for persistent files using the DataDir field.
+func (l *Lobby) getDataPath(filename string) string {
+	if l.DataDir == "" {
+		return filename
+	}
+	return filepath.Join(l.DataDir, filename)
+}
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -86,6 +95,7 @@ func newLobby() (*Lobby, error) {
 		envoiCache:              make(map[string]string),
 		vaultAddress:            os.Getenv("VAULT_ADDRESS"),
 		WCProjectID:             os.Getenv("WC_PROJECT_ID"), // Load WalletConnect Project ID
+		DataDir:                 os.Getenv("DATA_DIR"),      // Persistent volume path
 		maxFaucetCapacity:       10000.0,
 		adminFocusNetwork:       "Voi Mainnet",
 	}
@@ -113,7 +123,7 @@ func newLobby() (*Lobby, error) {
 	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
 
 	// Load Persistent Card Cache
-	if data, err := os.ReadFile(cardCacheFileName); err == nil {
+	if data, err := os.ReadFile(l.getDataPath("card_cache.json")); err == nil {
 		l.mutex.Lock()
 		json.Unmarshal(data, &l.persistentCardCache)
 		for id, card := range l.persistentCardCache {

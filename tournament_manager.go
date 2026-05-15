@@ -22,7 +22,7 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
-const regCacheFileName = "registrations.json"
+const regCacheName = "registrations.json"
 
 // tournamentCacheEntry stores the serialized JSON and its associated query key.
 type tournamentCacheEntry struct {

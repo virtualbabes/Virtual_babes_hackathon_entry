@@ -18,7 +18,7 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
-const cardCacheFileName = "card_cache.json"
+const cardCacheName = "card_cache.json"
 
 func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName string) (map[int]ServerCard, error) {
 	results := make(map[int]ServerCard)
@@ -1054,7 +1054,7 @@ func (l *Lobby) savePersistentCardCache() {
 		log.Printf("[CACHE] Failed to marshal card cache: %v\n", err)
 		return
 	}
-	if err := os.WriteFile(cardCacheFileName, data, 0644); err != nil {
+	if err := os.WriteFile(l.getDataPath(cardCacheName), data, 0644); err != nil {
 		log.Printf("[CACHE] Failed to write card cache file: %v\n", err)
 	}
 }

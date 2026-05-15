@@ -483,5 +483,6 @@ type Lobby struct {
 	envoiMutex              sync.RWMutex      // Dedicated lock for name resolution
 	SybilSyncComplete       bool              // Indicates historical claim state is fully restored
 	WCProjectID             string            // WalletConnect Project ID from environment variable
+	DataDir                 string            // Path to persistent data directory for volumes
 	mutex                   sync.RWMutex
 }

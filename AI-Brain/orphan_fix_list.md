@@ -216,4 +216,5 @@
 - [FIXED] Enhanced `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly apply CSS classes and colors based on admin broadcast priority levels.
 - [FIXED] Updated `networks.json` with stable production RPC endpoints for Ethereum and Polygon (LlamaRPC), resolving potential 401 errors from unconfigured Infura placeholders.
 - [FIXED] Hardened `determineTop5` in `tournament_manager.go` to correctly rank semi-finalists and quarter-finalists when multiple BYE matches are present in the bracket.
+- [FIXED] Introduced `DATA_DIR` resolution in `Lobby` to allow persistent state storage on Render volumes; updated all service files to use dynamic pathing for JSON caches and audit logs.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.

@@ -44,7 +44,7 @@ func (l *Lobby) logAdminAuditLocked(action, target, details string) {
 	}
 
 	b, _ := json.Marshal(entry)
-	f, err := os.OpenFile("admin_audit.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(l.getDataPath("admin_audit.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("[AUDIT ERROR] Failed to write to admin log: %v\n", err)
 		return
@@ -677,7 +677,7 @@ func (l *Lobby) handleGetAdminLogs(w http.ResponseWriter, r *http.Request) {
 	if endStr != "" {
 		end, _ = time.Parse(time.RFC3339, endStr)
 	}
-	f, err := os.Open("admin_audit.log")
+	f, err := os.Open(l.getDataPath("admin_audit.log"))
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "error", "message": "No logs"})
 		return

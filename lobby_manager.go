@@ -28,7 +28,7 @@ var safeAvatarPool = []string{
 	"Cards/Fran.webp",
 }
 
-const linkedWalletsFileName = "linked_wallets.json"
+const linkedWalletsName = "linked_wallets.json"
 
 func (c *Client) allowMessage() bool {
 	c.msgMutex.Lock()
@@ -1487,7 +1487,7 @@ func (l *Lobby) saveRegisteredTxIDs() {
 
 // loadLinkedWallets loads linked wallet information from a file.
 func (l *Lobby) loadLinkedWallets() {
-	data, err := os.ReadFile(linkedWalletsFileName)
+	data, err := os.ReadFile(l.getDataPath(linkedWalletsName))
 	if err != nil {
 		log.Printf("[CACHE] No linked_wallets.json found, starting fresh: %v\n", err)
 		return
@@ -1507,7 +1507,7 @@ func (l *Lobby) saveLinkedWallets() {
 		log.Printf("[CACHE ERROR] Failed to marshal linked wallets: %v\n", err)
 		return
 	}
-	if err := os.WriteFile(linkedWalletsFileName, data, 0644); err != nil {
+	if err := os.WriteFile(l.getDataPath(linkedWalletsName), data, 0644); err != nil {
 		log.Printf("[CACHE ERROR] Failed to write linked wallets file: %v\n", err)
 	}
 }
