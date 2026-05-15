@@ -50,6 +50,17 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PILLAR 2: Financial Guardrails
+	if req.StartPrice <= 0 || req.Duration <= 0 {
+		http.Error(w, "Invalid starting price or duration", http.StatusBadRequest)
+		return
+	}
+
+	if req.Bundle.CardID == 0 && req.Bundle.WeaponID == "" && req.Bundle.FaceplateID == "" {
+		http.Error(w, "Auction bundle cannot be empty", http.StatusBadRequest)
+		return
+	}
+
 	sellerName := l.ResolveEnvoiName(req.Wallet)
 
 	l.mutex.RLock()
@@ -68,6 +79,10 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	// PILLAR 2: Inventory Integrity.
+	// Ensure maps are initialized before checking item existence to prevent nil access panics.
+	l.ensurePlayerStatsMapsInitialized(req.Wallet)
 
 	stats := l.leaderboard[req.Wallet]
 	if req.Bundle.CardID != 0 {
@@ -109,7 +124,8 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 		TerritoryID:  "the_art_gallery",
 	}
 
-	l.logAdminAudit("AUCTION_CREATED", req.Wallet, fmt.Sprintf("ID: %s, Price: %.2f", auctionID, req.StartPrice))
+	// PILLAR 2: High-Finance Audit. Use Locked variant to prevent recursive deadlock.
+	l.logAdminAuditLocked("AUCTION_CREATED", req.Wallet, fmt.Sprintf("ID: %s, Price: %.2f", auctionID, req.StartPrice))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(l.auctions[auctionID])
 }
@@ -236,6 +252,14 @@ func (l *Lobby) processAuctions() {
 				// No direct change to l.faucetBalance for the full bid, only for the commission if it goes there.
 				l.applyDynamicScalingLocked() // Re-evaluate scaling due to potential faucet change
 
+				// 6. Track Achievement: ART_COLLECTOR (3 Wins)
+				winnerStats := l.leaderboard[auction.HighestBidder]
+				winnerStats.AuctionsWon++
+				l.leaderboard[auction.HighestBidder] = winnerStats
+				if winnerStats.AuctionsWon >= 3 {
+					l.unlockAchievementLocked(auction.HighestBidder, "ART_COLLECTOR")
+				}
+
 				l.logAdminAuditLocked("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Winner: %s, Seller: %s, Amount: %.2f (Net: %.2f, Commission: %.2f)",
 					id, auction.HighestBidder, auction.SellerWallet, float64(auction.CurrentBid)/1000000.0, float64(netPayoutToSellerMicro)/1000000.0, float64(commissionMicro)/1000000.0))
 
@@ -271,10 +295,8 @@ func (l *Lobby) processAuctions() {
 // If add is true, items are added. If add is false, items are removed.
 // It assumes the lobby mutex is held.
 func (l *Lobby) transferBundleItems(wallet string, bundle CardBundle, add bool) {
+	l.ensurePlayerStatsMapsInitialized(wallet)
 	stats := l.leaderboard[wallet]
-	if stats.Inventory == nil {
-		stats.Inventory = make(map[string]int)
-	}
 
 	if bundle.CardID != 0 {
 		cardKey := fmt.Sprintf("CARD-%d", bundle.CardID)

@@ -118,20 +118,23 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		targetClub.Treasury -= float64(lootMicro) / 1000000.0
 		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
-		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.Cunning += 1                                    // Successful heists improve Cunning
 
 		// Add net loot to player's rewards
 		l.rewards[wallet] += netLootMicro
 
+		// Update local reputation and leaderboard before achievement to ensure accuracy
+		playerStats.Reputation = l.CalculateReputation(playerStats)
+		l.leaderboard[wallet] = playerStats
+
 		// Achievement unlock uses the Locked variant since we already hold the lobby mutex.
 		l.unlockAchievementLocked(wallet, "FIRST_HEIST")
+		playerStats = l.leaderboard[wallet] // Re-fetch to avoid clobbering achievement
 
 	} else {
 		status = "failure"
 		playerStats.WantedLevel += 15
 		playerStats.Playstyle.RiskTolerance += 0.10
-		playerStats.Reputation = l.CalculateReputation(playerStats) // Update social standing
 		playerStats.HeistAttempts++
 
 		// MOJO GAIN: Reward the club for successful defense
@@ -168,15 +171,17 @@ func (l *Lobby) handleHeist(env *Envelope) {
 					playerStats.JailedCards = make(map[int]string)
 				}
 				playerStats.JailedCards[rarestCard.ID] = targetClub.ID
-				l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>GUARD DOG BUST:</b> You were caught by a Bio-Guard Dog! Your rarest card (%s) has been jailed by %s."}`, rarestCard.Name, targetClub.Name))})
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>GUARD DOG BUST:</b> You were caught by a Bio-Guard Dog! Your rarest card (%s) has been jailed by %s."}`, rarestCard.Name, targetClub.Name))})
 			}
 		}
 	}
 
+	// FINAL REPUTATION SYNC: Reflect all status changes, including potential jailing.
+	playerStats.Reputation = l.CalculateReputation(playerStats)
 	l.leaderboard[wallet] = playerStats
-	l.logAdminAudit("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s, Loot: %.2f, FenceFee: %.2f", data.TargetClubID, status, netLoot, fenceFee))
+	l.logAdminAuditLocked("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s, Loot: %.2f, FenceFee: %.2f", data.TargetClubID, status, netLoot, fenceFee))
 	if status == "success" {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>HEIST SUCCESS:</b> You looted %.2f $VBV from %s (Net after Fence Fee)."}`, netLoot, targetClub.Name))})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>HEIST SUCCESS:</b> You looted %.2f $VBV from %s (Net after Fence Fee)."}`, netLoot, targetClub.Name))})
 	}
 
 	response, _ := json.Marshal(map[string]interface{}{
@@ -189,7 +194,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		"kidnap_eligible":   canKidnap,
 		"target_club_id":    data.TargetClubID,
 	})
-	l.sendToClient(env.FromID, Envelope{Type: "heist_result", Payload: response})
+	l.sendToClientLocked(env.FromID, Envelope{Type: "heist_result", Payload: response})
 
 	// Trigger Global Sync so others see the treasury loot and the player's new Wanted Level
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
@@ -240,6 +245,7 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 		Inventory:       make(map[string]int),
 		ActiveBuffs:     make(map[string]string),
 		Leases:          make(map[string]*Lease),
+		Mojo:            0, // PILLAR 1: Start with neutral social standing
 		BuffExpirations: make(map[string]time.Time),
 		CreatedAt:       time.Now(), Jail: make(map[int]ServerCard), LastActivity: time.Now(),
 	}

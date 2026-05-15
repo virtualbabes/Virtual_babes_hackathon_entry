@@ -4,8 +4,8 @@ import { showToast, hideAllOverlays, renderCardHTML } from './ui.js';
 import { collectiveIntelligence } from '../collective-intelligence.js';
 import { userAddress, walletProvider, signClient, updateWalletUI } from './wallet.js';
 import { getCachedEnvoiName, getNetworkConfig, resolveEnvoiName, assetCache, resolveAssetSymbol } from './utils.js';
-import { globalClubs, availableNetworks } from './admin.js';
-import { lastLobbyPlayers } from './game.js';
+import { globalClubs, availableNetworks, fetchAdminLogs } from './admin.js';
+import { lastLobbyPlayers, syncUI } from './game.js';
 
 const algosdk = window.algosdk;
 
@@ -624,14 +624,111 @@ export function takeLease(clubId, leaseId) {
 }
 
 export async function openBlackMarket() {
-    const state = window.GetGameState();
-    const el = document.getElementById("black-market-overlay");
-    if (el) el.classList.remove("hidden");
+	const state = window.GetGameState();
+	const wanted = state.wanted_level || 0;
+	const cunning = state.cunning || 0;
+
+	const REQ_WANTED = 5;
+	const REQ_CUNNING = 10;
+
+	if (wanted < REQ_WANTED || cunning < REQ_CUNNING) {
+		showToast(`❌ Access Denied: Underworld clearance requires Wanted Level ${REQ_WANTED}+ and Cunning ${REQ_CUNNING}+.`, "error");
+		return;
+	}
+
+	const overlay = document.getElementById("black-market-overlay") || document.createElement("div");
+	overlay.id = "black-market-overlay";
+	overlay.className = "overlay";
+
+	const wantedColor = wanted >= REQ_WANTED ? 'var(--neon-green)' : '#ff4b4b';
+	const cunningColor = cunning >= REQ_CUNNING ? 'var(--neon-green)' : '#ff4b4b';
+
+	overlay.innerHTML = `
+		<div class="economy-panel black-market medium animate-modal">
+			<div class="market-header">
+				<span class="market-title">THE UNDERWORLD</span>
+				<div class="access-level">RESTRICTED ACCESS</div>
+			</div>
+			
+			<div class="market-notice mb-20">
+				<div class="notice-icon">💀</div>
+				<div class="notice-title">DEFAULTED COLLATERAL</div>
+				<p class="notice-text">
+					Underworld clearance verified. Access granted via status: 
+					<span style="color: ${wantedColor}">WANTED ${wanted}/${REQ_WANTED}</span> • 
+					<span style="color: ${cunningColor}">CUNNING ${cunning}/${REQ_CUNNING}</span>.
+				</p>
+			</div>
+
+			<div id="black-market-grid" class="market-grid" style="max-height: 400px; overflow-y: auto;">
+				<div class="opacity-5 py-40 italic text-center">Scanning datastreams for hot assets...</div>
+			</div>
+			
+			<button class="outline mt-20 w-full" onclick="document.getElementById('black-market-overlay').remove()">CLOSE TERMINAL</button>
+		</div>
+	`;
+
+	if (!document.getElementById("black-market-overlay")) document.body.appendChild(overlay);
+	overlay.classList.remove("hidden");
+
+	try {
+		const response = await fetch(`${CONFIG.API_BASE}/api/black-market?wallet=${userAddress}`);
+		if (!response.ok) throw new Error(await response.text());
+		const items = await response.json();
+		const grid = document.getElementById("black-market-grid");
+		
+		if (!items || items.length === 0) {
+			grid.innerHTML = `<div class="opacity-3 py-40 italic text-center">No hot items currently available.</div>`;
+		} else {
+			const wallets = [...new Set(items.map(i => i.borrower_wallet))];
+			await Promise.all(wallets.map(w => resolveEnvoiName(w)));
+
+			grid.innerHTML = items.map(item => {
+				const priceVBV = (item.repayment_amount * 0.75) / 1000000;
+				const borrower = getCachedEnvoiName(item.borrower_wallet);
+				return `
+					<div class="player-item border-error p-15">
+						<div class="text-left">
+							<b class="text-neon-cyan">Collateral: ${borrower}</b>
+							<div class="font-size-0-75em opacity-6">Hot Asset Bundle</div>
+						</div>
+						<div class="text-right">
+							<b class="text-neon-green">${priceVBV.toFixed(2)} $VBV</b>
+							<button class="outline btn-small border-error text-error mt-5" 
+									onclick="buyBlackMarketItem('${item.id}', ${priceVBV})">BUY (RISKY)</button>
+						</div>
+					</div>`;
+			}).join('');
+		}
+	} catch (err) {
+		showToast(`Market Link Error: ${err.message}`, "error");
+	}
 }
 
-export function buyBlackMarketItem(itemId, price) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "buy_black_market", payload: { item_id: itemId, price: price } }));
+export async function buyBlackMarketItem(loanId, price) {
+	if (!userAddress) return showToast("Connect wallet first", "error");
+	if (!confirm(`Are you sure you want to buy this item for ${price.toFixed(2)} $VBV? This will increase your Wanted Level.`)) return;
+
+	try {
+		const state = window.GetGameState();
+		const response = await fetch(`${CONFIG.API_BASE}/api/black-market/buy`, {
+			method: "POST",
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ wallet: userAddress, loan_id: loanId, network: state.network })
+		});
+
+		if (response.ok) {
+			const result = await response.json();
+			showToast(`🏴‍☠️ ${result.message}`, "success");
+			document.getElementById("black-market-overlay")?.remove();
+			syncUI();
+		} else {
+			const err = await response.text();
+			showToast(`❌ Black Market Purchase Failed: ${err}`, "error");
+		}
+	} catch (err) {
+		showToast(`Purchase Failed: ${err.message}`, "error");
+	}
 }
 
 window.updateMarketTicker = updateMarketTicker;

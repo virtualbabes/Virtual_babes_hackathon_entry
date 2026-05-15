@@ -1010,6 +1010,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		HasMardonBadge    bool           `json:"has_mardon_badge"`
 		Wins              int            `json:"wins"`
 		Reputation        int            `json:"reputation"`
+		AuctionsWon       int            `json:"auctions_won"`
 		WantedLevel       int            `json:"wanted_level"`
 		Cunning           int            `json:"cunning"`
 		Mojo              int            `json:"mojo"`
@@ -1029,7 +1030,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	for _, client := range l.clients {
 		hasMardon := false
 		var banExpires time.Time
-		wins, reputation, wanted, cunning, nurturing, mojo := 0, 0, 0, 0, 0, 0
+		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon := 0, 0, 0, 0, 0, 0, 0
 		var jailedCards map[int]string
 		var equippedFaceplate string
 		var socialRank string
@@ -1042,6 +1043,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				banExpires = stats.BanExpires
 				wins = stats.Wins
 				reputation = stats.Reputation
+				auctionsWon = stats.AuctionsWon
 				// UI Sync: Use Effective Mojo (including faceplate) for Career Path display
 				mojo = stats.GetEffectiveMojo()
 				wanted = stats.WantedLevel
@@ -1065,6 +1067,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
 			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation, 
+			AuctionsWon: auctionsWon,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			JailedCards: jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,

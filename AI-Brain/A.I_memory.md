@@ -424,4 +424,18 @@
 53. Complete: Hardened `handleCreateLease` and `handleTakeLease` in `club_service.go` by implementing micro-unit precision for revenue splitting and resolving recursive deadlocks.
 54. Complete: Hardened `processLeaseExpirations` in `club_service.go` to correctly update borrower reputation upon leased card return.
 55. Complete: Updated `openClubLeaseBoard` in `app.js` to display the Faucet tax and Club commission breakdown for industrial leases.
+56. Complete: Hardened `handleCreateAuction` in `auction_service.go` with item existence validation, empty bundle checks, and resolved recursive deadlock.
+57. Complete: Hardened `transferBundleItems` and `handleCreateAuction` in `auction_service.go` by integrating nil-safe map initialization via `ensurePlayerStatsMapsInitialized`.
+58. Complete: Hardened `processAuctions` in `auction_service.go` by implementing win-tracking and the ART_COLLECTOR achievement trigger.
+59. Complete: Verified `handleTradeShares` in `market_service.go` correctly weights the ART_COLLECTOR achievement through its contribution to player Reputation.
+60. Complete: Updated `switchPortfolioTab` in `economy.js` to display Gallery Victories, synchronized through `lobby_manager.go` and `main.go`.
+61. Complete: Refined `handleCreateClub` in `club_service.go` to explicitly initialize the Mojo field to 0 for new organizations.
+62. Complete: Consolidated Black Market logic into `economy.js` and updated requirements notice to display user's current Cunning and Wanted Level relative to thresholds.
+63. Complete: Hardened `handleHeist` in `club_service.go` by resolving recursive deadlock vulnerabilities in the audit and notification paths.
+64. Complete: Hardened `handleKidnapRequest` in `handlers_criminality.go` by resolving recursive deadlock vulnerabilities in the error-handling paths.
+65. Complete: Hardened `handleBailCard` in `handlers_criminality.go` by resolving recursive deadlocks and integrating reputation synchronization for bailed assets.
+66. Complete: Hardened `processInsuranceRecovery` in `handlers_criminality.go` by resolving recursive deadlocks and integrating reputation synchronization for victims and perpetrators.
+67. Complete: Hardened `handlePayRansom` and `handleReleaseHostage` in `handlers_criminality.go` by resolving recursive deadlocks and implementing reputation recalculation for both parties.
+68. Complete: Hardened `CalculateReputation` in `economy_service.go` with jailing penalties and resolved clobbering risks in `handleHeist`.
+69. Complete: Hardened `handleBailCard` in `handlers_criminality.go` by resolving remaining recursive deadlock vulnerabilities in the error paths.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

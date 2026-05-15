@@ -2057,6 +2057,7 @@ window.switchSocialTab = async (tab) => {
             { id: "FIRST_HEIST", name: "First Heist", description: "Complete a successful Club heist.", tier: 1 },
             { id: "OUTLAW_SLAYER", name: "Outlaw Slayer", description: "Defeat a high-infamy opponent.", tier: 2 },
             { id: "ARENA_LEGEND", name: "Arena Legend", description: "Achieve legendary status in the arena.", tier: 3 },
+            { id: "ART_COLLECTOR", name: "Art Collector", description: "Win 3 or more Art Gallery auctions.", tier: 2 },
             { id: "REHABILITATED", name: "Rehabilitated", description: "Pay off your courthouse fine and reset wanted level.", tier: 2 },
             { id: "GOVERNOR", name: "Governor", description: "Control 2+ territories as a club leader.", tier: 3 }
         ];

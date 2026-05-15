@@ -170,4 +170,18 @@
 - [FIXED] Hardened Industrial Leases in `club_service.go` to use micro-unit precision for revenue splits and resolved recursive deadlocks in the lease creation and fulfillment paths.
 - [FIXED] Hardened `processLeaseExpirations` in `club_service.go` to ensure borrower reputation is recalculated upon leased card return.
 - [FIXED] Updated `openClubLeaseBoard` in `app.js` to provide transparency on industrial lease fee distribution (20% Faucet, 20% Club).
+- [FIXED] Hardened `handleCreateAuction` in `auction_service.go` by validating that bundles are not empty and using `transferBundleItems` for consistent inventory escrow; resolved recursive deadlock in the audit path.
+- [FIXED] Resolved nil map access panic in `handleCreateAuction` and refactored `transferBundleItems` in `auction_service.go` to utilize the standard map initialization helper.
+- [FIXED] Implemented auction win tracking and the `ART_COLLECTOR` achievement trigger in `processAuctions` (auction_service.go); updated Hall of Valor catalog in `app.js`.
+- [VERIFIED] `handleTradeShares` in `market_service.go` correctly weights the `ART_COLLECTOR` achievement via its impact on player `Reputation`.
+- [FIXED] Updated `switchPortfolioTab` in `economy.js` and plumbed `AuctionsWon` metric from backend to WASM state machine for high-finance prestige display.
+- [FIXED] Explicitly initialized `Mojo: 0` in `handleCreateClub` within `club_service.go` for organizational transparency and consistency.
+- [FIXED] Eliminated duplicate `openBlackMarket` and `buyBlackMarketItem` definitions across `app.js` and `criminality.js`, centralizing authoritative Underworld logic in `economy.js` with dynamic requirements display.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handleHeist` within `club_service.go` by switching to `Locked` variant helpers for audits and notifications.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handleBailCard` within `handlers_criminality.go` and implemented reputation recalculation upon successful card release.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `processInsuranceRecovery` within `handlers_criminality.go` and implemented reputation recalculation for victims and perpetrators.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handlePayRansom` and `handleReleaseHostage` within `handlers_criminality.go` and implemented reputation recalculation for victims and perpetrators.
+- [FIXED] Hardened `CalculateReputation` in `economy_service.go` to account for jailed cards and resolved clobbering/sequencing issues in `handleHeist` (club_service.go) regarding Guard Dog jailing and achievement triggers.
+- [FIXED] Resolved remaining recursive deadlock vulnerabilities in the error paths of `handleBailCard` within `handlers_criminality.go`.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

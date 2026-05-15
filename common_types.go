@@ -274,6 +274,7 @@ type PlayerStats struct {
 	JobRole           string             `json:"job_role"`            // Manager, Security, Clerk, Freelancer
 	EmployerClubID    string             `json:"employer_id"`         // The club currently paying this user
 	Salary            uint64             `json:"salary"`              // Micro-units of $VBV per payment cycle
+	AuctionsWon       int                `json:"auctions_won"`        // Total Art Gallery victories
 	LastSalaryPayment time.Time          `json:"last_salary_payment"` // Timestamp of last payment
 	Inventory         map[string]int     `json:"inventory"`           // ItemID -> Quantity
 	MarketTokens      uint64             `json:"market_tokens"`       // Equity from liquidated loans

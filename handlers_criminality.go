@@ -25,14 +25,20 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	perpWallet, ok := l.wallets[env.FromID]
-	if !ok { return }
+	if !ok {
+		return
+	}
 
 	targetClub, exists := l.clubs[data.TargetClubID]
-	if !exists { return }
+	if !exists {
+		return
+	}
 
 	victimWallet := strings.ToLower(targetClub.OwnerWallet)
 	victimStats, victimExists := l.leaderboard[victimWallet]
-	if !victimExists { return }
+	if !victimExists {
+		return
+	}
 
 	// Selection Logic: Target the CEO's Favorite Card or their Rarest Card
 	var cardToKidnap ServerCard
@@ -53,7 +59,7 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	if !cardFound {
 		rarest, found := l.findRarestCardInInventory(victimWallet)
 		if !found {
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: Target has no valuable assets."}`)})
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: Target has no valuable assets."}`)})
 			return
 		}
 		cardToKidnap = rarest
@@ -62,7 +68,7 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 
 	// Final check: If no card was found after all attempts (should ideally not happen if findRarestCardInInventory is robust)
 	if !cardFound {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: No suitable card found for target."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: No suitable card found for target."}`)})
 		return
 	}
 
@@ -77,13 +83,17 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 
 	// Move the card to Hostage state
 	// Victim View: Their card is being Held Hostage
-	if victimStats.HeldHostageCards == nil { victimStats.HeldHostageCards = make(map[int]string) }
+	if victimStats.HeldHostageCards == nil {
+		victimStats.HeldHostageCards = make(map[int]string)
+	}
 	victimStats.HeldHostageCards[targetCardID] = perpWallet
 	l.leaderboard[victimWallet] = victimStats
 
 	// Perp View: They have Kidnapped a card
 	perpStats := l.leaderboard[perpWallet]
-	if perpStats.KidnappedCards == nil { perpStats.KidnappedCards = make(map[int]string) }
+	if perpStats.KidnappedCards == nil {
+		perpStats.KidnappedCards = make(map[int]string)
+	}
 	perpStats.KidnappedCards[targetCardID] = victimWallet
 	l.leaderboard[perpWallet] = perpStats
 
@@ -105,13 +115,13 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	// Notify Victim
 	victimClientID := l.getClientIDFromWalletLocked(victimWallet)
 	if victimClientID != "" {
-		msg := fmt.Sprintf(`{"text":"🚨 <b>KIDNAP GAMBIT:</b> %s has kidnapped your card #%d! Ransom demanded: %.2f $VBV.", "card_id": %d, "perp_wallet": "%s", "ransom": %d}`, 
+		msg := fmt.Sprintf(`{"text":"🚨 <b>KIDNAP GAMBIT:</b> %s has kidnapped your card #%d! Ransom demanded: %.2f $VBV.", "card_id": %d, "perp_wallet": "%s", "ransom": %d}`,
 			perpWallet, targetCardID, float64(data.RansomAmount)/1000000.0, targetCardID, perpWallet, data.RansomAmount)
 		l.sendToClientLocked(victimClientID, Envelope{Type: "ransom_demand", Payload: json.RawMessage(msg)})
 	}
 
 	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"💼 <b>HOSTAGE SECURED:</b> The target card is now in your custody."}`)})
-	
+
 	msg := l.getLobbyUpdateMsgLocked()
 	go func() { l.broadcast <- msg }()
 }
@@ -131,7 +141,9 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	victimWallet, ok := l.wallets[env.FromID]
-	if !ok { return }
+	if !ok {
+		return
+	}
 
 	victimStats := l.leaderboard[victimWallet]
 	if victimStats.HeldHostageCards == nil || victimStats.HeldHostageCards[data.CardID] != data.PerpWallet {
@@ -140,13 +152,13 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 
 	// Financial Transaction
 	if l.rewards[victimWallet] < data.RansomAmount {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Payment Failed: Insufficient reward balance."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Payment Failed: Insufficient reward balance."}`)})
 		return
 	}
 
 	perpStats, perpExists := l.leaderboard[data.PerpWallet] // Check if perp stats exist
 	if !perpExists {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Ransom Failed: Perpetrator stats not found."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Ransom Failed: Perpetrator stats not found."}`)})
 		return
 	}
 
@@ -164,27 +176,31 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	delete(victimStats.HeldHostageCards, data.CardID)
 	// Hardening: Restore card instance to victim's inventory
 	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
-	if victimStats.Inventory == nil { victimStats.Inventory = make(map[string]int) }
+	if victimStats.Inventory == nil {
+		victimStats.Inventory = make(map[string]int)
+	}
 	victimStats.Inventory[cardKey]++
 
+	victimStats.Reputation = l.CalculateReputation(victimStats)
 	l.leaderboard[victimWallet] = victimStats
 
 	delete(perpStats.KidnappedCards, data.CardID)
+	perpStats.Reputation = l.CalculateReputation(perpStats)
 	l.leaderboard[data.PerpWallet] = perpStats
 
 	// Remove from tracking
 	delete(l.activeKidnappings, data.CardID)
 
-	l.logAdminAudit("RANSOM_PAID", victimWallet, fmt.Sprintf("Paid %d to %s for Card #%d (Fee: %d)", data.RansomAmount, data.PerpWallet, data.CardID, arenaFeeMicro))
+	l.logAdminAuditLocked("RANSOM_PAID", victimWallet, fmt.Sprintf("Paid %d to %s for Card #%d (Fee: %d)", data.RansomAmount, data.PerpWallet, data.CardID, arenaFeeMicro))
 
 	// Notify Perp
-	perpClientID := l.getClientIDFromWallet(data.PerpWallet)
+	perpClientID := l.getClientIDFromWalletLocked(data.PerpWallet)
 	if perpClientID != "" {
-		l.sendToClient(perpClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>RANSOM RECEIVED:</b> %s paid %.2f $VBV for card release (Net: %.2f $VBV after Arena fees)."}`, victimWallet, float64(data.RansomAmount)/1000000.0, float64(perpShareMicro)/1000000.0))})
+		l.sendToClientLocked(perpClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>RANSOM RECEIVED:</b> %s paid %.2f $VBV for card release (Net: %.2f $VBV after Arena fees)."}`, victimWallet, float64(data.RansomAmount)/1000000.0, float64(perpShareMicro)/1000000.0))})
 	}
 
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>CARD RECLAIMED:</b> Your asset has been returned to your inventory."}`)})
-	
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>CARD RECLAIMED:</b> Your asset has been returned to your inventory."}`)})
+
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
@@ -201,11 +217,10 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	perpWallet, ok := l.wallets[env.FromID]
-	if !ok { 
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Release Failed: Your wallet is not registered."}`)})
+	if !ok {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Release Failed: Your wallet is not registered."}`)})
 		return
 	}
-
 
 	perpStats := l.leaderboard[perpWallet]
 	if perpStats.KidnappedCards == nil {
@@ -224,7 +239,7 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 	victimWallet := kidnapState.VictimWallet
 	victimStats, victimExists := l.leaderboard[victimWallet] // Check if victim stats exist
 	if !victimExists {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Release Failed: Victim player stats not found."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Release Failed: Victim player stats not found."}`)})
 		return
 	}
 	if victimStats.HeldHostageCards == nil || victimStats.HeldHostageCards[data.CardID] != perpWallet {
@@ -232,22 +247,28 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 	}
 
 	delete(perpStats.KidnappedCards, data.CardID)
+	perpStats.Reputation = l.CalculateReputation(perpStats)
 	l.leaderboard[perpWallet] = perpStats
+
 	delete(victimStats.HeldHostageCards, data.CardID)
 	// Hardening: Restore card instance to victim's inventory
 	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
-	if victimStats.Inventory == nil { victimStats.Inventory = make(map[string]int) }
+	if victimStats.Inventory == nil {
+		victimStats.Inventory = make(map[string]int)
+	}
 	victimStats.Inventory[cardKey]++
 
+	victimStats.Reputation = l.CalculateReputation(victimStats)
 	l.leaderboard[victimWallet] = victimStats
+
 	delete(l.activeKidnappings, data.CardID)
 
-	l.logAdminAudit("HOSTAGE_RELEASED", perpWallet, fmt.Sprintf("Card #%d voluntarily released to %s", data.CardID, victimWallet))
+	l.logAdminAuditLocked("HOSTAGE_RELEASED", perpWallet, fmt.Sprintf("Card #%d voluntarily released to %s", data.CardID, victimWallet))
 
-	if vCID := l.getClientIDFromWallet(victimWallet); vCID != "" {
-		l.sendToClient(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned by the kidnapper."}`, data.CardID))})
+	if vCID := l.getClientIDFromWalletLocked(victimWallet); vCID != "" {
+		l.sendToClientLocked(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned by the kidnapper."}`, data.CardID))})
 	}
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned to the victim."}`, data.CardID))})
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned to the victim."}`, data.CardID))})
 
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
@@ -271,20 +292,20 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 
 	club, exists := l.clubs[data.ClubID]
 	if !exists {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Club not found."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Club not found."}`)})
 		return
 	}
 
 	jailedCard, isJailed := club.Jail[data.CardID]
 	if !isJailed {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Card not found in this club's jail."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Card not found in this club's jail."}`)})
 		return
 	}
 
 	// Ensure the card belongs to the player attempting to bail it
 	playerStats := l.leaderboard[playerWallet]
 	if clubIDForCard, ok := playerStats.JailedCards[data.CardID]; !ok || clubIDForCard != data.ClubID {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: You do not own this jailed card."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: You do not own this jailed card."}`)})
 		return
 	}
 
@@ -298,7 +319,7 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 	vaultAddr := l.vaultAddress
 
 	if !voiOk {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Voi network configuration missing."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Voi network configuration missing."}`)})
 		return
 	}
 
@@ -312,7 +333,7 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, bailAmountMicro, assetID, playerWallet, vaultAddr)
 	if err != nil || !verified {
 		log.Printf("[CRIMINALITY] Bail payment verification failed for %s (Card %d): %v\n", playerWallet, data.CardID, err)
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Payment verification failed or insufficient amount."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Payment verification failed or insufficient amount."}`)})
 		return
 	}
 
@@ -329,15 +350,16 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 		playerStats.Inventory = make(map[string]int)
 	}
 	playerStats.Inventory[fmt.Sprintf("CARD-%d", data.CardID)]++
+	playerStats.Reputation = l.CalculateReputation(playerStats)
 	l.leaderboard[playerWallet] = playerStats
 
-	l.logAdminAudit("CARD_BAILED", playerWallet, fmt.Sprintf("Card #%d bailed from Club %s for %.2f $VBV", data.CardID, club.Name, bailAmountBase))
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>BAIL PAID:</b> Your card '%s' has been released from %s's jail!"}`, escapeHTML(jailedCard.Name), escapeHTML(club.Name)))})
+	l.logAdminAuditLocked("CARD_BAILED", playerWallet, fmt.Sprintf("Card #%d bailed from Club %s for %.2f $VBV", data.CardID, club.Name, bailAmountBase))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>BAIL PAID:</b> Your card '%s' has been released from %s's jail!"}`, escapeHTML(jailedCard.Name), escapeHTML(club.Name)))})
 
 	// Notify club owner/members (optional, but good for transparency)
-	clubOwnerClientID := l.getClientIDFromWallet(club.OwnerWallet)
+	clubOwnerClientID := l.getClientIDFromWalletLocked(club.OwnerWallet)
 	if clubOwnerClientID != "" {
-		l.sendToClient(clubOwnerClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>BAIL RECEIVED:</b> Club %s received %.2f $VBV for card #%d."}`, escapeHTML(club.Name), bailAmountBase, data.CardID))})
+		l.sendToClientLocked(clubOwnerClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>BAIL RECEIVED:</b> Club %s received %.2f $VBV for card #%d."}`, escapeHTML(club.Name), bailAmountBase, data.CardID))})
 	}
 
 	// Broadcast update to refresh UI lists
@@ -373,23 +395,25 @@ func (l *Lobby) processInsuranceRecovery() {
 			victimStats.Inventory = make(map[string]int)
 		}
 		victimStats.Inventory[cardKey]++ // Increment count, assuming it was decremented by 1
-		
+
+		victimStats.Reputation = l.CalculateReputation(victimStats)
 		l.leaderboard[state.VictimWallet] = victimStats
 
 		perpStats := l.leaderboard[state.PerpWallet]
 		delete(perpStats.KidnappedCards, cardID)
+		perpStats.Reputation = l.CalculateReputation(perpStats)
 		l.leaderboard[state.PerpWallet] = perpStats
 
 		delete(l.activeKidnappings, cardID)
 
-		l.logAdminAudit("INSURANCE_RECOVERY", state.VictimWallet, fmt.Sprintf("Card #%d automatically returned from %s", cardID, state.PerpWallet))
+		l.logAdminAuditLocked("INSURANCE_RECOVERY", state.VictimWallet, fmt.Sprintf("Card #%d automatically returned from %s", cardID, state.PerpWallet))
 
 		// Notify Players
-		if vCID := l.getClientIDFromWallet(state.VictimWallet); vCID != "" {
-			l.sendToClient(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>INSURANCE RECOVERY:</b> Your kidnapped card #%d has been returned."}`, cardID))})
+		if vCID := l.getClientIDFromWalletLocked(state.VictimWallet); vCID != "" {
+			l.sendToClientLocked(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>INSURANCE RECOVERY:</b> Your kidnapped card #%d has been returned."}`, cardID))})
 		}
-		if pCID := l.getClientIDFromWallet(state.PerpWallet); pCID != "" {
-			l.sendToClient(pCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>HOSTAGE ESCAPED:</b> Card #%d has returned to its owner via Insurance Recovery."}`, cardID))})
+		if pCID := l.getClientIDFromWalletLocked(state.PerpWallet); pCID != "" {
+			l.sendToClientLocked(pCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>HOSTAGE ESCAPED:</b> Card #%d has returned to its owner via Insurance Recovery."}`, cardID))})
 		}
 	}
 

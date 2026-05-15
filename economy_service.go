@@ -133,6 +133,9 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// 2. Infamy Penalty
 	rep -= (stats.WantedLevel * 20)
 
+	// 2.1 Asset Impoundment Penalty: Cards in sector custody reduce social reach
+	rep -= (len(stats.JailedCards) * 25)
+
 	// 3. Achievement Weighting
 	for _, id := range stats.Achievements {
 		bonus := 50 // Standard achievement

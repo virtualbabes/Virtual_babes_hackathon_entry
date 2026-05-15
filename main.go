@@ -137,6 +137,7 @@ type Player struct {
 	SocialRank      string       `json:"social_rank"`      // e.g., "Nobody", "Regular", "Icon"
 	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
 	EmployerClubID  string       `json:"employer_club_id"` // The club currently paying this user
+	AuctionsWon     int          `json:"auctions_won"`
 	Cunning         int          `json:"cunning"`
 	Nurturing       int          `json:"nurturing"`
 	Achievements    []string     `json:"achievements"`
@@ -612,6 +613,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.JobRole = data.Get("job_role").String()
 	p.EmployerClubID = data.Get("employer_id").String()
 	p.WantedLevel = data.Get("wanted_level").Int()
+	p.AuctionsWon = data.Get("auctions_won").Int()
 	p.Cunning = data.Get("cunning").Int()
 	p.Nurturing = data.Get("nurturing").Int()
 	p.RumorCount = data.Get("rumor_count").Int()
@@ -1930,6 +1932,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["job_role"] = Game.Players[0].JobRole
 		state["employer_id"] = Game.Players[0].EmployerClubID
 		state["wanted_level"] = Game.Players[0].WantedLevel
+		state["auctions_won"] = Game.Players[0].AuctionsWon
 		state["jailed_cards"] = Game.Players[0].JailedCards
 		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
 		state["held_hostage_cards"] = Game.Players[0].HeldHostageCards
