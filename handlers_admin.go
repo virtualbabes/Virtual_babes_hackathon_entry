@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/algorand/go-algorand-sdk/v2/crypto"
 	"github.com/algorand/go-algorand-sdk/v2/types"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 // logAdminAudit records an administrative action to a separate file for permanent record keeping.
@@ -328,7 +328,7 @@ func (l *Lobby) handleBanPlayer(w http.ResponseWriter, r *http.Request) {
 				if clientID == match.P1ID {
 					opp = match.P2ID
 				}
-				l.sendToClient(opp, Envelope{Type: "chat", FromID: "SERVER", Payload: json.RawMessage(`{"text":"Match terminated: Opponent restricted."}`)})
+				l.sendToClientLocked(opp, Envelope{Type: "chat", FromID: "SERVER", Payload: json.RawMessage(`{"text":"Match terminated: Opponent restricted."}`)})
 				delete(l.matches, opp)
 				delete(l.matches, clientID)
 			}
@@ -390,7 +390,7 @@ func (l *Lobby) handleAvatarBan(w http.ResponseWriter, r *http.Request) {
 		if client.avatarURL == targetURL {
 			client.avatarURL = safeAvatarPool[rand.Intn(len(safeAvatarPool))]
 			client.avatarBanNotice = "Your avatar was restricted by an administrator."
-			l.sendToClient(client.id, Envelope{
+			l.sendToClientLocked(client.id, Envelope{
 				Type:    "admin_notification",
 				FromID:  "SERVER",
 				Payload: json.RawMessage(`{"text":"🚨 <b>MODERATION:</b> Your profile image has been restricted globally."}`),
@@ -426,18 +426,18 @@ func (l *Lobby) handleResetStats(w http.ResponseWriter, r *http.Request) {
 	l.mutex.Lock()
 	if _, exists := l.leaderboard[req.Wallet]; exists {
 		l.leaderboard[req.Wallet] = PlayerStats{
-			Reputation: 100,
-			Inventory: make(map[string]int),
+			Reputation:  100,
+			Inventory:   make(map[string]int),
 			JailedCards: make(map[int]string),
 			// Initialize new maps for Kidnap Gambit
-			FavoriteCardID: 0,
-			KidnappedCards: make(map[int]string),
+			FavoriteCardID:   0,
+			KidnappedCards:   make(map[int]string),
 			HeldHostageCards: make(map[int]string),
-			RumorCount: 0,
+			RumorCount:       0,
 			Playstyle: PlaystyleTendencies{
-				PreferredRules: make(map[string]float64),
+				PreferredRules:     make(map[string]float64),
 				PreferredCardMoods: make(map[string]float64),
-				PreferredItems: make(map[string]float64),
+				PreferredItems:     make(map[string]float64),
 			},
 		}
 		msg := l.getLobbyUpdateMsgLocked()
@@ -585,11 +585,10 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 		matches = append(matches, TournamentMatch{ID: fmt.Sprintf("R1-M%d", (i/2)+1), P1: participants[seedMap[i]], P2: participants[seedMap[i+1]], Round: 1})
 	}
 	l.tournament = TournamentState{Active: true, Participants: participants, Matches: matches, CurrentRound: 1, Pot: pot, BuyInAmount: 50.0, IsBuyInMode: req.IsBuyIn}
-	l.logAdminAudit("START_TOURNAMENT", "GLOBAL", fmt.Sprintf("Size: %d", req.Size))
+	l.logAdminAuditLocked("START_TOURNAMENT", "GLOBAL", fmt.Sprintf("Size: %d", req.Size))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(l.tournament)
 }
-
 
 func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 	if !l.checkAdminAuth(w, r) {
@@ -755,7 +754,7 @@ func (l *Lobby) verifyAdminSignature(wallet, nonce, signatureStr string) bool {
 	// 2. Multi-Chain Verification Logic
 	if strings.HasPrefix(wallet, "0x") {
 		// EVM signature verification (personal_sign)
-		message := fmt.Sprintf("\x19Ethereum Signed Message:\n%dVirtualbabes Arena Admin Auth:%s", 
+		message := fmt.Sprintf("\x19Ethereum Signed Message:\n%dVirtualbabes Arena Admin Auth:%s",
 			len("Virtualbabes Arena Admin Auth:")+len(nonce), nonce)
 		messageHash := ethcrypto.Keccak256([]byte(message))
 

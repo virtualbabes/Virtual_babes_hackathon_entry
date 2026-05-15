@@ -209,4 +209,5 @@
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.
 - [FIXED] Hardened `checkVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during ARC-200 application box balance synchronization.
 - [FIXED] Hardened `checkNativeVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during native vault balance synchronization.
+- [FIXED] Resolved multiple recursive deadlock vulnerabilities in `handlers_admin.go` by switching to `Locked` variant helpers (`sendToClientLocked`, `logAdminAuditLocked`) while holding the state lock.
 - [FIXED] Hardened `handleMaintenanceMode` in `handlers_admin.go` by marshaling the payload as a struct and triggering a global `lobby_update`; synchronized `maintenance_time` field in `lobby_manager.go` to prevent UI errors for joining players.
