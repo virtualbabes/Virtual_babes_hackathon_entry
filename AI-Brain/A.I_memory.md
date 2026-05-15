@@ -153,4 +153,5 @@
 133. **Complete**: Implemented `tournament_update` case in `network.js` to ensure real-time bracket and `OpenTime` synchronization.
 135. **Complete**: Hardened `handleCourthouseReset` in `courthouse_service.go` to pass `"COURTHOUSE_FINE:"` prefix to `verifyBuyInTransaction` and normalized wallet addresses to lowercase.
 136. **Complete**: Hardened `handleRepayLoan` in `loan_service.go` to pass `"REPAY_LOAN:"` prefix to `verifyBuyInTransaction` for cryptographic binding of repayments.
+137. **Complete**: Updated `submitCourthouseFine` in `criminality.js` to include the `"COURTHOUSE_FINE:"` note prefix for on-chain validation.
 134. **Complete**: Hardened `handleTournamentRegister` and `verifyBuyInTransaction` to cryptographically bind buy-ins to specific `TournamentIDs` via on-chain note metadata.

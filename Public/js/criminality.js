@@ -127,13 +127,15 @@ export async function submitCourthouseFine() {
             txObj = {
                 from: userAddress, type: 'appl', appIndex: parseInt(assetId),
                 appArgs: [methodSelector, recipientAddr, amountArg],
-                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
+                // PILLAR 3: Bound Verification for Courthouse Fines
+                note: new TextEncoder().encode(`COURTHOUSE_FINE:${userAddress}:${Date.now()}`)
             };
         } else {
             txObj = {
                 from: userAddress, to: CONFIG.VAULT_ADDRESS, type: 'axfer',
                 assetIndex: parseInt(assetId), amount: amountMicro,
-                note: new TextEncoder().encode(`ARENA_COURTHOUSE_FINE:${wanted}`)
+                // PILLAR 3: Bound Verification for Courthouse Fines
+                note: new TextEncoder().encode(`COURTHOUSE_FINE:${userAddress}:${Date.now()}`)
             };
         }
 

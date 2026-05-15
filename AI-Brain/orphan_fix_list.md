@@ -243,3 +243,4 @@
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to strictly verify expected note prefixes, preventing cross-tournament payment replays.
 - [FIXED] Hardened `handleCourthouseReset` in `courthouse_service.go` with purpose-specific note verification and identity normalization.
 - [FIXED] Hardened `handleRepayLoan` in `loan_service.go` with purpose-specific note verification (`"REPAY_LOAN:"`) for repayment transactions.
+- [FIXED] Updated `submitCourthouseFine` in `criminality.js` to ensure the on-chain note contains the mandatory `"COURTHOUSE_FINE:"` prefix for Courthouse validation.
