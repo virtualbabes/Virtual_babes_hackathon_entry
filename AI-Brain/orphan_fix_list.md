@@ -235,4 +235,5 @@
 - [FIXED] Hardened tournament finalization in `tournament_manager.go` by collecting reward TxIDs and recording a `PayoutsHash` in the on-chain summary for secondary financial proof.
 - [FIXED] Synchronized Tournament ID generation across lifecycle (Registration -> Payout -> Summary) to allow handleTournamentHistory to cryptographically verify receipts against the PayoutsHash.
 - [FIXED] Synchronized `TournamentID` and `MatchID` population across `lobby_manager.go`, `battle_service.go`, and `game.js` to ensure tournament match positions are accurately reflected in player history.
+- [FIXED] Updated `syncStatsFromBlockchain` in `oracle_service.go` to correctly populate `ReceiptTxID` for mirrored 'Loss' and 'DNF' records via vault metadata recovery.
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.

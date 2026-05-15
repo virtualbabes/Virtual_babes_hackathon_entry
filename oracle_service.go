@@ -511,6 +511,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 
 	var res struct {
 		Transfers []struct {
+			TransactionID string `json:"transactionId"`
 			Metadata  string `json:"metadata"`
 			Timestamp int64  `json:"timestamp"`
 		} `json:"transfers"`
@@ -546,6 +547,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						Scores:            data.Scores,
 						TournamentID:      tournID,
 						TournamentMatchID: matchID,
+						ReceiptTxID:       tx.TransactionID,
 						Timestamp:         time.Unix(tx.Timestamp, 0),
 						WinnerIndex:       0, // Recipient of VBT_WIN is the winner
 					})
@@ -573,6 +575,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var gRes struct {
 				Transfers []struct {
+					TransactionID string `json:"transactionId"`
 					To        string `json:"to"`
 					Metadata  string `json:"metadata"`
 					Timestamp int64  `json:"timestamp"`
@@ -586,15 +589,23 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						var data struct {
 							Opp    string `json:"opp"`
 							Scores [2]int `json:"scores"`
-							TID    string `json:"tid"`
+							TID    string `json:"tid"` // Tournament ID
+							MID    string `json:"mid"` // Match ID
 						}
 						// If I am the 'Opponent', I lost this match. Add to history as Loss (WinnerIndex: 1).
 						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
 							if strings.EqualFold(data.Opp, wallet) {
+								matchID := data.MID
+								if matchID == "" { matchID = data.TID } // Legacy fallback
+								tournID := data.TID
+								if data.MID == "" { tournID = "" }     // If MID is empty, TID was MatchID
+
 								matchHistory = append(matchHistory, MatchHistory{
 									Opponent:          tx.To, // The person who received the win transaction
 									Scores:            data.Scores,
-									TournamentMatchID: data.TID,
+									TournamentID:      tournID,
+									TournamentMatchID: matchID,
+									ReceiptTxID:       tx.TransactionID,
 									Timestamp:         time.Unix(tx.Timestamp, 0),
 									WinnerIndex:       1, // Mirror record: relative Loss
 								})
@@ -609,12 +620,14 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_DNF:")), &data); err == nil {
 							if strings.EqualFold(data.Leaver, wallet) {
 								matchHistory = append(matchHistory, MatchHistory{
-									Opponent: data.Opp, TournamentMatchID: data.TID,
+									Opponent: data.Opp, TournamentMatchID: data.TID, 
+									ReceiptTxID: tx.TransactionID,
 									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 1, // I left
 								})
 							} else if strings.EqualFold(data.Opp, wallet) {
 								matchHistory = append(matchHistory, MatchHistory{
-									Opponent: data.Leaver, TournamentMatchID: data.TID,
+									Opponent: data.Leaver, TournamentMatchID: data.TID, 
+									ReceiptTxID: tx.TransactionID,
 									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 0, // They left
 								})
 							}

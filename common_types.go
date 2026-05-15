@@ -252,6 +252,7 @@ type MatchHistory struct {
 	Opponent          string                    `json:"opponent_wallet"`
 	TournamentID      string                    `json:"tournament_id,omitempty"`
 	TournamentMatchID string                    `json:"match_id,omitempty"`
+	ReceiptTxID       string                    `json:"receipt_txid,omitempty"`
 	Scores            [2]int                    `json:"scores"`
 	Timestamp         time.Time                 `json:"timestamp"`
 	WinnerIndex       int                       `json:"winner_index"` // 0 for P1, 1 for P2
@@ -370,11 +371,11 @@ type KidnapState struct {
 
 // TournamentMatch represents a single duel within the bracket.
 type TournamentMatch struct {
-	ID     string `json:"id"`
-	P1     string `json:"p1"` // Wallet Address
-	P2     string `json:"p2"` // Wallet Address
-	Winner string `json:"winner,omitempty"`
-	Round  int    `json:"round"`
+	ID          string `json:"id"`
+	P1          string `json:"p1"` // Wallet Address
+	P2          string `json:"p2"` // Wallet Address
+	Winner      string `json:"winner,omitempty"`
+	Round       int    `json:"round"`
 	ReceiptTxID string `json:"receipt_txid,omitempty"` // On-chain VBT_WIN receipt ID
 }
 
