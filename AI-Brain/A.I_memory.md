@@ -445,4 +445,6 @@
 74. Complete: Implemented Regional Power Boost (+5%) for club members in Region-controlled territories across server, WASM, and UI.
 75. Complete: Hardened `handleUnregister` in `lobby_manager.go` with scaled tournament DNF penalties and fixed state synchronization bugs.
 76. Complete: Implemented 'Bounty Ticker' in `economy.js` and wired into `network.js` to scroll live rewards for hunting high-Wanted outlaws.
+77. Complete: Prepared and documented Git workflow for migrating current build from dev2 branch to virtualbabes hackathon entry repository.
+78. Complete: Refined and documented the Git push process to handle multi-account credential conflicts during hackathon submission.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
