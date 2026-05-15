@@ -166,7 +166,8 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, req.TxID, loan.RepaymentAmount, assetID, req.Wallet, l.vaultAddress)
+	// PILLAR 3: Specific Purpose Verification for loan repayments
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, req.TxID, loan.RepaymentAmount, assetID, req.Wallet, l.vaultAddress, "REPAY_LOAN:")
 	if err != nil || !verified {
 		http.Error(w, "Repayment verification failed", http.StatusPaymentRequired)
 		return

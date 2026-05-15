@@ -242,3 +242,4 @@
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to strictly verify expected note prefixes, preventing cross-tournament payment replays.
 - [FIXED] Hardened `handleCourthouseReset` in `courthouse_service.go` with purpose-specific note verification and identity normalization.
+- [FIXED] Hardened `handleRepayLoan` in `loan_service.go` with purpose-specific note verification (`"REPAY_LOAN:"`) for repayment transactions.
