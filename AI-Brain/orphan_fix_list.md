@@ -152,4 +152,12 @@
 - [FIXED] Integrated the `GOVERNOR` achievement trigger into `refreshRegionalRoles` in `lobby_manager.go` to reward multi-district territory expansion.
 - [FIXED] Hardened `CalculateReputation` in `economy_service.go` to provide variable Standing bonuses for milestone achievements.
 - [FIXED] Resolved race condition in `handlePurchaseTerritory` and fixed variable scope error to ensure atomic GOVERNOR achievement triggers.
+- [FIXED] Hardened `handleCreateClub` and `handleJoinClub` in `club_service.go` to utilize network-specific precision divisors and ensure nil-safe map initialization.
+- [FIXED] Integrated reputation recalculation and `CAREER_START` achievement trigger into `handleHirePlayer` in `employment_service.go` to ensure immediate market valuation updates for new employees.
+- [FIXED] Integrated `EXECUTIVE_PAY` achievement trigger into `handleSetSalary` in `employment_service.go` for high-value employment contracts.
+- [FIXED] Hardened `startSalaryDispenser` in `career.go` by implementing micro-unit precision rounding for Outlaw Taxes and ensuring employee reputation is recalculated during the daily pay cycle.
+- [FIXED] Implemented auction settlement and no-bid return logic in `processAuctions` in `auction_service.go`, including commission distribution and item transfers.
+- [FIXED] Implemented `RequiredMojo`, `RequiredRole`, and `IsMasterTier` fields in `shop_registry.go` to enable specialized item unlocks for Governors and career roles.
+- [FIXED] Hardened `handlePurchaseItem` in `lobby_manager.go` to enforce Role, Mojo, and Regional Governor requirements for specialized shop items.
+- [FIXED] Updated `GlobalShopRegistry` in `economy.js` to match backend requirements and implemented visual requirement gating in `switchShopCategory`.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

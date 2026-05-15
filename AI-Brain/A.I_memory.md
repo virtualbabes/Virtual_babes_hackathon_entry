@@ -406,4 +406,12 @@
 35. Complete: Hardened `refreshRegionalRoles` in `lobby_manager.go` to trigger the GOVERNOR achievement upon reaching the 2-territory threshold.
 36. Complete: Hardened `CalculateReputation` in `economy_service.go` by implementing variable-weight bonuses for milestone achievements like GOVERNOR and ARENA_LEGEND.
 37. Complete: Hardened `handlePurchaseTerritory` in `club_service.go` to atomically trigger GOVERNOR status and achievement bonuses during district acquisition.
+38. Complete: Hardened `handleCreateClub` and `handleJoinClub` in `club_service.go` with dynamic precision divisors and robust map initialization.
+39. Complete: Hardened `handleHirePlayer` in `employment_service.go` by integrating reputation recalculation and the CAREER_START achievement.
+40. Complete: Hardened `handleSetSalary` in `employment_service.go` to trigger the EXECUTIVE_PAY achievement for contracts >= 500 $VBV.
+41. Complete: Hardened `startSalaryDispenser` in `career.go` with precision-rounded Outlaw Taxes and reputation synchronization for criminal employees.
+42. Complete: Hardened `processAuctions` in `auction_service.go` to correctly handle item and fund transfers for auction settlement and no-bid returns, including commission distribution.
+43. Complete: Implemented Mojo Bonuses and Role/Master-tier requirements in `shop_registry.go` to complete the tiered industrial unlock system.
+44. Complete: Hardened `handlePurchaseItem` in `lobby_manager.go` to enforce Role, Mojo, and Master-tier requirements during shop transactions.
+45. Complete: Updated `openShopsOverlay` in `economy.js` to visually distinguish Master-tier items and display career/mojo requirements.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

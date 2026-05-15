@@ -28,10 +28,13 @@ func (l *Lobby) startSalaryDispenser() {
 						taxRate := 0.0
 						if stats.WantedLevel >= 5 {
 							taxRate = float64(stats.WantedLevel) * 0.02
-							if taxRate > 0.40 { taxRate = 0.40 }
+							if taxRate > 0.40 {
+								taxRate = 0.40
+							}
 						}
 
-						taxAmountMicro := uint64(float64(stats.Salary) * taxRate)
+						// PILLAR 1: Precision Rounding for the Industrial Loop.
+						taxAmountMicro := uint64(float64(stats.Salary)*taxRate + 0.5)
 						netSalaryMicro := stats.Salary - taxAmountMicro
 
 						l.rewards[wallet] += netSalaryMicro
@@ -41,6 +44,10 @@ func (l *Lobby) startSalaryDispenser() {
 						}
 
 						stats.LastSalaryPayment = time.Now()
+
+						// PILLAR 1: Career Service Update.
+						// Re-sync reputation to reflect the ongoing service and potential club mojo shifts.
+						stats.Reputation = l.CalculateReputation(stats)
 						l.leaderboard[wallet] = stats
 
 						l.logAdminAuditLocked("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Net: %.2f, Tax: %.2f", club.Name, float64(netSalaryMicro)/1000000.0, float64(taxAmountMicro)/1000000.0))

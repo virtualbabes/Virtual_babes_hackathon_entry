@@ -19,8 +19,8 @@ func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mutex.RUnlock()
 
-	// Lazy Resolution: We resolve names outside the global state lock to prevent 
-	// display latency. Since we're iterating pointers, updating 'a' populates the 
+	// Lazy Resolution: We resolve names outside the global state lock to prevent
+	// display latency. Since we're iterating pointers, updating 'a' populates the
 	// master record for all future requests.
 	for _, a := range list {
 		if a.SellerName == "" {
@@ -200,20 +200,112 @@ func (l *Lobby) processAuctions() {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	now := time.Now()
+	anyProcessed := false
 
 	for id, auction := range l.auctions {
 		if now.After(auction.EndsAt) {
 			// Auction expired
 			if auction.HighestBidder != "" {
 				// Settle auction: transfer item to winner, pay seller
-				// TODO: Implement settlement logic
-				l.logAdminAudit("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Amount: %d", id, auction.CurrentBid))
+				// 1. Transfer items to winner
+				l.transferBundleItems(auction.HighestBidder, auction.Bundle, true)
+
+				// 2. Calculate commission (10%) and net payout to seller
+				// PILLAR 1: Precision Rounding for the Industrial Loop.
+				commissionMicro := (auction.CurrentBid*10 + 50) / 100 // Round to nearest micro-unit
+				netPayoutToSellerMicro := auction.CurrentBid - commissionMicro
+
+				// 3. Pay seller
+				l.rewards[auction.SellerWallet] += netPayoutToSellerMicro
+
+				// 4. Distribute commission
+				artGalleryClub := l.getClubByTerritoryID(auction.TerritoryID) // "the_art_gallery"
+				if artGalleryClub != nil {
+					artGalleryClub.Treasury += float64(commissionMicro) / 1000000.0
+					artGalleryClub.LastActivity = now
+					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_CLUB", artGalleryClub.ID, fmt.Sprintf("Auction: %s, Commission: %.2f", id, float64(commissionMicro)/1000000.0))
+				} else {
+					// If no club owns the Art Gallery, commission goes to the Faucet
+					l.faucetBalance += float64(commissionMicro) / 1000000.0
+					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_FAUCET", "GLOBAL", fmt.Sprintf("Auction: %s, Commission: %.2f", id, float64(commissionMicro)/1000000.0))
+				}
+
+				// 5. Update Faucet balance and dynamic scaling (as funds move through the system)
+				// The bid amount was already deducted from the bidder's rewards when placed.
+				// The net payout to seller and commission distribution effectively re-routes these funds.
+				// No direct change to l.faucetBalance for the full bid, only for the commission if it goes there.
+				l.applyDynamicScalingLocked() // Re-evaluate scaling due to potential faucet change
+
+				l.logAdminAuditLocked("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Winner: %s, Seller: %s, Amount: %.2f (Net: %.2f, Commission: %.2f)",
+					id, auction.HighestBidder, auction.SellerWallet, float64(auction.CurrentBid)/1000000.0, float64(netPayoutToSellerMicro)/1000000.0, float64(commissionMicro)/1000000.0))
+
+				// Notify winner and seller
+				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.HighestBidder), Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"🎉 <b>AUCTION WON:</b> You won auction %s for %.2f $VBV! Items added to inventory."}`, id, float64(auction.CurrentBid)/1000000.0)),
+				})
+				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.SellerWallet), Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>AUCTION SOLD:</b> Your auction %s sold for %.2f $VBV (Net: %.2f after commission)."}`, id, float64(auction.CurrentBid)/1000000.0, float64(netPayoutToSellerMicro)/1000000.0)),
+				})
 			} else {
 				// No bids, return item to seller
-				// TODO: Implement return logic
-				l.logAdminAudit("AUCTION_EXPIRED", auction.SellerWallet, fmt.Sprintf("Auction: %s, No bids", id))
+				l.transferBundleItems(auction.SellerWallet, auction.Bundle, true)
+				l.logAdminAuditLocked("AUCTION_EXPIRED", auction.SellerWallet, fmt.Sprintf("Auction: %s, No bids, items returned.", id))
+				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.SellerWallet), Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"📦 <b>AUCTION EXPIRED:</b> Your auction %s received no bids. Items returned to inventory."}`, id)),
+				})
 			}
 			delete(l.auctions, id)
+			anyProcessed = true
 		}
 	}
+
+	if anyProcessed {
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	}
+}
+
+// transferBundleItems handles adding or removing items from a player's inventory.
+// If add is true, items are added. If add is false, items are removed.
+// It assumes the lobby mutex is held.
+func (l *Lobby) transferBundleItems(wallet string, bundle CardBundle, add bool) {
+	stats := l.leaderboard[wallet]
+	if stats.Inventory == nil {
+		stats.Inventory = make(map[string]int)
+	}
+
+	if bundle.CardID != 0 {
+		cardKey := fmt.Sprintf("CARD-%d", bundle.CardID)
+		if add {
+			stats.Inventory[cardKey]++
+		} else {
+			stats.Inventory[cardKey]--
+			if stats.Inventory[cardKey] <= 0 {
+				delete(stats.Inventory, cardKey)
+			}
+		}
+	}
+	if bundle.WeaponID != "" {
+		if add {
+			stats.Inventory[bundle.WeaponID]++
+		} else {
+			stats.Inventory[bundle.WeaponID]--
+			if stats.Inventory[bundle.WeaponID] <= 0 {
+				delete(stats.Inventory, bundle.WeaponID)
+			}
+		}
+	}
+	if bundle.FaceplateID != "" {
+		if add {
+			stats.Inventory[bundle.FaceplateID]++
+		} else {
+			stats.Inventory[bundle.FaceplateID]--
+			if stats.Inventory[bundle.FaceplateID] <= 0 {
+				delete(stats.Inventory, bundle.FaceplateID)
+			}
+		}
+	}
+	l.leaderboard[wallet] = stats
 }

@@ -258,14 +258,26 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 		return
 	}
 
+	joinFee := 500.0
 	assetID := voiConfig.AssetID
 	verifyNet := "Voi"
-	if strings.ToUpper(data.Network) == "ALGO" || strings.HasPrefix(strings.ToUpper(data.Network), "ALGO") {
+
+	if strings.EqualFold(data.Network, "ALGO") || strings.HasPrefix(strings.ToUpper(data.Network), "ALGO") {
 		assetID = l.avoiAssetID
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, 500*1000000, assetID, wallet, vaultAddr)
+	// PILLAR 3: Dynamic Precision.
+	l.mutex.RLock()
+	netCfg, hasCfg := l.availableNetworks[verifyNet+" Mainnet"]
+	l.mutex.RUnlock()
+
+	divisor := 1000000.0 // Fallback to standard 6 decimals
+	if hasCfg && netCfg.PowerDivisor > 0 {
+		divisor = netCfg.PowerDivisor
+	}
+
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(joinFee*divisor), assetID, wallet, vaultAddr)
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Club Entry Error: Payment verification failed."}`)})
 		return

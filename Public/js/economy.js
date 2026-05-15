@@ -12,14 +12,17 @@ const algosdk = window.algosdk;
 // --- Item Registry (Mirrors shop_registry.go) ---
 export const GlobalShopRegistry = {
     "mood_catalyst": { name: "Mood Catalyst", desc: "+50 Mood Bonus (3 Matches)", price: 100, ClubType: "Elemental" },
-    "grounded_shield": { name: "Grounded Shield", desc: "Immunity to Mood Penalties (5 Matches)", price: 250, ClubType: "Elemental" },
+    "grounded_shield": { name: "Grounded Shield", desc: "Immunity to Mood Penalties (5 Matches)", price: 250, ClubType: "Elemental", requiredMojo: 100 },
+    "prism_shield": { name: "Prism Shield", desc: "Reflects Mood Penalties back to Opponent", price: 750, ClubType: "Elemental", requiredMojo: 500, isMasterTier: true },
     "rule_breaker": { name: "Rule Breaker", desc: "Force PLUS trigger (1 Match)", price: 150, ClubType: "Tactical" },
-    "intel_report": { name: "Intel Report", desc: "See Opponent Hand (3 Matches)", price: 300, ClubType: "Tactical" },
+    "intel_report": { name: "Intel Report", desc: "See Opponent Hand (3 Matches)", price: 300, ClubType: "Tactical", requiredMojo: 150 },
+    "ghost_protocol": { name: "Ghost Protocol", desc: "Match outcome hidden from Ticker", price: 1000, ClubType: "Tactical", requiredMojo: 600, requiredRole: "Security", isMasterTier: true },
     "stamina_stim": { name: "Stamina Stim", desc: "-20 Fatigue Immediately", price: 100, ClubType: "Vitality" },
-    "loyalty_pledge": { name: "Loyalty Pledge", desc: "+10 Loyalty Immediately", price: 500, ClubType: "Vitality" },
-    "tripwire": { name: "Laser Tripwire", desc: "+10% Heist Failure", price: 500, ClubType: "Hardware" },
-    "sentry_turret": { name: "Sentry Turret", desc: "+25% Heist Failure", price: 1200, ClubType: "Hardware" },
-    "guard_dog": { name: "Bio-Guard Dog", desc: "Forces Jail on Failure", price: 2000, ClubType: "Hardware" }
+    "loyalty_pledge": { name: "Loyalty Pledge", desc: "+10 Loyalty Immediately", price: 500, ClubType: "Vitality", requiredMojo: 200 },
+    "hyper_stim": { name: "Hyper-Stim", desc: "Resets fatigue for current deck", price: 1500, ClubType: "Vitality", requiredMojo: 800, requiredRole: "Manager", isMasterTier: true },
+    "tripwire": { name: "Laser Tripwire", desc: "+10% Heist Failure", price: 500, ClubType: "Hardware", requiredRole: "Security" },
+    "sentry_turret": { name: "Sentry Turret", desc: "+25% Heist Failure", price: 1200, ClubType: "Hardware", requiredRole: "Security", requiredMojo: 300 },
+    "guard_dog": { name: "Bio-Guard Dog", desc: "Forces Jail on Failure", price: 2000, ClubType: "Hardware", requiredRole: "Security", requiredMojo: 500 }
 };
 
 // --- Economic Features ---
@@ -46,6 +49,9 @@ export function switchShopCategory(category) {
 
     container.innerHTML = `<div class="grid-span-all opacity-5 py-40 italic">Scanning district stock for ${category} hardware...</div>`;
 
+    const state = window.GetGameState();
+    const userRole = state.job_role || "";
+
     const clubs = Object.values(globalClubs).filter(c => c.type === category);
     let itemsHTML = "";
 
@@ -53,9 +59,21 @@ export function switchShopCategory(category) {
         Object.entries(club.inventory || {}).forEach(([itemId, qty]) => {
             if (qty <= 0) return;
             const meta = GlobalShopRegistry[itemId] || { name: itemId.replace(/_/g, ' '), desc: "Tactical Enhancement", price: 100 };
+
+            // TACTICAL EVALUATION: Check if player/club meets unlock criteria
+            const meetsMojo = (club.mojo || 0) >= (meta.requiredMojo || 0);
+            const meetsRole = !meta.requiredRole || userRole === meta.requiredRole;
+            const meetsMaster = !meta.isMasterTier || (club.territories && club.territories.length >= 2);
+            const isLocked = !meetsMojo || !meetsRole || !meetsMaster;
+
+            let reqLabels = [];
+            if (meta.requiredMojo) reqLabels.push(`<span class="${meetsMojo ? 'text-neon-green' : 'text-error'}">MOJO ${meta.requiredMojo}+</span>`);
+            if (meta.requiredRole) reqLabels.push(`<span class="${meetsRole ? 'text-neon-green' : 'text-error'}">${meta.requiredRole.toUpperCase()}</span>`);
+            if (meta.isMasterTier) reqLabels.push(`<span class="${meetsMaster ? 'text-neon-green' : 'text-error'}">GOVERNOR</span>`);
             
             itemsHTML += `
-                <div class="shop-item animate-slide-up" onclick="buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}')">
+                <div class="shop-item animate-slide-up ${meta.isMasterTier ? 'master-tier' : ''} ${isLocked ? 'locked-item' : ''}" 
+                     onclick="${isLocked ? '' : `buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}')`}">
                     <div class="item-image">
                         <img src="Assets/Images/portraits/placeholder.webp" alt="Hardware">
                         <div class="item-badge">${club.name}</div>
@@ -63,6 +81,7 @@ export function switchShopCategory(category) {
                     <div class="item-info">
                         <div class="item-title">${meta.name.toUpperCase()}</div>
                         <div class="item-description">${meta.desc}</div>
+                        ${reqLabels.length > 0 ? `<div class="item-requirements" style="font-size: 0.7em; margin-top: 5px; font-weight: bold; letter-spacing: 1px;">${reqLabels.join(' • ')}</div>` : ''}
                         <div class="item-stats">
                             <div class="stat">
                                 <div class="stat-label">STOCK</div>
@@ -72,7 +91,7 @@ export function switchShopCategory(category) {
                     </div>
                     <div class="item-footer">
                         <div class="item-price">${meta.price}</div>
-                        <button class="buy-button">PURCHASE</button>
+                        <button class="buy-button" ${isLocked ? 'disabled' : ''}>${isLocked ? 'LOCKED' : 'PURCHASE'}</button>
                     </div>
                 </div>
             `;

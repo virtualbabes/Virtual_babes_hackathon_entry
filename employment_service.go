@@ -48,6 +48,14 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 	stats := l.leaderboard[targetWallet]
 	stats.JobRole = data.Role
 	stats.EmployerClubID = data.ClubID
+
+	// PILLAR 1: Career Integration.
+	// Recalculate reputation immediately to reflect the Employment Multiplier in the market.
+	stats.Reputation = l.CalculateReputation(stats)
+
+	// Grant career achievement
+	l.unlockAchievementLocked(targetWallet, "CAREER_START")
+
 	l.leaderboard[targetWallet] = stats
 
 	// Update club staffing map
@@ -110,8 +118,14 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 	// Update player's salary
 	stats := l.leaderboard[targetWallet]
 	stats.Salary = uint64(data.SalaryAmount * 1000000) // Store in micro-units
-	club.LastActivity = time.Now() // Management actions refresh club activity status
+	club.LastActivity = time.Now()                     // Management actions refresh club activity status
 	l.leaderboard[targetWallet] = stats
+
+	// PILLAR 1: High-Finance Integration.
+	// If the contract is high-value (>= 500 $VBV), grant the EXECUTIVE_PAY achievement.
+	if data.SalaryAmount >= 500.0 {
+		l.unlockAchievementLocked(targetWallet, "EXECUTIVE_PAY")
+	}
 
 	l.logAdminAuditLocked("SET_SALARY", targetWallet, fmt.Sprintf("Club: %s (%s), Amount: %.2f $VBV", club.Name, club.ID, data.SalaryAmount))
 

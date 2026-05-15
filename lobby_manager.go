@@ -579,10 +579,41 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 
+		// PILLAR 1: Professional Prestige & Industrial Unlocks.
+		item, itemExists := GlobalShopRegistry[data.ItemID]
+		if !itemExists {
+			l.mutex.Unlock()
+			return
+		}
+
+		// Role Check: Career role must match item requirement (e.g. Sentry Turrets require Security)
+		if item.RequiredRole != "" && stats.JobRole != item.RequiredRole {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Purchase Failed: Career role '%s' required to access this hardware."}`, item.RequiredRole))})
+			return
+		}
+
+		// Mojo Check: Club influence must meet item threshold
+		if targetClub.Mojo < item.RequiredMojo {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Purchase Failed: Club Mojo too low (%d/%d). Increase turnover or defenses."}`, targetClub.Mojo, item.RequiredMojo))})
+			return
+		}
+
+		// Regional Governance Check: Master Tier items require 2+ districts
+		if item.IsMasterTier && len(targetClub.Territories) < 2 {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Purchase Failed: This is a Master Tier item. Requires Regional Governor status (2+ Districts)."}`)})
+			return
+		}
+
 		// 2. Fulfillment: Deduct from Club, Grant to Player
 		l.rewards[wallet] -= data.Price
 		targetClub.Inventory[data.ItemID]--
 		targetClub.LastActivity = time.Now()
+
+		// Apply item-specific Mojo bonus to the club
+		targetClub.Mojo += item.MojoBonus
 
 		// INDUSTRIAL LOOP: Purchase proceeds return to Faucet liquidity
 		l.faucetBalance += float64(data.Price) / 1000000.0
