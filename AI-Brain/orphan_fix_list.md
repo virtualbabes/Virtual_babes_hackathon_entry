@@ -247,3 +247,91 @@
 - [FIXED] Hardened `initiateBail` in `criminality.js` to include timestamps in the blockchain note and removed redundant code blocks from `app.js`.
 - [FIXED] Purged massive redundant logic block from `Public/app.js` (Functions: `buildEmptyBoard`, `renderCardHTML`, `openShopsOverlay`, etc.) to enforce modularity and prevent logic drift.
 - [FIXED] Purged redundant global `window` assignments and duplicated function definitions from `Public/app.js` to enforce modularity and prevent code bloat.
+- [FIXED] Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
+- [FIXED] Hardened `handleTournamentHistory` in `tournament_manager.go` with backoff for 429 rate-limits and improved error handling for indexer responses.
+- [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` with backoff for 429 rate-limits across both Voi and Algorand network paths.
+- [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses during player stats reconstruction.
+- [FIXED] Hardened `getVerifiedCards` and `getVerifiedCardsCrossChain` in `oracle_service.go` with retry logic for 429 errors during multi-chain NFT discovery and metadata retrieval.
+- [FIXED] Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for indexer responses during global leaderboard reconstruction.
+- [FIXED] Hardened `loadOnboardedWalletsFromIndexer` in `oracle_service.go` with backoff for 429 rate-limits during paged historical onboarding sync.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.
+- [FIXED] Hardened `checkVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during ARC-200 application box balance synchronization.
+- [FIXED] Hardened `checkNativeVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during native vault balance synchronization.
+- [FIXED] Resolved multiple recursive deadlock vulnerabilities in `handlers_admin.go` by switching to `Locked` variant helpers (`sendToClientLocked`, `logAdminAuditLocked`) while holding the state lock.
+- [FIXED] Hardened `handleMaintenanceMode` in `handlers_admin.go` by marshaling the payload as a struct and triggering a global `lobby_update`; synchronized `maintenance_time` field in `lobby_manager.go` to prevent UI errors for joining players.
+- [FIXED] Enhanced `handleSystemMessage` in `handlers_admin.go` to support tiered priorities; integrated with the frontend `admin_notification` system for high-priority broadcasts.
+- [FIXED] Updated `adminBroadcast` in `admin.js` to support multi-priority system broadcasts (info, warning, critical).
+- [FIXED] Enhanced `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly apply CSS classes and colors based on admin broadcast priority levels.
+- [FIXED] Updated `networks.json` with stable production RPC endpoints for Ethereum and Polygon (LlamaRPC), resolving potential 401 errors from unconfigured Infura placeholders.
+- [FIXED] Hardened `determineTop5` in `tournament_manager.go` to correctly rank semi-finalists and quarter-finalists when multiple BYE matches are present in the bracket.
+- [FIXED] Introduced `DATA_DIR` resolution in `Lobby` to allow persistent state storage on Render volumes; updated all service files to use dynamic pathing for JSON caches and audit logs.
+- [FIXED] Hardened `syncStatsFromBlockchain` and implemented `loadRegistrationsFromIndexer` to allow full reconstruction of the used transaction cache from on-chain `VBT_TOURN_BUYIN` notes.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.
+- [FIXED] Hardened `processTournamentResult` in `tournament_manager.go` with an activity guard to prevent processing results for inactive or finalized tournaments.
+- [FIXED] Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under lock to prevent race conditions during registration window closure.
+- [FIXED] Hardened `handleStartTournament` in `handlers_admin.go` to ensure participants are correctly gathered from `paidParticipants` with case-insensitive comparison and preserved tournament configuration.
+- [FIXED] Hardened `isAdminWallet` in `handlers_admin.go` with case-insensitive comparison (EqualFold) for environment variable authorization.
+- [FIXED] Hardened `link_wallet_request` in `lobby_manager.go` with chain-aware address normalization to prevent cross-session identity drift.
+- [FIXED] Hardened `getAdminHeaders` in `admin.js` to restrict administrative actions to WalletConnect providers only, ensuring consistency with backend security policies.
+- [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` to implement authoritative ID resolution for Voi assets, ensuring correct fallback to `AppID` from `networks.json` when a generic `assetIDStr` is provided.
+- [FIXED] Updated match win metadata format in `faucet_service.go` and implemented full reconstruction of match history (Tournament and Standard) in `oracle_service.go` for player immersion.
+- [FIXED] Enhanced `processTournamentResult` and `finalizeMatchResultLocked` to update ephemeral `match_history` for losers, ensuring real-time immersion for both standard and tournament matches.
+- [FIXED] Implemented on-chain "Loss" reconstruction in `syncStatsFromBlockchain` via Global Result Recovery (Vault scan); contextualized `VBT_DNF` notes with opponent and TID metadata.
+- [FIXED] Enhanced `handleTournamentHistory` in `tournament_manager.go` to cross-reference `VBT_WIN` payout receipts with bracket matches for high-fidelity verification.
+- [FIXED] Implemented `ReceiptsVerified` field in `TournamentSummary` and updated `GetTournamentArchiveBadge` in `main.go` to provide visual feedback for deep financial verification.
+- [FIXED] Updated `fetchTournamentHistory` in `leaderboard.js` to correctly pass the `receipts_verified` status to the `GetTournamentArchiveBadge` helper for enhanced UI feedback.
+- [FIXED] Hardened tournament finalization in `tournament_manager.go` by collecting reward TxIDs and recording a `PayoutsHash` in the on-chain summary for secondary financial proof.
+- [FIXED] Synchronized Tournament ID generation across lifecycle (Registration -> Payout -> Summary) to allow `handleTournamentHistory` to cryptographically verify receipts against the `PayoutsHash`.
+- [FIXED] Synchronized `TournamentID` and `MatchID` population across `lobby_manager.go`, `battle_service.go`, and `game.js` to ensure tournament match positions are accurately reflected in player history.
+- [FIXED] Updated `syncStatsFromBlockchain` in `oracle_service.go` to correctly populate `ReceiptTxID` for mirrored 'Loss' and 'DNF' records via vault metadata recovery.
+- [FIXED] Enhanced `renderMatchHistory` in `game.js` to visually indicate blockchain-verified match results using the `ReceiptTxID` field.
+- [FIXED] Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with specialized iconography and Envoi name resolution for seasonal archives.
+- [FIXED] Implemented automated recovery of `paidParticipants` from blockchain buy-in notes to ensure tournament registration state survives server restarts.
+- [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to strictly verify expected note prefixes, preventing cross-tournament payment replays.
+- [FIXED] Hardened `handleCourthouseReset` in `courthouse_service.go` with purpose-specific note verification and identity normalization.
+- [FIXED] Hardened `handleRepayLoan` in `loan_service.go` with purpose-specific note verification (`"REPAY_LOAN:"`) for repayment transactions.
+- [FIXED] Updated `submitCourthouseFine` in `criminality.js` to ensure the on-chain note contains the mandatory `"COURTHOUSE_FINE:"` prefix for Courthouse validation.
+- [FIXED] Hardened `initiateBail` in `criminality.js` to include timestamps in the blockchain note and removed redundant code blocks from `app.js`.
+- [FIXED] Purged massive redundant logic block from `Public/app.js` (Functions: `buildEmptyBoard`, `renderCardHTML`, `openShopsOverlay`, etc.) to enforce modularity and prevent logic drift.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
+- [FIXED] Hardened `handleTournamentHistory` in `tournament_manager.go` with backoff for 429 rate-limits.
+- [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` with backoff for 429 rate-limits across both Voi and Algorand network paths.
+- [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses during player stats reconstruction.
+- [FIXED] Hardened `getVerifiedCards` and `getVerifiedCardsCrossChain` in `oracle_service.go` with retry logic for 429 errors during multi-chain NFT discovery and metadata retrieval.
+- [FIXED] Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for indexer responses during global leaderboard reconstruction.
+- [FIXED] Hardened `loadOnboardedWalletsFromIndexer` in `oracle_service.go` with backoff for 429 rate-limits during paged historical onboarding sync.
+- [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.
+- [FIXED] Hardened `checkVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during ARC-200 application box balance synchronization.
+- [FIXED] Hardened `checkNativeVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during native vault balance synchronization.
+- [FIXED] Resolved multiple recursive deadlock vulnerabilities in `handlers_admin.go` by switching to `Locked` variant helpers (`sendToClientLocked`, `logAdminAuditLocked`) while holding the state lock.
+- [FIXED] Hardened `handleMaintenanceMode` in `handlers_admin.go` by marshaling the payload as a struct and triggering a global `lobby_update`; synchronized `maintenance_time` field in `lobby_manager.go` to prevent UI errors for joining players.
+- [FIXED] Enhanced `handleSystemMessage` in `handlers_admin.go` to support tiered priorities; integrated with the frontend `admin_notification` system for high-priority broadcasts.
+- [FIXED] Updated `adminBroadcast` in `admin.js` to support multi-priority system broadcasts (info, warning, critical).
+- [FIXED] Enhanced `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly apply CSS classes and colors based on admin broadcast priority levels.
+- [FIXED] Updated `networks.json` with stable production RPC endpoints for Ethereum and Polygon (LlamaRPC), resolving potential 401 errors from unconfigured Infura placeholders.
+- [FIXED] Hardened `determineTop5` in `tournament_manager.go` to correctly rank semi-finalists and quarter-finalists when multiple BYE matches are present in the bracket.
+- [FIXED] Introduced `DATA_DIR` resolution in `Lobby` to allow persistent state storage on Render volumes; updated all service files to use dynamic pathing for JSON caches and audit logs.
+- [FIXED] Hardened `syncStatsFromBlockchain` and implemented `loadRegistrationsFromIndexer` to allow full reconstruction of the used transaction cache from on-chain `VBT_TOURN_BUYIN` notes.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.
+- [FIXED] Hardened `processTournamentResult` in `tournament_manager.go` with an activity guard to prevent processing results for inactive or finalized tournaments.
+- [FIXED] Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under lock to prevent race conditions during registration window closure.
+- [FIXED] Hardened `handleStartTournament` in `handlers_admin.go` to ensure participants are correctly gathered from `paidParticipants` with case-insensitive comparison and preserved tournament configuration.
+- [FIXED] Hardened `isAdminWallet` in `handlers_admin.go` with case-insensitive comparison (EqualFold) for environment variable authorization.
+- [FIXED] Hardened `link_wallet_request` in `lobby_manager.go` with chain-aware address normalization to prevent cross-session identity drift.
+- [FIXED] Hardened `getAdminHeaders` in `admin.js` to restrict administrative actions to WalletConnect providers only, ensuring consistency with backend security policies.
+- [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` to implement authoritative ID resolution for Voi assets, ensuring correct fallback to `AppID` from `networks.json` when a generic `assetIDStr` is provided.
+- [FIXED] Updated match win metadata format in `faucet_service.go` and implemented full reconstruction of match history (Tournament and Standard) in `oracle_service.go` for player immersion.
+- [FIXED] Enhanced `processTournamentResult` and `finalizeMatchResultLocked` to update ephemeral `match_history` for losers, ensuring real-time immersion for both standard and tournament matches.
+- [FIXED] Implemented on-chain "Loss" reconstruction in `syncStatsFromBlockchain` via Global Result Recovery (Vault scan); contextualized `VBT_DNF` notes with opponent and TID metadata.
+- [FIXED] Enhanced `handleTournamentHistory` in `tournament_manager.go` to cross-reference `VBT_WIN` payout receipts with bracket matches for high-fidelity verification.
+- [FIXED] Implemented `ReceiptsVerified` field in `TournamentSummary` and updated `GetTournamentArchiveBadge` in `main.go` to provide visual feedback for deep financial verification.
+- [FIXED] Updated `fetchTournamentHistory` in `leaderboard.js` to correctly pass the `receipts_verified` status to the `GetTournamentArchiveBadge` helper for enhanced UI feedback.
+- [FIXED] Hardened tournament finalization in `tournament_manager.go` by collecting reward TxIDs and recording a `PayoutsHash` in the on-chain summary for secondary financial proof.
+- [FIXED] Synchronized Tournament ID generation across lifecycle (Registration -> Payout -> Summary) to allow `handleTournamentHistory` to cryptographically verify receipts against the `PayoutsHash`.
+- [FIXED] Synchronized `TournamentID` and `MatchID` population across `lobby_manager.go`, `battle_service.go`, and `game.js` to ensure tournament match positions are accurately reflected in player history.
+- [FIXED] Updated `syncStatsFromBlockchain` in `oracle_service.go` to correctly populate `ReceiptTxID` for mirrored 'Loss' and 'DNF' records via vault metadata recovery.
+- [FIXED] Enhanced `renderMatchHistory` in `game.js` to visually indicate blockchain-verified match results using the `ReceiptTxID` field.
+- [FIXED] Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with specialized iconography and Envoi name resolution for seasonal archives.
+- [FIXED] Implemented automated recovery of `paidParticipants` from blockchain buy-in notes to ensure tournament registration state survives server restarts.
