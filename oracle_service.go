@@ -66,11 +66,32 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 				log.Printf("[ORACLE] Syncing tokens for %s on %s...\n", t.addr, t.network)
 				url := fmt.Sprintf("%s/tokens?owner=%s", cfg.IndexerURL, t.addr)
 
-				ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-				req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-				resp, err := http.DefaultClient.Do(req)
+				var resp *http.Response
+				var err error
+				for i := 0; i < 3; i++ {
+					ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+					req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+					resp, err = http.DefaultClient.Do(req)
+					cancel()
+					if err != nil {
+						if i < 2 {
+							time.Sleep(500 * time.Millisecond)
+							continue
+						}
+						break
+					}
+					if resp.StatusCode == http.StatusTooManyRequests {
+						resp.Body.Close()
+						if i < 2 {
+							time.Sleep(time.Duration(i+1) * 1 * time.Second)
+							continue
+						}
+						break
+					}
+					break
+				}
 
-				if err == nil && resp.StatusCode == http.StatusOK {
+				if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 					var res struct {
 						Tokens []struct {
 							TokenID  int    `json:"tokenId"`
@@ -98,18 +119,38 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 					}
 					resp.Body.Close()
 				}
-				cancel()
 			} else if strings.HasPrefix(cfg.ChainID, "eip155") {
 				// EVM Discovery logic: Query Etherscan NFT transfer history for ownership patterns
 				log.Printf("[ORACLE] Syncing EVM tokens for %s on %s...\n", t.addr, t.network)
 				url := fmt.Sprintf("%s/api?module=account&action=tokennfttx&contractaddress=%s&address=%s&sort=desc",
 					cfg.IndexerURL, cfg.AssetID, t.addr)
 
-				ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-				req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-				resp, err := http.DefaultClient.Do(req)
+				var resp *http.Response
+				var err error
+				for i := 0; i < 3; i++ {
+					ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+					req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+					resp, err = http.DefaultClient.Do(req)
+					cancel()
+					if err != nil {
+						if i < 2 {
+							time.Sleep(500 * time.Millisecond)
+							continue
+						}
+						break
+					}
+					if resp.StatusCode == http.StatusTooManyRequests {
+						resp.Body.Close()
+						if i < 2 {
+							time.Sleep(time.Duration(i+1) * 1 * time.Second)
+							continue
+						}
+						break
+					}
+					break
+				}
 
-				if err == nil && resp.StatusCode == http.StatusOK {
+				if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 					var evmRes struct {
 						Status string `json:"status"`
 						Result []struct {
@@ -140,7 +181,6 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 					}
 					resp.Body.Close()
 				}
-				cancel()
 			}
 		}
 
@@ -179,15 +219,34 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 	}
 	url := fmt.Sprintf("%s/tokens?contractId=%s&tokenId=%s", baseURL, contractID, strings.Join(ids, ","))
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if req == nil {
-		return nil, fmt.Errorf("failed to create HTTP request for indexer")
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE] Indexer request failed for %s after retries: %v\n", url, err)
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			log.Printf("[ORACLE] Indexer rate-limited (429) for %s after retries.\n", url)
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
 	}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 		defer resp.Body.Close()
 		var res struct {
 			Tokens []struct {
@@ -203,10 +262,11 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 				tokenMeta[t.TokenID] = metaResult{mintRound: t.MintRound, name: meta.Name, image: meta.Image, exists: true}
 			}
 		}
-	} else if err != nil {
-		log.Printf("[ORACLE] Indexer request failed for %s: %v\n", url, err)
-	} else {
+	} else if resp != nil {
+		defer resp.Body.Close()
 		log.Printf("[ORACLE] Indexer returned non-200 status for %s: %d %s\n", url, resp.StatusCode, resp.Status)
+	} else {
+		log.Printf("[ORACLE] Indexer request failed for %s\n", url)
 	}
 
 	l.mutex.Lock()
@@ -243,11 +303,32 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 			url := fmt.Sprintf("%s/api?module=token&action=tokenid_metadata&contractaddress=%s&tokenid=%d",
 				cfg.IndexerURL, cfg.AssetID, id)
 
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-			resp, err := http.DefaultClient.Do(req)
+			var resp *http.Response
+			var err error
+			for i := 0; i < 3; i++ {
+				ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+				req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+				resp, err = http.DefaultClient.Do(req)
+				cancel()
+				if err != nil {
+					if i < 2 {
+						time.Sleep(500 * time.Millisecond)
+						continue
+					}
+					break
+				}
+				if resp.StatusCode == http.StatusTooManyRequests {
+					resp.Body.Close()
+					if i < 2 {
+						time.Sleep(time.Duration(i+1) * 1 * time.Second)
+						continue
+					}
+					break
+				}
+				break
+			}
 
-			if err == nil && resp.StatusCode == http.StatusOK {
+			if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 				var evmRes struct {
 					Status  string `json:"status"`
 					Result  string `json:"result"` // Usually JSON string of metadata
@@ -266,8 +347,10 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 					}
 				}
 				resp.Body.Close()
+			} else if resp != nil {
+				log.Printf("[ORACLE] EVM Metadata fetch for %s #%d returned status %d", cfg.NetworkName, id, resp.StatusCode)
+				resp.Body.Close()
 			}
-			cancel()
 		} else if isSolana {
 			// Solana Metadata Fetch (Metaplex Digital Asset Standard - DAS) via NodeURL
 
@@ -289,12 +372,33 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 
 			url := cfg.NodeURL // DAS API is typically accessed via the NodeURL (RPC endpoint)
 
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
-			req.Header.Set("Content-Type", "application/json")
-			resp, err := http.DefaultClient.Do(req)
+			var resp *http.Response
+			var err error
+			for i := 0; i < 3; i++ {
+				ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+				req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				resp, err = http.DefaultClient.Do(req)
+				cancel()
+				if err != nil {
+					if i < 2 {
+						time.Sleep(500 * time.Millisecond)
+						continue
+					}
+					break
+				}
+				if resp.StatusCode == http.StatusTooManyRequests {
+					resp.Body.Close()
+					if i < 2 {
+						time.Sleep(time.Duration(i+1) * 1 * time.Second)
+						continue
+					}
+					break
+				}
+				break
+			}
 
-			if err == nil && resp.StatusCode == http.StatusOK {
+			if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 				var dasRes struct {
 					Result struct {
 						Content struct {
@@ -318,10 +422,12 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 					log.Printf("[ORACLE] Solana DAS 'getAsset' response parsing failed or no metadata for %s #%d. Error: %v", cfg.NetworkName, id, err)
 				}
 				resp.Body.Close()
+			} else if resp != nil {
+				log.Printf("[ORACLE] Solana DAS 'getAsset' request failed for %s #%d. Status: %d", cfg.NetworkName, id, resp.StatusCode)
+				resp.Body.Close()
 			} else {
-				log.Printf("[ORACLE] Solana DAS 'getAsset' request failed for %s #%d. Error: %v, Status: %d", cfg.NetworkName, id, err, resp.StatusCode)
+				log.Printf("[ORACLE] Solana DAS 'getAsset' connection failed for %s #%d: %v", cfg.NetworkName, id, err)
 			}
-			cancel()
 
 			if !foundOnChain {
 				log.Printf("[ORACLE] Solana DAS fetch for %s #%d failed to retrieve valid metadata. Using placeholder card.", cfg.NetworkName, id)
