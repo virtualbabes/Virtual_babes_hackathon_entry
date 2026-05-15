@@ -247,6 +247,8 @@
 - [FIXED] Hardened `initiateBail` in `criminality.js` to include timestamps in the blockchain note and removed redundant code blocks from `app.js`.
 - [FIXED] Purged massive redundant logic block from `Public/app.js` (Functions: `buildEmptyBoard`, `renderCardHTML`, `openShopsOverlay`, etc.) to enforce modularity and prevent logic drift.
 - [FIXED] Purged redundant global `window` assignments and duplicated function definitions from `Public/app.js` to enforce modularity and prevent code bloat.
+- [FIXED] Enhanced `handleTradeShares` in `market_service.go` to record high-value share purchases and sales on-chain using the `VBT_SHARE_TRADE:` note prefix for audibility.
+
 - [FIXED] Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
 - [FIXED] Hardened `handleTournamentHistory` in `tournament_manager.go` with backoff for 429 rate-limits and improved error handling for indexer responses.

@@ -58,3 +58,4 @@
 *   **132-133**: Global countdown sync for registration; Implemented `tournament_update` in `network.js`.
 *   **134-138**: Cryptographically bound all economy notes (`BAIL_PAYMENT`, `COURTHOUSE_FINE`, `REPAY_LOAN`) to specific TxID purposes and timestamps.
 *   **139-140**: Finalized `Public/app.js` modularity cleanup; purged 300+ lines of redundant function definitions.
+*   **141**: Implemented on-chain recording of high-value share trades (`VBT_SHARE_TRADE:`) in `market_service.go` for financial proof.

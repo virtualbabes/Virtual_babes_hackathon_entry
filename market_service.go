@@ -104,6 +104,14 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			l.faucetBalance -= totalValueBase
 			l.applyDynamicScalingLocked()
 			l.logAdminAuditLocked("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
+
+			// PILLAR 3: Financial Proof. Record high-value share sale on-chain.
+			if totalValueBase >= 100.0 {
+				go func() {
+					jsonPayload, _ := json.Marshal(tradeDetails)
+					l.sendNoteTx(fmt.Sprintf("VBT_SHARE_TRADE:%s", string(jsonPayload)))
+				}()
+			}
 		} else {
 			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})
 			return
