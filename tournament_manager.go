@@ -455,6 +455,10 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	payoutPercentages := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
 
 	if effectivePot > 0 && len(top5) > 0 {
+		// PILLAR 3: Economic Precision.
+		// The loop iterates only over the actual number of players in top5.
+		// If top5 is shorter than 5, only the corresponding payout percentages are distributed.
+		// The remaining portion of the effectivePot is retained in the faucet.
 		log.Printf("[TOURNAMENT] Finalizing Event. Pot: %.2f $VBV (Tax: %.2f). Payout Ranks: %v\n", effectivePot, govTax, top5)
 
 		for i, player := range top5 {

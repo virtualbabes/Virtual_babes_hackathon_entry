@@ -121,3 +121,4 @@
 101. **Complete**: Hardened `verifyBuyInTransaction` to correctly utilize `AssetID` and `AppID` from `networks.json`.
 102. **Complete**: Hardened `advanceTournamentRound` in `tournament_manager.go` with normalized Match IDs and robust BYE handling for odd-numbered winners.
 103. **Complete**: Hardened `determineTop5` in `tournament_manager.go` with winner presence validation to accurately rank finishers in BYE-heavy brackets.
+104. **Complete**: Verified `dispatchTournamentRewards` and `finalizeTournament` correctly handle partial pot distribution for shorter `top5` lists.
