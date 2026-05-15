@@ -326,9 +326,12 @@ export async function openBountyBoard() {
         targetsHtml = outlaws.map(p => {
             const name = getCachedEnvoiName(p.wallet);
             const isMe = p.id === myClientId;
+            const employer = globalClubs[p.employer_id]?.name || 'Freelancer';
+            const mojo = p.mojo || 0;
+
             return `
                 <div class="player-item border-gold">
-                    <div class="text-left"><b class="text-gold">${name}</b><br><small>Wanted: ${p.wanted_level}</small></div>
+                    <div class="text-left"><b class="text-gold">${name}</b><br><small>Wanted: ${p.wanted_level} | Mojo: ${mojo}<br>Affiliation: ${employer}</small></div>
                     <div class="text-right">
                         <b class="text-neon-green">${p.wanted_level * 50} $VBV</b>
                         ${isHunter && !isMe ? `<button class="outline btn-small border-gold mt-5" onclick="window.sendChallenge('${p.id}'); hideAllOverlays();">HUNT</button>` : ''}

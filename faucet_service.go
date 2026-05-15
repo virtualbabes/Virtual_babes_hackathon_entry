@@ -238,6 +238,21 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 		bonusApplied = true
 	}
 
+	// PILLAR 1: Professional Hunter Bonus.
+	// Hunters gain a multiplier on Bounty payouts based on their Mojo Tier.
+	mojoMultiplier := 1.0
+	if hasStats {
+		if stats.Mojo >= 1000 {
+			mojoMultiplier = 1.25 // Diamond
+		} else if stats.Mojo >= 600 {
+			mojoMultiplier = 1.15 // Gold
+		} else if stats.Mojo >= 300 {
+			mojoMultiplier = 1.10 // Silver
+		} else if stats.Mojo >= 100 {
+			mojoMultiplier = 1.05 // Bronze
+		}
+	}
+
 	var txns []types.Transaction
 	var totalUnits float64
 	vaultAddrObj, _ := types.DecodeAddress(vaultAddr)
@@ -255,8 +270,10 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 		// PILLAR 4: Bounty System Integration.
 		// Add the calculated bounty from MatchHistory if this is the primary Arena asset.
 		if appIDStr == l.rewardAssetID && history.BountyReward > 0 {
-			amt += uint64(history.BountyReward * 1000000)
-			log.Printf("[FAUCET] Bounty payout of %.2f included for %s", history.BountyReward, recipient)
+			// Apply Mojo tier multiplier to the bounty portion
+			finalBounty := history.BountyReward * mojoMultiplier
+			amt += uint64(finalBounty * 1000000)
+			log.Printf("[FAUCET] Bounty payout of %.2f (scaled by %.2fx Mojo) included for %s", finalBounty, mojoMultiplier, recipient)
 		}
 
 		// NEW: Granular Opt-in Verification
@@ -318,7 +335,7 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	// Wait for confirmation to ensure the transaction is processed before updating internal state
 	transaction.WaitForConfirmation(client, firstTxID, 4, context.Background())
 
-	l.mutex.Lock() // Lock to update faucet balance and re-evaluate dynamic scaling
+	l.mutex.Lock()                // Lock to update faucet balance and re-evaluate dynamic scaling
 	l.faucetBalance -= totalUnits // Deduct from the overall faucet balance
 	l.applyDynamicScalingLocked() // Re-evaluate dynamic scaling after payout
 	l.mutex.Unlock()

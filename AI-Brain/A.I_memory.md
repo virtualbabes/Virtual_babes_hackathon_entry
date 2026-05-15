@@ -438,4 +438,7 @@
 67. Complete: Hardened `handlePayRansom` and `handleReleaseHostage` in `handlers_criminality.go` by resolving recursive deadlocks and implementing reputation recalculation for both parties.
 68. Complete: Hardened `CalculateReputation` in `economy_service.go` with jailing penalties and resolved clobbering risks in `handleHeist`.
 69. Complete: Hardened `handleBailCard` in `handlers_criminality.go` by resolving remaining recursive deadlock vulnerabilities in the error paths.
+70. Complete: Updated `openBountyBoard` in `criminality.js` to display target Mojo and current Employer (Club Name) for high-fidelity hunting.
+71. Complete: Hardened `dispatchReward` in `faucet_service.go` to scale Bounty Rewards based on the Hunter's Mojo Tier.
+72. Complete: Hardened `processFallenPenaltyJailLocked` in `battle_service.go` to award Mojo to the capturing player's club for each card seized, and updated `calculateMojoGain` in `club_service.go`.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

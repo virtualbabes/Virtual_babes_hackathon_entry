@@ -606,6 +606,9 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 	case "DEFENSE":
 		// Successful heist defense yields a flat Mojo boost
 		gain = 15
+	case "JAIL_CAPTURE":
+		// Jailing an opponent's card yields a flat Mojo boost for the club
+		gain = 5
 
 		// PILLAR 1: Regional Security Synergy.
 		// Governors (2+ territories) have interlocked security grids that yield 

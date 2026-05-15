@@ -788,6 +788,10 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		owningClub.Jail[card.ID] = card
 		owningClub.LastActivity = time.Now() // Defensive success prevents Mojo decay
 
+		// PILLAR 1: Mojo Gain for Capturing Player's Club
+		mojoGain := l.calculateMojoGain(owningClub, "JAIL_CAPTURE", 0)
+		owningClub.Mojo += mojoGain
+
 		// Remove from original owner's inventory (Decrementing instead of absolute deletion)
 		originalOwnerStats.Inventory[cardKey]--
 		if originalOwnerStats.Inventory[cardKey] <= 0 {
@@ -802,7 +806,7 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		jailedThisMatch[jailKey] = true
 		match.Board[captured.GridIndex] = nil // Seized cards leave the arena immediately
 
-		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s.\n", 
+		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s. Club gained %d Mojo.\n", 
 			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)
 
 		// Use CaptureType in client notifications for high-fidelity tactical feedback
