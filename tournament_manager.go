@@ -111,6 +111,8 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}
 
 	var actualRegistrationTime time.Time
+	var divisor float64 = 1000000.0
+	var verifyNetwork string = "Voi"
 
 	if !isElite {
 		if req.TxID == "" {
@@ -128,7 +130,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		if buyInAsset == "" {
 			buyInAsset = voiConfig.AppID
 		}
-		verifyNetwork := "Voi"
+		verifyNetwork = "Voi"
 
 		if req.Network == "ALGO" {
 			l.mutex.RLock()
@@ -148,7 +150,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		netCfg, hasCfg := l.availableNetworks[verifyNetwork+" Mainnet"]
 		l.mutex.RUnlock()
 
-		divisor := 1000000.0 // Fallback to standard 6 decimals (VBV/AVoi)
+		divisor = 1000000.0 // Fallback to standard 6 decimals (VBV/AVoi)
 		if hasCfg && netCfg.PowerDivisor > 0 {
 			divisor = netCfg.PowerDivisor
 		}
@@ -176,12 +178,18 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		actualRegistrationTime = time.Unix(txUnixTime, 0)
-
-		// Process Club Kickback (Tournament Revenue Loop) using the correct network precision
-		l.distributeTournamentKickback(req.Wallet, uint64(buyInAmt*divisor), actualRegistrationTime, verifyNetwork)
 	}
 
 	l.mutex.Lock()
+	// PILLAR 3: Bracket Integrity.
+	// Re-verify tournament status under exclusive lock to prevent registration
+	// into a bracket that transitioned to Active or Finalized during verification.
+	if !l.tournament.Active || l.tournament.CurrentRound != 0 {
+		l.mutex.Unlock()
+		http.Error(w, "Tournament registration closed during verification protocol.", http.StatusConflict)
+		return
+	}
+
 	l.paidParticipants = append(l.paidParticipants, targetWallet)
 	if !isElite {
 		l.registeredTxIDs[req.TxID] = time.Now()
@@ -189,6 +197,11 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		l.tournamentPotBonus += (buyInAmt / 2.0)
 	}
 	l.mutex.Unlock()
+
+	// Only process kickback if the registration was actually committed and not elite
+	if !isElite {
+		l.distributeTournamentKickback(targetWallet, uint64(buyInAmt*divisor), actualRegistrationTime, verifyNetwork)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "is_elite": isElite})
