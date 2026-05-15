@@ -1727,38 +1727,55 @@ func (l *Lobby) processPlaystyleDecay() {
 // simulateTournament orchestrates a full tournament simulation, including bracket generation and match results.
 func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 	l.mutex.Lock()
-	defer l.mutex.Unlock()
 
 	log.Printf("[SIMULATION] Starting %d-player tournament simulation (Buy-in: %v)...\n", size, isBuyIn)
+
+	// Identify clubs for member assignment testing
+	var clubIDs []string
+	for id := range l.clubs {
+		clubIDs = append(clubIDs, id)
+	}
 
 	// 1. Generate mock participants
 	participants := make([]string, size)
 	for i := 0; i < size; i++ {
 		mockWallet := fmt.Sprintf("SIM_PLAYER_%d_%d", i, time.Now().UnixNano()%10000)
 		participants[i] = mockWallet
-		l.leaderboard[mockWallet] = PlayerStats{
+		stats := PlayerStats{
 			Reputation: rand.Intn(1000),
 			Wins:       rand.Intn(50),
 		}
+
+		// PILLAR 1: Kickback Verification Setup.
+		// Assign 30% of participants to existing clubs to ensure kickbacks are distributed during the simulation.
+		if len(clubIDs) > 0 && rand.Float64() < 0.30 {
+			cid := clubIDs[rand.Intn(len(clubIDs))]
+			stats.EmployerClubID = cid
+			if l.clubs[cid].Members == nil {
+				l.clubs[cid].Members = make(map[string]time.Time)
+			}
+			l.clubs[cid].Members[strings.ToLower(mockWallet)] = time.Now().Add(-2 * time.Hour)
+		}
+
+		l.leaderboard[mockWallet] = stats
 		l.ensurePlayerStatsMapsInitialized(mockWallet)
 		// Simulate registration to trigger kickback logic (if isBuyIn)
 		if isBuyIn {
 			l.paidParticipants = append(l.paidParticipants, mockWallet)
 			l.faucetBalance += (50.0 / 2.0) // Simulate half buy-in to pot
 			l.tournamentPotBonus += (50.0 / 2.0)
-			l.distributeTournamentKickback(mockWallet, uint64(50*1000000), time.Now(), "Voi")
+			// PILLAR 3: Deadlock Fix. Use variant that assumes lock is held.
+			l.distributeTournamentKickbackLocked(mockWallet, uint64(50*1000000), time.Now(), "Voi")
 		}
 	}
 
 	// 2. Initialize tournament state (similar to handleStartTournament)
 	matches := []TournamentMatch{}
-	seedMap := map[int][]int{
-		8:  {0, 7, 3, 4, 1, 6, 2, 5},
-		16: {0, 15, 7, 8, 4, 11, 3, 12, 1, 14, 6, 9, 5, 10, 2, 13},
-	}[size]
+	seedMap := map[int][]int{8: {0, 7, 3, 4, 1, 6, 2, 5}, 16: {0, 15, 7, 8, 4, 11, 3, 12, 1, 14, 6, 9, 5, 10, 2, 13}}[size]
 
 	if seedMap == nil {
 		log.Printf("[SIMULATION ERROR] Invalid tournament size: %d\n", size)
+		l.mutex.Unlock()
 		return
 	}
 
@@ -1768,50 +1785,55 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 		})
 	}
 
+	pot := 500.0
+	if isBuyIn {
+		pot += l.tournamentPotBonus
+		l.tournamentPotBonus = 0
+	}
+
 	l.tournament = TournamentState{
 		Active:       true,
+		ID:           fmt.Sprintf("SIM-T-%d", time.Now().Unix()),
 		Participants: participants,
 		Matches:      matches,
 		CurrentRound: 1,
-		Pot:          float64(size) * 50.0, // Assuming 50 VBV buy-in for simulation
+		Pot:          pot,
 		BuyInAmount:  50.0,
 		IsBuyInMode:  isBuyIn,
 		OpenTime:     time.Now().Add(-1 * time.Hour), // Set in the past for registration
 	}
+	l.mutex.Unlock()
 
 	// 3. Simulate rounds until a winner is determined
-	for l.tournament.Active && len(l.tournament.Matches) > 0 {
+	for {
+		l.mutex.Lock()
+		if !l.tournament.Active || len(l.tournament.Matches) == 0 {
+			l.mutex.Unlock()
+			break
+		}
+
 		currentRoundMatches := []TournamentMatch{}
 		for _, m := range l.tournament.Matches {
 			if m.Round == l.tournament.CurrentRound && m.Winner == "" {
 				currentRoundMatches = append(currentRoundMatches, m)
 			}
 		}
+
 		if len(currentRoundMatches) == 0 {
+			l.mutex.Unlock()
 			break
 		} // No more matches in this round
 
 		for _, m := range currentRoundMatches {
-			winner := m.P1
-			if rand.Intn(2) == 1 {
-				winner = m.P2
-			} // Randomly pick winner
+			winner := m.P1 // Simulated outcome
+			if rand.Intn(2) == 1 { winner = m.P2 }
 			l.processTournamentResult(m.ID, winner) // This will advance rounds and finalize
 		}
-		// Small delay to simulate time passing between rounds
+		l.mutex.Unlock()
+		// PILLAR 3: Performance Hardening. Pulse the lock to allow standard lobby traffic.
 		time.Sleep(100 * time.Millisecond)
 	}
-
-	// Determine the winner
-	var winner string
-	for _, m := range l.tournament.Matches {
-		if m.Winner != "" && m.Winner != "BYE" {
-			winner = m.Winner
-		}
-	}
-	l.tournament.Winner = winner
-
-	log.Printf("[SIMULATION] Tournament simulation complete. Winner: %s\n", l.tournament.Winner)
+	log.Printf("[SIMULATION] Tournament simulation complete. Final Winner ID recorded in archival summary.\n")
 }
 
 // getClubByTerritoryID returns the club that owns the given territory, or nil if none.

@@ -251,6 +251,7 @@
 - [FIXED] Updated `package.json` with `test:stress` script to facilitate isolated high-concurrency testing of the tournament bracket logic.
 - [FIXED] Implemented automatic 16-player tournament simulation on `lobby_manager.go` startup when `ARENA_STRESS_TEST` environment variable is detected.
 - [FIXED] Hardened `Dockerfile` with `entrypoint.sh` to dynamically create and permission the `DATA_DIR` for Render persistent volume mounts.
+- [FIXED] Resolved potential deadlock in `simulateTournament` by refactoring `distributeTournamentKickback` into a `Locked` variant and implemented lock pulsing during simulation loops.
 
 - [FIXED] Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.

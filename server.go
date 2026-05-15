@@ -240,7 +240,11 @@ func (l *Lobby) saveNetworkConfigs() {
 func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.distributeTournamentKickbackLocked(playerWallet, feeMicro, registrationTime, network)
+}
 
+// distributeTournamentKickbackLocked handles the kickback payout assuming the mutex is already held.
+func (l *Lobby) distributeTournamentKickbackLocked(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
 	// PILLAR 3: Dynamic Precision Recovery.
 	divisor := 1000000.0 // Default fallback
 	if cfg, ok := l.availableNetworks[network+" Mainnet"]; ok && cfg.PowerDivisor > 0 {
