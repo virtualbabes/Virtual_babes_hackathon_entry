@@ -41,6 +41,10 @@ RUN mkdir -p /app/data && chown -R arenabot:arena /app/data
 # Set Environment Variable for the data directory
 ENV DATA_DIR=/app/data
 
+# Copy the entrypoint script and make it executable
+COPY --chown=arenabot:arena entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Copy only the compiled binary from the builder stage
 COPY --from=builder --chown=arenabot:arena /app/server-bin .
 
