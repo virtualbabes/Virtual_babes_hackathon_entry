@@ -77,7 +77,6 @@ export async function adminBroadcast() { // Exported for use in app.js
     if (!text) return;
 
     const headers = await getAdminHeaders();
-    } catch (err) { showToast("❌ Broadcast failed", "error"); }
     if (!headers) return;
 
     setTransactionStatus("Broadcasting system message...", "info");

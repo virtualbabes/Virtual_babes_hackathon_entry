@@ -212,3 +212,4 @@
 - [FIXED] Resolved multiple recursive deadlock vulnerabilities in `handlers_admin.go` by switching to `Locked` variant helpers (`sendToClientLocked`, `logAdminAuditLocked`) while holding the state lock.
 - [FIXED] Hardened `handleMaintenanceMode` in `handlers_admin.go` by marshaling the payload as a struct and triggering a global `lobby_update`; synchronized `maintenance_time` field in `lobby_manager.go` to prevent UI errors for joining players.
 - [FIXED] Enhanced `handleSystemMessage` in `handlers_admin.go` to support tiered priorities; integrated with the frontend `admin_notification` system for high-priority broadcasts.
+- [FIXED] Updated `adminBroadcast` in `admin.js` to support multi-priority system broadcasts (info, warning, critical).
