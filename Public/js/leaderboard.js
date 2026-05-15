@@ -108,6 +108,7 @@ export async function fetchTournamentHistory(page = 1) {
                     <div class="flex-row justify-between align-center mb-10">
                         <b class="text-neon-cyan">TOURNAMENT #${t.id.substring(0, 8)}</b>
                         <small class="opacity-5">${new Date(t.timestamp).toLocaleDateString()}</small>
+                        ${window.GetTournamentArchiveBadge(t.is_verified, t.links, t.receipts_verified)}
                     </div>
                     <div class="flex-row justify-between">
                         <span>Winner: <b class="text-gold">${getCachedEnvoiName(t.winner)}</b></span>
