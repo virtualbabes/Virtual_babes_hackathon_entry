@@ -72,10 +72,6 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	if data.Action == "buy" {
 		if l.rewards[wallet] >= totalValueMicro {
 			l.rewards[wallet] -= totalValueMicro
-
-			if stats.Portfolio == nil {
-				stats.Portfolio = make(map[string]float64)
-			}
 			currentShares := stats.Portfolio[targetWallet]
 			stats.Portfolio[targetWallet] = currentShares + data.Amount
 
@@ -112,6 +108,9 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})
 			return
 		}
+	} else {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Error: Invalid action."}`)})
+		return
 	}
 
 	// REPUTATION SYNC: Ensure the trader's Standing reflects the current world state post-trade.
