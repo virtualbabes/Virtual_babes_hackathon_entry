@@ -136,22 +136,61 @@ export async function fetchSeasonHistory() {
         const response = await fetch(`${CONFIG.API_BASE}/api/season/history`);
         const seasons = await response.json();
         
-        container.innerHTML = seasons.map(s => `
-            <div class="season-item glass-panel">
-                <div class="flex-row justify-between align-center mb-10">
-                    <b class="text-neon-purple">SEASON ${s.season}</b>
-                    <small class="opacity-5">${new Date(s.start).toLocaleDateString()} - ${new Date(s.end).toLocaleDateString()}</small>
+        // Resolve names for all unique wallets in top standings and highlights
+        const wallets = new Set();
+        seasons.forEach(s => {
+            s.top.forEach(p => wallets.add(p.w));
+            if (s.highlights) s.highlights.forEach(h => wallets.add(h.w));
+        });
+        await Promise.all(Array.from(wallets).map(w => resolveEnvoiName(w)));
+
+        const highlightIcons = {
+            "Tournament Champion": "🏆",
+            "Master Collector": "🎨",
+            "Social Titan": "🔥"
+        };
+
+        container.innerHTML = seasons.map(s => {
+            const highlightsHTML = s.highlights && s.highlights.length > 0 ? `
+                <div class="season-highlights mb-20">
+                    <div class="highlight-label font-size-0-7em opacity-5 mb-10 letter-spacing-1">HALL OF VALOR</div>
+                    <div class="flex-col gap-10">
+                        ${s.highlights.map(h => `
+                            <div class="highlight-row glass-panel m-0 p-10 flex-row align-center gap-15 border-gold" style="background: rgba(255, 215, 0, 0.05);">
+                                <div class="highlight-icon font-size-1-5em">${highlightIcons[h.a] || '⭐'}</div>
+                                <div class="text-left flex-1">
+                                    <div class="highlight-title font-bold text-gold" style="font-size: 0.9em; letter-spacing: 1px;">${h.a.toUpperCase()}</div>
+                                    <div class="highlight-player font-size-0-8em opacity-9">
+                                        <b class="text-neon-cyan">${getCachedEnvoiName(h.w)}</b> 
+                                        <span class="opacity-5" style="margin-left: 5px;">— ${h.m}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>` : '';
+
+            return `
+                <div class="season-item glass-panel">
+                    <div class="flex-row justify-between align-center mb-15">
+                        <b class="text-neon-purple" style="font-size: 1.1em;">SEASON ${s.season}</b>
+                        <small class="opacity-5">${new Date(s.start).toLocaleDateString()} - ${new Date(s.end).toLocaleDateString()}</small>
+                    </div>
+                    
+                    ${highlightsHTML}
+
+                    <div class="season-winners-list">
+                        <div class="highlight-label font-size-0-7em opacity-5 mb-5 letter-spacing-1">TOP STANDINGS</div>
+                        ${s.top.map((p, i) => `
+                            <div class="season-winner-row flex-row justify-between align-center p-5">
+                                <span><span class="rank-badge mr-10" style="min-width: 25px;">#${i+1}</span> ${getCachedEnvoiName(p.w)}</span>
+                                <b class="text-neon-green">${p.v} Wins</b>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
-                <div class="season-winners-list">
-                    ${s.top.map((p, i) => `
-                        <div class="season-winner-row flex-row justify-between">
-                            <span>#${i+1} ${getCachedEnvoiName(p.w)}</span>
-                            <b class="text-neon-green">${p.v} Wins</b>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (err) {
         container.innerHTML = `<div class="text-error">Season Archive Offline.</div>`;
     }
