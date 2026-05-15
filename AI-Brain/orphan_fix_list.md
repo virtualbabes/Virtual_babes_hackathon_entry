@@ -217,4 +217,5 @@
 - [FIXED] Updated `networks.json` with stable production RPC endpoints for Ethereum and Polygon (LlamaRPC), resolving potential 401 errors from unconfigured Infura placeholders.
 - [FIXED] Hardened `determineTop5` in `tournament_manager.go` to correctly rank semi-finalists and quarter-finalists when multiple BYE matches are present in the bracket.
 - [FIXED] Introduced `DATA_DIR` resolution in `Lobby` to allow persistent state storage on Render volumes; updated all service files to use dynamic pathing for JSON caches and audit logs.
+- [FIXED] Hardened `syncStatsFromBlockchain` and implemented `loadRegistrationsFromIndexer` to allow full reconstruction of the used transaction cache from on-chain `VBT_TOURN_BUYIN` notes.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.

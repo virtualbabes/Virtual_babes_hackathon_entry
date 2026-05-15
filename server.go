@@ -121,6 +121,7 @@ func newLobby() (*Lobby, error) {
 	l.loadRegisteredTxIDs()
 	l.loadLinkedWallets()
 	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
+	go l.loadRegistrationsFromIndexer()    // Reconstruct tournament registration state
 
 	// Load Persistent Card Cache
 	if data, err := os.ReadFile(l.getDataPath("card_cache.json")); err == nil {

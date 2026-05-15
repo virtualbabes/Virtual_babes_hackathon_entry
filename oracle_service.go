@@ -461,14 +461,17 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
 	if !ok {
 		return
 	}
 
 	baseURL := voiConfig.IndexerURL
+	
+	// PASS 1: Wins/DNFs (Vault -> Wallet)
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		baseURL, voiConfig.AssetID, l.vaultAddress, wallet)
+		baseURL, voiConfig.AssetID, vaultAddr, wallet)
 
 	var resp *http.Response
 	var err error
@@ -535,6 +538,40 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	stats.Reputation = l.CalculateReputation(stats)
 	l.leaderboard[wallet] = stats
 	l.mutex.Unlock()
+
+	// PASS 2: Buy-ins/Registrations (Wallet -> Vault)
+	// This allows the server to discover used TxIDs for the specific player joining.
+	buyInURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		baseURL, voiConfig.AssetID, wallet, vaultAddr)
+
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", buyInURL, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var regRes struct {
+				Transfers []struct {
+					TransactionID string `json:"transactionId"`
+					Metadata      string `json:"metadata"`
+					Timestamp     int64  `json:"timestamp"`
+				} `json:"transfers"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&regRes) == nil {
+				l.mutex.Lock()
+				for _, tx := range regRes.Transfers {
+					if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:") || strings.HasPrefix(tx.Metadata, "ARENA_TOURN_BUYIN:") {
+						l.registeredTxIDs[tx.TransactionID] = time.Unix(tx.Timestamp, 0)
+					}
+				}
+				l.mutex.Unlock()
+			}
+			resp.Body.Close()
+			break
+		}
+		if resp != nil { resp.Body.Close() }
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func (l *Lobby) refreshGlobalLeaderboard() {
@@ -862,7 +899,9 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			for _, tx := range res.Transfers {
 				amt, _ := strconv.ParseUint(tx.Amount, 10, 64)
-				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == targetAsset {
+				// SECURITY: Verify prefix to ensure transaction was intended as a buy-in
+				hasValidNote := strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:") || strings.HasPrefix(tx.Metadata, "ARENA_TOURN_BUYIN:")
+				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == targetAsset && hasValidNote {
 					return true, tx.Timestamp, nil
 				}
 			}

@@ -202,6 +202,17 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress, l.vaultAddress)
 
+	// PILLAR 3: Concurrency Throttling.
+	// Protect the indexer from redundant history requests during peak traffic.
+	select {
+	case l.oracleSemaphore <- struct{}{}:
+		// Acquired slot
+	case <-time.After(5 * time.Second):
+		http.Error(w, "Arena Indexer is busy. Please try again later.", http.StatusServiceUnavailable)
+		return
+	}
+	defer func() { <-l.oracleSemaphore }()
+
 	var resp *http.Response
 	var err error
 	for i := 0; i < 3; i++ {
@@ -247,8 +258,10 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 		for _, tx := range res.Transfers {
 			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_SUMM:") {
 				var s TournamentSummary
-				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_SUMM:")), &s)
-				uniqueSummaries[s.ID] = s
+				// Defensive check: ensure the summary has a valid ID after unmarshaling
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_SUMM:")), &s); err == nil && s.ID != "" {
+					uniqueSummaries[s.ID] = s
+				}
 			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_DATA:") {
 				var chunk struct {
 					ID      string
