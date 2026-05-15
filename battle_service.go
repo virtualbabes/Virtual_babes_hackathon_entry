@@ -19,12 +19,14 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	wanted := match.P1WantedLevel
 	cunning := match.P1Cunning
 	nurturing := match.P1Nurturing
+	regBoost := match.P1RegionalBoost
 
 	if c.Owner == 1 {
 		pID = match.P2ID
 		wanted = match.P2WantedLevel
 		cunning = match.P2Cunning
 		nurturing = match.P2Nurturing
+		regBoost = match.P2RegionalBoost
 	}
 
 	// Dynamic Buff Check: Re-apply global match-wide power boosts.
@@ -32,6 +34,12 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 		if _, ok := match.ActiveItemBuffs[pID]["mood_catalyst"]; ok {
 			base += 50
 		}
+	}
+
+	// PILLAR 1: Regional Power Boost.
+	// Members of clubs owning a region (2+ territories) get +5% power in that district.
+	if regBoost {
+		base += (base * 5) / 100
 	}
 
 	// Apply Wanted Level Penalty (Mitigated by Cunning)

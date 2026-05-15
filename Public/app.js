@@ -661,6 +661,7 @@ window.showPowerTooltip = (e, card, index, state) => {
     const ownerWantedLevel = (ownerPlayerIndex === 0 ? state.p1_wanted_level : state.p2_wanted_level) || 0;
     const ownerCunning = (ownerPlayerIndex === 0 ? state.p1_cunning : state.p2_cunning) || 0;
     const ownerNurturing = (ownerPlayerIndex === 0 ? state.p1_nurturing : state.p2_nurturing) || 0;
+    const hasRegBoost = (ownerPlayerIndex === 0 ? state.p1_regional_boost : state.p2_regional_boost) || false;
 
     // Calculate player-level modifiers once
     let netWantedPenalty = 0;
@@ -671,7 +672,9 @@ window.showPowerTooltip = (e, card, index, state) => {
     }
 
     sides.forEach((side, sideIndex) => {
-        const base = card.power[i];
+        const base = card.power[sideIndex];
+        let regBonus = hasRegBoost ? Math.floor(base * 0.05) : 0;
+
         const artifactBonus = card.artifact || 0;
         
         let moodModifier = 0;
@@ -692,11 +695,14 @@ window.showPowerTooltip = (e, card, index, state) => {
 
         const loyaltyBonus = card.loyalty >= 100 ? 25 : 0;
 
-        const totalEffectivePower = base + artifactBonus + moodModifier + netFatiguePenalty + loyaltyBonus + netWantedPenalty;
+        const totalEffectivePower = base + regBonus + artifactBonus + moodModifier + netFatiguePenalty + loyaltyBonus + netWantedPenalty;
         const grade = window.GetLevelLabelForDisplay(totalEffectivePower);
         
         // Build the HTML for modifiers
         let modifiersHtml = '';
+        if (regBonus !== 0) {
+            modifiersHtml += `<span class="text-neon-purple">+${regBonus}R</span> `;
+        }
         if (artifactBonus !== 0) {
             modifiersHtml += `<span class="${artifactBonus > 0 ? 'text-neon-cyan' : 'text-error'}">${artifactBonus > 0 ? '+' : ''}${artifactBonus}A</span> `;
         }

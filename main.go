@@ -201,6 +201,8 @@ type Engine struct {
 	SpecialFanfare      string                    // Archetype for specific win/loss tracks: "Emotional", "Witch"
 	TerritoryID         string                    // The location of the current match
 	ActiveItemBuffs     map[string]map[string]int // PlayerID -> ItemID -> MatchesRemaining
+	P1RegionalBoost     bool                      // Global +5% power for district region owners
+	P2RegionalBoost     bool                      // Global +5% power for district region owners
 	VaultLow            bool                      // Warning flag for low faucet balance
 	DeckRating          string                    // Current player's active deck rating (e.g., [A++])
 	MasterVolume        float64                   // Global master volume (0.0 - 1.0)
@@ -1970,6 +1972,8 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["p2_wanted_level"] = Game.Players[1].WantedLevel
 		state["p2_cunning"] = Game.Players[1].Cunning
 		state["p2_nurturing"] = Game.Players[1].Nurturing
+		state["p1_regional_boost"] = Game.P1RegionalBoost
+		state["p2_regional_boost"] = Game.P2RegionalBoost
 		state["rules"] = Game.Rules
 		state["local_player_index"] = Game.LocalPlayerIndex
 	}

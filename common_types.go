@@ -223,8 +223,11 @@ type MatchState struct {
 	P1Nurturing       int                       `json:"p1_nurturing"`
 	P2Cunning         int                       `json:"p2_cunning"`
 	P2Nurturing       int                       `json:"p2_nurturing"`
+	P1RegionalBoost   bool                      `json:"p1_regional_boost"`
+	P2RegionalBoost   bool                      `json:"p2_regional_boost"`
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
+	Round             int                       `json:"round"`                    // Match round (isolation for Sudden Death)
 	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played
 	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs"` // PlayerID -> ItemID -> MatchesRemaining
 	IsBountyMatch     bool

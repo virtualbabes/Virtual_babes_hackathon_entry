@@ -879,7 +879,17 @@ func (l *Lobby) handleUnregister(client *Client) {
 					}
 				}
 				if wallet, ok := l.wallets[client.id]; ok {
-					l.incrementDNF(wallet, match.TournamentMatchID != "") // Pass tournament context
+					tourneyRound := 0
+					if match.TournamentMatchID != "" {
+						// PILLAR 3: Tournament Integrity. Find the round to scale the DNF penalty.
+						for _, tm := range l.tournament.Matches {
+							if tm.ID == match.TournamentMatchID {
+								tourneyRound = tm.Round
+								break
+							}
+						}
+					}
+					l.incrementDNF(wallet, tourneyRound) // Pass tournament round for scaling
 				}
 
 				// PILLAR 3: Tournament Disconnection Protocol.
@@ -1293,6 +1303,25 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		}
 	}
 
+	// PILLAR 1: Regional Power Boost Calculation.
+	// Determine if the territory belongs to a Region (2+ districts) 
+	// and if players are affiliated with the owning club.
+	p1Boost, p2Boost := false, false
+	if owningClub := l.getClubByTerritoryID(territoryID); owningClub != nil && len(owningClub.Territories) >= 2 {
+		// Check P1
+		if strings.EqualFold(owningClub.OwnerWallet, p1Wallet) {
+			p1Boost = true
+		} else if _, ok := owningClub.Members[strings.ToLower(p1Wallet)]; ok {
+			p1Boost = true
+		}
+		// Check P2
+		if strings.EqualFold(owningClub.OwnerWallet, p2Wallet) {
+			p2Boost = true
+		} else if _, ok := owningClub.Members[strings.ToLower(p2Wallet)]; ok {
+			p2Boost = true
+		}
+	}
+
 	match := &MatchState{
 		P1ID:            id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
 		P1Wallet:        p1Wallet,
@@ -1305,7 +1334,10 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		P1Nurturing:     p1Stats.Nurturing,
 		P2Cunning:       p2Stats.GetEffectiveCunning(),
 		P2Nurturing:     p2Stats.Nurturing,
+		Round:           1, // Standard match initialization
 		TerritoryID:     territoryID,
+		P1RegionalBoost: p1Boost,
+		P2RegionalBoost: p2Boost,
 		ActiveItemBuffs: make(map[string]map[string]int),
 	}
 
