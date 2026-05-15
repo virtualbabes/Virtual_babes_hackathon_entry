@@ -805,6 +805,17 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		return false, 0, fmt.Errorf("network configuration not found for: %s", netKey)
 	}
 
+	// Authoritative ID Resolution: Pull from networks.json if the provided parameter is generic
+	// PILLAR 3: Robust economic validation.
+	targetAsset := expectedAsset
+	if targetAsset == "" || targetAsset == "0" {
+		if netConfig.AssetID != "" && netConfig.AssetID != "0" {
+			targetAsset = netConfig.AssetID
+		} else if netConfig.AppID != "" && netConfig.AppID != "0" {
+			targetAsset = netConfig.AppID
+		}
+	}
+
 	// 2. Branch logic based on Network Type
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		// VOI Logic: Custom ARC-200 Indexer
@@ -851,7 +862,7 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			for _, tx := range res.Transfers {
 				amt, _ := strconv.ParseUint(tx.Amount, 10, 64)
-				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == expectedAsset {
+				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == targetAsset {
 					return true, tx.Timestamp, nil
 				}
 			}
@@ -912,11 +923,11 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			t := res.Transaction
 			// Handle ASA Transfers
-			if t.AssetTransfer != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == expectedAsset {
+			if t.AssetTransfer != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == targetAsset {
 				return true, t.RoundTime, nil
 			}
 			// Handle Native Payments (Asset ID "0" or empty)
-			if (expectedAsset == "" || expectedAsset == "0") && t.Payment != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.Payment.Receiver, vaultAddr) && t.Payment.Amount >= expectedAmt {
+			if (targetAsset == "" || targetAsset == "0") && t.Payment != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.Payment.Receiver, vaultAddr) && t.Payment.Amount >= expectedAmt {
 				return true, t.RoundTime, nil
 			}
 		}

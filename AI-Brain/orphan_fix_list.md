@@ -215,3 +215,4 @@
 - [FIXED] Updated `adminBroadcast` in `admin.js` to support multi-priority system broadcasts (info, warning, critical).
 - [FIXED] Enhanced `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly apply CSS classes and colors based on admin broadcast priority levels.
 - [FIXED] Updated `networks.json` with stable production RPC endpoints for Ethereum and Polygon (LlamaRPC), resolving potential 401 errors from unconfigured Infura placeholders.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.

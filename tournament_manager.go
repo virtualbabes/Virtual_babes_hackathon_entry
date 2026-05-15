@@ -125,10 +125,20 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		}
 
 		buyInAsset := voiConfig.AssetID
+		if buyInAsset == "" {
+			buyInAsset = voiConfig.AppID
+		}
 		verifyNetwork := "Voi"
 
 		if req.Network == "ALGO" {
-			buyInAsset = l.avoiAssetID
+			l.mutex.RLock()
+			algoCfg, hasAlgo := l.availableNetworks["Algorand Mainnet"]
+			l.mutex.RUnlock()
+			if hasAlgo && algoCfg.AssetID != "" {
+				buyInAsset = algoCfg.AssetID
+			} else {
+				buyInAsset = l.avoiAssetID
+			}
 			verifyNetwork = "Algorand"
 		}
 

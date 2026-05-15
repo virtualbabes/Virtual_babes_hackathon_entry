@@ -314,9 +314,11 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 	bailAmountBase := float64(bailAmountMicro) / 1000000.0
 
 	// Verify payment transaction
+	l.mutex.RLock()
 	voiConfig, voiOk := l.availableNetworks["Voi Mainnet"]
 	avoiAssetID := l.avoiAssetID
 	vaultAddr := l.vaultAddress
+	l.mutex.RUnlock()
 
 	if !voiOk {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Voi network configuration missing."}`)})
@@ -324,9 +326,19 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 	}
 
 	assetID := voiConfig.AssetID
+	if assetID == "" {
+		assetID = voiConfig.AppID
+	}
 	verifyNet := "Voi"
 	if strings.EqualFold(data.Network, "ALGO") {
-		assetID = avoiAssetID
+		l.mutex.RLock()
+		algoCfg, hasAlgo := l.availableNetworks["Algorand Mainnet"]
+		l.mutex.RUnlock()
+		if hasAlgo && algoCfg.AssetID != "" {
+			assetID = algoCfg.AssetID
+		} else {
+			assetID = avoiAssetID
+		}
 		verifyNet = "Algorand"
 	}
 

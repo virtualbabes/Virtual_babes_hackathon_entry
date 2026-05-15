@@ -48,7 +48,9 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 	// Hardening: Use snapshotted values from the match state to ensure consistency.
 	// These values are captured in lobby_manager.go during initiatePairedMatch.
 	mitigation := cunning * 2
-	if mitigation > wantedPenalty { mitigation = wantedPenalty }
+	if mitigation > wantedPenalty {
+		mitigation = wantedPenalty
+	}
 	base -= (wantedPenalty - mitigation)
 
 	// Fatigue Penalty: -1 power per point above 50
@@ -56,7 +58,9 @@ func getEffectiveServerPower(l *Lobby, match *MatchState, c *ServerCard, sideIdx
 		fatiguePenalty := (c.Fatigue - 50)
 		// Nurturing reduces fatigue impact: 1 power back per Nurturing point
 		reduction := nurturing
-		if reduction > fatiguePenalty { reduction = fatiguePenalty }
+		if reduction > fatiguePenalty {
+			reduction = fatiguePenalty
+		}
 		base -= (fatiguePenalty - reduction)
 	}
 
@@ -368,9 +372,9 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		if match.TournamentMatchID != "" {
 			p1Stats := l.leaderboard[match.P1Wallet]
 			p2Stats := l.leaderboard[match.P2Wallet]
-			
+
 			log.Printf("[BATTLE] Tournament Draw safety trigger. Resolving via Reputation for %s vs %s\n", match.P1Wallet, match.P2Wallet)
-			
+
 			if p1Stats.Reputation >= p2Stats.Reputation {
 				history.WinnerID, history.WinnerIndex = match.P1ID, 0
 				history.Opponent = match.P2Wallet
@@ -397,7 +401,9 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 
 		if history.WinnerID == hunterID {
 			hunterWallet := match.P1Wallet
-			if hunterID == match.P2ID { hunterWallet = match.P2Wallet }
+			if hunterID == match.P2ID {
+				hunterWallet = match.P2Wallet
+			}
 
 			history.BountyReward = float64(targetWanted * 50)
 			l.sendToClientLocked(hunterID, Envelope{
@@ -439,7 +445,9 @@ func (l *Lobby) processMatchFatigueLocked(match *MatchState) {
 		}
 
 		card.Fatigue += 5 // Fixed fatigue cost per match deployment
-		if card.Fatigue > 100 { card.Fatigue = 100 }
+		if card.Fatigue > 100 {
+			card.Fatigue = 100
+		}
 
 		// INDUSTRIAL LOOP: Persist fatigue to global and disk cache
 		l.inventory[card.ID] = *card
@@ -506,11 +514,11 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 	match.FinalScores = [2]int{0, 0}
 
 	payload, _ := json.Marshal(map[string]interface{}{
-		"text":    "⚔️ <b>SUDDEN DEATH!</b> The board has cleared. Decks have been redistributed based on card ownership.",
-		"p1_deck": p1NewDeck,
-		"p2_deck": p2NewDeck,
+		"text":              "⚔️ <b>SUDDEN DEATH!</b> The board has cleared. Decks have been redistributed based on card ownership.",
+		"p1_deck":           p1NewDeck,
+		"p2_deck":           p2NewDeck,
 		"active_item_buffs": match.ActiveItemBuffs, // Sync active buffs to client UI
-		"rules":             match.Rules,             // Sync authoritative rules
+		"rules":             match.Rules,           // Sync authoritative rules
 	})
 
 	l.sendToClientLocked(match.P1ID, Envelope{Type: "sudden_death_start", FromID: "SERVER", Payload: payload})
@@ -618,24 +626,8 @@ func (l *Lobby) updateLeaderboard(wallet string, isTournamentWin bool, scores [2
 
 	// REFRESH: Fetch updated Playstyle from the map to prevent clobbering behavioral data.
 	stats.Playstyle = l.leaderboard[wallet].Playstyle
-	stats.Reputation = l.CalculateReputation(stats)                            // Ensure reputation is updated
+	stats.Reputation = l.CalculateReputation(stats) // Ensure reputation is updated
 	l.leaderboard[wallet] = stats
-}
-
-func (l *Lobby) incrementDNF(wallet string) {
-	stats := l.leaderboard[wallet]
-	stats.DNFs++
-	stats.DisconnectStreak++
-	if stats.DisconnectStreak > 3 {
-		stats.BanExpires = time.Now().Add(24 * time.Hour)
-	}
-	l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false) // Update playstyle on DNF
-
-	// REFRESH: Sync local stats with the newly calculated playstyle before calculating Standing.
-	stats.Playstyle = l.leaderboard[wallet].Playstyle
-	stats.Reputation = l.CalculateReputation(stats)                            // Update the map with modified stats
-	l.leaderboard[wallet] = stats
-	go l.recordDNFOnChain(wallet)
 }
 
 // processPrisonerRule checks if a card should be jailed based on match outcome and territory.
@@ -724,7 +716,7 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 
 	// High-Fidelity Jailing: Use Round and GridIndex to ensure each capture event is handled,
 	// preventing collisions during Sudden Death or when players use duplicate card archetypes.
-	jailedThisMatch := make(map[string]bool) 
+	jailedThisMatch := make(map[string]bool)
 
 	for _, captured := range capturedCards {
 		jailKey := fmt.Sprintf("%d-%d", captured.Round, captured.GridIndex)
@@ -771,7 +763,7 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		// This prevents attempting to jail "board-only" captures or causing negative inventory counts.
 		count, hasCard := originalOwnerStats.Inventory[cardKey]
 		if !hasCard || count <= 0 {
-			log.Printf("[FALLEN_PENALTY_JAIL] Card %d not found in %s's persistent collection (Capture: %s). Skipping.\n", 
+			log.Printf("[FALLEN_PENALTY_JAIL] Card %d not found in %s's persistent collection (Capture: %s). Skipping.\n",
 				captured.CardID, captured.OriginalOwnerWallet, captured.CaptureType)
 			continue
 		}
@@ -814,18 +806,18 @@ func (l *Lobby) processFallenPenaltyJailLocked(match *MatchState, capturedCards 
 		jailedThisMatch[jailKey] = true
 		match.Board[captured.GridIndex] = nil // Seized cards leave the arena immediately
 
-		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s. Club gained %d Mojo.\n", 
+		log.Printf("[FALLEN_PENALTY_JAIL] %s's card (%s) jailed by Club %s via %s capture in %s. Club gained %d Mojo.\n",
 			captured.OriginalOwnerWallet, card.Name, owningClub.Name, captured.CaptureType, match.TerritoryID)
 
 		// Use CaptureType in client notifications for high-fidelity tactical feedback
 		l.sendToClientLocked(l.getClientIDFromWalletLocked(captured.OriginalOwnerWallet), Envelope{
-			Type:    "admin_notification",
-			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>FALLEN PENALTY:</b> Your card '%s' was seized via %s and jailed by Club %s!"}`, 
+			Type: "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>FALLEN PENALTY:</b> Your card '%s' was seized via %s and jailed by Club %s!"}`,
 				escapeHTML(card.Name), captured.CaptureType, escapeHTML(owningClub.Name))),
 		})
 		l.sendToClientLocked(l.getClientIDFromWalletLocked(captured.CapturingPlayerWallet), Envelope{
-			Type:    "admin_notification",
-			Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>FALLEN PENALTY:</b> You jailed '%s's card (%s) via %s capture!"}`, 
+			Type: "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"⛓️ <b>FALLEN PENALTY:</b> You jailed '%s's card (%s) via %s capture!"}`,
 				escapeHTML(captured.OriginalOwnerWallet), escapeHTML(card.Name), captured.CaptureType)),
 		})
 	}
