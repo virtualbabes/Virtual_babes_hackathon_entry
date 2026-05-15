@@ -632,14 +632,37 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		// VOI Logic: Custom ARC-200 Indexer
 		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		defer cancel()
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err := http.DefaultClient.Do(req)
+		var resp *http.Response
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
+			cancel()
+			if err != nil {
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return false, 0, err
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+				return false, 0, fmt.Errorf("voi indexer rate-limited (429)")
+			}
+			break
+		}
 		if err != nil {
 			return false, 0, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return false, 0, fmt.Errorf("voi indexer returned non-200 status: %d", resp.StatusCode)
+		}
 
 		var res struct {
 			Transfers []struct {
@@ -659,14 +682,40 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 	} else {
 		// ALGORAND Logic: Standard Indexer Transaction Endpoint
 		url := fmt.Sprintf("%s/v2/transactions/%s", netConfig.IndexerURL, txid)
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		defer cancel()
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err := http.DefaultClient.Do(req)
+		var resp *http.Response
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
+			cancel()
+			if err != nil {
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return false, 0, err
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+				return false, 0, fmt.Errorf("algorand indexer rate-limited (429)")
+			}
+			break
+		}
 		if err != nil {
 			return false, 0, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return false, 0, nil
+		}
+		if resp.StatusCode != http.StatusOK {
+			return false, 0, fmt.Errorf("algorand indexer returned non-200 status: %d", resp.StatusCode)
+		}
 
 		var res struct {
 			Transaction struct {

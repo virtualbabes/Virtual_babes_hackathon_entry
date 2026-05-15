@@ -199,4 +199,5 @@
 - [FIXED] Hardened `handleTradeShares` in `market_service.go` by removing redundant nil checks and adding a guard for invalid actions to prevent unnecessary state broadcasts.
 - [FIXED] Updated `README.md` for accuracy and created `User_manual.md`.
 - [FIXED] Hardened `handleTournamentRegister` in `tournament_manager.go` with duplicate registration protection and oracle throttling to prevent indexer rate-limiting.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

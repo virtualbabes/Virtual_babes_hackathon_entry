@@ -456,4 +456,5 @@
 80. Complete: Updated `README.md` for accuracy and created `User_manual.md` for players.
 
 84. Complete: Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
+85. Complete: Hardened `verifyBuyInTransaction` in `oracle_service.go` with 429 retry policy and robust status code handling.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
