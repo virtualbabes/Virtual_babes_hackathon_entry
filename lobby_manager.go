@@ -83,6 +83,16 @@ func (c *Client) writePump() {
 func (l *Lobby) run() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
+
+	// STRESS TEST HOOK: Automatically trigger a 16-player tournament simulation on startup
+	if os.Getenv("ARENA_STRESS_TEST") == "true" {
+		log.Println("[STRESS TEST] ARENA_STRESS_TEST detected. Triggering 16-player tournament simulation...")
+		// Simulate a 16-player buy-in tournament.
+		go l.simulateTournament(16, true)
+		// Give the simulation a moment to start before the main loop takes over
+		time.Sleep(2 * time.Second)
+	}
+
 	matchmakingTicker := time.NewTicker(5 * time.Second)
 	defer matchmakingTicker.Stop()
 	vaultCheckTicker := time.NewTicker(5 * time.Minute)

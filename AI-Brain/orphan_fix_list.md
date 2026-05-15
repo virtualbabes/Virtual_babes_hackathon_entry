@@ -249,6 +249,7 @@
 - [FIXED] Purged redundant global `window` assignments and duplicated function definitions from `Public/app.js` to enforce modularity and prevent code bloat.
 - [FIXED] Enhanced `handleTradeShares` in `market_service.go` to record high-value share purchases and sales on-chain using the `VBT_SHARE_TRADE:` note prefix for audibility.
 - [FIXED] Updated `package.json` with `test:stress` script to facilitate isolated high-concurrency testing of the tournament bracket logic.
+- [FIXED] Implemented automatic 16-player tournament simulation on `lobby_manager.go` startup when `ARENA_STRESS_TEST` environment variable is detected.
 
 - [FIXED] Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
