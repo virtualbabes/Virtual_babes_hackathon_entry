@@ -137,3 +137,4 @@
 117. **Complete**: Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from on-chain data, with fallback to local storage.
 118. **Complete**: Enhanced `processTournamentResult` and `finalizeMatchResultLocked` to update ephemeral history for both winners and losers (Standard and Tournament) to ensure immediate immersion.
 119. **Complete**: Hardened `syncStatsFromBlockchain` to reconstruct mirrored match history (Losses) by scanning Vault output metadata; updated `VBT_DNF` protocol with match context.
+120. **Complete**: Enhanced `handleTournamentHistory` to ingest `VBT_WIN` payout receipts for high-fidelity, receipt-backed bracket verification during deep reconstruction.

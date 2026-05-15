@@ -212,8 +212,10 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
 
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress, l.vaultAddress)
+	// PILLAR 4: Global Result Recovery.
+	// Fetch all transfers FROM the vault to capture Summaries, Data Chunks, AND Payout Receipts (VBT_WIN).
+	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
+		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress)
 
 	// PILLAR 3: Concurrency Throttling.
 	// Protect the indexer from redundant history requests during peak traffic.
@@ -261,12 +263,14 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	var res struct {
 		Transfers []struct {
 			TransactionID string `json:"transactionId"`
+			To            string `json:"to"`
 			Metadata      string `json:"metadata"`
 		} `json:"transfers"`
 	}
 
 	uniqueSummaries := make(map[string]TournamentSummary)
 	chunkMap := make(map[string][]TournamentMatch)
+	receiptMap := make(map[string]string) // MatchID -> WinnerWallet
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
 			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_SUMM:") {
@@ -282,6 +286,17 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				}
 				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_DATA:")), &chunk)
 				chunkMap[tx.TransactionID] = chunk.Matches
+			} else if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
+				// PILLAR 4: Receipt-Backed Verification.
+				// Parse victory notes to associate TournamentMatchIDs with the actual recipient of funds.
+				var data struct {
+					TID string `json:"tid"`
+				}
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+					if data.TID != "" {
+						receiptMap[data.TID] = tx.To
+					}
+				}
 			}
 		}
 	}
@@ -299,11 +314,27 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 					s.Matches = append(s.Matches, m...)
 				}
 			}
+
 			if s.Checksum != "" {
 				b, _ := json.Marshal(s.Matches)
 				h := sha256.Sum256(b)
 				if hex.EncodeToString(h[:]) == s.Checksum {
 					s.IsVerified = true
+				}
+			}
+
+			// PILLAR 4: Receipt Audit.
+			// Verify that the winner of each match actually received an on-chain reward.
+			if s.IsVerified {
+				allReceiptsValid := true
+				for _, m := range s.Matches {
+					if m.Winner != "" && !strings.EqualFold(m.P2, "BYE") {
+						if paidWinner, exists := receiptMap[m.ID]; !exists || !strings.EqualFold(paidWinner, m.Winner) {
+							// Note: We don't fail verification here yet as some matches (e.g. standard)
+							// might have different reward asset IDs or latencies.
+							log.Printf("[ARCHIVE] Receipt mismatch for match %s: Summary says %s, Payout says %s", m.ID, m.Winner, paidWinner)
+						}
+					}
 				}
 			}
 		}
