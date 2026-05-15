@@ -57,9 +57,31 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 		return
 	}
 
-	// INDUSTRIAL LOOP: Recycle fee and update spreader Standing
+	// INDUSTRIAL LOOP: Fee Redistribution & Spreader Standing
 	l.rewards[spreaderWallet] -= rumorCost
-	l.faucetBalance += float64(rumorCost) / 1000000.0
+
+	feeBase := float64(rumorCost) / 1000000.0
+	var governors []*Club
+	for _, club := range l.clubs {
+		if len(club.Territories) >= 2 {
+			governors = append(governors, club)
+		}
+	}
+
+	if len(governors) > 0 {
+		govTaxBase := feeBase * 0.20 // 20% Regional Governor Tax
+		faucetShareBase := feeBase - govTaxBase
+		l.faucetBalance += faucetShareBase
+		taxPerGov := govTaxBase / float64(len(governors))
+		for _, gov := range governors {
+			gov.Treasury += taxPerGov
+			gov.LastActivity = time.Now()
+		}
+		l.logAdminAuditLocked("RUMOR_FEE_REDISTRIBUTION", spreaderWallet, fmt.Sprintf("Governors: %d, Tax: %.2f", len(governors), govTaxBase))
+	} else {
+		l.faucetBalance += feeBase
+	}
+
 	l.applyDynamicScalingLocked()
 
 	l.ensurePlayerStatsMapsInitialized(spreaderWallet)
@@ -70,29 +92,29 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 
 	// Refresh target Standing to reflect market volatility
 	l.ensurePlayerStatsMapsInitialized(targetWallet)
-	targetStats := l.leaderboard[targetWallet] 
+	targetStats := l.leaderboard[targetWallet]
 	targetStats.Reputation = l.CalculateReputation(targetStats)
 	l.leaderboard[targetWallet] = targetStats
 
 	// Create and add rumor
 	rumorID := fmt.Sprintf("RUMOR-%d", time.Now().UnixNano())
 	rumor := &Rumor{ // Define rumor here so rumorJSON can use it
-		ID:            rumorID,
+		ID:             rumorID,
 		SpreaderWallet: spreaderWallet,
-		TargetWallet:  targetWallet,
-		Type:          data.Type,
-		Strength:      data.Strength,
-		ExpiresAt:     time.Now().Add(time.Duration(data.Duration) * time.Minute),
+		TargetWallet:   targetWallet,
+		Type:           data.Type,
+		Strength:       data.Strength,
+		ExpiresAt:      time.Now().Add(time.Duration(data.Duration) * time.Minute),
 	}
 	l.rumors[rumorID] = rumor // Add to lobby's rumors map
 
-	l.logAdminAudit("RUMOR_SPREAD", spreaderWallet, fmt.Sprintf("Target: %s, Type: %s, Strength: %.2f, Duration: %dmin", targetWallet, data.Type, data.Strength, data.Duration))
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📢 Rumor about %s spread successfully!"}`, targetWallet))})
+	l.logAdminAuditLocked("RUMOR_SPREAD", spreaderWallet, fmt.Sprintf("Target: %s, Type: %s, Strength: %.2f, Duration: %dmin", targetWallet, data.Type, data.Strength, data.Duration))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📢 Rumor about %s spread successfully!"}`, targetWallet))})
 
 	// Notify target (if connected)
-	targetClientID := l.getClientIDFromWallet(targetWallet)
+	targetClientID := l.getClientIDFromWalletLocked(targetWallet)
 	if targetClientID != "" {
-		l.sendToClient(targetClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"👀 A %s rumor is circulating about you!"}`, data.Type))})
+		l.sendToClientLocked(targetClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"👀 A %s rumor is circulating about you!"}`, data.Type))})
 	}
 
 	// Broadcast rumor update to all clients for lobby visibility, including the full rumor object

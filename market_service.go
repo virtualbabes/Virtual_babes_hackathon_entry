@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"log"
+	"math"
 	"strings"
 	"time"
 )
@@ -16,7 +16,9 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 		Action   string  `json:"action"`
 		Amount   float64 `json:"amount"`
 	}
-	if err := json.Unmarshal(env.Payload, &data); err != nil { return }
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
 
 	if data.Amount <= 0 {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Market Error: Trade amount must be positive."}`)})
@@ -27,7 +29,9 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	defer l.mutex.Unlock()
 
 	wallet, ok := l.wallets[env.FromID]
-	if !ok { return }
+	if !ok {
+		return
+	}
 
 	// Resolve target wallet: check active session map first, then leaderboard (NPCs/Offline), then fallback to direct address
 	var targetWallet string
@@ -48,7 +52,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	// REAL-TIME PRICING: Recalculate reputation to ensure Marketability Multipliers (Aggressiveness/Risk) are reflected.
 	targetStats := l.leaderboard[targetWallet]
 	targetStats.Reputation = l.CalculateReputation(targetStats)
-	l.leaderboard[targetWallet] = targetStats 
+	l.leaderboard[targetWallet] = targetStats
 
 	basePrice := float64((targetStats.Wins * 10) + int(float64(targetStats.Reputation)/2.0) + 100.0)
 	for _, rumor := range l.rumors {
@@ -61,16 +65,20 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	totalValueBase := float64(totalValueMicro) / 1000000.0
 
 	stats := l.leaderboard[wallet]
-	if stats.Portfolio == nil { stats.Portfolio = make(map[string]float64) }
+	if stats.Portfolio == nil {
+		stats.Portfolio = make(map[string]float64)
+	}
 
 	if data.Action == "buy" {
 		if l.rewards[wallet] >= totalValueMicro {
 			l.rewards[wallet] -= totalValueMicro
-			
-			if stats.Portfolio == nil { stats.Portfolio = make(map[string]float64) }
+
+			if stats.Portfolio == nil {
+				stats.Portfolio = make(map[string]float64)
+			}
 			currentShares := stats.Portfolio[targetWallet]
 			stats.Portfolio[targetWallet] = currentShares + data.Amount
-			
+
 			// Industrial Loop: Investment returns to Faucet
 			l.faucetBalance += totalValueBase
 			l.applyDynamicScalingLocked()
@@ -125,7 +133,9 @@ func (l *Lobby) observeGlobalSentiments() {
 	var totalAgg, totalRisk float64
 	ruleCounts := make(map[string]float64)
 	count := float64(len(l.leaderboard))
-	if count == 0 { return }
+	if count == 0 {
+		return
+	}
 
 	for _, s := range l.leaderboard {
 		totalAgg += s.Playstyle.Aggressiveness
@@ -148,13 +158,20 @@ func (l *Lobby) observeGlobalSentiments() {
 func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
 	l.mutex.RLock()
 	wallet, ok := l.wallets[clientID]
+	if !ok {
+		l.mutex.RUnlock()
+		return
+	}
 	stats, exists := l.leaderboard[wallet]
 	global := l.globalSentiment
-	l.mutex.RUnlock()
 
-	if !ok || !exists || time.Since(global.UpdatedAt) > 1*time.Hour { return }
+	if !exists || time.Since(global.UpdatedAt) > 1*time.Hour {
+		l.mutex.RUnlock()
+		return
+	}
 
-	// Identify the global "Meta" rule (most heavily weighted across all players)
+	// PILLAR 3: Narrative Snapshot.
+	// Identify trends under lock to prevent concurrent map access panics.
 	metaRule := ""
 	maxMetaWeight := 0.0
 	for r, w := range global.DominantRules {
@@ -164,33 +181,39 @@ func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
 		}
 	}
 
+	playerTopRule := ""
+	pMax := 0.0
+	for r, w := range stats.Playstyle.PreferredRules {
+		if w > pMax {
+			pMax = w
+			playerTopRule = r
+		}
+	}
+
+	// Copy values for logic processing outside of the lock
+	risk := stats.Playstyle.RiskTolerance
+	agg := stats.Playstyle.Aggressiveness
+	avgRisk := global.AvgRiskTolerance
+	avgAgg := global.AvgAggressiveness
+	l.mutex.RUnlock()
+
+	displayName := l.ResolveEnvoiName(wallet)
 	message := ""
 	if trigger == "LOBBY_ENTRY" {
-		if stats.Playstyle.RiskTolerance > global.AvgRiskTolerance*1.5 {
-			message = fmt.Sprintf("Back for more, %s? Your reckless placements are becoming legendary.", clientID)
-		} else if stats.Playstyle.Aggressiveness > global.AvgAggressiveness*1.4 {
-			message = fmt.Sprintf("Make way! %s is here. I can smell the thirst for captures from across the sector.", clientID)
+		if risk > avgRisk*1.5 {
+			message = fmt.Sprintf("Back for more, %s? Your reckless placements are becoming legendary.", displayName)
+		} else if agg > avgAgg*1.4 {
+			message = fmt.Sprintf("Make way! %s is here. I can smell the thirst for captures from across the sector.", displayName)
 		}
 	} else if trigger == "MATCH_START" {
-		// Identify player's specialty
-		playerTopRule := ""
-		pMax := 0.0
-		for r, w := range stats.Playstyle.PreferredRules {
-			if w > pMax {
-				pMax = w
-				playerTopRule = r
-			}
-		}
-
-		// Meta-aware commentary
 		if playerTopRule != "" && playerTopRule == metaRule {
-			message = fmt.Sprintf("Attention spectators: %s is a specialist in the current %s meta. A surgical display expected.", clientID, playerTopRule)
-		} else if stats.Playstyle.Aggressiveness > global.AvgAggressiveness*1.3 {
-			message = fmt.Sprintf("Watch your flanks. %s plays like a predator in the neon deep.", clientID)
-		} else if stats.Playstyle.RiskTolerance > global.AvgRiskTolerance*1.3 {
-			message = fmt.Sprintf("%s is known for high-infamy gambits. This should be interesting.", clientID)
+			message = fmt.Sprintf("Attention spectators: %s is a specialist in the current %s meta. A surgical display expected.", displayName, playerTopRule)
+		} else if agg > avgAgg*1.3 {
+			message = fmt.Sprintf("Watch your flanks. %s plays like a predator in the neon deep.", displayName)
+		} else if risk > avgRisk*1.3 {
+			message = fmt.Sprintf("%s is known for high-infamy gambits. This should be interesting.", displayName)
 		} else if playerTopRule != "" && playerTopRule != metaRule {
-			message = fmt.Sprintf("%s is sticking to %s. A bold choice against the crowd.", clientID, playerTopRule)
+			message = fmt.Sprintf("%s is sticking to %s. A bold choice against the crowd.", displayName, playerTopRule)
 		}
 	}
 

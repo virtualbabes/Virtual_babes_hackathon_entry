@@ -414,4 +414,14 @@
 43. Complete: Implemented Mojo Bonuses and Role/Master-tier requirements in `shop_registry.go` to complete the tiered industrial unlock system.
 44. Complete: Hardened `handlePurchaseItem` in `lobby_manager.go` to enforce Role, Mojo, and Master-tier requirements during shop transactions.
 45. Complete: Updated `openShopsOverlay` in `economy.js` to visually distinguish Master-tier items and display career/mojo requirements.
+46. Complete: Hardened `handleHeist` in `club_service.go` with Regional Security bonuses and Master-tier hardware synergies.
+47. Complete: Hardened `processMojoDecay` in `lobby_manager.go` with tiered decay rates for Regional Governors to ensure sector accountability.
+48. Complete: Hardened `calculateMojoGain` in `club_service.go` by implementing Regional Security Synergy and hardware trap weighting for defense events.
+49. Complete: Hardened `handleSpreadRumor` in `handlers_rumor.go` with Governor Tax redistribution and resolved recursive deadlock vulnerabilities.
+50. Complete: Hardened `generateNPCCommentary` in `market_service.go` to prevent concurrent map access panics and integrated Envoi names for taunt immersion.
+51. Complete: Verified `observeGlobalSentiments` in `market_service.go` is safe from concurrent map access panics due to correct mutex usage.
+52. Complete: Implemented "Governor's Tax" on tournament pots in `tournament_manager.go`, routing 5% of the pot to the club controlling "arena_center".
+53. Complete: Hardened `handleCreateLease` and `handleTakeLease` in `club_service.go` by implementing micro-unit precision for revenue splitting and resolving recursive deadlocks.
+54. Complete: Hardened `processLeaseExpirations` in `club_service.go` to correctly update borrower reputation upon leased card return.
+55. Complete: Updated `openClubLeaseBoard` in `app.js` to display the Faucet tax and Club commission breakdown for industrial leases.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

@@ -357,12 +357,26 @@ func (l *Lobby) finalizeTournament(winners []string) {
 		winner = winners[0]
 	}
 
+	// PILLAR 1: Governor's Tax Integration.
+	// 5% of the total tournament pot is routed to the club controlling the 'arena_center' territory.
+	var govTax float64
+	centerClub := l.getClubByTerritoryID("arena_center")
+	if centerClub != nil {
+		govTax = l.tournament.Pot * 0.05
+		centerClub.Treasury += govTax
+		centerClub.LastActivity = time.Now()
+		l.logAdminAuditLocked("GOVERNOR_TAX_PAID", centerClub.ID, fmt.Sprintf("Tournament Pot Tax: %.2f $VBV", govTax))
+	}
+
+	// Calculate effective pot available for player distribution
+	effectivePot := l.tournament.Pot - govTax
+
 	// Placement Identification & Multi-Asset Reward Loop
 	top5 := l.determineTop5(l.tournament.Matches, winner)
 	payoutPercentages := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
 
-	if l.tournament.Pot > 0 && len(top5) > 0 {
-		log.Printf("[TOURNAMENT] Finalizing Event. Pot: %.2f $VBV. Payout Ranks: %v\n", l.tournament.Pot, top5)
+	if effectivePot > 0 && len(top5) > 0 {
+		log.Printf("[TOURNAMENT] Finalizing Event. Pot: %.2f $VBV (Tax: %.2f). Payout Ranks: %v\n", effectivePot, govTax, top5)
 
 		for i, player := range top5 {
 			if i >= len(payoutPercentages) {
@@ -370,7 +384,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			}
 
 			// Calculate Pot Share (Primary Asset)
-			shareMicro := uint64(l.tournament.Pot * payoutPercentages[i] * 1000000)
+			shareMicro := uint64(effectivePot * payoutPercentages[i] * 1000000)
 
 			// Dispatch grouped rewards in background goroutine
 			go func(p string, rank int, amt uint64) {

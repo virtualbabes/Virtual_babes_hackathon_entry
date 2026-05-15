@@ -1798,17 +1798,27 @@ func (l *Lobby) processMojoDecay() {
 		if now.Sub(club.LastActivity) > stagnationThreshold {
 			// PILLAR 1: Dynamic Decay Scaling. 
 			// Larger clubs lose more Mojo to maintain competitive churn.
-			// 2% of current Mojo or a minimum of 5 points.
-			decayAmount := int(float64(club.Mojo) * 0.02)
-			if decayAmount < 5 { decayAmount = 5 }
+			
+			isRegion := len(club.Territories) >= 2
+			decayRate := 0.02
+			minDecay := 5
+
+			if isRegion {
+				// PILLAR 1: Regional Governor Accountability.
+				// Established regions suffer 2.5x higher decay to prevent sector stagnation.
+				decayRate = 0.05
+				minDecay = 15
+			}
+
+			decayAmount := int(float64(club.Mojo)*decayRate + 0.5)
+			if decayAmount < minDecay { decayAmount = minDecay }
 
 			club.Mojo -= decayAmount
 			if club.Mojo < 0 {
 				club.Mojo = 0
 			}
 			decayOccurred = true
-
-			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay due to stagnation. New Mojo: %d\n", club.Name, club.Mojo)
+			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay (isRegion: %v). New Mojo: %d\n", club.Name, isRegion, club.Mojo)
 
 			// PILLAR 1: Rippled Standing Decay. 
 			// Recalculate reputation for all employees whose standing relies on this club's Mojo.

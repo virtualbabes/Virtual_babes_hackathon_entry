@@ -32,7 +32,13 @@ func (l *Lobby) handleHeist(env *Envelope) {
 
 	// SUCCESS CHANCE CALCULATION: Base 50% chance + (Effective Cunning - Security Level) / 100
 	successChance := 0.50
+
+	// PILLAR 1: Regional Security Integration.
+	isRegion := len(targetClub.Territories) >= 2
 	securityLevel := float64(targetClub.Mojo) / 10.0
+	if isRegion {
+		securityLevel += 15.0 // established regions have superior administrative security
+	}
 
 	for _, role := range targetClub.Staff {
 		if role == "Security" {
@@ -40,7 +46,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}
 	}
 
-	// Apply Attribute Modifier: Players compete against the club's Mojo and Security staff
+	// Apply Attribute Modifier: Players compete against the club's total security profile
 	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
 
 	// Apply Trap Penalties from the Club's active buffs with lazy pruning
@@ -54,7 +60,18 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}
 
 		if item, ok := GlobalShopRegistry[itemID]; ok && item.HeistSuccessModifier != 0 {
-			successChance += item.HeistSuccessModifier
+			modifier := item.HeistSuccessModifier
+
+			// PILLAR 1: Regional Governor Synergy.
+			// Defensive hardware is more effective when integrated into a district-wide regional network.
+			if isRegion {
+				modifier *= 1.5
+			}
+			// Master Tier items provide an additional scaling bonus to their specialized effects.
+			if item.IsMasterTier {
+				modifier *= 1.25
+			}
+			successChance += modifier
 		}
 	}
 
@@ -583,6 +600,20 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 	case "DEFENSE":
 		// Successful heist defense yields a flat Mojo boost
 		gain = 15
+
+		// PILLAR 1: Regional Security Synergy.
+		// Governors (2+ territories) have interlocked security grids that yield 
+		// more prestige upon successful defense.
+		if len(club.Territories) >= 2 {
+			gain += 10
+		}
+
+		// Tech Synergy: Bonus for every active hardware trap successfully defended.
+		for key := range club.ActiveBuffs {
+			if strings.HasPrefix(key, "TRAP_") {
+				gain += 5
+			}
+		}
 	}
 
 	if gain <= 0 && reason == "REVENUE" {
@@ -693,8 +724,8 @@ func (l *Lobby) handleCreateLease(env *Envelope) {
 	}
 	club.LastActivity = time.Now() // Club is active when a lease is created
 
-	l.logAdminAudit("LEASE_CREATED", wallet, fmt.Sprintf("Club: %s, Card: %d, Price: %.2f", data.ClubID, data.CardID, data.Price))
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📜 <b>LEASE ADVERTISED:</b> %s is now available for rent in %s."}`, card.Name, club.Name))})
+	l.logAdminAuditLocked("LEASE_CREATED", wallet, fmt.Sprintf("Club: %s, Card: %d, Price: %.2f", data.ClubID, data.CardID, data.Price))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"📜 <b>LEASE ADVERTISED:</b> %s is now available for rent in %s."}`, card.Name, club.Name))})
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
@@ -723,24 +754,30 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 
 	lease := club.Leases[data.LeaseID]
 	if lease.Borrower != "" || strings.EqualFold(lease.LenderWallet, borrowerWallet) {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Invalid borrower or already active."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Invalid borrower or already active."}`)})
 		return
 	}
 
 	priceMicro := uint64(lease.Price * 1000000)
 	if l.rewards[borrowerWallet] < priceMicro {
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Insufficient funds."}`)})
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Insufficient funds."}`)})
 		return
 	}
 
-	// Payment distribution: 50% creator, 20% faucet, 20% club, 10% members
+	// PILLAR 1: Industrial Lease Revenue Distribution.
+	// Split: 50% Lender, 20% Faucet (Tax), 20% Club Treasury, 10% Members.
+	// We use micro-unit math to ensure absolute ledger integrity.
 	l.rewards[borrowerWallet] -= priceMicro
-	l.faucetBalance += lease.Price * 0.20
-	club.Treasury += lease.Price * 0.20
+
+	faucetShareMicro := (priceMicro * 20) / 100
+	clubShareMicro := (priceMicro * 20) / 100
+	lenderShareMicro := (priceMicro * 50) / 100
+	memberShareTotalMicro := priceMicro - faucetShareMicro - clubShareMicro - lenderShareMicro
+
+	l.faucetBalance += float64(faucetShareMicro) / 1000000.0
 	club.LastActivity = time.Now() // Club is active when a lease is taken
 	l.applyDynamicScalingLocked()
 
-	memberShareTotalMicro := uint64(lease.Price * 0.10 * 1000000)
 	numMembers := uint64(len(club.Members))
 	if numMembers > 0 {
 		perMemberMicro := memberShareTotalMicro / numMembers
@@ -748,16 +785,17 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 			l.rewards[strings.ToLower(m)] += perMemberMicro
 		}
 
-		// Precision Recovery: Redirect rounding remainder to Club Treasury to ensure no micro-units are lost
-		remainderMicro := memberShareTotalMicro - (perMemberMicro * numMembers)
-		if remainderMicro > 0 {
-			club.Treasury += float64(remainderMicro) / 1000000.0
-		}
+		// Precision Recovery: Redirect division remainder to Club Treasury.
+		// This handles cases where the 10% share isn't perfectly divisible by member count.
+		memberRemainderMicro := memberShareTotalMicro - (perMemberMicro * numMembers)
+		clubShareMicro += memberRemainderMicro
 	} else {
-		// Fallback: If no members exist, the entire 10% share defaults to the Club Treasury
-		club.Treasury += lease.Price * 0.10
+		// Fallback: If no members, the 10% share defaults to the Club Treasury
+		clubShareMicro += memberShareTotalMicro
 	}
-	l.rewards[strings.ToLower(lease.LenderWallet)] += uint64(float64(priceMicro) * 0.50)
+
+	l.rewards[strings.ToLower(lease.LenderWallet)] += lenderShareMicro
+	club.Treasury += float64(clubShareMicro) / 1000000.0
 
 	// Execute lease
 	lease.Borrower = borrowerWallet
@@ -770,8 +808,8 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	borrowerStats.Inventory[fmt.Sprintf("CARD-%d", lease.CardID)]++
 	l.leaderboard[borrowerWallet] = borrowerStats
 
-	l.logAdminAudit("LEASE_TAKEN", borrowerWallet, fmt.Sprintf("ID: %s, Price: %.2f", lease.ID, lease.Price))
-	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 <b>LEASE SECURED:</b> You have rented %s."}`, lease.CardName))})
+	l.logAdminAuditLocked("LEASE_TAKEN", borrowerWallet, fmt.Sprintf("ID: %s, Price: %.2f", lease.ID, lease.Price))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 <b>LEASE SECURED:</b> You have rented %s."}`, lease.CardName))})
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
@@ -789,6 +827,9 @@ func (l *Lobby) processLeaseExpirations() {
 				if bStats.Inventory[cardKey] > 0 {
 					bStats.Inventory[cardKey]--
 				}
+				l.leaderboard[lease.Borrower] = bStats
+				// Recalculate borrower's reputation after card return
+				bStats.Reputation = l.CalculateReputation(bStats)
 				l.leaderboard[lease.Borrower] = bStats
 
 				lStats := l.leaderboard[lease.LenderWallet]

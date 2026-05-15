@@ -73,7 +73,7 @@ var GlobalShopRegistry = map[string]ShopItem{
 	"guard_dog": {
 		ID: "guard_dog", Name: "Bio-Guard Dog", Price: 2000, ClubType: "Hardware",
 		Description: "Forces Jail on Failure", HeistSuccessModifier: -0.05, MojoBonus: 80,
-		RequiredRole: "Security", RequiredMojo: 500,
+		RequiredRole: "Security", RequiredMojo: 500, IsMasterTier: true,
 	},
 }
 

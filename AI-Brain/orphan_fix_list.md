@@ -160,4 +160,14 @@
 - [FIXED] Implemented `RequiredMojo`, `RequiredRole`, and `IsMasterTier` fields in `shop_registry.go` to enable specialized item unlocks for Governors and career roles.
 - [FIXED] Hardened `handlePurchaseItem` in `lobby_manager.go` to enforce Role, Mojo, and Regional Governor requirements for specialized shop items.
 - [FIXED] Updated `GlobalShopRegistry` in `economy.js` to match backend requirements and implemented visual requirement gating in `switchShopCategory`.
+- [FIXED] Hardened `handleHeist` in `club_service.go` to correctly account for Regional Governor security bonuses and Master-tier hardware multipliers.
+- [FIXED] Hardened `processMojoDecay` in `lobby_manager.go` to implement tiered Mojo decay for Regional Governors to maintain competitive sector churn.
+- [FIXED] Hardened `calculateMojoGain` in `club_service.go` to provide Regional Governors with interlocked security synergy and hardware trap bonuses for heist defense.
+- [FIXED] Hardened `handleSpreadRumor` in `handlers_rumor.go` by implementing a 20% Regional Governor Tax and resolving recursive deadlocks in the audit and notification paths.
+- [FIXED] Hardened `generateNPCCommentary` in `market_service.go` by moving map iterations inside the read lock to prevent concurrent access panics and utilizing `ResolveEnvoiName` for improved player-driven narrative.
+- [VERIFIED] `observeGlobalSentiments` in `market_service.go` is already safe from concurrent map access panics.
+- [FIXED] Implemented "Governor's Tax" in `tournament_manager.go` to route a portion of the tournament pot to the club owning the Arena Center district.
+- [FIXED] Hardened Industrial Leases in `club_service.go` to use micro-unit precision for revenue splits and resolved recursive deadlocks in the lease creation and fulfillment paths.
+- [FIXED] Hardened `processLeaseExpirations` in `club_service.go` to ensure borrower reputation is recalculated upon leased card return.
+- [FIXED] Updated `openClubLeaseBoard` in `app.js` to provide transparency on industrial lease fee distribution (20% Faucet, 20% Club).
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.

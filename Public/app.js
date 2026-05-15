@@ -2871,6 +2871,9 @@ window.openClubLeaseBoard = async () => { // Imported from economy.js
 
         for (const lease of available) {
             found++;
+            const faucetTax = (lease.price * 0.20).toFixed(1);
+            const clubComm = (lease.price * 0.20).toFixed(1);
+
             const lender = getCachedEnvoiName(lease.lender_wallet);
             html += `
                 <div class="player-item" style="padding: 12px; border-color: var(--glass-border); background: rgba(0,0,0,0.25);">
@@ -2879,7 +2882,12 @@ window.openClubLeaseBoard = async () => { // Imported from economy.js
                         <div style="font-size: 0.7em; opacity: 0.6;">Lender: ${lender} | Term: ${lease.duration_hours}h</div>
                     </div>
                     <div style="text-align: right; display: flex; align-items: center; gap: 15px;">
-                        <div style="color: var(--neon-green); font-weight: bold; font-family: 'Rajdhani', sans-serif;">${lease.price.toFixed(1)} $VBV</div>
+                        <div style="text-align: right;">
+                            <div style="color: var(--neon-green); font-weight: bold; font-family: 'Rajdhani', sans-serif; font-size: 1.1em;">${lease.price.toFixed(1)} $VBV</div>
+                            <div style="font-size: 0.6em; opacity: 0.5; margin-top: 2px; letter-spacing: 0.5px;">
+                                FAUCET: ${faucetTax} | CLUB: ${clubComm}
+                            </div>
+                        </div>
                         <button class="outline" style="min-width: 100px; padding: 8px; border-color: var(--neon-purple); color: var(--neon-purple);" 
                                 onclick="takeLease('${club.id}', '${lease.id}', ${lease.price})">RENT</button>
                     </div>
