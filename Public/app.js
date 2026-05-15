@@ -1,7 +1,7 @@
 import { CONFIG } from './js/config.js';
 import { initWebSocket, handleServerMessage } from './js/network.js';
-import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles } from './js/ui.js';
-import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress } from './js/wallet.js';
+import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, showToast, setTransactionStatus, openSettingsOverlay, closeSettingsOverlay, showTournamentTransition, shareTournamentVictory, showQuickCastMenu, movePowerTooltip, hidePowerTooltip } from './js/ui.js';
+import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress, connectWith, updatePayoutUI } from './js/wallet.js';
 import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket } from './js/leaderboard.js';
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
@@ -9,9 +9,8 @@ import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, a
 import { openShopsOverlay, buyClubItem, openClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker, updateBountyTicker } from './js/economy.js';
 import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
 import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext, playCharacterVoiceLine } from './js/audio.js';
-import { initParticleSystem, triggerCaptureParticles } from './js/particles.js';
+import { initParticleSystem, triggerCaptureParticles, animateParticles } from './js/particles.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './js/utils.js';
-import { showPowerTooltip, movePowerTooltip, hidePowerTooltip } from './js/ui.js';
 
 let lastBoardMoods = Array(9).fill(null);
 // 1. Initialize Go WASM Engine
@@ -69,69 +68,15 @@ window.onload = async () => {
 
 // Expose HTML event handlers for inline onclicks in module mode
 // Function mappings migrated to domains
-window.hideAllOverlays = hideAllOverlays;
-window.openPayoutSettings = openPayoutSettings;
-window.savePayoutAddress = savePayoutAddress;
-window.toggleMuteMusic = toggleMuteMusic;
-window.toggleMatchmakingQueue = toggleMatchmakingQueue;
-window.sendChatMessage = sendChatMessage;
-window.registerForTournament = registerForTournament;
-window.openTournamentBracket = openTournamentBracket;
-window.openDeckManager = openDeckManager;
-window.openShopsOverlay = openShopsOverlay;
-window.buyClubItem = buyClubItem;
-window.openTerritoryMapOverlay = openTerritoryMapOverlay;
-window.openSocialPanelOverlay = openSocialPanelOverlay;
-window.ToggleLeaderboard = () => { window.ToggleLeaderboard(); syncUI(); };
-window.proceedToWarRoom = proceedToWarRoom;
-window.closeDeckManager = closeDeckManager;
-window.adminBanWallet = adminBanWallet;
-window.adminRefillVault = adminRefillVault;
-window.adminAddReward = adminAddReward;
-window.adminRemoveReward = adminRemoveReward;
-window.adminUpdateRules = adminUpdateRules;
-window.adminToggleMaintenance = adminToggleMaintenance;
-window.adminResetStats = adminResetStats;
-window.adminSimulateTournament = adminSimulateTournament;
-window.switchHofTab = switchHofTab;
-window.selectCard = selectCard;
-window.clickGrid = clickGrid;
-window.executeQuickCast = executeQuickCast;
-window.switchPortfolioTab = switchPortfolioTab;
-window.releaseHostage = releaseHostage;
-window.payRansom = payRansom;
-window.openCourthouse = openCourthouse;
-window.openSecuritySentry = openSecuritySentry;
-window.openBountyBoard = openBountyBoard;
-window.openRumorMill = openRumorMill;
-window.openHeistPlanningOverlay = openHeistPlanningOverlay;
-window.switchSocialTab = switchSocialTab;
-window.openPortfolioView = openPortfolioView;
-window.tradeShares = tradeShares;
-window.openBlackMarket = openBlackMarket;
-window.openArtGalleryOverlay = openArtGalleryOverlay;
-window.openConsignmentOverlay = openConsignmentOverlay;
-window.selectConsignmentItem = selectConsignmentItem;
-window.submitConsignment = submitConsignment;
-window.promptBid = promptBid;
-window.openClubLeaseBoard = openClubLeaseBoard;
-window.takeLease = takeLease;
-window.adjustMapZoom = adjustMapZoom;
-window.setMasterVolume = setMasterVolume;
-window.setMusicVolume = setMusicVolume;
-window.setSfxVolume = setSfxVolume;
-window.updateMarketTicker = updateMarketTicker;
-window.updateBountyTicker = updateBountyTicker;
-window.renderCardHTML = renderCardHTML;
-window.showPowerTooltip = showPowerTooltip;
-window.movePowerTooltip = movePowerTooltip;
-window.hidePowerTooltip = hidePowerTooltip;
-window.triggerCaptureParticles = triggerCaptureParticles;
-window.updateHeistRiskAssessment = updateHeistRiskAssessment;
-window.executeHeistStrike = executeHeistStrike;
-window.handleHeistResult = handleHeistResult;
-window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
-window.executeKidnap = executeKidnap;
+window.hideAllOverlays = hideAllOverlays; // ui.js
+window.openPayoutSettings = openPayoutSettings; // wallet.js
+window.savePayoutAddress = savePayoutAddress; // wallet.js
+window.toggleMuteMusic = toggleMuteMusic; // audio.js
+window.toggleMatchmakingQueue = toggleMatchmakingQueue; // game.js
+window.sendChatMessage = sendChatMessage; // game.js
+window.registerForTournament = registerForTournament; // leaderboard.js
+window.openTournamentBracket = openTournamentBracket; // leaderboard.js
+window.open
 
 // 4. THE RENDER LOOP (The Camera fetching Go State)
 /**

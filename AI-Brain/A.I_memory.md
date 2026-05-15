@@ -156,3 +156,4 @@
 137. **Complete**: Updated `submitCourthouseFine` in `criminality.js` to include the `"COURTHOUSE_FINE:"` note prefix for on-chain validation.
 134. **Complete**: Hardened `handleTournamentRegister` and `verifyBuyInTransaction` to cryptographically bind buy-ins to specific `TournamentIDs` via on-chain note metadata.
 138. **Complete**: Hardened `initiateBail` in `criminality.js` with timestamped notes and purged redundant logic definitions from `app.js`.
+139. **Complete**: Performed comprehensive cleanup of `Public/app.js`, removing redundant global `window` assignments and duplicated function definitions to enforce modularity.
