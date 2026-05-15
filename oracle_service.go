@@ -993,24 +993,39 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-
-	info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
-	if err != nil {
-		log.Printf("[ORACLE ERROR] Failed to fetch native vault balance: %v\n", err)
-		return
+	var amount uint64
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
+		cancel()
+		if err != nil {
+			// Handle Node rate-limiting (429)
+			if strings.Contains(err.Error(), "429") {
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+			}
+			// Transient network errors
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to fetch native vault balance after retries: %v\n", err)
+			return
+		}
+		amount = info.Amount
+		break
 	}
 
 	l.mutex.Lock()
-
 	// CRITICAL GUARD: Ensure vault has at least 1 VOI for gas
-	if info.Amount < 1000000 {
-		log.Printf("[CRITICAL] Vault is low on gas! Balance: %d microVOI", info.Amount)
+	if amount < 1000000 {
+		log.Printf("[CRITICAL] Vault is low on gas! Balance: %d microVOI", amount)
 		l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted. Reward dispatches will fail.")
 	}
 
-	l.faucetBalance = float64(info.Amount) / 1000000.0 // Note: This updates faucetBalance using native VOI units
+	l.faucetBalance = float64(amount) / 1000000.0 // Note: This updates faucetBalance using native VOI units
 	l.mutex.Unlock()
 }
 

@@ -464,4 +464,5 @@
 90. Complete: Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with 429 retry policy and robust status code handling.
 91. Complete: Hardened `loadOnboardedWalletsFromIndexer` in `oracle_service.go` with 429 retry policy for each page of the historical scan.
 92. Complete: Hardened `checkVaultBalanceOnChain` in `oracle_service.go` with 429 retry policy for ARC-200 application box lookups.
+93. Complete: Hardened `checkNativeVaultBalanceOnChain` in `oracle_service.go` with 429 retry policy for account information lookups.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
