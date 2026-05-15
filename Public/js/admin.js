@@ -17,8 +17,67 @@ export const setGlobalClubs = (clubs) => { globalClubs = clubs; };
 export const setAdminFocusNetwork = (network) => { adminFocusNetwork = network; };
 export const setIgnoredReporters = (reporters) => { ignoredReporters = reporters; };
 
+let cachedAdminHeaders = null;
+
+/**
+ * getAdminHeaders constructs the authentication headers required for administrative APIs.
+ * PILLAR 5: Admin Security. Strictly enforces WalletConnect for administrative signatures.
+ */
 export async function getAdminHeaders() {
-    if (!userAddress) { 
+    if (!userAddress) {
+        showToast("❌ Admin access requires a connected wallet.", "error");
+        return null;
+    }
+
+    if (walletProvider !== 'walletconnect') {
+        showToast("🚨 <b>SECURITY POLICY:</b> Administrative actions are restricted to WalletConnect sessions only.", "critical", 10000);
+        return null;
+    }
+
+    if (cachedAdminHeaders && cachedAdminHeaders['X-Admin-Wallet'] === userAddress) {
+        return cachedAdminHeaders;
+    }
+
+    try {
+        setTransactionStatus("Requesting administrative nonce...", "info");
+        
+        const nonce = await new Promise((resolve, reject) => {
+            setNonceResolver(resolve);
+            socket.send(JSON.stringify({ type: "nonce_request" }));
+            setTimeout(() => reject(new Error("Nonce request timed out")), 10000);
+        });
+
+        setTransactionStatus("Signing administrative proof...", "info");
+
+        const sessions = signClient.session.getAll();
+        if (!sessions || sessions.length === 0) throw new Error("Active session not found.");
+        const topic = sessions[0].topic;
+        let signature = "";
+        const msg = `Virtualbabes Arena Admin Auth:${nonce}`;
+
+        if (userAddress.startsWith("0x")) {
+            signature = await signClient.request({
+                topic,
+                chainId: CONFIG.ETH_CHAIN_ID || "eip155:1",
+                request: { method: "personal_sign", params: [msg, userAddress] }
+            });
+        } else {
+            const response = await signClient.request({
+                topic,
+                chainId: CONFIG.VOI_CHAIN_ID,
+                request: { method: "algo_signMessage", params: { address: userAddress, message: msg } }
+            });
+            signature = response.signature;
+        }
+
+        cachedAdminHeaders = { "X-Admin-Wallet": userAddress, "X-Admin-Nonce": nonce, "X-Admin-Signature": signature };
+        return cachedAdminHeaders;
+    } catch (err) {
+        console.error("[ADMIN AUTH ERROR]", err);
+        showToast(`❌ Authentication Failed: ${err.message}`, "error");
+        return null;
+    } finally {
+        setTransactionStatus(null);
     }
 }
 
