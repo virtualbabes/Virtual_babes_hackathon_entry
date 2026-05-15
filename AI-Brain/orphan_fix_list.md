@@ -202,4 +202,5 @@
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
 - [FIXED] Hardened `handleTournamentHistory` in `tournament_manager.go` with backoff for 429 rate-limits and improved error handling for indexer responses.
 - [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` with backoff for 429 rate-limits across both Voi and Algorand network paths.
+- [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses during player stats reconstruction.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

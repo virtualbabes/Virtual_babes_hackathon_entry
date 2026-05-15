@@ -459,4 +459,5 @@
 85. Complete: Hardened `verifyBuyInTransaction` in `oracle_service.go` with 429 retry policy and robust status code handling.
 86. Complete: Hardened `handleTournamentHistory` in `tournament_manager.go` with 429 retry policy and improved error handling for indexer responses.
 87. Complete: Hardened `checkAssetOptIn` in `oracle_service.go` with 429 retry policy for node and indexer requests.
+88. Complete: Hardened `syncStatsFromBlockchain` in `oracle_service.go` with 429 retry policy and robust status code handling.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

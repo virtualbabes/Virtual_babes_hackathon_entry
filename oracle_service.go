@@ -364,14 +364,41 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		baseURL, voiConfig.AssetID, l.vaultAddress, wallet)
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ { // Retry up to 3 times
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel() // Ensure context is cancelled after each attempt
+		if err != nil {
+			if i < 2 { // If not the last attempt, wait and retry
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to connect to indexer for stats sync after retries: %v\n", err)
+			return // Return on persistent network error
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 { // If not the last attempt, wait with backoff and retry
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for stats sync after retries.\n")
+			return // Return on persistent rate-limiting
+		}
+		break // Break loop on successful response
 	}
-	defer resp.Body.Close()
+	if err != nil {
+		return // Should be caught by the loop, but as a final safeguard
+	}
+	defer resp.Body.Close() // Ensure body is closed
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[ORACLE ERROR] Indexer returned non-200 status for stats sync: %d %s\n", resp.StatusCode, resp.Status)
+		return // Return on non-OK status
+	}
 
 	var res struct {
 		Transfers []struct {
