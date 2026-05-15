@@ -304,6 +304,11 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 }
 
 func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
+	// PILLAR 3: Bracket Integrity. Ignore results if tournament is no longer active.
+	if !l.tournament.Active {
+		return
+	}
+
 	found := false
 	for i, m := range l.tournament.Matches {
 		if m.ID == matchID && m.Winner == "" {

@@ -125,3 +125,4 @@
 105. **Complete**: Hardened persistence layer by introducing `DATA_DIR` environment variable and updating Dockerfile for Render volume compatibility.
 106. **Complete**: Implemented global on-chain registration reconstruction via `loadRegistrationsFromIndexer` and hardened `syncStatsFromBlockchain` to catch buy-ins using the `VBT_TOURN_BUYIN` prefix.
 107. **Complete**: Hardened `handleTournamentHistory` in `tournament_manager.go` with concurrency throttling and defensive ID validation; verified isolation from global registration sync.
+108. **Complete**: Hardened `processTournamentResult` in `tournament_manager.go` to ignore reported results if the tournament is no longer active.

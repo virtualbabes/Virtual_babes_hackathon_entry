@@ -219,3 +219,4 @@
 - [FIXED] Introduced `DATA_DIR` resolution in `Lobby` to allow persistent state storage on Render volumes; updated all service files to use dynamic pathing for JSON caches and audit logs.
 - [FIXED] Hardened `syncStatsFromBlockchain` and implemented `loadRegistrationsFromIndexer` to allow full reconstruction of the used transaction cache from on-chain `VBT_TOURN_BUYIN` notes.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to correctly utilize `AssetID` and `AppID` from `networks.json` as fallbacks/authoritative IDs for payment validation.
+- [FIXED] Hardened `processTournamentResult` in `tournament_manager.go` with an activity guard to prevent processing results for inactive or finalized tournaments.
