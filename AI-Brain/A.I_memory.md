@@ -127,3 +127,4 @@
 107. **Complete**: Hardened `handleTournamentHistory` in `tournament_manager.go` with concurrency throttling and defensive ID validation; verified isolation from global registration sync.
 108. **Complete**: Hardened `processTournamentResult` in `tournament_manager.go` to ignore reported results if the tournament is no longer active.
 109. **Complete**: Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under exclusive lock to prevent registrations after the window has closed.
+110. **Complete**: Hardened `handleStartTournament` in `handlers_admin.go` with case-insensitive participant gathering, registration window validation, and configuration persistence.

@@ -555,22 +555,35 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 	}
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	// PILLAR 3: Bracket Integrity.
+	// Ensure a registration window is open and the bracket hasn't already started.
+	if !l.tournament.Active || l.tournament.CurrentRound != 0 {
+		http.Error(w, "Tournament registration is not open or bracket already active", http.StatusForbidden)
+		return
+	}
+
 	type entry struct {
 		wallet string
 		wins   int
 	}
 	var hof []entry
 	for w, s := range l.leaderboard {
-		hof = append(hof, entry{wallet: w, wins: s.Wins})
+		// Normalize for case-insensitive Elite/Paid comparison
+		hof = append(hof, entry{wallet: strings.ToLower(w), wins: s.Wins})
 	}
 	sort.Slice(hof, func(i, j int) bool { return hof[i].wins > hof[j].wins })
 	participants := []string{}
 	pot := 500.0
+	buyInAmt := l.tournament.BuyInAmount
+	openTime := l.tournament.OpenTime
+
 	if req.IsBuyIn {
 		elite := make(map[string]bool)
 		for i := 0; i < len(hof) && i < 10; i++ {
-			elite[hof[i].wallet] = true
-			participants = append(participants, hof[i].wallet)
+			lowerW := strings.ToLower(hof[i].wallet)
+			elite[lowerW] = true
+			participants = append(participants, lowerW)
 			if len(participants) >= req.Size {
 				break
 			}
@@ -579,8 +592,9 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 			if len(participants) >= req.Size {
 				break
 			}
-			if !elite[p] {
-				participants = append(participants, p)
+			lowerP := strings.ToLower(p)
+			if !elite[lowerP] {
+				participants = append(participants, lowerP)
 			}
 		}
 		if len(participants) < req.Size {
@@ -605,7 +619,16 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(seedMap); i += 2 {
 		matches = append(matches, TournamentMatch{ID: fmt.Sprintf("R1-M%d", (i/2)+1), P1: participants[seedMap[i]], P2: participants[seedMap[i+1]], Round: 1})
 	}
-	l.tournament = TournamentState{Active: true, Participants: participants, Matches: matches, CurrentRound: 1, Pot: pot, BuyInAmount: 50.0, IsBuyInMode: req.IsBuyIn}
+	l.tournament = TournamentState{
+		Active:       true,
+		Participants: participants,
+		Matches:      matches,
+		CurrentRound: 1,
+		Pot:          pot,
+		BuyInAmount:  buyInAmt,
+		IsBuyInMode:  req.IsBuyIn,
+		OpenTime:     openTime,
+	}
 	l.logAdminAuditLocked("START_TOURNAMENT", "GLOBAL", fmt.Sprintf("Size: %d", req.Size))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(l.tournament)
