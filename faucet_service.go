@@ -256,7 +256,8 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	var txns []types.Transaction
 	var totalUnits float64
 	vaultAddrObj, _ := types.DecodeAddress(vaultAddr)
-	winNote := []byte(fmt.Sprintf("VBT_WIN:{\"opp\":\"%s\",\"scores\":[%d,%d]}", history.Opponent, history.Scores[0], history.Scores[1]))
+	// PILLAR 4: Match History Continuity. Include tournament ID and scores for reconstruction.
+	winNote := []byte(fmt.Sprintf("VBT_WIN:{\"opp\":\"%s\",\"scores\":[%d,%d],\"tid\":\"%s\"}", history.Opponent, history.Scores[0], history.Scores[1], history.TournamentMatchID))
 
 	for appIDStr, baseAmt := range activeRewards {
 		appID, err := strconv.ParseUint(appIDStr, 10, 64)

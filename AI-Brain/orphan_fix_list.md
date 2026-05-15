@@ -225,3 +225,5 @@
 - [FIXED] Hardened `isAdminWallet` in `handlers_admin.go` with case-insensitive comparison (EqualFold) for environment variable authorization.
 - [FIXED] Hardened `link_wallet_request` in `lobby_manager.go` with chain-aware address normalization to prevent cross-session identity drift.
 - [FIXED] Hardened `getAdminHeaders` in `admin.js` to restrict administrative actions to WalletConnect providers only, ensuring consistency with backend security policies.
+- [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` to implement authoritative ID resolution for Voi assets, ensuring correct fallback to `AppID` from `networks.json` when a generic `assetIDStr` is provided.
+- [FIXED] Updated match win metadata format in `faucet_service.go` and implemented full reconstruction of match history (Tournament and Standard) in `oracle_service.go` for player immersion.

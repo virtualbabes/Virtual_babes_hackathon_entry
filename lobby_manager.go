@@ -1040,6 +1040,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		SocialRank        string         `json:"social_rank"`        // Added for UI display
 		EquippedFaceplate string         `json:"equipped_faceplate"` // For UI rendering
 		KidnappedCards    map[int]string `json:"kidnapped_cards"`    // Added for UI display
+		MatchHistory      []MatchHistory `json:"match_history"`       // Last 5 matches for immersion
 		HeldHostageCards  map[int]string `json:"held_hostage_cards"` 
 		Achievements      []string       `json:"achievements"`       // Added for UI display
 		// JobRole and EmployerID are already present in the playerInfo struct
@@ -1053,6 +1054,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		var banExpires time.Time
 		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon := 0, 0, 0, 0, 0, 0, 0
 		var jailedCards map[int]string
+		var matches []MatchHistory
 		var equippedFaceplate string
 		var socialRank string
 		var achievements []string
@@ -1078,6 +1080,11 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				jobRole = stats.JobRole
 				employerID = stats.EmployerClubID
 				achievements = stats.Achievements
+				// PILLAR 4: Historical Immersion. Send the last 5 matches for display.
+				matches = stats.History
+				if len(matches) > 5 {
+					matches = matches[:5]
+				}
 				if stats.Wins >= 50 && stats.DisconnectStreak == 0 {
 					hasMardon = true
 				}
@@ -1090,6 +1097,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation, 
 			AuctionsWon: auctionsWon,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
+			MatchHistory: matches,
 			JailedCards: jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,
 			JobRole: jobRole, EmployerID: employerID,

@@ -282,6 +282,7 @@ type PlayerStats struct {
 	AuctionsWon       int                `json:"auctions_won"`        // Total Art Gallery victories
 	LastSalaryPayment time.Time          `json:"last_salary_payment"` // Timestamp of last payment
 	Inventory         map[string]int     `json:"inventory"`           // ItemID -> Quantity
+	History           []MatchHistory     `json:"match_history"`       // Historical records from blockchain
 	MarketTokens      uint64             `json:"market_tokens"`       // Equity from liquidated loans
 	Relationships     map[string]int     `json:"relationships"`       // Character Name -> Score (0-100)
 	BestRating        string             `json:"best_rating"`

@@ -517,6 +517,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	}
 
 	wins, dnfs := 0, 0
+	var matchHistory []MatchHistory
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
 			if tx.Timestamp < l.seasonStart.Unix() {
@@ -524,6 +525,24 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			}
 			if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
 				wins++
+
+				// PILLAR 4: Historical Reconstruction. Parse note metadata to rebuild match context.
+				var data struct {
+					Opp    string `json:"opp"`
+					Scores [2]int `json:"scores"`
+					TID    string `json:"tid"`
+				}
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+					matchHistory = append(matchHistory, MatchHistory{
+						Opponent:          data.Opp,
+						Scores:            data.Scores,
+						TournamentMatchID: data.TID,
+						Timestamp:         time.Unix(tx.Timestamp, 0),
+						WinnerIndex:       0, // Recipient of VBT_WIN is the winner
+					})
+				} else {
+					matchHistory = append(matchHistory, MatchHistory{Opponent: "Legacy Victory", Timestamp: time.Unix(tx.Timestamp, 0)})
+				}
 			}
 			if strings.HasPrefix(tx.Metadata, "VBT_DNF:") {
 				dnfs++
@@ -531,10 +550,13 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 		}
 	}
 
+	sort.Slice(matchHistory, func(i, j int) bool { return matchHistory[i].Timestamp.After(matchHistory[j].Timestamp) })
+
 	l.mutex.Lock()
 	l.ensurePlayerStatsMapsInitialized(wallet) // Ensure maps are initialized
 	stats := l.leaderboard[wallet]
 	stats.Wins, stats.DNFs = wins, dnfs // Update raw wins/dnfs
+	stats.History = matchHistory
 	stats.Reputation = l.CalculateReputation(stats)
 	l.leaderboard[wallet] = stats
 	l.mutex.Unlock()
