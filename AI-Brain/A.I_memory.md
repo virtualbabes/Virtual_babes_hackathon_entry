@@ -66,3 +66,4 @@
 *   **146**: Enhanced `package.json` build script with a `clean` step for robust production artifact generation.
 *   **147**: Hardened `CalculateReputation` in `economy_service.go` with diminishing returns for extreme win counts to preserve social simulation balance.
 *   **148**: Verified `handleTradeShares` in `market_service.go` correctly utilizes the new scaled Reputation for share pricing.
+*   **149**: Updated `Devsum.md` with comprehensive details on architectural refactoring, economic hardening, and financial proof milestones.

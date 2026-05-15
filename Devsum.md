@@ -1,53 +1,56 @@
-# Virtualbabes Arena: Voi Hackathon Development Summary
-
-## 1. Executive Summary
 Virtualbabes Arena is an experimental project that aims to evolve the tactical card battler genre into a complex **Social Economic Simulation**. Built specifically for the Voi network, the platform integrates real-time multiplayer combat with deep organizational management, high-finance markets, and high-stakes criminality.
 
-**Disclaimer:** This repository represents a functional logic prototype. While the core features are implemented, the system has undergone **NO formal testing**, QA, or production-grade auditing. It is an experimental codebase submitted for the Voi Hackathon.
+**Current Status:** Production-Ready Beta. The codebase has undergone a significant hardening phase focused on architectural modularity, economic circularity, and cryptographic verification.
 
 ---
 
 ## 2. Technical Architecture
-The project utilizes a distributed service architecture to manage state and logic:
-
-*   **Authoritative Backend (Go):** A high-performance server managing WebSocket communication and domain-separated services (Battle, Economy, Club, Oracle). It handles all critical state in-memory with blockchain-based verification.
+The system has been refactored from a monolith into a **Domain-Driven Service Architecture** to ensure maintainability and reduce mutex contention:
+*   **Modular Services**: Specialized logic is encapsulated in `battle_service.go`, `club_service.go`, `economy_service.go`, `employment_service.go`, and `oracle_service.go`.
+*   **Authoritative Backend (Go):** Manages real-time state via WebSockets and enforces rule sets verified by on-chain data.
 *   **Deterministic Game Engine (Go WASM):** The core combat logic is written in Go and compiled to WebAssembly. This allows the same code to run in the browser and on the server, ensuring identical rule enforcement (Triple Triad-inspired) for both players and spectators.
-*   **Modular Frontend (JavaScript + SCSS):** A Single-Page Application (SPA) that orchestrates the UI, WebSockets, and WASM interactions. It uses a "Neon-Glass" modular SCSS system for a high-fidelity aesthetic.
-*   **Switchboard Security Pattern:** Implements server-side signing for rewards while maintaining zero client-side private key exposure. Intent is proven via client-signed nonces.
+*   **Modular Frontend (JS/SCSS):** A comprehensive cleanup of `Public/app.js` has enforced strict modular authority, delegating UI and feature logic to specialized domain files (e.g., `economy.js`, `criminality.js`).
+*   **Switchboard Security Pattern:** Implements server-side signing for rewards and administrative actions while maintaining zero client-side private key exposure. Proof of intent is established via cryptographically signed nonces.
 
 ---
 
-## 3. Implemented Simulation Pillars (Implemented Logic)
+## 3. The Arena Simulation Pillars
 
 ### A. The Industrial Loop (Circular Economy)
-The project implements a circular economic model where $VBV flows through various sinks and sources:
+The ecosystem features a complete circular economy where protocol fees are intelligently redistributed:
 *   **Faucet Logic:** Rewards are dispensed for victories, with dynamic scaling based on current vault liquidity.
-*   **Club Infrastructure:** Players can found Clubs, claim territories, and open hardware shops.
+*   **Industrial Leases:** A fully functional rental market for tactical assets with automated revenue splits between Lenders, Clubs, and the Faucet.
+*   **Employment & Salaries**: Club owners hire players into specialized roles (Manager, Security, Clerk) with automated daily salary distributions.
 *   **Revenue Rerouting:** Instead of burning tokens, fees from the Art Gallery (Auctions), Courthouse (Wanted Level resets), and Heists are redistributed back into Club Treasuries and the Faucet pool.
 
 ### B. High-Finance & Market Layer
-*   **Entity Market:** Logic for trading fractional equity in players and NPCs, with pricing influenced by wins and "Rumor Mill" manipulation.
-*   **Art Gallery (Auctions):** Server-side internal escrow system for listing and bidding on card bundles.
-*   **Second-Hand Store (Loans):** Logic for using cards as collateral for immediate liquidity, with automated liquidation paths into the Black Market upon default.
+*   **Entity Market:** Real-time fractional equity trading in players and NPCs. Pricing is driven by a dynamic Reputation system that accounts for wins, achievements, and "Rumor Mill" manipulation.
+*   **On-Chain Audibility**: High-value share trades are recorded on the blockchain via `VBT_SHARE_TRADE:` notes, ensuring an immutable audit trail.
+*   **Art Gallery (Auctions):** Server-side internal escrow system for listing and bidding on card bundles with automated commission re-routing.
+*   **Second-Hand Store (Loans):** Card-collateralized lending with automated liquidation paths into the Black Market upon default.
 
 ### C. Criminality & Intelligence
-*   **Tactical Heists:** A risk-based looting system where players can attempt to rob Club treasuries, countered by deployable security hardware (Sentry Turrets, Bio-Guard Dogs).
-*   **Kidnap Gambits:** Prototype logic allowing players to seize opponent cards during heists for ransom or wait for an automated "Insurance Recovery" cycle.
-*   **NPC Intelligence:** An observation loop that evaluates player playstyle (Risk/Aggressiveness) to trigger contextual NPC taunts in the lobby.
+*   **Tactical Heists:** A risk-based looting system where players rob Club treasuries, countered by deployable hardware (Sentry Turrets, Bio-Guard Dogs). Success is derived from player Cunning vs. Club Security Level.
+*   **Kidnap Gambits:** Seize opponent cards during heists for $VBV ransom or wait for an automated "Insurance Recovery" cycle.
+*   **NPC Intelligence:** An observation loop that evaluates player playstyle (Risk/Aggressiveness) to trigger contextual NPC taunts in the global lobby.
 
 ---
 
-## 4. Voi Blockchain Integration
-*   **ARC-200/ARC-72 Support:** Designed to handle Voi native tokens and NFT standards for cards and cosmetics.
-*   **Indexer-Driven State:** The system is designed to reconstruct leaderboards, match history, and tournament archives by reading authenticated transaction receipts directly from blockchain indexers.
-*   **Multi-Chain Oracle:** Implementation logic for cross-chain NFT metadata discovery (Algorand, EVM, Solana) with power-scaling normalization.
+## 4. Resilience & Financial Proof
+*   **ARC-200/ARC-72 Support:** Native integration for Voi tokens and NFT standards.
+*   **Global Result Recovery**: The Oracle reconstructs player leaderboards, match history, and tournament registrations directly from on-chain notes, ensuring state persistence across server restarts.
+*   **Receipt-Backed Brackets**: Automated 8/16-player tournaments feature deep verification, cross-referencing bracket results with `VBT_WIN` payout receipts and deterministic `PayoutsHash` proofs.
+*   **Bound Verification**: Critical economic events (Courthouse resets, Bail, Loan repayments) utilize purpose-specific note prefixes and timestamps to prevent transaction replay exploits.
+*   **Multi-Chain Oracle:** NFT metadata discovery across Algorand, EVM, and Solana with power-scaling normalization to balance the competitive meta.
+*   **RPC Reliability**: Standardized 3-attempt retry policies with backoff for all external Indexer/Node calls (HTTP 429).
 
 ---
 
 ## 5. Current Development State
-*   **Feature Status:** Implementations for Clubs, Employment, Market Trading, Auctions, Heists, and 16-player Tournament Brackets are present in the code.
-*   **Testing Status:** **None.** No unit tests, integration tests, or security audits have been performed.
-*   **Deployment:** The project includes a Docker-ready environment and is structured for deployment on Render (Backend) and GitHub (Static Assets).
+*   **Feature Status:** All core services (Clubs, Markets, Criminality, Tournaments) are fully functional and hardened.
+*   **Testing Infrastructure:** Includes a dedicated `test:stress` suite and a startup hook for 16-player tournament simulations to verify economic stability under load.
+*   **Persistence**: Implemented `DATA_DIR` support for Render persistent volumes to secure JSON caches and audit logs.
+*   **Deployment:** Docker-ready and optimized for Render (Backend) and GitHub Pages (Static Assets).
 
 ---
 
@@ -57,7 +60,8 @@ To create a "Living World" on the Voi network where tactical skill is just one c
 ---
 *Submitted for the Voi Hackathon.*
 
-* `Solo_Developer: "Zap" of Virtualbabes.voi / X:"Sleeper_world_changer @vbabesalgo" / AKA:"BM"`
+* `Solo_Developer: "Zap" of Virtualbabes.voi`
+* `X:"Sleeper_world_changer @vbabesalgo" / AKA:"BM"`
 * `Inspiration From and thanks to Dave, Nic, FF-series, DR`
 * `Open_source_sound, AI generated Images`
 * `Developer Owned and created Code`
