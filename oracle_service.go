@@ -649,19 +649,39 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 		url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=%d&offset=%d",
 			voiConfig.IndexerURL, rewardAsset, vaultAddr, limit, offset)
 
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync: %v\n", err)
+		var resp *http.Response
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
 			cancel()
-			return // Keep SybilSyncComplete as false
+			if err != nil {
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync after retries: %v\n", err)
+				return
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+				log.Printf("[ORACLE ERROR] Indexer rate-limited (429) during onboarding sync after retries.\n")
+				return
+			}
+			break
 		}
 
+		if err != nil {
+			return // Keep SybilSyncComplete as false
+		}
 		if resp.StatusCode != http.StatusOK {
 			log.Printf("[ORACLE ERROR] Indexer returned non-200 status during onboarding sync: %d %s\n", resp.StatusCode, resp.Status)
 			resp.Body.Close()
-			cancel()
 			return // Critical failure: stop and keep SybilSyncComplete as false
 		}
 
@@ -674,7 +694,6 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 
 		decodeErr := json.NewDecoder(resp.Body).Decode(&res)
 		resp.Body.Close()
-		cancel()
 
 		if decodeErr != nil {
 			log.Printf("[ORACLE ERROR] Failed to decode indexer response during onboarding sync: %v\n", decodeErr)
@@ -694,8 +713,6 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 		}
 		l.mutex.Unlock()
 
-		resp.Body.Close()
-		cancel()
 		if len(res.Transfers) < limit {
 			break
 		}
