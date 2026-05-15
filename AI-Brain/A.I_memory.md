@@ -447,4 +447,9 @@
 76. Complete: Implemented 'Bounty Ticker' in `economy.js` and wired into `network.js` to scroll live rewards for hunting high-Wanted outlaws.
 77. Complete: Prepared and documented Git workflow for migrating current build from dev2 branch to virtualbabes hackathon entry repository.
 78. Complete: Refined and documented the Git push process to handle multi-account credential conflicts during hackathon submission.
+79. Complete: Resolved Git push 'rejected' error by implementing a forced-push strategy for the initial hackathon submission.
+80. Complete: Updated README.md for accuracy regarding Social Economic Simulation pillars and Beta status.
+81. Complete: Created User_manual.md as a comprehensive guide for players.
+80. Complete: Updated `README.md` for accuracy and created `User_manual.md` for players.
+
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

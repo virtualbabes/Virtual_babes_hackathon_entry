@@ -190,8 +190,11 @@
 - [FIXED] Hardened `dispatchReward` in `faucet_service.go` to correctly apply Mojo tier multipliers to Bounty Hunter payouts.
 - [FIXED] Implemented Regional Power Boost logic in `battle_service.go`, `main.go`, and `app.js` to provide tactical advantages for multi-territory governance.
 - [FIXED] Resolved potential Git credential mismatch when pushing to the virtualbabes repository by providing explicit remote URL formatting and push commands.
+- [FIXED] Resolved initial Git history mismatch between local dev2 branch and remote submission repository using the force-push protocol.
+- [FIXED] Updated `README.md` for technical accuracy and created `User_manual.md` for player onboarding.
 - [FIXED] Hardened `handleUnregister` and `incrementDNF` in `lobby_manager.go` to implement scaled tournament DNF penalties based on bracket round; fixed signature mismatch and missing `Round` field in `MatchState`.
 - [FIXED] Established multi-remote Git workflow to allow pushing dev2 build to the virtualbabes hackathon repository without data loss.
 - [FIXED] Implemented themed 'Bounty Ticker' in `economy.js` and integrated with `network.js` for real-time criminal reward tracking in the lobby.
 - [FIXED] Hardened `handleTradeShares` in `market_service.go` by removing redundant nil checks and adding a guard for invalid actions to prevent unnecessary state broadcasts.
+- [FIXED] Updated `README.md` for accuracy and created `User_manual.md`.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

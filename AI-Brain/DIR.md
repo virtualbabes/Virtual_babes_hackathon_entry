@@ -279,4 +279,5 @@
 # C. root_documents 
 
 * `README.md`
+* `User_manual.md`
 * `development_plan.md`
