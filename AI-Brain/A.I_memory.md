@@ -441,4 +441,5 @@
 70. Complete: Updated `openBountyBoard` in `criminality.js` to display target Mojo and current Employer (Club Name) for high-fidelity hunting.
 71. Complete: Hardened `dispatchReward` in `faucet_service.go` to scale Bounty Rewards based on the Hunter's Mojo Tier.
 72. Complete: Hardened `processFallenPenaltyJailLocked` in `battle_service.go` to award Mojo to the capturing player's club for each card seized, and updated `calculateMojoGain` in `club_service.go`.
+73. Complete: Created `LICENSE` file in root directory stipulating proprietary codebase with open-source sound asset exception.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

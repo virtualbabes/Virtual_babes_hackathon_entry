@@ -185,6 +185,7 @@
 - [FIXED] Hardened `CalculateReputation` in `economy_service.go` to account for jailed cards and resolved clobbering/sequencing issues in `handleHeist` (club_service.go) regarding Guard Dog jailing and achievement triggers.
 - [FIXED] Resolved remaining recursive deadlock vulnerabilities in the error paths of `handleBailCard` within `handlers_criminality.go`.
 - [FIXED] Updated `openBountyBoard` in `criminality.js` to provide contextual intel (Mojo and Employer) on outlaw targets.
+- [FIXED] Created `LICENSE` file in root directory stipulating proprietary codebase with open-source sound asset exception.
 - [FIXED] Implemented Mojo gain for the capturing player's club in `processFallenPenaltyJailLocked` (battle_service.go) and added "JAIL_CAPTURE" case to `calculateMojoGain` (club_service.go).
 - [FIXED] Hardened `dispatchReward` in `faucet_service.go` to correctly apply Mojo tier multipliers to Bounty Hunter payouts.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

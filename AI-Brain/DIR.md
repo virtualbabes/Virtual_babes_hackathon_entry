@@ -271,7 +271,10 @@
 # B9. server-bin
 
 * `server-bin`
-* `season.json`
+* `season.json` 
+
+# B10. License
+* `LICENSE`
 
 # C. root_documents 
 
