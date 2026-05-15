@@ -89,7 +89,11 @@ func (l *Lobby) recordWinOnChain(winnerWallet string, history MatchHistory) {
 	log.Printf("[ORACLE] Win Logged: %s vs %s. Payout sequence initiated.\n", winnerWallet, history.Opponent)
 }
 
-func (l *Lobby) recordDNFOnChain(wallet string) {
+// recordDNFOnChain persists a match disconnection to the blockchain.
+// Metadata includes the leaver, the opponent, and the tournament context for reconstruction.
+func (l *Lobby) recordDNFOnChain(wallet, opponent, tid string) {
+	if wallet == "" { return }
+
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
@@ -98,10 +102,14 @@ func (l *Lobby) recordDNFOnChain(wallet string) {
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 	senderAddr, _ := types.DecodeAddress(l.vaultAddress)
-	dnfNote := []byte(fmt.Sprintf("VBT_DNF:%d", time.Now().Unix()))
+	
+	meta := map[string]string{"leaver": wallet, "opp": opponent, "tid": tid}
+	jsonData, _ := json.Marshal(meta)
+	dnfNote := []byte(fmt.Sprintf("VBT_DNF:%s", string(jsonData)))
 
 	appID, _ := strconv.ParseUint(voiConfig.AppID, 10, 64)
-	txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, nil, nil, nil, sp, senderAddr, dnfNote, types.Digest{}, [32]byte{}, types.Address{})
+	// PILLAR 4: Historical Persistence. Send NoOp to vault with leaver context.
+	txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, []string{wallet}, nil, nil, sp, senderAddr, dnfNote, types.Digest{}, [32]byte{}, types.Address{})
 	_, stxn, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
 	client.SendRawTransaction(stxn).Do(context.Background())
 }

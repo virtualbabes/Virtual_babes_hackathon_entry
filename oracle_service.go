@@ -517,7 +517,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	}
 
 	wins, dnfs := 0, 0
-	var matchHistory []MatchHistory
+	var matchHistory []MatchHistory // Unique list of matches for immersion
+	
+	// Pass 1: Scan transactions RECEIVED by the wallet (My Wins)
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
 			if tx.Timestamp < l.seasonStart.Unix() {
@@ -547,6 +549,74 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			if strings.HasPrefix(tx.Metadata, "VBT_DNF:") {
 				dnfs++
 			}
+		}
+	}
+
+	// PILLAR 4: Mirrored Immersion.
+	// Pass 3: Global Result Recovery. Scan the Vault's output to find matches where I was the Loser.
+	// This allows reconstructing persistent "Loss" records without extra blockchain fees.
+	globalURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=200", 
+		baseURL, voiConfig.AssetID, vaultAddr)
+	
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", globalURL, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var gRes struct {
+				Transfers []struct {
+					To        string `json:"to"`
+					Metadata  string `json:"metadata"`
+					Timestamp int64  `json:"timestamp"`
+				} `json:"transfers"`
+			}
+			if json.NewDecoder(resp.Body).Decode(&gRes) == nil {
+				for _, tx := range gRes.Transfers {
+					if tx.Timestamp < l.seasonStart.Unix() { continue }
+
+					if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
+						var data struct {
+							Opp    string `json:"opp"`
+							Scores [2]int `json:"scores"`
+							TID    string `json:"tid"`
+						}
+						// If I am the 'Opponent', I lost this match. Add to history as Loss (WinnerIndex: 1).
+						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+							if strings.EqualFold(data.Opp, wallet) {
+								matchHistory = append(matchHistory, MatchHistory{
+									Opponent:          tx.To, // The person who received the win transaction
+									Scores:            data.Scores,
+									TournamentMatchID: data.TID,
+									Timestamp:         time.Unix(tx.Timestamp, 0),
+									WinnerIndex:       1, // Mirror record: relative Loss
+								})
+							}
+						}
+					} else if strings.HasPrefix(tx.Metadata, "VBT_DNF:") {
+						var data struct {
+							Leaver string `json:"leaver"`
+							Opp    string `json:"opp"`
+							TID    string `json:"tid"`
+						}
+						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_DNF:")), &data); err == nil {
+							if strings.EqualFold(data.Leaver, wallet) {
+								matchHistory = append(matchHistory, MatchHistory{
+									Opponent: data.Opp, TournamentMatchID: data.TID,
+									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 1, // I left
+								})
+							} else if strings.EqualFold(data.Opp, wallet) {
+								matchHistory = append(matchHistory, MatchHistory{
+									Opponent: data.Leaver, TournamentMatchID: data.TID,
+									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 0, // They left
+								})
+							}
+						}
+					}
+				}
+			}
+			resp.Body.Close()
+			break
 		}
 	}
 

@@ -890,17 +890,16 @@ func (l *Lobby) handleUnregister(client *Client) {
 					}
 				}
 				if wallet, ok := l.wallets[client.id]; ok {
+					oppWallet := match.P1Wallet
+					if strings.EqualFold(wallet, match.P1Wallet) { oppWallet = match.P2Wallet }
+					
 					tourneyRound := 0
 					if match.TournamentMatchID != "" {
-						// PILLAR 3: Tournament Integrity. Find the round to scale the DNF penalty.
 						for _, tm := range l.tournament.Matches {
-							if tm.ID == match.TournamentMatchID {
-								tourneyRound = tm.Round
-								break
-							}
+							if tm.ID == match.TournamentMatchID { tourneyRound = tm.Round; break }
 						}
 					}
-					l.incrementDNF(wallet, tourneyRound) // Pass tournament round for scaling
+					l.incrementDNF(wallet, tourneyRound, oppWallet, match.TournamentMatchID) // Pass match context for on-chain log
 				}
 
 				// PILLAR 3: Tournament Disconnection Protocol.
