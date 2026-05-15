@@ -68,21 +68,50 @@ window.onload = async () => {
 
 // Expose HTML event handlers for inline onclicks in module mode
 // Function mappings migrated to domains
-window.hideAllOverlays = hideAllOverlays; // ui.js
-window.openPayoutSettings = openPayoutSettings; // wallet.js
-window.savePayoutAddress = savePayoutAddress; // wallet.js
-window.toggleMuteMusic = toggleMuteMusic; // audio.js
-window.toggleMatchmakingQueue = toggleMatchmakingQueue; // game.js
-window.sendChatMessage = sendChatMessage; // game.js
-window.registerForTournament = registerForTournament; // leaderboard.js
-window.openTournamentBracket = openTournamentBracket; // leaderboard.js
-window.open
+window.hideAllOverlays = hideAllOverlays;
+window.openPayoutSettings = openPayoutSettings;
+window.savePayoutAddress = savePayoutAddress;
+window.toggleMuteMusic = toggleMuteMusic;
+window.toggleMatchmakingQueue = toggleMatchmakingQueue;
+window.sendChatMessage = sendChatMessage;
+window.registerForTournament = registerForTournament;
+window.openTournamentBracket = openTournamentBracket;
+window.closeTournamentBracket = closeTournamentBracket;
+window.proceedToWarRoom = proceedToWarRoom;
+window.openDeckManager = openDeckManager;
+window.closeDeckManager = closeDeckManager;
+window.openShopsOverlay = openShopsOverlay;
+window.buyClubItem = buyClubItem;
+window.openTerritoryMapOverlay = openTerritoryMapOverlay;
+window.openSocialPanelOverlay = openSocialPanelOverlay;
+window.switchSocialTab = switchSocialTab;
+window.openPortfolioView = openPortfolioView;
+window.switchPortfolioTab = switchPortfolioTab;
+window.tradeShares = tradeShares;
+window.openBlackMarket = openBlackMarket;
+window.buyBlackMarketItem = buyBlackMarketItem;
+window.openArtGalleryOverlay = openArtGalleryOverlay;
+window.openConsignmentOverlay = openConsignmentOverlay;
+window.selectConsignmentItem = selectConsignmentItem;
+window.submitConsignment = submitConsignment;
+window.promptBid = promptBid;
+window.openClubLeaseBoard = openClubLeaseBoard;
+window.takeLease = takeLease;
+window.openCourthouse = openCourthouse;
+window.submitCourthouseFine = submitCourthouseFine;
+window.openSecuritySentry = openSecuritySentry;
+window.openBountyBoard = openBountyBoard;
+window.openRumorMill = openRumorMill;
+window.spreadRumor = spreadRumor;
+window.openHeistPlanningOverlay = openHeistPlanningOverlay;
+window.updateHeistRiskAssessment = updateHeistRiskAssessment;
+window.executeHeistStrike = executeHeistStrike;
+window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
+window.executeKidnap = executeKidnap;
+window.payRansom = payRansom;
+window.releaseHostage = releaseHostage;
+window.shareTournamentVictory = shareTournamentVictory;
 
-// 4. THE RENDER LOOP (The Camera fetching Go State)
-/**
- * THE RENDER LOOP (The Camera fetching Go State)
- * Optimized with synchronous execution, strict scope isolation, and cached DOM lookups.
- */
 const UI_CACHE = new Map();
 const getEl = (id) => {
     if (!UI_CACHE.has(id)) UI_CACHE.set(id, document.getElementById(id));
