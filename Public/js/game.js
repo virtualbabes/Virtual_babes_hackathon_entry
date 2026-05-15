@@ -121,6 +121,8 @@ export function updatePlayerList(players) {
                         </div>`;
         list.appendChild(li);
     });
+
+    renderMatchHistory(); // Ensure history is refreshed when lobby data updates
 }
 
 export function sendChatMessage() {
@@ -172,9 +174,28 @@ export async function saveMatchResult(state) {
 }
 
 export async function renderMatchHistory() {
-    const history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
     const display = document.getElementById("history-display");
-    if (!display || history.length === 0) return;
+    if (!display) return;
+
+    let history = [];
+    
+    // PILLAR 4: Historical Immersion. Prioritize server-authoritative history reconstructed from blockchain.
+    const me = lastLobbyPlayers.find(p => p.id === myClientId);
+    if (me && me.match_history && me.match_history.length > 0) {
+        // Map server format (MatchHistory struct) to display format
+        history = me.match_history.map(m => ({
+            winner: m.winner_index, // 0=Win, 1=Loss, 2=Draw
+            scores: m.scores,
+            opponent: m.opponent_wallet,
+            timestamp: new Date(m.timestamp).toLocaleString(),
+            tournamentId: m.tournament_id
+        }));
+    } else {
+        // Fallback to local storage for guest sessions or non-indexed wins
+        history = JSON.parse(localStorage.getItem("vbabes_history") || "[]");
+    }
+
+    if (history.length === 0) return;
     
     // Batch resolve names for wallets in local history
     const wallets = history.map(e => e.opponent).filter(o => o && o.length > 50);
@@ -190,8 +211,9 @@ export async function renderMatchHistory() {
         const label = labels[entry.winner] || "END";
 
         const opponentDisplay = getCachedEnvoiName(entry.opponent);
+        const tourneyTag = entry.tournamentId ? `<span class="text-neon-purple" style="font-size: 0.8em; margin-left: 5px;">[${entry.tournamentId}]</span>` : '';
 
-        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}</span> vs ${opponentDisplay} <br/> 
+        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}</span> vs ${opponentDisplay}${tourneyTag} <br/> 
                          <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;
         display.appendChild(div);
     });

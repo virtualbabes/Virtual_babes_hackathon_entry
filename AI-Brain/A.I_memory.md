@@ -134,3 +134,4 @@
 115. **Complete**: Hardened `checkAssetOptIn` in `oracle_service.go` to correctly fall back to `AppID` or `AssetID` from `networks.json` for Voi-based chains.
 116. **Complete**: Enhanced `matchHistory` reconstruction in `oracle_service.go` to parse `TournamentMatchIDs` and scores from `VBT_WIN` notes; updated `faucet_service.go` to include match context in on-chain metadata.
 112. **Complete**: Hardened `isAdminWallet` in `handlers_admin.go` to be case-insensitive during comparison against the `ADMIN_WALLETS` environment variable.
+117. **Complete**: Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from on-chain data, with fallback to local storage.

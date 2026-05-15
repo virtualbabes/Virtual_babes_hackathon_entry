@@ -227,3 +227,4 @@
 - [FIXED] Hardened `getAdminHeaders` in `admin.js` to restrict administrative actions to WalletConnect providers only, ensuring consistency with backend security policies.
 - [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` to implement authoritative ID resolution for Voi assets, ensuring correct fallback to `AppID` from `networks.json` when a generic `assetIDStr` is provided.
 - [FIXED] Updated match win metadata format in `faucet_service.go` and implemented full reconstruction of match history (Tournament and Standard) in `oracle_service.go` for player immersion.
+- [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.
