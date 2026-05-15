@@ -167,8 +167,9 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		}
 		defer func() { <-l.oracleSemaphore }()
 
-		// verifyBuyInTransaction expects a prefix that matches "Network Mainnet" keys
-		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, targetWallet, l.vaultAddress)
+		// PILLAR 3: Bound Verification. Include tournament ID to prevent replay exploits.
+		prefix := "VBT_TOURN_BUYIN:" + l.tournament.ID + ":"
+		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, targetWallet, l.vaultAddress, prefix)
 		if err != nil || !verified || txUnixTime < openTime.Unix() {
 			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", targetWallet, verifyNetwork, err)
 			msg := "Payment verification failed or transaction too old"
@@ -296,9 +297,13 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				}
 				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
 					if data.TID != "" && data.MID != "" {
-						if matchReceipts[data.TID] == nil { matchReceipts[data.TID] = make(map[string]string) }
+						if matchReceipts[data.TID] == nil {
+							matchReceipts[data.TID] = make(map[string]string)
+						}
 						matchReceipts[data.TID][data.MID] = tx.To
-						if matchTxIDs[data.TID] == nil { matchTxIDs[data.TID] = make(map[string]string) }
+						if matchTxIDs[data.TID] == nil {
+							matchTxIDs[data.TID] = make(map[string]string)
+						}
 						matchTxIDs[data.TID][data.MID] = tx.TransactionID
 					}
 				}
@@ -609,7 +614,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	top5 := l.determineTop5(l.tournament.Matches, winner)
 	payoutPercentages := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
 
-	// PILLAR 3: Bracket Integrity. 
+	// PILLAR 3: Bracket Integrity.
 	// Clone the matches and close the bracket state immediately to release the Lobby loop.
 	summaryMatches := make([]TournamentMatch, len(l.tournament.Matches))
 	copy(summaryMatches, l.tournament.Matches)
@@ -636,7 +641,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			}
 			// Calculate Pot Share (Primary Asset)
 			shareMicro := uint64(effectivePot * payoutPercentages[i] * 1000000)
-			
+
 			wg.Add(1)
 			// Dispatch grouped rewards
 			go func(p string, rank int, amt uint64) {

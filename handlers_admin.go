@@ -648,11 +648,25 @@ func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l.mutex.Lock()
-	l.tournament = TournamentState{Active: true, ID: fmt.Sprintf("ARENA-T-%d", time.Now().Unix()), CurrentRound: 0, BuyInAmount: req.BuyIn, Matches: []TournamentMatch{}, Participants: []string{}, OpenTime: time.Now()}
+	l.tournament = TournamentState{
+		Active:       true,
+		ID:           fmt.Sprintf("ARENA-T-%d", time.Now().Unix()),
+		CurrentRound: 0,
+		BuyInAmount:  req.BuyIn,
+		IsBuyInMode:  req.BuyIn > 0, // PILLAR 3: Correctly initialize buy-in mode
+		Matches:      []TournamentMatch{},
+		Participants: []string{},
+		OpenTime:     time.Now(),
+	}
 	l.paidParticipants = []string{}
 	l.tournamentPotBonus = 0
 	l.mutex.Unlock()
 	l.broadcastTournamentState()
+
+	// PILLAR 3: Sync Hardening. 
+	// Trigger global lobby update to ensure OpenTime is correctly synchronized for all clients.
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+
 	l.logAdminAudit("OPEN_REGISTRATION", "GLOBAL", fmt.Sprintf("Buy-in: %.2f", req.BuyIn))
 	json.NewEncoder(w).Encode(l.tournament)
 }

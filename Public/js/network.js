@@ -266,6 +266,13 @@ export function handleServerMessage(msg) {
             console.log("[WS] Maintenance update received:", msg.payload);
             handleMaintenanceUI(msg.payload.active, msg.payload.timestamp);
             break;
+        case "tournament_update":
+            // PILLAR 3: Bracket Sync. Ensure real-time tournament and OpenTime updates are processed.
+            console.log("[WS] Tournament update received:", msg.payload);
+            if (window.SyncTournament) window.SyncTournament(msg.payload);
+            handleTournamentUI(msg.payload);
+            requestBatchedSync("meta");
+            break;
         case "admin_notification":
             showToast(msg.payload.text, "warning", 8000);
             const adminPanel = document.getElementById("admin-control-panel");

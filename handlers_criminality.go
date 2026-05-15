@@ -342,7 +342,8 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, bailAmountMicro, assetID, playerWallet, vaultAddr)
+	// PILLAR 3: Specific Purpose Verification for underworld bail
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, bailAmountMicro, assetID, playerWallet, vaultAddr, "BAIL_PAYMENT:")
 	if err != nil || !verified {
 		log.Printf("[CRIMINALITY] Bail payment verification failed for %s (Card %d): %v\n", playerWallet, data.CardID, err)
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Bail Failed: Payment verification failed or insufficient amount."}`)})

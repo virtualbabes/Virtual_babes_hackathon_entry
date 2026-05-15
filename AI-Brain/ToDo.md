@@ -40,6 +40,7 @@
 - [x] Implement 'equip_cosmetic' message type in `lobby_manager.go`.
 - [x] Audit `handleHeist` in `club_service.go` for `GetEffectiveCunning` integration.
 - [x] **Redundancy Audit**: Removed duplicate `incrementDNF` from `battle_service.go` to prevent double handling.
+- [x] **Sync Hardening**: Updated `handleOpenRegistration` and `network.js` to ensure `OpenTime` is correctly broadcasted and handled.
 
 ## Technical Debt & Refactoring (Completed / Hardened)
 - [x] Decompose `lobby_manager.go` into domain-specific service files.

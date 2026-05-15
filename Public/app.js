@@ -2554,7 +2554,7 @@ window.registerForTournament = async () => {
                 type: 'appl',
                 appIndex: assetId,
                 appArgs: [methodSelector, recipientAddr, amountArg],
-                note: new TextEncoder().encode(`VBT_TOURN_BUYIN:${Date.now()}`)
+                note: new TextEncoder().encode(`VBT_TOURN_BUYIN:${state.tournament.id}:${Date.now()}`)
             };
         } else if (network === "ALGO") {
             // Standard ASA Transfer
@@ -2564,7 +2564,7 @@ window.registerForTournament = async () => {
                 type: 'axfer',
                 assetIndex: assetId,
                 amount: buyInMicro,
-                note: new TextEncoder().encode(`ARENA_TOURN_BUYIN:${Date.now()}`)
+                note: new TextEncoder().encode(`VBT_TOURN_BUYIN:${state.tournament.id}:${Date.now()}`)
             };
         }
 

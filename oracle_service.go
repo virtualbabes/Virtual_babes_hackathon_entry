@@ -468,7 +468,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	}
 
 	baseURL := voiConfig.IndexerURL
-	
+
 	// PASS 1: Wins/DNFs (Vault -> Wallet)
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		baseURL, voiConfig.AssetID, vaultAddr, wallet)
@@ -512,14 +512,14 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	var res struct {
 		Transfers []struct {
 			TransactionID string `json:"transactionId"`
-			Metadata  string `json:"metadata"`
-			Timestamp int64  `json:"timestamp"`
+			Metadata      string `json:"metadata"`
+			Timestamp     int64  `json:"timestamp"`
 		} `json:"transfers"`
 	}
 
 	wins, dnfs := 0, 0
 	var matchHistory []MatchHistory // Unique list of matches for immersion
-	
+
 	// Pass 1: Scan transactions RECEIVED by the wallet (My Wins)
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
@@ -538,9 +538,13 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				}
 				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
 					matchID := data.MID
-					if matchID == "" { matchID = data.TID } // Legacy fallback
+					if matchID == "" {
+						matchID = data.TID
+					} // Legacy fallback
 					tournID := data.TID
-					if data.MID == "" { tournID = "" }     // If MID is empty, TID was MatchID
+					if data.MID == "" {
+						tournID = ""
+					} // If MID is empty, TID was MatchID
 
 					matchHistory = append(matchHistory, MatchHistory{
 						Opponent:          data.Opp,
@@ -564,9 +568,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	// PILLAR 4: Mirrored Immersion.
 	// Pass 3: Global Result Recovery. Scan the Vault's output to find matches where I was the Loser.
 	// This allows reconstructing persistent "Loss" records without extra blockchain fees.
-	globalURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=200", 
+	globalURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=200",
 		baseURL, voiConfig.AssetID, vaultAddr)
-	
+
 	for i := 0; i < 3; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 		req, _ := http.NewRequestWithContext(ctx, "GET", globalURL, nil)
@@ -576,14 +580,16 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			var gRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
-					To        string `json:"to"`
-					Metadata  string `json:"metadata"`
-					Timestamp int64  `json:"timestamp"`
+					To            string `json:"to"`
+					Metadata      string `json:"metadata"`
+					Timestamp     int64  `json:"timestamp"`
 				} `json:"transfers"`
 			}
 			if json.NewDecoder(resp.Body).Decode(&gRes) == nil {
 				for _, tx := range gRes.Transfers {
-					if tx.Timestamp < l.seasonStart.Unix() { continue }
+					if tx.Timestamp < l.seasonStart.Unix() {
+						continue
+					}
 
 					if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
 						var data struct {
@@ -596,9 +602,13 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
 							if strings.EqualFold(data.Opp, wallet) {
 								matchID := data.MID
-								if matchID == "" { matchID = data.TID } // Legacy fallback
+								if matchID == "" {
+									matchID = data.TID
+								} // Legacy fallback
 								tournID := data.TID
-								if data.MID == "" { tournID = "" }     // If MID is empty, TID was MatchID
+								if data.MID == "" {
+									tournID = ""
+								} // If MID is empty, TID was MatchID
 
 								matchHistory = append(matchHistory, MatchHistory{
 									Opponent:          tx.To, // The person who received the win transaction
@@ -620,15 +630,15 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_DNF:")), &data); err == nil {
 							if strings.EqualFold(data.Leaver, wallet) {
 								matchHistory = append(matchHistory, MatchHistory{
-									Opponent: data.Opp, TournamentMatchID: data.TID, 
+									Opponent: data.Opp, TournamentMatchID: data.TID,
 									ReceiptTxID: tx.TransactionID,
-									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 1, // I left
+									Timestamp:   time.Unix(tx.Timestamp, 0), WinnerIndex: 1, // I left
 								})
 							} else if strings.EqualFold(data.Opp, wallet) {
 								matchHistory = append(matchHistory, MatchHistory{
-									Opponent: data.Leaver, TournamentMatchID: data.TID, 
+									Opponent: data.Leaver, TournamentMatchID: data.TID,
 									ReceiptTxID: tx.TransactionID,
-									Timestamp: time.Unix(tx.Timestamp, 0), WinnerIndex: 0, // They left
+									Timestamp:   time.Unix(tx.Timestamp, 0), WinnerIndex: 0, // They left
 								})
 							}
 						}
@@ -665,7 +675,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
-				From          string `json:"from"`
+					From          string `json:"from"`
 					Metadata      string `json:"metadata"`
 					Timestamp     int64  `json:"timestamp"`
 				} `json:"transfers"`
@@ -678,8 +688,16 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						l.registeredTxIDs[tx.TransactionID] = txTime
 
 						// PILLAR 3: Registration Reconstruction.
-						// Discover and restore tournament eligibility if a window is currently open.
-						if l.tournament.Active && l.tournament.CurrentRound == 0 && txTime.After(l.tournament.OpenTime) {
+						// Use TournamentID for precise reconstruction if available in note
+						parts := strings.Split(tx.Metadata, ":")
+						matchesCurrent := false
+						if len(parts) >= 2 && parts[1] == l.tournament.ID {
+							matchesCurrent = true
+						} else if txTime.After(l.tournament.OpenTime) {
+							matchesCurrent = true // Legacy fallback
+						}
+
+						if l.tournament.Active && l.tournament.CurrentRound == 0 && matchesCurrent {
 							if !l.isWalletRegistered(wallet) {
 								l.paidParticipants = append(l.paidParticipants, wallet)
 								log.Printf("[ORACLE] Reconstructed tournament entry for %s (Tx: %s)\n", wallet, tx.TransactionID)
@@ -692,7 +710,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			resp.Body.Close()
 			break
 		}
-		if resp != nil { resp.Body.Close() }
+		if resp != nil {
+			resp.Body.Close()
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
 }
@@ -950,7 +970,7 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 	return truncated
 }
 
-func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset string, sender, vaultAddr string) (bool, int64, error) {
+func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset, sender, vaultAddr, expectedNotePrefix string) (bool, int64, error) {
 	// 1. Authoritative Network Key Resolution (Deterministic Case Sync)
 	netKey := l.mapChainToNetworkName(network)
 	if netKey == "" {
@@ -1014,17 +1034,16 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 		var res struct {
 			Transfers []struct {
-				From, To, Amount string
-				ContractID       uint64
-				Timestamp        int64
+				From, To, Amount, Metadata string
+				ContractID                 uint64
+				Timestamp                  int64
 			} `json:"transfers"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			for _, tx := range res.Transfers {
 				amt, _ := strconv.ParseUint(tx.Amount, 10, 64)
-				// SECURITY: Verify prefix to ensure transaction was intended as a buy-in
-				hasValidNote := strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:") || strings.HasPrefix(tx.Metadata, "ARENA_TOURN_BUYIN:")
-				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == targetAsset && hasValidNote {
+				// SECURITY: Verify exact note prefix to prevent cross-purpose payment replays
+				if strings.EqualFold(tx.From, sender) && strings.EqualFold(tx.To, vaultAddr) && amt >= expectedAmt && strconv.FormatUint(tx.ContractID, 10) == targetAsset && strings.HasPrefix(tx.Metadata, expectedNotePrefix) {
 					return true, tx.Timestamp, nil
 				}
 			}
@@ -1079,17 +1098,19 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 					Amount   uint64 `json:"amount"`
 				} `json:"payment-transaction,omitempty"`
 				Sender    string `json:"sender"`
+				Note      []byte `json:"note"`
 				RoundTime int64  `json:"round-time"`
 			} `json:"transaction"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
 			t := res.Transaction
+			noteStr := string(t.Note)
 			// Handle ASA Transfers
-			if t.AssetTransfer != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == targetAsset {
+			if t.AssetTransfer != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.AssetTransfer.Receiver, vaultAddr) && t.AssetTransfer.Amount >= expectedAmt && strconv.FormatUint(t.AssetTransfer.AssetID, 10) == targetAsset && strings.HasPrefix(noteStr, expectedNotePrefix) {
 				return true, t.RoundTime, nil
 			}
 			// Handle Native Payments (Asset ID "0" or empty)
-			if (targetAsset == "" || targetAsset == "0") && t.Payment != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.Payment.Receiver, vaultAddr) && t.Payment.Amount >= expectedAmt {
+			if (targetAsset == "" || targetAsset == "0") && t.Payment != nil && strings.EqualFold(t.Sender, sender) && strings.EqualFold(t.Payment.Receiver, vaultAddr) && t.Payment.Amount >= expectedAmt && strings.HasPrefix(noteStr, expectedNotePrefix) {
 				return true, t.RoundTime, nil
 			}
 		}
@@ -1270,15 +1291,15 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type SeasonArchive struct {
-		Season int       `json:"season"`
-		Start  time.Time `json:"start"`
-		End    time.Time `json:"end"`
+		Season     int       `json:"season"`
+		Start      time.Time `json:"start"`
+		End        time.Time `json:"end"`
 		Highlights []struct {
 			W string `json:"w"` // Wallet
 			A string `json:"a"` // Award/Placement Title
 			M string `json:"m"` // Meta/Detail (e.g. Tournament ID)
 		} `json:"highlights,omitempty"`
-		Top    []struct {
+		Top []struct {
 			W string `json:"w"` // Wallet
 			V int    `json:"v"` // Wins
 			R string `json:"r"` // Rating

@@ -149,3 +149,6 @@
 129. **Complete**: Updated `handleSeasonHistory` in `oracle_service.go` and `archiveSeason` in `lobby_manager.go` to include prestigious placement highlights (Champions, Collectors, Titans) reconstructed from player history and achievements.
 130. **Complete**: Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with stylized "Hall of Valor" icons and resolved Envoi names.
 131. **Complete**: Hardened `syncStatsFromBlockchain` and `loadRegistrationsFromIndexer` to reconstruct `paidParticipants` for active tournament windows; fixed `handleTournamentRegister` timestamp bug.
+132. **Complete**: Hardened `handleOpenRegistration` in `handlers_admin.go` with `IsBuyInMode` initialization and global `lobby_update` trigger.
+133. **Complete**: Implemented `tournament_update` case in `network.js` to ensure real-time bracket and `OpenTime` synchronization.
+134. **Complete**: Hardened `handleTournamentRegister` and `verifyBuyInTransaction` to cryptographically bind buy-ins to specific `TournamentIDs` via on-chain note metadata.

@@ -240,3 +240,4 @@
 - [FIXED] Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with specialized iconography and Envoi name resolution for seasonal archives.
 - [FIXED] Implemented automated recovery of `paidParticipants` from blockchain buy-in notes to ensure tournament registration state survives server restarts.
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.
+- [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` to strictly verify expected note prefixes, preventing cross-tournament payment replays.
