@@ -303,11 +303,14 @@ func (l *Lobby) handleSystemMessage(w http.ResponseWriter, r *http.Request) {
 		if strings.ToLower(req.Priority) == "critical" {
 			prefix = "🔥 <b>URGENT:</b> "
 		}
-		payload, _ := json.Marshal(map[string]string{"text": prefix + req.Text})
+		payload, _ := json.Marshal(map[string]string{
+			"text":     prefix + req.Text,
+			"priority": strings.ToLower(req.Priority), // Include priority in payload
+		})
 		msg = jsonListEnvelope("admin_notification", payload)
 	default:
 		// Standard chat broadcast
-		payload, _ := json.Marshal(map[string]string{"text": "[ADMIN] " + req.Text})
+		payload, _ := json.Marshal(map[string]string{"text": "[ADMIN] " + req.Text, "priority": "info"}) // Include priority in payload
 		msg = jsonListEnvelope("chat", payload)
 	}
 

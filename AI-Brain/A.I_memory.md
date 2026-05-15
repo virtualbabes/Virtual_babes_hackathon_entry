@@ -469,4 +469,5 @@
 95. Complete: Hardened `handlers_admin.go` by resolving recursive deadlocks in ban, tournament, and reward paths; updated maintenance protocol with struct marshaling and global sync.
 97. Complete: Updated `adminBroadcast` in `admin.js` to read priority from the UI and transmit it to the backend.
 96. Complete: Enhanced `handleSystemMessage` in `handlers_admin.go` to support message priority levels (info, warning, critical), utilizing the `admin_notification` protocol for high-visibility UI alerts.
+98. Complete: Updated `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly display admin broadcast priority levels.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

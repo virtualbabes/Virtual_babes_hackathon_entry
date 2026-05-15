@@ -42,7 +42,14 @@ export function setTransactionStatus(message, type = 'info') {
 
     if (message) {
         statusEl.classList.remove("hidden");
-        statusEl.innerHTML = `<span style="color: ${type === 'error' ? '#ff4b4b' : type === 'success' ? 'var(--neon-green)' : 'var(--neon-cyan)'};">${message}</span>`;
+        const colorMap = {
+            'error': '#ff4b4b',
+            'critical': '#ff4b4b', // Critical messages will use the error red color
+            'success': 'var(--neon-green)',
+            'info': 'var(--neon-cyan)',
+            'warning': '#ffd700' // Warning messages will use a gold/yellow color
+        };
+        statusEl.innerHTML = `<span style="color: ${colorMap[type] || 'white'};">${message}</span>`;
     } else {
         statusEl.classList.add("hidden");
         statusEl.innerHTML = "";
