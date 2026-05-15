@@ -223,3 +223,4 @@
 - [FIXED] Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under lock to prevent race conditions during registration window closure.
 - [FIXED] Hardened `handleStartTournament` in `handlers_admin.go` to ensure participants are correctly gathered from `paidParticipants` with case-insensitive comparison and preserved tournament configuration.
 - [FIXED] Hardened `isAdminWallet` in `handlers_admin.go` with case-insensitive comparison (EqualFold) for environment variable authorization.
+- [FIXED] Hardened `link_wallet_request` in `lobby_manager.go` with chain-aware address normalization to prevent cross-session identity drift.

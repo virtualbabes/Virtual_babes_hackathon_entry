@@ -246,14 +246,24 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			return
 		}
 
+		// PILLAR 3: Identity Normalization.
+		// Voi/AVM wallets are normalized to lowercase. 
+		// EVM addresses are normalized, but Solana (Base58) remains case-sensitive.
+		primaryWallet := strings.ToLower(data.PrimaryAVMWallet)
+		linkedAddr := data.LinkedAddress
+		isSolana := strings.EqualFold(data.LinkedChain, "sol")
+		if !isSolana {
+			linkedAddr = strings.ToLower(data.LinkedAddress)
+		}
+
 		l.mutex.RLock()
 		nonceData, exists := l.nonces[env.FromID] // Nonce is generated for the client's session
 		l.mutex.RUnlock()
 
 		if !exists || nonceData.Value != data.Nonce || time.Since(nonceData.CreatedAt) > 5*time.Minute {
 			log.Printf("[LINK] Nonce verification failed for %s (linked: %s). Exists: %v, Match: %v, Expired: %v\n",
-				env.FromID, data.LinkedAddress, exists, nonceData.Value == data.Nonce, time.Since(nonceData.CreatedAt) > 5*time.Minute)
-			l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"error","message":"Nonce invalid or expired","address":"%s"}`, data.LinkedAddress))})
+				env.FromID, linkedAddr, exists, nonceData.Value == data.Nonce, time.Since(nonceData.CreatedAt) > 5*time.Minute)
+			l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"error","message":"Nonce invalid or expired","address":"%s"}`, linkedAddr))})
 			return
 		}
 
@@ -285,19 +295,19 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				break
 			}
 			recoveredAddress := ethcrypto.PubkeyToAddress(*pubKey).Hex()
-			if strings.ToLower(recoveredAddress) == strings.ToLower(data.LinkedAddress) {
+			if strings.EqualFold(recoveredAddress, linkedAddr) {
 				verified = true
 			} else {
-				verifyErr = fmt.Errorf("EVM signature mismatch. Recovered: %s, Expected: %s", recoveredAddress, data.LinkedAddress)
+				verifyErr = fmt.Errorf("EVM signature mismatch. Recovered: %s, Expected: %s", recoveredAddress, linkedAddr)
 			}
 		case "sol":
 			// Solana signature verification (ed25519)
-			// Message format: `\x19Solana Signed Message:\n` + length + message
+			// Message format: `\x19Solana Signed Message:\n` + length + message. Base58 check.
 			message := fmt.Sprintf("\x19Solana Signed Message:\n%d%s", len(data.Nonce), data.Nonce)
 			messageBytes := []byte(message)
 
 			// Decode base58 Solana address to public key bytes
-			pubKeyBytes, err := base58.Decode(data.LinkedAddress)
+			pubKeyBytes, err := base58.Decode(linkedAddr)
 			if err != nil {
 				verifyErr = fmt.Errorf("invalid Solana address format: %v", err)
 				break
@@ -324,14 +334,14 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 
 		if !verified {
-			log.Printf("[LINK] Wallet link verification failed for %s: %v\n", data.LinkedAddress, verifyErr)
-			l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"error","message":"Verification failed: %s","address":"%s"}`, verifyErr.Error(), data.LinkedAddress))})
+			log.Printf("[LINK] Wallet link verification failed for %s: %v\n", linkedAddr, verifyErr)
+			l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"error","message":"Verification failed: %s","address":"%s"}`, verifyErr.Error(), linkedAddr))})
 			return
 		}
 
-		l.addOrUpdateLinkedWallet(data.PrimaryAVMWallet, data.LinkedAddress, data.LinkedChain)
-		l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"success","message":"Wallet linked successfully","address":"%s"}`, data.LinkedAddress))})
-		log.Printf("[LINK] Successfully linked %s (%s) to primary AVM wallet %s\n", data.LinkedAddress, data.LinkedChain, data.PrimaryAVMWallet)
+		l.addOrUpdateLinkedWallet(primaryWallet, linkedAddr, data.LinkedChain)
+		l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"success","message":"Wallet linked successfully","address":"%s"}`, linkedAddr))})
+		log.Printf("[LINK] Successfully linked %s (%s) to primary AVM wallet %s\n", linkedAddr, data.LinkedChain, primaryWallet)
 	case "move":
 		l.mutex.RLock()
 		match, ok := l.matches[env.FromID]

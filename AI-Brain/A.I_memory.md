@@ -129,4 +129,5 @@
 109. **Complete**: Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under exclusive lock to prevent registrations after the window has closed.
 110. **Complete**: Hardened `handleStartTournament` in `handlers_admin.go` with case-insensitive participant gathering, registration window validation, and configuration persistence.
 111. **Complete**: Hardened `register_wallet` case in `handleGameProtocol` (lobby_manager.go) to normalize wallet addresses to lowercase for system-wide consistency.
+113. **Complete**: Hardened `link_wallet_request` in `lobby_manager.go` to normalize primary and linked addresses while preserving Solana Base58 case-sensitivity.
 112. **Complete**: Hardened `isAdminWallet` in `handlers_admin.go` to be case-insensitive during comparison against the `ADMIN_WALLETS` environment variable.
