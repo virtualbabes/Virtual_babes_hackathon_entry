@@ -222,3 +222,4 @@
 - [FIXED] Hardened `processTournamentResult` in `tournament_manager.go` with an activity guard to prevent processing results for inactive or finalized tournaments.
 - [FIXED] Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under lock to prevent race conditions during registration window closure.
 - [FIXED] Hardened `handleStartTournament` in `handlers_admin.go` to ensure participants are correctly gathered from `paidParticipants` with case-insensitive comparison and preserved tournament configuration.
+- [FIXED] Hardened `isAdminWallet` in `handlers_admin.go` with case-insensitive comparison (EqualFold) for environment variable authorization.

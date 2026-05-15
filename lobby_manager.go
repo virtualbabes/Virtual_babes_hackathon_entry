@@ -145,25 +145,26 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			Wallet string `json:"wallet"`
 		}
 		json.Unmarshal(env.Payload, &data)
+		normalizedWallet := strings.ToLower(data.Wallet)
 		l.mutex.Lock()
-		l.wallets[env.FromID] = data.Wallet
-		l.ensurePlayerStatsMapsInitialized(data.Wallet)
+		l.wallets[env.FromID] = normalizedWallet
+		l.ensurePlayerStatsMapsInitialized(normalizedWallet)
 
 		// Trigger NPC Welcome Commentary if they have a distinct style
 		go l.generateNPCCommentary(env.FromID, "LOBBY_ENTRY")
 
-		stats := l.leaderboard[data.Wallet]
+		stats := l.leaderboard[normalizedWallet]
 		portfolioPayload, _ := json.Marshal(stats.Portfolio) // Marshal portfolio while lock is held
 
 		// Check admin status and update client while lock is held
-		isAdmin := l.isAdminWallet(data.Wallet)
+		isAdmin := l.isAdminWallet(normalizedWallet)
 		if isAdmin {
 			if c, ok := l.clients[env.FromID]; ok {
 				c.isAdmin = true
 			}
 		}
 		l.mutex.Unlock() // Release lock after all state modifications
-		go l.syncStatsFromBlockchain(env.FromID, data.Wallet)
+		go l.syncStatsFromBlockchain(env.FromID, normalizedWallet)
 		l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
 		if isAdmin {
 			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()

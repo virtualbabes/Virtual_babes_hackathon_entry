@@ -128,3 +128,5 @@
 108. **Complete**: Hardened `processTournamentResult` in `tournament_manager.go` to ignore reported results if the tournament is no longer active.
 109. **Complete**: Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under exclusive lock to prevent registrations after the window has closed.
 110. **Complete**: Hardened `handleStartTournament` in `handlers_admin.go` with case-insensitive participant gathering, registration window validation, and configuration persistence.
+111. **Complete**: Hardened `register_wallet` case in `handleGameProtocol` (lobby_manager.go) to normalize wallet addresses to lowercase for system-wide consistency.
+112. **Complete**: Hardened `isAdminWallet` in `handlers_admin.go` to be case-insensitive during comparison against the `ADMIN_WALLETS` environment variable.

@@ -844,7 +844,7 @@ func (l *Lobby) isAdminWallet(wallet string) bool {
 		return false
 	}
 	for _, addr := range strings.Split(admins, ",") {
-		if strings.TrimSpace(addr) == wallet {
+		if strings.EqualFold(strings.TrimSpace(addr), wallet) {
 			return true
 		}
 	}
