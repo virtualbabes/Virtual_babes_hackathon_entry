@@ -244,3 +244,4 @@
 - [FIXED] Hardened `handleCourthouseReset` in `courthouse_service.go` with purpose-specific note verification and identity normalization.
 - [FIXED] Hardened `handleRepayLoan` in `loan_service.go` with purpose-specific note verification (`"REPAY_LOAN:"`) for repayment transactions.
 - [FIXED] Updated `submitCourthouseFine` in `criminality.js` to ensure the on-chain note contains the mandatory `"COURTHOUSE_FINE:"` prefix for Courthouse validation.
+- [FIXED] Hardened `initiateBail` in `criminality.js` to include timestamps in the blockchain note and removed redundant code blocks from `app.js`.

@@ -212,7 +212,8 @@ export async function initiateBail(cardId, clubId) {
             const txObj = {
                 from: userAddress, type: 'appl', appIndex: parseInt(assetId),
                 appArgs: [methodSelector, recipientAddr, amountArg],
-                note: new TextEncoder().encode(`BAIL_PAYMENT:${cardId}`)
+                // PILLAR 3: Bound Verification for Underworld Bail
+                note: new TextEncoder().encode(`BAIL_PAYMENT:${cardId}:${userAddress}:${Date.now()}`)
             };
             
             if (walletProvider === 'nautilus') {
