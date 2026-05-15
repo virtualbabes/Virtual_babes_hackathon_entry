@@ -8,9 +8,9 @@
 - **Tech Stack**: Go, WASM, WebSockets, Algorand/Voi Blockchain.
 - **Current Phase**: Production-Ready Beta / Hardened Launch Readiness.
 ## Phase 1: Stability & Security Audit
-1. **Complete:** Validated `verifyBuyInTransaction` logic against actual Indexer responses.
+1. **Complete:** Logic audit of `verifyBuyInTransaction` against Indexer schema patterns.
 2. **Complete:** Implemented `sync.RWMutex` in `main.go` to harden the WASM Engine against race conditions during async card imports (Plan F).
-3. **Complete:** Performed 16-player tournament stress tests to verify bracket archival and treasury kickback logic under load.
+3. **Logic Verified:** Internal simulation (8/16 player) confirms bracket and kickback logic; **Live Stress Test Pending**.
 4. **Identity:** Ensure `LinkedWallet` verification handles all target chains (ETH/SOL/POL) consistently.
 
 ## Phase 2: Performance Optimization
@@ -26,8 +26,8 @@
 8. Complete: Hardened `syncUI` in `app.js` with DOM caching and non-blocking asynchronous asset resolution.
 9. Complete: Hardened `processLoans` in `economy_processing.go` to synchronize liquidation fees with Faucet dynamic scaling.
 10. Complete: Hardened `handleSellMarketTokens` in `black_market_service.go` to deduct payouts from the Faucet balance and trigger dynamic scaling.
+83. **Awaiting Verification**: Live environment stress test for 16-player tournaments.
 
-## Critical Logic Patterns
 - **Switchboard Pattern**: Server-side signing for faucet rewards; client-side proof of intent.
 - **Sybil Protection**: Onboarding is gated by historical paged indexer checks; addresses are normalized to lowercase.
 - **WASM Determinism**: Core rules (Same/Plus/Combo) must remain identical between client and server.
@@ -447,7 +447,10 @@
 76. Complete: Implemented 'Bounty Ticker' in `economy.js` and wired into `network.js` to scroll live rewards for hunting high-Wanted outlaws.
 77. Complete: Prepared and documented Git workflow for migrating current build from dev2 branch to virtualbabes hackathon entry repository.
 78. Complete: Refined and documented the Git push process to handle multi-account credential conflicts during hackathon submission.
-79. Complete: Resolved Git push 'rejected' error by implementing a forced-push strategy for the initial hackathon submission.
+79. Complete: Resolved Git push 'rejected' error via force-push protocol.
+80. Complete: Updated README.md for accuracy regarding Social Economic Simulation pillars and Beta status.
+81. Complete: Created User_manual.md as a comprehensive guide for players.
+82. Complete: Synced local changes to `slapkarnts dev2` branch.
 80. Complete: Updated README.md for accuracy regarding Social Economic Simulation pillars and Beta status.
 81. Complete: Created User_manual.md as a comprehensive guide for players.
 80. Complete: Updated `README.md` for accuracy and created `User_manual.md` for players.

@@ -68,9 +68,9 @@
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
 
 ## Phase 1: Stability & Security Audit
-1. **Complete:** Validated `verifyBuyInTransaction` logic against actual Indexer responses.
+1. **Complete:** Logic audit of `verifyBuyInTransaction` against expected Indexer response patterns.
 2. **Complete:** Implemented `sync.RWMutex` in `main.go` to harden the WASM Engine against race conditions during async card imports (Plan F).
-3. **Complete:** Performed 16-player tournament stress tests to verify bracket archival and treasury kickback logic under load.
+3. **In-Progress:** Live environment stress testing (Internal simulation logic confirmed).
 4. **Identity:** Ensure `LinkedWallet` verification handles all target chains (ETH/SOL/POL) consistently.
 
 ## Phase 2: Performance Optimization
