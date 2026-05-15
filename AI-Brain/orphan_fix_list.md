@@ -207,3 +207,4 @@
 - [FIXED] Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for indexer responses during global leaderboard reconstruction.
 - [FIXED] Hardened `loadOnboardedWalletsFromIndexer` in `oracle_service.go` with backoff for 429 rate-limits during paged historical onboarding sync.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.
+- [FIXED] Hardened `checkVaultBalanceOnChain` in `oracle_service.go` with backoff for 429 rate-limits during ARC-200 application box balance synchronization.

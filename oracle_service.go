@@ -944,19 +944,40 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	addrObj, _ := types.DecodeAddress(vaultAddr)
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-
 	// ARC-200 Balance is stored in an application box named by the account's public key bytes.
-	boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
-	if err != nil {
-		log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
-		return
+	var boxValue []byte
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
+		cancel()
+		if err != nil {
+			// If not found, vault is empty or not initialized
+			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+				log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
+				return
+			}
+			// Handle Node rate-limiting (429)
+			if strings.Contains(err.Error(), "429") {
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+			}
+			// Transient network errors
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to fetch vault box balance after retries: %v\n", err)
+			return
+		}
+		boxValue = boxResp.Value
+		break
 	}
 
 	// ARC-200 balances are 32-byte uint256 values
-	if len(boxResp.Value) >= 32 {
-		bal := new(big.Int).SetBytes(boxResp.Value[:32]).Uint64()
+	if len(boxValue) >= 32 {
+		bal := new(big.Int).SetBytes(boxValue[:32]).Uint64()
 		l.mutex.Lock()
 		l.faucetBalance = float64(bal) / 1000000.0
 		l.applyDynamicScalingLocked() // Adjust reward amounts based on new liquidity level
