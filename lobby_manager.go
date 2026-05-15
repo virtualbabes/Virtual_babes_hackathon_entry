@@ -1088,6 +1088,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	update := struct {
 		Players           []playerInfo             `json:"players"`
 		MaintenanceActive bool                     `json:"maintenance_active"`
+		MaintenanceTime   time.Time                `json:"maintenance_time"`
 		FaucetBalance     float64                  `json:"faucet_balance"`
 		Clubs             map[string]*Club         `json:"clubs"`
 		Rewards           map[string]uint64        `json:"rewards"`
@@ -1100,6 +1101,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		BlackMarket       []Loan                   `json:"black_market"` // Added for real-time economy feel
 	}{
 		Players: players, MaintenanceActive: l.maintenanceMode,
+		MaintenanceTime: l.maintenanceTime,
 		Clubs:   l.clubs,
 		Rewards: l.rewards, FaucetBalance: l.faucetBalance,
 		ActiveMatchCount: len(l.matches) / 2, Tournament: l.tournament,
