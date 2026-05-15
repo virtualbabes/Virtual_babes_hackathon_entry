@@ -983,28 +983,60 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		assetID, _ := strconv.ParseUint(assetIDStr, 10, 64)
 		addr, _ := types.DecodeAddress(wallet)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
-		if err != nil {
-			// If the error contains "404" or "not found", the user is definitely not opted in.
-			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-				return false, 0, nil
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, err = client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
+			cancel()
+			if err != nil {
+				// If the error contains "404" or "not found", the user is definitely not opted in.
+				if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+					return false, 0, nil
+				}
+				// Hardening: Handle Node rate-limiting (429)
+				if strings.Contains(err.Error(), "429") {
+					if i < 2 {
+						time.Sleep(time.Duration(i+1) * 1 * time.Second)
+						continue
+					}
+				}
+				// Transient network errors
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return false, 0, fmt.Errorf("voi node error during opt-in check: %w", err)
 			}
-			// Otherwise, it's a node/network error, return it so the caller knows the check failed.
-			return false, 0, fmt.Errorf("voi node error during opt-in check: %w", err)
+			return true, 0, nil
 		}
-		return true, 0, nil
+		return false, 0, err
 	}
 
 	// 3. ALGORAND / ASA Pattern: Indexer Account Asset Scan
 	url := fmt.Sprintf("%s/v2/accounts/%s", netConfig.IndexerURL, wallet)
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return false, 0, fmt.Errorf("indexer connection failed: %w", err)
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return false, 0, fmt.Errorf("indexer connection failed: %w", err)
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return false, 0, fmt.Errorf("algorand indexer rate-limited (429)")
+		}
+		break
 	}
 	defer resp.Body.Close()
 
