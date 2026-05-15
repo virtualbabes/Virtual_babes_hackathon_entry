@@ -390,15 +390,16 @@ type TournamentState struct {
 
 // TournamentSummary represents a finalized tournament for archival.
 type TournamentSummary struct {
-	ID         string            `json:"id"`
-	Timestamp  time.Time         `json:"timestamp"`
-	Pot        float64           `json:"pot"`
-	Winner     string            `json:"winner"`
-	IsVerified bool              `json:"is_verified"`        // Indicates successful blockchain reconstruction
-	ReceiptsVerified bool        `json:"receipts_verified"`  // Indicates VBT_WIN receipts were found for all matches
-	Checksum   string            `json:"checksum,omitempty"` // SHA256 of full match data
-	Links      []string          `json:"links,omitempty"`    // TxIDs for additional match data
-	Matches    []TournamentMatch `json:"matches"`
+	ID               string            `json:"id"`
+	Timestamp        time.Time         `json:"timestamp"`
+	Pot              float64           `json:"pot"`
+	Winner           string            `json:"winner"`
+	IsVerified       bool              `json:"is_verified"`            // Indicates successful blockchain reconstruction
+	ReceiptsVerified bool              `json:"receipts_verified"`      // Indicates VBT_WIN receipts were found for all matches
+	PayoutsHash      string            `json:"payouts_hash,omitempty"` // SHA256 of reward transaction IDs
+	Checksum         string            `json:"checksum,omitempty"`     // SHA256 of full match data
+	Links            []string          `json:"links,omitempty"`        // TxIDs for additional match data
+	Matches          []TournamentMatch `json:"matches"`
 }
 
 // Client represents one connected WebSocket user.

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
@@ -449,7 +450,7 @@ func (l *Lobby) advanceTournamentRound() {
 	}
 
 	if len(roundWinners) <= 1 {
-		l.finalizeTournament(roundWinners)
+		go l.finalizeTournament(roundWinners)
 		return
 	}
 
@@ -554,6 +555,7 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 }
 
 func (l *Lobby) finalizeTournament(winners []string) {
+	l.mutex.Lock()
 	winner := ""
 	if len(winners) > 0 {
 		winner = winners[0]
@@ -569,13 +571,25 @@ func (l *Lobby) finalizeTournament(winners []string) {
 		centerClub.LastActivity = time.Now()
 		l.logAdminAuditLocked("GOVERNOR_TAX_PAID", centerClub.ID, fmt.Sprintf("Tournament Pot Tax: %.2f $VBV", govTax))
 	}
-
 	// Calculate effective pot available for player distribution
 	effectivePot := l.tournament.Pot - govTax
-
 	// Placement Identification & Multi-Asset Reward Loop
 	top5 := l.determineTop5(l.tournament.Matches, winner)
 	payoutPercentages := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
+
+	// PILLAR 3: Bracket Integrity. 
+	// Clone the matches and close the bracket state immediately to release the Lobby loop.
+	summaryMatches := make([]TournamentMatch, len(l.tournament.Matches))
+	copy(summaryMatches, l.tournament.Matches)
+	totalPot := l.tournament.Pot
+
+	l.tournament.Active = false
+	l.broadcastTournamentState()
+	l.mutex.Unlock()
+
+	var payoutTxIDs []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
 	if effectivePot > 0 && len(top5) > 0 {
 		// PILLAR 3: Economic Precision.
@@ -588,32 +602,46 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			if i >= len(payoutPercentages) {
 				break
 			}
-
 			// Calculate Pot Share (Primary Asset)
 			shareMicro := uint64(effectivePot * payoutPercentages[i] * 1000000)
-
-			// Dispatch grouped rewards in background goroutine
+			
+			wg.Add(1)
+			// Dispatch grouped rewards
 			go func(p string, rank int, amt uint64) {
+				defer wg.Done()
 				txid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
 				if err != nil {
 					log.Printf("[TOURNAMENT ERROR] Payout failed for rank %d (%s): %v\n", rank+1, p, err)
 				} else {
+					mu.Lock()
+					payoutTxIDs = append(payoutTxIDs, txid)
+					mu.Unlock()
 					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). Tx: %s. Skipped: %v\n", rank+1, p, txid, skipped)
 					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received rewards. Tx: %s. (Skipped: %v)", rank+1, p, txid, strings.Join(skipped, ", ")))
 				}
 			}(player, i, shareMicro)
 		}
+		wg.Wait()
+	}
+
+	// PILLAR 4: Deep Verification Hash.
+	// Calculate a deterministic hash of all successful payout transaction IDs.
+	var payoutsHash string
+	if len(payoutTxIDs) > 0 {
+		sort.Strings(payoutTxIDs) // Ensure determinism
+		hashInput := strings.Join(payoutTxIDs, ",")
+		h := sha256.Sum256([]byte(hashInput))
+		payoutsHash = hex.EncodeToString(h[:])
+		log.Printf("[TOURNAMENT] Payouts Hash generated: %s (from %d TxIDs)\n", payoutsHash, len(payoutTxIDs))
 	}
 
 	summary := TournamentSummary{
 		ID: fmt.Sprintf("ARENA-T-%d", time.Now().Unix()), Timestamp: time.Now(),
-		Pot: l.tournament.Pot, Winner: winner, Matches: l.tournament.Matches,
+		Pot: totalPot, Winner: winner, Matches: summaryMatches,
+		PayoutsHash: payoutsHash,
 	}
 
-	go l.recordTournamentOnChain(summary)
-
-	l.tournament.Active = false
-	l.broadcastTournamentState()
+	l.recordTournamentOnChain(summary)
 }
 
 func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
