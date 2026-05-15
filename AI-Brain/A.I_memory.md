@@ -63,3 +63,5 @@
 *   **143**: Implemented `ARENA_STRESS_TEST` environment variable detection in `lobby_manager.go` to automatically trigger 16-player tournament simulations on startup.
 *   **144**: Updated `Dockerfile` with `entrypoint.sh` to dynamically ensure `DATA_DIR` permissions for Render persistent volumes.
 *   **145**: Hardened `simulateTournament` logic in `lobby_manager.go` with deadlock prevention, lock pulsing, and accurate club kickback simulation.
+*   **146**: Enhanced `package.json` build script with a `clean` step for robust production artifact generation.
+*   **145**: Hardened `simulateTournament` logic in `lobby_manager.go` with deadlock prevention, lock pulsing, and accurate club kickback simulation.

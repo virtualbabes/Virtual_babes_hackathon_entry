@@ -9,7 +9,8 @@
     "wasm:build": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env, {GOOS:'js', GOARCH:'wasm'}); const r=spawnSync('go',['build','-o','Public/main.wasm','main.go'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
     "wasm:init": "node -e \"const fs=require('fs'); const path=require('path'); const cp=require('child_process'); const groot=cp.execSync('go env GOROOT').toString().trim(); const src=path.join(groot,'lib','wasm','wasm_exec.js'); const dest=path.join(process.cwd(),'Public','wasm_exec.js'); fs.copyFileSync(src,dest); console.log('Copied', src, 'to', dest);\"",
     "server:build": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env); delete env.GOOS; delete env.GOARCH; env.CGO_ENABLED='0'; const r=spawnSync('go',['build','-ldflags','-w -s','-o','server-bin','.'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
-    "build": "npm run wasm:init && npm run wasm:build && npm run sass:build && npm run server:build",
+    "clean": "rm -f Public/main.wasm Public/wasm_exec.js Public/styles.css server-bin",
+    "build": "npm run clean && npm run wasm:init && npm run wasm:build && npm run sass:build && npm run server:build",
     "start": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env, {PORT:'8083'}); const r=spawnSync('go',['run','.'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
     "test:stress": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env, {PORT:'8085', ARENA_STRESS_TEST:'true', DATA_DIR:'./test_data'}); const r=spawnSync('npm',['run','build'],{stdio:'inherit'}); if (r.status===0) spawnSync('go',['run','.'],{stdio:'inherit',env});\""
   },
