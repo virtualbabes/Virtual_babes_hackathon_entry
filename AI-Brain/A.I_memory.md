@@ -461,4 +461,5 @@
 87. Complete: Hardened `checkAssetOptIn` in `oracle_service.go` with 429 retry policy for node and indexer requests.
 88. Complete: Hardened `syncStatsFromBlockchain` in `oracle_service.go` with 429 retry policy and robust status code handling.
 89. Complete: Hardened `getVerifiedCards` and `getVerifiedCardsCrossChain` in `oracle_service.go` with 429 retry policies for multi-chain discovery.
+90. Complete: Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with 429 retry policy and robust status code handling.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

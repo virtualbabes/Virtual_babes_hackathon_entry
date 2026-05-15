@@ -548,14 +548,41 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
 		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress)
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	resp, err := http.DefaultClient.Do(req)
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to connect to indexer for leaderboard refresh after retries: %v\n", err)
+			return
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for leaderboard refresh after retries.\n")
+			return
+		}
+		break
+	}
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[ORACLE ERROR] Indexer returned non-200 status for leaderboard refresh: %d %s\n", resp.StatusCode, resp.Status)
+		return
+	}
 
 	var res struct {
 		Transfers []struct {

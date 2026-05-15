@@ -204,4 +204,5 @@
 - [FIXED] Hardened `checkAssetOptIn` in `oracle_service.go` with backoff for 429 rate-limits across both Voi and Algorand network paths.
 - [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses during player stats reconstruction.
 - [FIXED] Hardened `getVerifiedCards` and `getVerifiedCardsCrossChain` in `oracle_service.go` with retry logic for 429 errors during multi-chain NFT discovery and metadata retrieval.
+- [FIXED] Hardened `refreshGlobalLeaderboard` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for indexer responses during global leaderboard reconstruction.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.
