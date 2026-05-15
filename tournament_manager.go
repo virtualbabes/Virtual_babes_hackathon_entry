@@ -367,7 +367,7 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 
 	// 2nd Place: Loser of the final
 	for _, m := range matches {
-		if m.Round == maxRound {
+		if m.Round == maxRound && m.Winner != "" {
 			runnerUp := m.P1
 			if strings.EqualFold(m.P1, winner) {
 				runnerUp = m.P2
@@ -382,7 +382,7 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 	// 3rd & 4th: Losers of semi-finals (Sorted by Reputation)
 	semiLosers := []string{}
 	for _, m := range matches {
-		if m.Round == maxRound-1 && maxRound > 1 {
+		if m.Round == maxRound-1 && maxRound > 1 && m.Winner != "" {
 			var loser string
 			if strings.EqualFold(m.Winner, m.P1) {
 				loser = m.P2
@@ -404,7 +404,7 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 	if len(top5) < 5 {
 		quartLosers := []string{}
 		for _, m := range matches {
-			if m.Round == maxRound-2 && maxRound > 2 {
+			if m.Round == maxRound-2 && maxRound > 2 && m.Winner != "" {
 				var loser string
 				if strings.EqualFold(m.Winner, m.P1) {
 					loser = m.P2
