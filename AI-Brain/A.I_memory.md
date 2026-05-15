@@ -470,4 +470,5 @@
 97. Complete: Updated `adminBroadcast` in `admin.js` to read priority from the UI and transmit it to the backend.
 96. Complete: Enhanced `handleSystemMessage` in `handlers_admin.go` to support message priority levels (info, warning, critical), utilizing the `admin_notification` protocol for high-visibility UI alerts.
 98. Complete: Updated `showToast` in `Public/js/ui.js` and `handleServerMessage` in `Public/js/network.js` to correctly display admin broadcast priority levels.
+99. Complete: Finalized production RPC endpoints in `networks.json` for multi-chain discovery, replacing Infura placeholders with stable public endpoints.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
