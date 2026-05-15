@@ -48,20 +48,47 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	targetWallet := strings.ToLower(req.Wallet)
+
 	l.mutex.RLock()
 	if !l.tournament.Active || l.tournament.CurrentRound != 0 {
 		l.mutex.RUnlock()
 		http.Error(w, "Registration is currently closed", http.StatusForbidden)
 		return
 	}
-	if l.isWalletRegistered(req.Wallet) {
+	if l.isWalletRegistered(targetWallet) {
 		l.mutex.RUnlock()
 		http.Error(w, "Wallet already registered", http.StatusForbidden)
 		return
 	}
+
+	// 0. Verification Throttling: Check if already processing or TxID recycled
+	if _, isProcessing := l.processingRegistrations[targetWallet]; isProcessing {
+		l.mutex.RUnlock()
+		http.Error(w, "Registration already in progress for this wallet", http.StatusConflict)
+		return
+	}
+	if _, isUsed := l.registeredTxIDs[req.TxID]; isUsed && req.TxID != "" {
+		l.mutex.RUnlock()
+		http.Error(w, "Transaction ID already utilized for another entry", http.StatusConflict)
+		return
+	}
+	l.mutex.RUnlock()
+
+	// Lock to mark as processing to block rapid repeat clicks
+	l.mutex.Lock()
+	l.processingRegistrations[targetWallet] = time.Now()
+	l.mutex.Unlock()
+
+	// Ensure processing status is cleared after attempt
+	defer func() {
+		l.mutex.Lock()
+		delete(l.processingRegistrations, targetWallet)
+		l.mutex.Unlock()
+	}()
+
 	openTime := l.tournament.OpenTime
 	buyInAmt := l.tournament.BuyInAmount
-	l.mutex.RUnlock()
 
 	// Identify Elite Status
 	l.mutex.RLock()
@@ -116,11 +143,26 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 			divisor = netCfg.PowerDivisor
 		}
 
+		// PILLAR 3: Concurrency Throttling.
+		// Limit simultaneous indexer requests to prevent rate-limiting during burst registration.
+		select {
+		case l.oracleSemaphore <- struct{}{}:
+			// Acquired slot, proceed to oracle
+		case <-time.After(15 * time.Second):
+			http.Error(w, "Arena Indexer busy. Please try again in a few moments.", http.StatusServiceUnavailable)
+			return
+		}
+		defer func() { <-l.oracleSemaphore }()
+
 		// verifyBuyInTransaction expects a prefix that matches "Network Mainnet" keys
-		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, req.Wallet, l.vaultAddress)
+		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, targetWallet, l.vaultAddress)
 		if err != nil || !verified || txUnixTime < openTime.Unix() {
-			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", req.Wallet, verifyNetwork, err)
-			http.Error(w, "Payment verification failed or transaction too old", http.StatusPaymentRequired)
+			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", targetWallet, verifyNetwork, err)
+			msg := "Payment verification failed or transaction too old"
+			if err != nil && strings.Contains(err.Error(), "429") {
+				msg = "External Indexer rate-limited. Please retry."
+			}
+			http.Error(w, msg, http.StatusPaymentRequired)
 			return
 		}
 		actualRegistrationTime = time.Unix(txUnixTime, 0)
@@ -130,7 +172,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}
 
 	l.mutex.Lock()
-	l.paidParticipants = append(l.paidParticipants, req.Wallet)
+	l.paidParticipants = append(l.paidParticipants, targetWallet)
 	if !isElite {
 		l.registeredTxIDs[req.TxID] = time.Now()
 		l.faucetBalance += (buyInAmt / 2.0)
@@ -552,7 +594,7 @@ func (l *Lobby) broadcastTournamentState() {
 
 func (l *Lobby) isWalletRegistered(wallet string) bool {
 	for _, p := range l.paidParticipants {
-		if p == wallet {
+		if strings.EqualFold(p, wallet) {
 			return true
 		}
 	}

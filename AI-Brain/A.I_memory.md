@@ -455,4 +455,5 @@
 81. Complete: Created User_manual.md as a comprehensive guide for players.
 80. Complete: Updated `README.md` for accuracy and created `User_manual.md` for players.
 
+84. Complete: Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

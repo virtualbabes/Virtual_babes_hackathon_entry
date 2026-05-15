@@ -98,7 +98,9 @@ func (p PlayerStats) GetEffectiveCunning() int {
 	// Infamy Penalty: Every 5 levels of Wanted Level reduces effective Cunning by 1
 	penalty := p.WantedLevel / 5
 	eff -= penalty
-	if eff < 0 { eff = 0 }
+	if eff < 0 {
+		eff = 0
+	}
 	return eff
 }
 
@@ -201,35 +203,35 @@ type ARC72Metadata struct {
 
 // MatchState tracks an ongoing game on the server for win verification.
 type MatchState struct {
-	P1ID              string                    `json:"p1_id"`
-	P2ID              string                    `json:"p2_id"`
-	P1Wallet          string                    `json:"p1_wallet"` // Snapshotted for penalty calculation stability
-	P2Wallet          string                    `json:"p2_wallet"`
-	TournamentMatchID string                    `json:"tournament_match_id,omitempty"` // Link to tournament bracket
-	P1Deck            []int                     `json:"p1_deck"`                       // Card IDs in P1's deck
-	P1Avatar          string                    `json:"p1_avatar"`
-	P1Gloat           string                    `json:"p1_gloat"`
-	P2Deck            []int                     `json:"p2_deck"` // Card IDs in P2's deck
-	P2Avatar          string                    `json:"p2_avatar"`
-	BoardMoods        [9]string                 `json:"board_moods"` // Moods assigned to specific tiles
-	P2Gloat           string                    `json:"p2_gloat"`
-	Board             [9]*ServerCard            `json:"board"`
-	Rules             map[string]bool           `json:"rules"`
-	IsFinished        bool                      `json:"is_finished"`
-	Spectators        []string                  `json:"spectators"` // Client IDs spectating this match
-	P1WantedLevel     int                       `json:"p1_wanted_level"`
-	P2WantedLevel     int                       `json:"p2_wanted_level"`
-	P1Cunning         int                       `json:"p1_cunning"`
-	P1Nurturing       int                       `json:"p1_nurturing"`
-	P2Cunning         int                       `json:"p2_cunning"`
-	P2Nurturing       int                       `json:"p2_nurturing"`
-	P1RegionalBoost   bool                      `json:"p1_regional_boost"`
-	P2RegionalBoost   bool                      `json:"p2_regional_boost"`
+	P1ID              string          `json:"p1_id"`
+	P2ID              string          `json:"p2_id"`
+	P1Wallet          string          `json:"p1_wallet"` // Snapshotted for penalty calculation stability
+	P2Wallet          string          `json:"p2_wallet"`
+	TournamentMatchID string          `json:"tournament_match_id,omitempty"` // Link to tournament bracket
+	P1Deck            []int           `json:"p1_deck"`                       // Card IDs in P1's deck
+	P1Avatar          string          `json:"p1_avatar"`
+	P1Gloat           string          `json:"p1_gloat"`
+	P2Deck            []int           `json:"p2_deck"` // Card IDs in P2's deck
+	P2Avatar          string          `json:"p2_avatar"`
+	BoardMoods        [9]string       `json:"board_moods"` // Moods assigned to specific tiles
+	P2Gloat           string          `json:"p2_gloat"`
+	Board             [9]*ServerCard  `json:"board"`
+	Rules             map[string]bool `json:"rules"`
+	IsFinished        bool            `json:"is_finished"`
+	Spectators        []string        `json:"spectators"` // Client IDs spectating this match
+	P1WantedLevel     int             `json:"p1_wanted_level"`
+	P2WantedLevel     int             `json:"p2_wanted_level"`
+	P1Cunning         int             `json:"p1_cunning"`
+	P1Nurturing       int             `json:"p1_nurturing"`
+	P2Cunning         int             `json:"p2_cunning"`
+	P2Nurturing       int             `json:"p2_nurturing"`
+	P1RegionalBoost   bool            `json:"p1_regional_boost"`
+	P2RegionalBoost   bool            `json:"p2_regional_boost"`
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
 	Round             int                       `json:"round"`                    // Match round (isolation for Sudden Death)
 	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played
-	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs"` // PlayerID -> ItemID -> MatchesRemaining
+	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs"`        // PlayerID -> ItemID -> MatchesRemaining
 	IsBountyMatch     bool
 }
 
@@ -245,22 +247,22 @@ type CapturedCardInfo struct {
 
 // MatchHistory stores the result of a completed game for reward verification.
 type MatchHistory struct {
-	WinnerID         string    `json:"winner_id"`
-	Opponent         string    `json:"opponent_wallet"`
-	TournamentMatchID string    `json:"tournament_id"`
-	Scores           [2]int    `json:"scores"`
-	Timestamp        time.Time `json:"timestamp"`
-	WinnerIndex      int       `json:"winner_index"` // 0 for P1, 1 for P2
-	IsBountyMatch    bool      `json:"is_bounty_match,omitempty"`
-	BountyReward     float64   `json:"bounty_reward,omitempty"`
-	P1WantedLevel    int       `json:"p1_wanted_level"`
-	P2WantedLevel    int       `json:"p2_wanted_level"`
-	P1Cunning        int       `json:"p1_cunning"`
-	P2Cunning        int       `json:"p2_cunning"`
-	P1Nurturing      int       `json:"p1_nurturing"`
-	P2Nurturing      int       `json:"p2_nurturing"`
-	ActiveItemBuffs  map[string]map[string]int `json:"active_item_buffs,omitempty"`
-	CapturedCards    []CapturedCardInfo        `json:"captured_cards,omitempty"`
+	WinnerID          string                    `json:"winner_id"`
+	Opponent          string                    `json:"opponent_wallet"`
+	TournamentMatchID string                    `json:"tournament_id"`
+	Scores            [2]int                    `json:"scores"`
+	Timestamp         time.Time                 `json:"timestamp"`
+	WinnerIndex       int                       `json:"winner_index"` // 0 for P1, 1 for P2
+	IsBountyMatch     bool                      `json:"is_bounty_match,omitempty"`
+	BountyReward      float64                   `json:"bounty_reward,omitempty"`
+	P1WantedLevel     int                       `json:"p1_wanted_level"`
+	P2WantedLevel     int                       `json:"p2_wanted_level"`
+	P1Cunning         int                       `json:"p1_cunning"`
+	P2Cunning         int                       `json:"p2_cunning"`
+	P1Nurturing       int                       `json:"p1_nurturing"`
+	P2Nurturing       int                       `json:"p2_nurturing"`
+	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs,omitempty"`
+	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"`
 }
 
 // PlayerStats tracks the performance and reliability of a player.
@@ -322,15 +324,15 @@ type CardBundle struct {
 
 // Auction represents a live listing in the Art Gallery.
 type Auction struct {
-	ID            string     `json:"id"`
-	SellerWallet  string     `json:"seller_wallet"`
-	SellerName    string     `json:"seller_name"` // Pre-resolved Envoi name
-	Bundle        CardBundle `json:"bundle"`
-	CurrentBid    uint64     `json:"current_bid"` // Micro-units of $VBV
-	HighestBidder string     `json:"highest_bidder"`
-	HighestBidderName string `json:"highest_bidder_name"` // Pre-resolved Envoi name
-	EndsAt        time.Time  `json:"ends_at"`
-	TerritoryID   string     `json:"territory_id"` // For commission distribution
+	ID                string     `json:"id"`
+	SellerWallet      string     `json:"seller_wallet"`
+	SellerName        string     `json:"seller_name"` // Pre-resolved Envoi name
+	Bundle            CardBundle `json:"bundle"`
+	CurrentBid        uint64     `json:"current_bid"` // Micro-units of $VBV
+	HighestBidder     string     `json:"highest_bidder"`
+	HighestBidderName string     `json:"highest_bidder_name"` // Pre-resolved Envoi name
+	EndsAt            time.Time  `json:"ends_at"`
+	TerritoryID       string     `json:"territory_id"` // For commission distribution
 }
 
 // Loan represents a collateralized loan from the Second-Hand Store.
@@ -427,57 +429,59 @@ type WalletLinkInfo struct {
 
 // Lobby manages the central state of the arena.
 type Lobby struct {
-	clients              map[string]*Client
-	matches              map[string]*MatchState
-	inventory            map[int]ServerCard
-	persistentCardCache  map[int]ServerCard
-	tournamentPotBonus   float64
-	tournamentCache      map[string]*interface{} // Using interface{} for element storage
-	paidParticipants     []string
-	matchmakingPool      []QueueEntry
-	bannedAvatars        map[string]time.Time
-	registeredTxIDs      map[string]time.Time
-	processingRewards    map[string]time.Time
-	processingOnboarding map[string]time.Time
-	activeKidnappings    map[int]KidnapState // CardID -> State
-	wallets              map[string]string
-	clubs                map[string]*Club // Key: ClubID
-	blackMarket          []Loan           // Defaulted loans available for purchase
-	rumors               map[string]*Rumor
-	loans                map[string]*Loan
-	auctions             map[string]*Auction
-	leaderboard          map[string]PlayerStats
-	matchHistory         map[string]MatchHistory
-	linkedWallets        map[string]WalletLinkInfo
-	vaultAddress         string
-	faucetBalance        float64
-	rewards              map[string]uint64
-	initialRewards       map[string]uint64 // Unscaled base values for all assets in the reward stack
-	holdingBonuses       map[string][]HoldingBonus
-	initialBaseReward    uint64
-	seasonStart          time.Time
-	seasonNumber         int
-	maxFaucetCapacity    float64
-	rewardAssetID        string
-	avoiAssetID          string
-	baseReward           uint64
-	nonces               map[string]NonceData
-	availableNetworks    map[string]NetworkConfig
-	adminFocusNetwork    string
-	maintenanceMode      bool
-	maintenanceTime      time.Time
-	rateLimits           map[string]time.Time
-	httpRateLimits       map[string]*RateBucket
-	tournament           TournamentState
-	globalSentiment      GlobalSentiment
-	register             chan *Client
-	unregister           chan *Client
-	broadcast            chan []byte
-	onboardedWallets     map[string]bool // Tracks wallets that have received an onboarding pack
-	onboardingSemaphore  chan struct{}
-	envoiCache           map[string]string // Wallet -> Envoi Name Cache
-	envoiMutex           sync.RWMutex      // Dedicated lock for name resolution
-	SybilSyncComplete    bool // Indicates historical claim state is fully restored
-	WCProjectID          string // WalletConnect Project ID from environment variable
-	mutex                sync.RWMutex
+	clients                 map[string]*Client
+	matches                 map[string]*MatchState
+	inventory               map[int]ServerCard
+	persistentCardCache     map[int]ServerCard
+	tournamentPotBonus      float64
+	tournamentCache         map[string]*interface{} // Using interface{} for element storage
+	paidParticipants        []string
+	matchmakingPool         []QueueEntry
+	bannedAvatars           map[string]time.Time
+	registeredTxIDs         map[string]time.Time
+	processingRewards       map[string]time.Time
+	processingOnboarding    map[string]time.Time
+	processingRegistrations map[string]time.Time // Prevents concurrent registration hits for the same wallet
+	activeKidnappings       map[int]KidnapState  // CardID -> State
+	wallets                 map[string]string
+	clubs                   map[string]*Club // Key: ClubID
+	blackMarket             []Loan           // Defaulted loans available for purchase
+	rumors                  map[string]*Rumor
+	loans                   map[string]*Loan
+	auctions                map[string]*Auction
+	leaderboard             map[string]PlayerStats
+	matchHistory            map[string]MatchHistory
+	linkedWallets           map[string]WalletLinkInfo
+	vaultAddress            string
+	faucetBalance           float64
+	rewards                 map[string]uint64
+	initialRewards          map[string]uint64 // Unscaled base values for all assets in the reward stack
+	holdingBonuses          map[string][]HoldingBonus
+	initialBaseReward       uint64
+	seasonStart             time.Time
+	seasonNumber            int
+	maxFaucetCapacity       float64
+	rewardAssetID           string
+	avoiAssetID             string
+	baseReward              uint64
+	nonces                  map[string]NonceData
+	availableNetworks       map[string]NetworkConfig
+	adminFocusNetwork       string
+	maintenanceMode         bool
+	maintenanceTime         time.Time
+	rateLimits              map[string]time.Time
+	httpRateLimits          map[string]*RateBucket
+	tournament              TournamentState
+	globalSentiment         GlobalSentiment
+	register                chan *Client
+	unregister              chan *Client
+	broadcast               chan []byte
+	onboardedWallets        map[string]bool // Tracks wallets that have received an onboarding pack
+	onboardingSemaphore     chan struct{}
+	oracleSemaphore         chan struct{}     // Throttles concurrent external indexer requests
+	envoiCache              map[string]string // Wallet -> Envoi Name Cache
+	envoiMutex              sync.RWMutex      // Dedicated lock for name resolution
+	SybilSyncComplete       bool              // Indicates historical claim state is fully restored
+	WCProjectID             string            // WalletConnect Project ID from environment variable
+	mutex                   sync.RWMutex
 }

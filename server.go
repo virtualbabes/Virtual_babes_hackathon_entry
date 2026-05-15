@@ -53,39 +53,41 @@ func newLobby() (*Lobby, error) {
 	}
 
 	l := &Lobby{
-		clients:              make(map[string]*Client),
-		matches:              make(map[string]*MatchState),
-		inventory:            make(map[int]ServerCard),
-		persistentCardCache:  make(map[int]ServerCard),
-		wallets:              make(map[string]string),
-		leaderboard:          make(map[string]PlayerStats),
-		matchHistory:         make(map[string]MatchHistory),
-		nonces:               make(map[string]NonceData),
-		rateLimits:           make(map[string]time.Time),
-		httpRateLimits:       make(map[string]*RateBucket),
-		bannedAvatars:        make(map[string]time.Time),
-		registeredTxIDs:      make(map[string]time.Time),
-		processingRewards:    make(map[string]time.Time),
-		processingOnboarding: make(map[string]time.Time),
-		activeKidnappings:    make(map[int]KidnapState),
-		availableNetworks:    make(map[string]NetworkConfig),
-		linkedWallets:        make(map[string]WalletLinkInfo),
-		loans:                make(map[string]*Loan),
-		rumors:               make(map[string]*Rumor),
-		auctions:             make(map[string]*Auction),
-		rewards:              make(map[string]uint64),
-		initialRewards:       make(map[string]uint64),
-		holdingBonuses:       make(map[string][]HoldingBonus),
-		register:             make(chan *Client),
-		unregister:           make(chan *Client),
-		broadcast:            make(chan []byte),
-		onboardedWallets:     make(map[string]bool), // Initialize the new map
-		onboardingSemaphore:  make(chan struct{}, 5), // Limit concurrent bridge operations
-		envoiCache:           make(map[string]string),
-		vaultAddress:         os.Getenv("VAULT_ADDRESS"),
-		WCProjectID:          os.Getenv("WC_PROJECT_ID"), // Load WalletConnect Project ID
-		maxFaucetCapacity:    10000.0,
-		adminFocusNetwork:    "Voi Mainnet",
+		clients:                 make(map[string]*Client),
+		matches:                 make(map[string]*MatchState),
+		inventory:               make(map[int]ServerCard),
+		persistentCardCache:     make(map[int]ServerCard),
+		wallets:                 make(map[string]string),
+		leaderboard:             make(map[string]PlayerStats),
+		matchHistory:            make(map[string]MatchHistory),
+		nonces:                  make(map[string]NonceData),
+		rateLimits:              make(map[string]time.Time),
+		httpRateLimits:          make(map[string]*RateBucket),
+		bannedAvatars:           make(map[string]time.Time),
+		registeredTxIDs:         make(map[string]time.Time),
+		processingRewards:       make(map[string]time.Time),
+		processingOnboarding:    make(map[string]time.Time),
+		processingRegistrations: make(map[string]time.Time),
+		activeKidnappings:       make(map[int]KidnapState),
+		availableNetworks:       make(map[string]NetworkConfig),
+		linkedWallets:           make(map[string]WalletLinkInfo),
+		loans:                   make(map[string]*Loan),
+		rumors:                  make(map[string]*Rumor),
+		auctions:                make(map[string]*Auction),
+		rewards:                 make(map[string]uint64),
+		initialRewards:          make(map[string]uint64),
+		holdingBonuses:          make(map[string][]HoldingBonus),
+		register:                make(chan *Client),
+		unregister:              make(chan *Client),
+		broadcast:               make(chan []byte),
+		onboardedWallets:        make(map[string]bool),   // Initialize the new map
+		onboardingSemaphore:     make(chan struct{}, 5),  // Limit concurrent bridge operations
+		oracleSemaphore:         make(chan struct{}, 10), // Limit concurrent indexer queries
+		envoiCache:              make(map[string]string),
+		vaultAddress:            os.Getenv("VAULT_ADDRESS"),
+		WCProjectID:             os.Getenv("WC_PROJECT_ID"), // Load WalletConnect Project ID
+		maxFaucetCapacity:       10000.0,
+		adminFocusNetwork:       "Voi Mainnet",
 	}
 
 	// Initialize reward configuration
@@ -145,7 +147,7 @@ func (l *Lobby) loadNetworkConfigs() {
 			IndexerURL:   "https://mainnet-idx.algonode.cloud",
 			NodeURL:      "https://mainnet-api.algonode.cloud",
 			ExplorerURL:  "https://explorer.perawallet.app",
-			AppID:        "0",                                     // No game app on Algo, assets only
+			AppID:        "0",             // No game app on Algo, assets only
 			AssetID:      l.rewardAssetID, // Placeholder or specific mapping
 			ChainID:      "algorand:mainnet-v1.0",
 			PowerDivisor: 1000000,
@@ -344,7 +346,7 @@ func main() {
 	http.HandleFunc("/api/auctions", lobby.handleGetAuctions)
 	http.HandleFunc("/api/auctions/create", lobby.handleCreateAuction)
 	http.HandleFunc("/api/auctions/bid", lobby.handlePlaceBid)
-	
+
 	// Second-Hand Store / Loans
 	http.HandleFunc("/api/loans", lobby.handleGetLoans)
 	http.HandleFunc("/api/loans/take", lobby.handleTakeLoan)
