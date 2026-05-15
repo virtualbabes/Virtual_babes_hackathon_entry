@@ -188,7 +188,8 @@ export async function renderMatchHistory() {
             scores: m.scores,
             opponent: m.opponent_wallet,
             timestamp: new Date(m.timestamp).toLocaleString(),
-            tournamentId: m.tournament_id
+            tournamentId: m.tournament_id,
+            matchId: m.match_id
         }));
     } else {
         // Fallback to local storage for guest sessions or non-indexed wins
@@ -211,7 +212,11 @@ export async function renderMatchHistory() {
         const label = labels[entry.winner] || "END";
 
         const opponentDisplay = getCachedEnvoiName(entry.opponent);
-        const tourneyTag = entry.tournamentId ? `<span class="text-neon-purple" style="font-size: 0.8em; margin-left: 5px;">[${entry.tournamentId}]</span>` : '';
+        let tourneyTag = '';
+        if (entry.tournamentId) {
+            const shortId = entry.tournamentId.substring(0, 12);
+            tourneyTag = `<span class="text-neon-purple" style="font-size: 0.8em; margin-left: 5px;" title="Tournament ID: ${entry.tournamentId}">[${shortId}${entry.matchId ? `:${entry.matchId}` : ''}]</span>`;
+        }
 
         div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}</span> vs ${opponentDisplay}${tourneyTag} <br/> 
                          <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;

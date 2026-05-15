@@ -1177,6 +1177,7 @@ func (l *Lobby) processMatchmaking() {
 					if l.initiatePairedMatch(l.matchmakingPool[idx1].ClientID, l.matchmakingPool[idx2].ClientID) {
 						// Link to bracket for automatic result reporting
 						if mState, ok := l.matches[l.matchmakingPool[idx1].ClientID]; ok {
+							mState.TournamentID = l.tournament.ID
 							mState.TournamentMatchID = match.ID
 						}
 						matchedIndices[idx1], matchedIndices[idx2] = true, true

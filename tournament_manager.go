@@ -405,6 +405,7 @@ func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
 				if !dup {
 					history := MatchHistory{
 						Opponent:          loserWallet,
+						TournamentID:      l.tournament.ID,
 						TournamentMatchID: matchID,
 						Timestamp:         time.Now(),
 						WinnerIndex:       0, // Relative Win
@@ -431,6 +432,7 @@ func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
 				if !dup {
 					history := MatchHistory{
 						Opponent:          winnerWallet,
+						TournamentID:      l.tournament.ID,
 						TournamentMatchID: matchID,
 						Timestamp:         time.Now(),
 						WinnerIndex:       1, // Relative Loss

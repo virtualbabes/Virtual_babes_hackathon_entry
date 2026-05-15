@@ -338,6 +338,7 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 	history := MatchHistory{
 		Scores:            [2]int{p1, p2},
 		Timestamp:         time.Now(),
+		TournamentID:      match.TournamentID,
 		TournamentMatchID: match.TournamentMatchID,
 		IsBountyMatch:     match.IsBountyMatch,
 		P1WantedLevel:     match.P1WantedLevel,
