@@ -119,3 +119,4 @@
 99. **Complete**: Updated `networks.json` with stable production RPC endpoints (LlamaRPC).
 100. **Complete**: Audited `cleanupNonces` safety for spectating sessions.
 101. **Complete**: Hardened `verifyBuyInTransaction` to correctly utilize `AssetID` and `AppID` from `networks.json`.
+102. **Complete**: Hardened `advanceTournamentRound` in `tournament_manager.go` with normalized Match IDs and robust BYE handling for odd-numbered winners.

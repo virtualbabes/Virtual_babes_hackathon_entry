@@ -333,14 +333,18 @@ func (l *Lobby) advanceTournamentRound() {
 	l.tournament.CurrentRound++
 	newRound := l.tournament.CurrentRound
 	for i := 0; i < len(roundWinners); i += 2 {
+		matchNum := (i / 2) + 1
 		if i+1 >= len(roundWinners) {
+			// PILLAR 3: Bracket Integrity.
+			// Handle odd numbers of winners by granting a BYE.
+			// The winner string is enforced to be the advancing player.
 			l.tournament.Matches = append(l.tournament.Matches, TournamentMatch{
-				ID: fmt.Sprintf("R%d-M%d-BYE", newRound, i/2), P1: roundWinners[i], P2: "BYE", Round: newRound, Winner: roundWinners[i],
+				ID: fmt.Sprintf("R%d-M%d-BYE", newRound, matchNum), P1: roundWinners[i], P2: "BYE", Round: newRound, Winner: roundWinners[i],
 			})
 			continue
 		}
 		l.tournament.Matches = append(l.tournament.Matches, TournamentMatch{
-			ID: fmt.Sprintf("R%d-M%d", newRound, i/2), P1: roundWinners[i], P2: roundWinners[i+1], Round: newRound,
+			ID: fmt.Sprintf("R%d-M%d", newRound, matchNum), P1: roundWinners[i], P2: roundWinners[i+1], Round: newRound,
 		})
 	}
 	l.broadcastTournamentState()
