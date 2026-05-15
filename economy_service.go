@@ -92,7 +92,9 @@ func (l *Lobby) recordWinOnChain(winnerWallet string, history MatchHistory) {
 // recordDNFOnChain persists a match disconnection to the blockchain.
 // Metadata includes the leaver, the opponent, and the tournament context for reconstruction.
 func (l *Lobby) recordDNFOnChain(wallet, opponent, tid string) {
-	if wallet == "" { return }
+	if wallet == "" {
+		return
+	}
 
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
@@ -102,7 +104,7 @@ func (l *Lobby) recordDNFOnChain(wallet, opponent, tid string) {
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 	senderAddr, _ := types.DecodeAddress(l.vaultAddress)
-	
+
 	meta := map[string]string{"leaver": wallet, "opp": opponent, "tid": tid}
 	jsonData, _ := json.Marshal(meta)
 	dnfNote := []byte(fmt.Sprintf("VBT_DNF:%s", string(jsonData)))
@@ -136,7 +138,19 @@ func logWinAudit(recipient, network, txid, groupID string, amount uint64, histor
 // CalculateReputation computes a player's social standing based on their performance and infamy.
 func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// 1. Base Performance Score (Wins vs DNFs/Streak)
-	rep := (stats.Wins * 100) - (stats.DNFs * 50) - (stats.DisconnectStreak * 15)
+	// PILLAR 4: Competitive Balance.
+	// Implemented diminishing returns for raw wins to prevent "grinding" from overwhelming
+	// social markers (Achievements/Mojo) during long seasons or extreme simulations.
+	winRep := 0
+	if stats.Wins <= 100 {
+		winRep = stats.Wins * 100
+	} else if stats.Wins <= 500 {
+		winRep = 10000 + (stats.Wins-100)*25
+	} else {
+		winRep = 20000 + (stats.Wins-500)*5
+	}
+
+	rep := winRep - (stats.DNFs * 50) - (stats.DisconnectStreak * 15)
 
 	// 2. Infamy Penalty
 	rep -= (stats.WantedLevel * 20)
