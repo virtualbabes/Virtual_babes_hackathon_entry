@@ -326,6 +326,66 @@ func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
 	for i, m := range l.tournament.Matches {
 		if m.ID == matchID && m.Winner == "" {
 			l.tournament.Matches[i].Winner = winnerWallet
+
+			// PILLAR 4: Historical Immersion. Update ephemeral history for tournament participants.
+			// This handles cases where a match is resolved via DNF award, bypassing standard battle service.
+			loserWallet := m.P1
+			if strings.EqualFold(m.P1, winnerWallet) {
+				loserWallet = m.P2
+			}
+
+			// Update Winner's history (crucial for Awarded victories where no battle occurred)
+			if winnerWallet != "" {
+				l.ensurePlayerStatsMapsInitialized(winnerWallet)
+				wStats := l.leaderboard[winnerWallet]
+				dup := false
+				for _, h := range wStats.History {
+					if h.TournamentMatchID == matchID {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					history := MatchHistory{
+						Opponent:          loserWallet,
+						TournamentMatchID: matchID,
+						Timestamp:         time.Now(),
+						WinnerIndex:       0, // Relative Win
+					}
+					wStats.History = append([]MatchHistory{history}, wStats.History...)
+					if len(wStats.History) > 15 {
+						wStats.History = wStats.History[:15]
+					}
+					l.leaderboard[winnerWallet] = wStats
+				}
+			}
+
+			// Update Loser's history (handles both match loss and DNF leaver records)
+			if loserWallet != "" && !strings.EqualFold(loserWallet, "BYE") {
+				l.ensurePlayerStatsMapsInitialized(loserWallet)
+				lStats := l.leaderboard[loserWallet]
+				dup := false
+				for _, h := range lStats.History {
+					if h.TournamentMatchID == matchID {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					history := MatchHistory{
+						Opponent:          winnerWallet,
+						TournamentMatchID: matchID,
+						Timestamp:         time.Now(),
+						WinnerIndex:       1, // Relative Loss
+					}
+					lStats.History = append([]MatchHistory{history}, lStats.History...)
+					if len(lStats.History) > 15 {
+						lStats.History = lStats.History[:15]
+					}
+					l.leaderboard[loserWallet] = lStats
+				}
+			}
+
 			found = true
 			break
 		}

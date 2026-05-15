@@ -385,6 +385,29 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				l.finalizeMatchResultLocked(match.P2ID, match.P2Deck, history)
 			}
 		}
+
+		// PILLAR 4: Immersion. Update ephemeral history for standard draws.
+		// This ensures non-tournament ties appear in the player's recent history list.
+		if match.TournamentMatchID == "" {
+			for _, wallet := range []string{match.P1Wallet, match.P2Wallet} {
+				if wallet == "" || strings.EqualFold(wallet, "BYE") {
+					continue
+				}
+				l.ensurePlayerStatsMapsInitialized(wallet)
+				st := l.leaderboard[wallet]
+				drawRecord := history
+				drawRecord.Opponent = match.P2Wallet
+				if strings.EqualFold(wallet, match.P2Wallet) {
+					drawRecord.Opponent = match.P1Wallet
+				}
+				drawRecord.WinnerIndex = 2 // 2=Draw
+				st.History = append([]MatchHistory{drawRecord}, st.History...)
+				if len(st.History) > 15 {
+					st.History = st.History[:15]
+				}
+				l.leaderboard[wallet] = st
+			}
+		}
 	}
 
 	// BOUNTY SYSTEM: Check for Hunter/Outlaw reward triggers
@@ -529,6 +552,18 @@ func (l *Lobby) initiateSuddenDeath(match *MatchState) {
 func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history MatchHistory) {
 	l.matchHistory[winnerID] = history
 	if wallet, ok := l.wallets[winnerID]; ok {
+		// PILLAR 4: Historical Immersion. Update winner's ephemeral history for immediate UI refresh.
+		// This ensures standard and bracket victories appear instantly in the "Recent Victories" panel.
+		l.ensurePlayerStatsMapsInitialized(wallet)
+		stats := l.leaderboard[wallet]
+		winnerRecord := history
+		winnerRecord.WinnerIndex = 0 // Relative win for this record
+		stats.History = append([]MatchHistory{winnerRecord}, stats.History...)
+		if len(stats.History) > 15 {
+			stats.History = stats.History[:15]
+		}
+		l.leaderboard[wallet] = stats
+
 		l.updateLeaderboard(wallet, history.TournamentMatchID != "", history.Scores, deck, history.IsBountyMatch) // Pass match context
 		go func() {
 			rating := l.calculateDeckRating(deck)
@@ -549,6 +584,33 @@ func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history M
 		if history.TournamentMatchID != "" {
 			l.processTournamentResult(history.TournamentMatchID, wallet)
 		}
+	}
+
+	// PILLAR 4: Historical Immersion. Update loser's history for real-time feedback.
+	// The loser wallet is derived from the 'Opponent' field of the winner's record.
+	loserWallet := history.Opponent
+	if loserWallet != "" && loserWallet != "DRAW" && loserWallet != "BYE" {
+		l.ensurePlayerStatsMapsInitialized(loserWallet)
+		lStats := l.leaderboard[loserWallet]
+
+		// Mirrored entry for loser: Winner becomes the opponent, and record is a Loss.
+		loserRecord := history
+		if wWallet, ok := l.wallets[winnerID]; ok {
+			loserRecord.Opponent = wWallet
+		}
+
+		// Flip WinnerIndex to reflect a Loss (1) relative to the loser's profile
+		if history.WinnerIndex == 0 {
+			loserRecord.WinnerIndex = 1
+		} else if history.WinnerIndex == 1 {
+			loserRecord.WinnerIndex = 0
+		}
+
+		lStats.History = append([]MatchHistory{loserRecord}, lStats.History...)
+		if len(lStats.History) > 15 {
+			lStats.History = lStats.History[:15]
+		}
+		l.leaderboard[loserWallet] = lStats
 	}
 }
 

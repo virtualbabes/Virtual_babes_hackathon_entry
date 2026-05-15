@@ -129,9 +129,10 @@
 109. **Complete**: Hardened `handleTournamentRegister` in `tournament_manager.go` with a re-verification check under exclusive lock to prevent registrations after the window has closed.
 110. **Complete**: Hardened `handleStartTournament` in `handlers_admin.go` with case-insensitive participant gathering, registration window validation, and configuration persistence.
 111. **Complete**: Hardened `register_wallet` case in `handleGameProtocol` (lobby_manager.go) to normalize wallet addresses to lowercase for system-wide consistency.
+112. **Complete**: Hardened `isAdminWallet` in `handlers_admin.go` to be case-insensitive during comparison against the `ADMIN_WALLETS` environment variable.
 113. **Complete**: Hardened `link_wallet_request` in `lobby_manager.go` to normalize primary and linked addresses while preserving Solana Base58 case-sensitivity.
 114. **Complete**: Hardened `getAdminHeaders` in `admin.js` to strictly enforce WalletConnect sessions for administrative signatures and implemented multi-chain message signing.
 115. **Complete**: Hardened `checkAssetOptIn` in `oracle_service.go` to correctly fall back to `AppID` or `AssetID` from `networks.json` for Voi-based chains.
 116. **Complete**: Enhanced `matchHistory` reconstruction in `oracle_service.go` to parse `TournamentMatchIDs` and scores from `VBT_WIN` notes; updated `faucet_service.go` to include match context in on-chain metadata.
-112. **Complete**: Hardened `isAdminWallet` in `handlers_admin.go` to be case-insensitive during comparison against the `ADMIN_WALLETS` environment variable.
 117. **Complete**: Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from on-chain data, with fallback to local storage.
+118. **Complete**: Enhanced `processTournamentResult` and `finalizeMatchResultLocked` to update ephemeral history for both winners and losers (Standard and Tournament) to ensure immediate immersion.
