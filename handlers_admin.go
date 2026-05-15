@@ -281,7 +281,8 @@ func (l *Lobby) handleSystemMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Text string `json:"text"`
+		Text     string `json:"text"`
+		Priority string `json:"priority"` // info, warning, critical
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Text == "" {
 		http.Error(w, "Invalid message", http.StatusBadRequest)
@@ -293,9 +294,26 @@ func (l *Lobby) handleSystemMessage(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "success"})
 		return
 	}
-	payload, _ := json.Marshal(map[string]string{"text": "[ADMIN] " + req.Text})
-	l.broadcast <- jsonListEnvelope("chat", payload)
-	l.logAdminAudit("SYSTEM_MESSAGE", "GLOBAL", req.Text)
+
+	var msg []byte
+	switch strings.ToLower(req.Priority) {
+	case "warning", "critical":
+		// Support high-priority UI toasts
+		prefix := "🚨 <b>ADMIN:</b> "
+		if strings.ToLower(req.Priority) == "critical" {
+			prefix = "🔥 <b>URGENT:</b> "
+		}
+		payload, _ := json.Marshal(map[string]string{"text": prefix + req.Text})
+		msg = jsonListEnvelope("admin_notification", payload)
+	default:
+		// Standard chat broadcast
+		payload, _ := json.Marshal(map[string]string{"text": "[ADMIN] " + req.Text})
+		msg = jsonListEnvelope("chat", payload)
+	}
+
+	l.broadcast <- msg
+	l.logAdminAudit("SYSTEM_MESSAGE", "GLOBAL", fmt.Sprintf("[%s] %s", req.Priority, req.Text))
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success"})
 }
 

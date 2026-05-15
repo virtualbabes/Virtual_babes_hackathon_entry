@@ -467,4 +467,5 @@
 93. Complete: Hardened `checkNativeVaultBalanceOnChain` in `oracle_service.go` with 429 retry policy for account information lookups.
 94. Complete: Hardened `handleMaintenanceMode` in `handlers_admin.go` and synchronized maintenance state in `getLobbyUpdateMsgLocked` for late-joining players.
 95. Complete: Hardened `handlers_admin.go` by resolving recursive deadlocks in ban, tournament, and reward paths; updated maintenance protocol with struct marshaling and global sync.
+96. Complete: Enhanced `handleSystemMessage` in `handlers_admin.go` to support message priority levels (info, warning, critical), utilizing the `admin_notification` protocol for high-visibility UI alerts.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.
