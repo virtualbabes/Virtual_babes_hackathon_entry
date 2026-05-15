@@ -2368,11 +2368,12 @@ func registerFunctions() {
 
 // GetTournamentArchiveBadge returns a stylized HTML badge based on verification status
 func GetTournamentArchiveBadge(this js.Value, args []js.Value) interface{} {
-	if len(args) < 2 { // Now expects 2 arguments: isVerified (bool) and links (JS array)
+	if len(args) < 3 { // Updated to expect 3 arguments: isVerified, links, receiptsVerified
 		return ""
 	}
 	isVerified := args[0].Bool()
 	jsLinks := args[1] // This is a JS array
+	receiptsVerified := args[2].Bool()
 
 	var links []string
 	if jsLinks.Type() == js.TypeObject && jsLinks.Get("length").Truthy() {
@@ -2386,11 +2387,16 @@ func GetTournamentArchiveBadge(this js.Value, args []js.Value) interface{} {
 		tooltipText = "Blockchain Links:\\n" + strings.Join(links, "\\n")
 	} else if isVerified {
 		tooltipText = "Archive verified on-chain."
+		if receiptsVerified {
+			tooltipText = "Deep Archive: Checksum and Payout Receipts verified on-chain."
+		}
 	} else {
 		tooltipText = "Data could not be fully verified or reconstructed."
 	}
 
-	if isVerified {
+	if isVerified && receiptsVerified {
+		return fmt.Sprintf(`<span class="verified-badge" title="%s" style="font-size: 0.7em; padding: 2px 6px; border: 1px solid var(--neon-cyan); color: var(--neon-cyan); border-radius: 4px; margin-left: 10px; background: rgba(0, 242, 254, 0.1); box-shadow: 0 0 10px rgba(0, 242, 254, 0.2); vertical-align: middle;">✓ RECEIPT VERIFIED</span>`, tooltipText)
+	} else if isVerified {
 		return fmt.Sprintf(`<span class="verified-badge" title="%s" style="font-size: 0.7em; padding: 2px 6px; border: 1px solid var(--neon-green); color: var(--neon-green); border-radius: 4px; margin-left: 10px; background: rgba(63, 185, 80, 0.1); box-shadow: 0 0 10px rgba(63, 185, 80, 0.2); vertical-align: middle;">✓ VERIFIED ARCHIVE</span>`, tooltipText)
 	}
 	return fmt.Sprintf(`<span style="font-size: 0.7em; padding: 2px 6px; border: 1px solid #ffa657; color: #ffa657; border-radius: 4px; margin-left: 10px; opacity: 0.8; background: rgba(255, 166, 87, 0.1); vertical-align: middle;" title="%s">⚠ PARTIAL DATA</span>`, tooltipText)

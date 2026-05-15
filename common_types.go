@@ -395,6 +395,7 @@ type TournamentSummary struct {
 	Pot        float64           `json:"pot"`
 	Winner     string            `json:"winner"`
 	IsVerified bool              `json:"is_verified"`        // Indicates successful blockchain reconstruction
+	ReceiptsVerified bool        `json:"receipts_verified"`  // Indicates VBT_WIN receipts were found for all matches
 	Checksum   string            `json:"checksum,omitempty"` // SHA256 of full match data
 	Links      []string          `json:"links,omitempty"`    // TxIDs for additional match data
 	Matches    []TournamentMatch `json:"matches"`

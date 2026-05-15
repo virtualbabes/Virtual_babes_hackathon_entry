@@ -330,12 +330,13 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				for _, m := range s.Matches {
 					if m.Winner != "" && !strings.EqualFold(m.P2, "BYE") {
 						if paidWinner, exists := receiptMap[m.ID]; !exists || !strings.EqualFold(paidWinner, m.Winner) {
-							// Note: We don't fail verification here yet as some matches (e.g. standard)
-							// might have different reward asset IDs or latencies.
+							allReceiptsValid = false
 							log.Printf("[ARCHIVE] Receipt mismatch for match %s: Summary says %s, Payout says %s", m.ID, m.Winner, paidWinner)
+							break
 						}
 					}
 				}
+				s.ReceiptsVerified = allReceiptsValid
 			}
 		}
 		// If not deepVerify, s.Matches will only contain what was directly in the summary (potentially nil if chunked)

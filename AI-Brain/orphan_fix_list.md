@@ -230,4 +230,5 @@
 - [FIXED] Enhanced `processTournamentResult` and `finalizeMatchResultLocked` to update ephemeral `match_history` for losers, ensuring real-time immersion for both standard and tournament matches.
 - [FIXED] Implemented on-chain "Loss" reconstruction in `syncStatsFromBlockchain` via Global Result Recovery (Vault scan); contextualized `VBT_DNF` notes with opponent and TID metadata.
 - [FIXED] Enhanced `handleTournamentHistory` in `tournament_manager.go` to cross-reference `VBT_WIN` payout receipts with bracket matches for high-fidelity verification.
+- [FIXED] Implemented `ReceiptsVerified` field in `TournamentSummary` and updated `GetTournamentArchiveBadge` in `main.go` to provide visual feedback for deep financial verification.
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.
