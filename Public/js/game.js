@@ -189,7 +189,8 @@ export async function renderMatchHistory() {
             opponent: m.opponent_wallet,
             timestamp: new Date(m.timestamp).toLocaleString(),
             tournamentId: m.tournament_id,
-            matchId: m.match_id
+            matchId: m.match_id,
+            receiptTxId: m.receipt_tx_id // Include the new receiptTxId
         }));
     } else {
         // Fallback to local storage for guest sessions or non-indexed wins
@@ -217,8 +218,13 @@ export async function renderMatchHistory() {
             const shortId = entry.tournamentId.substring(0, 12);
             tourneyTag = `<span class="text-neon-purple" style="font-size: 0.8em; margin-left: 5px;" title="Tournament ID: ${entry.tournamentId}">[${shortId}${entry.matchId ? `:${entry.matchId}` : ''}]</span>`;
         }
+        
+        let verificationTag = '';
+        if (entry.receiptTxId) {
+            verificationTag = `<span class="receipt-verify-badge" title="Blockchain Receipt: ${entry.receiptTxId}" style="color: var(--neon-green); margin-left: 5px; font-weight: bold; cursor: help;">✓</span>`;
+        }
 
-        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}</span> vs ${opponentDisplay}${tourneyTag} <br/> 
+        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}${verificationTag}</span> vs ${opponentDisplay}${tourneyTag} <br/> 
                          <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;
         display.appendChild(div);
     });

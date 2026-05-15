@@ -219,7 +219,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				ClientID: env.FromID, Wallet: wallet, Reputation: l.leaderboard[wallet].Reputation,
 				DeckRating: data.DeckRating, JoinedAt: time.Now(), // FavoriteCardID is not part of QueueEntry
 			})
-			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck} // Initialize match state
+			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck}                  // Initialize match state
 			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false, false) // Update playstyle based on deck
 
 			go l.generateNPCCommentary(env.FromID, "MATCH_START")
@@ -247,7 +247,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		}
 
 		// PILLAR 3: Identity Normalization.
-		// Voi/AVM wallets are normalized to lowercase. 
+		// Voi/AVM wallets are normalized to lowercase.
 		// EVM addresses are normalized, but Solana (Base58) remains case-sensitive.
 		primaryWallet := strings.ToLower(data.PrimaryAVMWallet)
 		linkedAddr := data.LinkedAddress
@@ -366,7 +366,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				log.Printf("[SECURITY] Unauthorized CardID %d in move from %s. Using baseline power.\n", move.CardID, env.FromID)
 				card = ServerCard{ID: move.CardID, Power: [4]int{5, 5, 5, 5}}
 			}
-			
+
 			match.Board[move.GridIndex] = &ServerCard{
 				ID: move.CardID, Owner: pIdx, Power: card.Power,
 				Artifact: card.Artifact, Fatigue: card.Fatigue,
@@ -475,7 +475,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				notificationText = fmt.Sprintf("💖 %s's Loyalty increased by 10!", targetCard.Name)
 			}
 			// Vitality items are generally non-combat or out-of-match-high-stakes
-			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false, false) 
+			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false, false)
 			l.inventory[data.TargetCardID] = targetCard                                                                     // Update global card cache
 			playerStats.Playstyle.PreferredItems[data.ItemID] = playerStats.Playstyle.PreferredItems[data.ItemID]*0.9 + 1.0 // Update preferred items
 			l.persistentCardCache[data.TargetCardID] = targetCard                                                           // Update persistent cache
@@ -891,12 +891,17 @@ func (l *Lobby) handleUnregister(client *Client) {
 				}
 				if wallet, ok := l.wallets[client.id]; ok {
 					oppWallet := match.P1Wallet
-					if strings.EqualFold(wallet, match.P1Wallet) { oppWallet = match.P2Wallet }
-					
+					if strings.EqualFold(wallet, match.P1Wallet) {
+						oppWallet = match.P2Wallet
+					}
+
 					tourneyRound := 0
 					if match.TournamentMatchID != "" {
 						for _, tm := range l.tournament.Matches {
-							if tm.ID == match.TournamentMatchID { tourneyRound = tm.Round; break }
+							if tm.ID == match.TournamentMatchID {
+								tourneyRound = tm.Round
+								break
+							}
 						}
 					}
 					l.incrementDNF(wallet, tourneyRound, oppWallet, match.TournamentMatchID) // Pass match context for on-chain log
@@ -956,7 +961,9 @@ func (l *Lobby) handleBroadcast(message []byte) {
 		if env.Type == "move" {
 			if match, ok := l.matches[env.ToID]; ok {
 				for _, sID := range match.Spectators {
-					if sID == env.FromID { continue } // Don't echo to sender
+					if sID == env.FromID {
+						continue
+					} // Don't echo to sender
 					if s, ok := l.clients[sID]; ok {
 						select {
 						case s.send <- message:
@@ -1039,9 +1046,9 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		SocialRank        string         `json:"social_rank"`        // Added for UI display
 		EquippedFaceplate string         `json:"equipped_faceplate"` // For UI rendering
 		KidnappedCards    map[int]string `json:"kidnapped_cards"`    // Added for UI display
-		MatchHistory      []MatchHistory `json:"match_history"`       // Last 5 matches for immersion
-		HeldHostageCards  map[int]string `json:"held_hostage_cards"` 
-		Achievements      []string       `json:"achievements"`       // Added for UI display
+		MatchHistory      []MatchHistory `json:"match_history"`      // Last 5 matches for immersion
+		HeldHostageCards  map[int]string `json:"held_hostage_cards"`
+		Achievements      []string       `json:"achievements"` // Added for UI display
 		// JobRole and EmployerID are already present in the playerInfo struct
 		RumorCount int    `json:"rumor_count"` // Added for UI display
 		JobRole    string `json:"job_role"`    // Manager, Security, Clerk
@@ -1069,7 +1076,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				// UI Sync: Use Effective Mojo (including faceplate) for Career Path display
 				mojo = stats.GetEffectiveMojo()
 				wanted = stats.WantedLevel
-				// Alignment: Broadcast the Effective Cunning (including faceplate/penalty) 
+				// Alignment: Broadcast the Effective Cunning (including faceplate/penalty)
 				// to ensure the UI heist heuristic matches the server calculation.
 				cunning = stats.GetEffectiveCunning()
 				nurturing = stats.Nurturing
@@ -1093,11 +1100,11 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		players = append(players, playerInfo{
 			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
-			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation, 
+			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation,
 			AuctionsWon: auctionsWon,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			MatchHistory: matches,
-			JailedCards: jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
+			JailedCards:  jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,
 			JobRole: jobRole, EmployerID: employerID,
 		})
@@ -1120,13 +1127,13 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	}{
 		Players: players, MaintenanceActive: l.maintenanceMode,
 		MaintenanceTime: l.maintenanceTime,
-		Clubs:   l.clubs,
-		Rewards: l.rewards, FaucetBalance: l.faucetBalance,
+		Clubs:           l.clubs,
+		Rewards:         l.rewards, FaucetBalance: l.faucetBalance,
 		ActiveMatchCount: len(l.matches) / 2, Tournament: l.tournament,
 		AvailableNetworks: l.availableNetworks, AdminFocusNetwork: l.adminFocusNetwork,
-		Rumors: l.rumors,
-		BannedAvatars:     l.bannedAvatars,
-		BlackMarket:       l.blackMarket,
+		Rumors:        l.rumors,
+		BannedAvatars: l.bannedAvatars,
+		BlackMarket:   l.blackMarket,
 	}
 
 	payload, _ := json.Marshal(update)
@@ -1310,7 +1317,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	// Determine territory and authoritative moods before match initialization.
 	territoryID := l.assignMatchTerritoryLocked()
 	matchRules := map[string]bool{
-		"Open": true, "Power_copy": false, "Power_up": false, 
+		"Open": true, "Power_copy": false, "Power_up": false,
 		"Elemental_sync": true, "Fallen_penalty": true, "Sudden_death": true,
 	}
 
@@ -1325,7 +1332,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	}
 
 	// PILLAR 1: Regional Power Boost Calculation.
-	// Determine if the territory belongs to a Region (2+ districts) 
+	// Determine if the territory belongs to a Region (2+ districts)
 	// and if players are affiliated with the owning club.
 	p1Boost, p2Boost := false, false
 	if owningClub := l.getClubByTerritoryID(territoryID); owningClub != nil && len(owningClub.Territories) >= 2 {
@@ -1344,7 +1351,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	}
 
 	match := &MatchState{
-		P1ID:            id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
+		P1ID: id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
 		P1Wallet:        p1Wallet,
 		P2Wallet:        p2Wallet,
 		Rules:           matchRules,
@@ -1679,7 +1686,9 @@ func (l *Lobby) processPlaystyleDecay() {
 		// 1. Preference Decay with State Pruning
 		// Refactored into a reusable helper to handle rules, moods, and items.
 		decayAndPrune := func(m map[string]float64) {
-			if m == nil { return }
+			if m == nil {
+				return
+			}
 			for k, v := range m {
 				newVal := v * decayFactor
 				if newVal < cleanupThreshold {
@@ -1768,11 +1777,15 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 				currentRoundMatches = append(currentRoundMatches, m)
 			}
 		}
-		if len(currentRoundMatches) == 0 { break } // No more matches in this round
+		if len(currentRoundMatches) == 0 {
+			break
+		} // No more matches in this round
 
 		for _, m := range currentRoundMatches {
 			winner := m.P1
-			if rand.Intn(2) == 1 { winner = m.P2 } // Randomly pick winner
+			if rand.Intn(2) == 1 {
+				winner = m.P2
+			} // Randomly pick winner
 			l.processTournamentResult(m.ID, winner) // This will advance rounds and finalize
 		}
 		// Small delay to simulate time passing between rounds
@@ -1852,9 +1865,9 @@ func (l *Lobby) processMojoDecay() {
 		}
 
 		if now.Sub(club.LastActivity) > stagnationThreshold {
-			// PILLAR 1: Dynamic Decay Scaling. 
+			// PILLAR 1: Dynamic Decay Scaling.
 			// Larger clubs lose more Mojo to maintain competitive churn.
-			
+
 			isRegion := len(club.Territories) >= 2
 			decayRate := 0.02
 			minDecay := 5
@@ -1867,7 +1880,9 @@ func (l *Lobby) processMojoDecay() {
 			}
 
 			decayAmount := int(float64(club.Mojo)*decayRate + 0.5)
-			if decayAmount < minDecay { decayAmount = minDecay }
+			if decayAmount < minDecay {
+				decayAmount = minDecay
+			}
 
 			club.Mojo -= decayAmount
 			if club.Mojo < 0 {
@@ -1876,7 +1891,7 @@ func (l *Lobby) processMojoDecay() {
 			decayOccurred = true
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay (isRegion: %v). New Mojo: %d\n", club.Name, isRegion, club.Mojo)
 
-			// PILLAR 1: Rippled Standing Decay. 
+			// PILLAR 1: Rippled Standing Decay.
 			// Recalculate reputation for all employees whose standing relies on this club's Mojo.
 			for wallet, stats := range l.leaderboard {
 				if stats.EmployerClubID == club.ID {
@@ -1885,7 +1900,7 @@ func (l *Lobby) processMojoDecay() {
 				}
 			}
 			// Reset clock to 'now' so decay is periodic (e.g., every 48h) rather than continuous
-			club.LastActivity = now 
+			club.LastActivity = now
 		}
 	}
 
@@ -1908,13 +1923,56 @@ func (l *Lobby) archiveSeason() {
 		V int    `json:"v"` // Victories
 		R string `json:"r"` // Rating
 	}
+	type highlight struct {
+		W string `json:"w"` // Wallet
+		A string `json:"a"` // Award
+		M string `json:"m"` // Meta/Detail
+	}
+
 	var standings []hofEntry
+	var highlights []highlight
+
+	var topMojo int = -1
+	var mojoKing string
+
 	for w, s := range l.leaderboard {
 		if s.Wins > 0 {
 			standings = append(standings, hofEntry{W: w, V: s.Wins, R: s.BestRating})
 		}
+
+		// PILLAR 4: Prestige Highlights.
+		// 1. Identify Tournament Champions using achievement triggers
+		for _, ach := range s.Achievements {
+			if ach == "TOURNAMENT_CHAMPION" {
+				// Scan history for the most recent Tournament ID
+				eventID := "Elite Event"
+				for _, h := range s.History {
+					if h.TournamentID != "" && h.WinnerIndex == 0 {
+						eventID = h.TournamentID
+						break
+					}
+				}
+				highlights = append(highlights, highlight{W: w, A: "Tournament Champion", M: eventID})
+				break
+			}
+		}
+
+		// 2. Identify High-Finance Leaders (Art Collectors)
+		if s.AuctionsWon >= 3 {
+			highlights = append(highlights, highlight{W: w, A: "Master Collector", M: fmt.Sprintf("%d Gallery Victories", s.AuctionsWon)})
+		}
+
+		// 3. Track social peak for Mojo highlight
+		if s.Mojo > topMojo {
+			topMojo = s.Mojo
+			mojoKing = w
+		}
 	}
 	sort.Slice(standings, func(i, j int) bool { return standings[i].V > standings[j].V })
+
+	if mojoKing != "" && topMojo > 0 {
+		highlights = append(highlights, highlight{W: mojoKing, A: "Social Titan", M: fmt.Sprintf("%d Mojo", topMojo)})
+	}
 
 	// Take Top 10 for the archive note
 	limit := 10
@@ -1923,15 +1981,17 @@ func (l *Lobby) archiveSeason() {
 	}
 
 	summary := struct {
-		Season int        `json:"season"`
-		Start  time.Time  `json:"start"`
-		End    time.Time  `json:"end"`
-		Top    []hofEntry `json:"top"`
+		Season     int         `json:"season"`
+		Start      time.Time   `json:"start"`
+		End        time.Time   `json:"end"`
+		Highlights []highlight `json:"highlights,omitempty"`
+		Top        []hofEntry  `json:"top"`
 	}{
-		Season: l.seasonNumber,
-		Start:  l.seasonStart,
-		End:    time.Now(),
-		Top:    standings[:limit],
+		Season:     l.seasonNumber,
+		Start:      l.seasonStart,
+		End:        time.Now(),
+		Highlights: highlights,
+		Top:        standings[:limit],
 	}
 
 	jsonData, _ := json.Marshal(summary)
@@ -1986,6 +2046,7 @@ func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	// RumorCount is an int, no map initialization needed
 	l.leaderboard[wallet] = stats
 }
+
 // refreshRegionalRoles updates governor status for clubs based on territory control.
 func (l *Lobby) refreshRegionalRoles() {
 	l.mutex.Lock()

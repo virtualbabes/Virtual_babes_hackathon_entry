@@ -1262,6 +1262,11 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 		Season int       `json:"season"`
 		Start  time.Time `json:"start"`
 		End    time.Time `json:"end"`
+		Highlights []struct {
+			W string `json:"w"` // Wallet
+			A string `json:"a"` // Award/Placement Title
+			M string `json:"m"` // Meta/Detail (e.g. Tournament ID)
+		} `json:"highlights,omitempty"`
 		Top    []struct {
 			W string `json:"w"` // Wallet
 			V int    `json:"v"` // Wins
