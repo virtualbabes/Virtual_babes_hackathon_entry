@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 // handleCourthouseReset allows players to pay a $VBV fine to reset their Wanted Level.
@@ -26,8 +27,10 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	targetWallet := strings.ToLower(req.Wallet)
+
 	l.mutex.RLock()
-	stats, exists := l.leaderboard[req.Wallet]
+	stats, exists := l.leaderboard[targetWallet]
 	voiConfig, voiOk := l.availableNetworks["Voi Mainnet"]
 	avoiAssetID := l.avoiAssetID
 	vaultAddr := l.vaultAddress
@@ -48,16 +51,19 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 	costMicro := uint64(costBase * 1000000)
 
 	assetID := voiConfig.AssetID
+	if assetID == "" {
+		assetID = voiConfig.AppID
+	}
 	verifyNet := "Voi"
 	if req.Network == "ALGO" {
 		assetID = avoiAssetID
 		verifyNet = "Algorand"
 	}
 
-	// Verify the fine payment transaction via blockchain indexer
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, req.TxID, costMicro, assetID, req.Wallet, vaultAddr)
+	// PILLAR 3: Specific Purpose Verification for courthouse fines
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, req.TxID, costMicro, assetID, targetWallet, vaultAddr, "COURTHOUSE_FINE:")
 	if err != nil || !verified {
-		log.Printf("[COURTHOUSE] Verification failed for %s. Error: %v\n", req.Wallet, err)
+		log.Printf("[COURTHOUSE] Verification failed for %s. Error: %v\n", targetWallet, err)
 		http.Error(w, "Fine payment verification failed or insufficient amount", http.StatusPaymentRequired)
 		return
 	}
@@ -65,20 +71,20 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 	// Update Player Stats and Vault balance
 	l.mutex.Lock()
 	stats.WantedLevel = 0
-	l.leaderboard[req.Wallet] = stats
+	l.leaderboard[targetWallet] = stats
 
 	if len(l.clubs) > 0 {
-		l.faucetBalance += (costBase / 2.0)                    // Half returns to Faucet
+		l.faucetBalance += (costBase / 2.0)                     // Half returns to Faucet
 		l.distributeCourthouseFineToClubsLocked(costBase / 2.0) // Half to Clubs
 	} else {
 		// Industrial Loop fallback: Faucet absorbs the full fine if no clubs exist
 		l.faucetBalance += costBase
 	}
 
-	l.logAdminAuditLocked("COURTHOUSE_RESET", req.Wallet, fmt.Sprintf("Paid %.2f $VBV fine", costBase))
+	l.logAdminAuditLocked("COURTHOUSE_RESET", targetWallet, fmt.Sprintf("Paid %.2f $VBV fine", costBase))
 	l.mutex.Unlock()
 
-	go l.unlockAchievement(req.Wallet, "REHABILITATED")
+	go l.unlockAchievement(targetWallet, "REHABILITATED")
 
 	// Update all clients with the new social standing
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
