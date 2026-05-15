@@ -190,4 +190,5 @@
 - [FIXED] Hardened `dispatchReward` in `faucet_service.go` to correctly apply Mojo tier multipliers to Bounty Hunter payouts.
 - [FIXED] Implemented Regional Power Boost logic in `battle_service.go`, `main.go`, and `app.js` to provide tactical advantages for multi-territory governance.
 - [FIXED] Hardened `handleUnregister` and `incrementDNF` in `lobby_manager.go` to implement scaled tournament DNF penalties based on bracket round; fixed signature mismatch and missing `Round` field in `MatchState`.
+- [FIXED] Implemented themed 'Bounty Ticker' in `economy.js` and integrated with `network.js` for real-time criminal reward tracking in the lobby.
 - [FIXED] Resolved recursive deadlock vulnerabilities in `handleKidnapRequest` within `handlers_criminality.go` by utilizing `sendToClientLocked` in all execution branches.

@@ -6,7 +6,7 @@ import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBr
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
-import { openShopsOverlay, buyClubItem, openClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker } from './js/economy.js';
+import { openShopsOverlay, buyClubItem, openClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, openClubLeaseBoard, adjustMapZoom, openTerritoryMapOverlay, switchPortfolioTab, takeLease, updateMarketTicker, updateBountyTicker } from './js/economy.js';
 import { openCourthouse, openSecuritySentry, openBountyBoard, openRumorMill, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer } from './js/criminality.js';
 import { updateMasterVolume, updateMusicVolume, updateSfxVolume, toggleMuteMusic, masterVolume, musicVolume, sfxVolume, syncSFXGain, initAudioContext, playCharacterVoiceLine } from './js/audio.js';
 import { initParticleSystem, triggerCaptureParticles } from './js/particles.js';
@@ -121,6 +121,7 @@ window.setMasterVolume = setMasterVolume;
 window.setMusicVolume = setMusicVolume;
 window.setSfxVolume = setSfxVolume;
 window.updateMarketTicker = updateMarketTicker;
+window.updateBountyTicker = updateBountyTicker;
 window.renderCardHTML = renderCardHTML;
 window.showPowerTooltip = showPowerTooltip;
 window.movePowerTooltip = movePowerTooltip;

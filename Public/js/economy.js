@@ -317,6 +317,9 @@ export async function submitConsignment() {
 export let tickerItems = [];
 export let tickerOffset = 0;
 export let tickerAnimId = null;
+export let bountyItems = [];
+export let bountyOffset = 0;
+export let bountyAnimId = null;
 export let mapZoom = 1.0;
 
 export function updateMarketTicker(players) {
@@ -420,6 +423,85 @@ export function startTickerAnimation() {
         tickerAnimId = requestAnimationFrame(animate);
     };
     tickerAnimId = requestAnimationFrame(animate);
+}
+
+/**
+ * Bounty Ticker: Scrolls live rewards for hunting high-Wanted outlaws.
+ * Utilizes a themed canvas (Gold/Red) positioned below the market ticker.
+ */
+export function updateBountyTicker(players) {
+    const spacing = 80;
+    let tickerContainer = document.getElementById("bounty-ticker");
+    if (!tickerContainer) {
+        tickerContainer = document.createElement("div");
+        tickerContainer.id = "bounty-ticker";
+        tickerContainer.className = "market-ticker-container";
+        tickerContainer.style.top = "30px"; // Visual offset for double-ticker stack
+        tickerContainer.innerHTML = `
+            <div class="ticker-label" style="background: #ff4b4b; color: #fff;">WANTED:</div>
+            <canvas id="bounty-ticker-canvas" style="flex: 1; height: 30px; cursor: default;"></canvas>
+        `;
+        const marketTicker = document.getElementById("market-ticker");
+        if (marketTicker) marketTicker.after(tickerContainer);
+        else document.body.prepend(tickerContainer);
+
+        const canvas = document.getElementById("bounty-ticker-canvas");
+        const resize = () => {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 30 * dpr;
+            canvas.getContext('2d').scale(dpr, dpr);
+        };
+        window.addEventListener('resize', resize);
+        resize();
+    }
+
+    const outlaws = players.filter(p => (p.wanted_level || 0) >= 10).sort((a, b) => b.wanted_level - a.wanted_level);
+    const newItems = outlaws.length === 0 ? 
+        [{ symbol: "SECTOR SECURE", val: "No active bounties.", color: "#3fb950" }] :
+        outlaws.map(p => ({
+            symbol: getCachedEnvoiName(p.wallet),
+            val: `REWARD: ${(p.wanted_level * 50).toFixed(0)} $VBV`,
+            color: "#ffd700"
+        }));
+
+    const ctx = document.getElementById("bounty-ticker-canvas").getContext('2d');
+    bountyItems = newItems.map(item => {
+        ctx.font = "bold 12px 'Rajdhani', sans-serif";
+        item.width = ctx.measureText(`${item.symbol} ${item.val}`).width + spacing;
+        return item;
+    });
+
+    if (!bountyAnimId) startBountyAnimation();
+}
+
+export function startBountyAnimation() {
+    const canvas = document.getElementById("bounty-ticker-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const animate = () => {
+        const width = canvas.width / (window.devicePixelRatio || 1);
+        const totalWidth = bountyItems.reduce((s, i) => s + i.width, 0);
+        if (totalWidth <= 0) { bountyAnimId = requestAnimationFrame(animate); return; }
+        bountyOffset = (bountyOffset + 0.6) % totalWidth;
+        ctx.clearRect(0, 0, width, 30);
+        ctx.textBaseline = "middle";
+        let x = -bountyOffset;
+        while (x < width) {
+            bountyItems.forEach(item => {
+                if (x + item.width > 0 && x < width) {
+                    ctx.fillStyle = item.color || "#ffd700";
+                    ctx.fillText(item.symbol, x, 15);
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillText(" " + item.val, x + ctx.measureText(item.symbol).width, 15);
+                }
+                x += item.width;
+            });
+        }
+        bountyAnimId = requestAnimationFrame(animate);
+    };
+    bountyAnimId = requestAnimationFrame(animate);
 }
 
 export function adjustMapZoom(delta) {

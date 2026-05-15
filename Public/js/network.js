@@ -5,7 +5,7 @@ import { showToast, setTransactionStatus } from './ui.js';
 import { updateWalletUI, disconnectUserWallet, initWalletConnect } from './wallet.js';
 import { handleTournamentUI, setSeasonEnd, startSeasonTimer } from './leaderboard.js';
 import { updatePlayerList } from './game.js';
-import { updateMarketTicker, buyBlackMarketItem } from './economy.js';
+import { updateMarketTicker, updateBountyTicker, buyBlackMarketItem } from './economy.js';
 import { handleMaintenanceUI } from './ui.js';
 import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs } from './admin.js';
 import { updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer } from './criminality.js';
@@ -135,6 +135,7 @@ export function handleServerMessage(msg) {
             setLastLobbyPlayers(msg.payload.players);
             updatePlayerList(msg.payload.players);
             updateMarketTicker(msg.payload.players);
+            updateBountyTicker(msg.payload.players);
 
             // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
             const me = msg.payload.players.find(p => p.id === myClientId);
