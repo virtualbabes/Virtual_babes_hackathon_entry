@@ -192,15 +192,38 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress, l.vaultAddress)
 
-	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			http.Error(w, "Failed to connect to indexer", http.StatusInternalServerError)
+			return
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			http.Error(w, "Indexer rate-limited (429)", http.StatusTooManyRequests)
+			return
+		}
+		break
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, fmt.Sprintf("Indexer returned non-200 status: %d", resp.StatusCode), http.StatusInternalServerError)
+		return
+	}
 	var res struct {
 		Transfers []struct {
 			TransactionID string `json:"transactionId"`
