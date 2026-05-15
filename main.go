@@ -52,6 +52,7 @@ type TournamentMatch struct {
 	P2     string `json:"p2"` // Wallet Address
 	Winner string `json:"winner,omitempty"`
 	Round  int    `json:"round"`
+	ReceiptTxID string `json:"receipt_txid,omitempty"` // On-chain VBT_WIN receipt ID
 }
 
 // LinkedWallet represents a non-AVM wallet linked to a primary AVM wallet.
@@ -2368,12 +2369,13 @@ func registerFunctions() {
 
 // GetTournamentArchiveBadge returns a stylized HTML badge based on verification status
 func GetTournamentArchiveBadge(this js.Value, args []js.Value) interface{} {
-	if len(args) < 3 { // Updated to expect 3 arguments: isVerified, links, receiptsVerified
+	if len(args) < 4 { // Now expects 4 arguments: isVerified, links, receiptsVerified, payoutsHash
 		return ""
 	}
 	isVerified := args[0].Bool()
 	jsLinks := args[1] // This is a JS array
 	receiptsVerified := args[2].Bool()
+	payoutsHash := args[3].String()
 
 	var links []string
 	if jsLinks.Type() == js.TypeObject && jsLinks.Get("length").Truthy() {

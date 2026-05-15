@@ -108,7 +108,7 @@ export async function fetchTournamentHistory(page = 1) {
                     <div class="flex-row justify-between align-center mb-10">
                         <b class="text-neon-cyan">TOURNAMENT #${t.id.substring(0, 8)}</b>
                         <small class="opacity-5">${new Date(t.timestamp).toLocaleDateString()}</small>
-                        ${window.GetTournamentArchiveBadge(t.is_verified, t.links, t.receipts_verified)}
+                        ${window.GetTournamentArchiveBadge(t.is_verified, t.links || [], t.receipts_verified, t.payouts_hash || "")}
                     </div>
                     <div class="flex-row justify-between">
                         <span>Winner: <b class="text-gold">${getCachedEnvoiName(t.winner)}</b></span>
@@ -190,12 +190,13 @@ window.generateBracketHTML = (matches, activeRound = -1) => {
                 const p2Short = getCachedEnvoiName(m.p2);
                 const isWinnerP1 = m.winner === m.p1;
                 const isWinnerP2 = m.winner === m.p2;
+                const receiptTag = m.receipt_txid ? `<span class="receipt-verify-badge" title="Blockchain Receipt: ${m.receipt_txid}" style="color: var(--neon-green); margin-left: 5px; font-weight: bold; cursor: help;">✓</span>` : '';
                 
                 return `
                     <div class="bracket-match ${(activeRound == r && !m.winner) ? 'active' : ''}">
-                        <div class="bracket-player ${isWinnerP1 ? 'winner' : m.winner ? 'loser' : ''}">${p1Short}</div>
+                        <div class="bracket-player ${isWinnerP1 ? 'winner' : m.winner ? 'loser' : ''}">${p1Short}${isWinnerP1 ? receiptTag : ''}</div>
                         <div class="vs-label">VS</div>
-                        <div class="bracket-player ${isWinnerP2 ? 'winner' : m.winner ? 'loser' : ''}">${p2Short}</div>
+                        <div class="bracket-player ${isWinnerP2 ? 'winner' : m.winner ? 'loser' : ''}">${p2Short}${isWinnerP2 ? receiptTag : ''}</div>
                     </div>
                 `;
             }).join('')}

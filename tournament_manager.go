@@ -272,6 +272,7 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	uniqueSummaries := make(map[string]TournamentSummary)
 	chunkMap := make(map[string][]TournamentMatch)
 	matchReceipts := make(map[string]map[string]string) // TournamentID -> MatchID -> Winner
+	matchTxIDs := make(map[string]map[string]string)    // TournamentID -> MatchID -> TxID
 	payoutTxIDs := make(map[string][]string)            // TournamentID -> list of TxIDs
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
@@ -297,6 +298,8 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 					if data.TID != "" && data.MID != "" {
 						if matchReceipts[data.TID] == nil { matchReceipts[data.TID] = make(map[string]string) }
 						matchReceipts[data.TID][data.MID] = tx.To
+						if matchTxIDs[data.TID] == nil { matchTxIDs[data.TID] = make(map[string]string) }
+						matchTxIDs[data.TID][data.MID] = tx.TransactionID
 					}
 				}
 			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_PAYOUT:") {
@@ -337,12 +340,15 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 			// Verify that the winner of each match actually received an on-chain reward.
 			if s.IsVerified {
 				allReceiptsValid := true
-				for _, m := range s.Matches {
+				for i, m := range s.Matches {
 					if m.Winner != "" && !strings.EqualFold(m.P2, "BYE") {
-						if paidWinner, exists := matchReceipts[s.ID][m.ID]; !exists || !strings.EqualFold(paidWinner, m.Winner) {
+						paidWinner, exists := matchReceipts[s.ID][m.ID]
+						if !exists || !strings.EqualFold(paidWinner, m.Winner) {
 							allReceiptsValid = false
 							log.Printf("[ARCHIVE] Receipt mismatch for match %s: Summary says %s, Payout says %s", m.ID, m.Winner, paidWinner)
-							break
+						} else {
+							// Attach specific VBT_WIN receipt to the match record for bracket immersion
+							s.Matches[i].ReceiptTxID = matchTxIDs[s.ID][m.ID]
 						}
 					}
 				}

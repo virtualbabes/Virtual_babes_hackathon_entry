@@ -143,3 +143,4 @@
 124. **Complete**: Hardened tournament reconstruction logic to verify PayoutsHash; refactored ID generation to registration window opening to ensure payout receipts (VBT_TOURN_PAYOUT) carry authoritative TournamentIDs.
 123. **Complete**: Updated `finalizeTournament` in `tournament_manager.go` to collect reward TxIDs and include a `PayoutsHash` in the on-chain summary for deep verification; refactored to background finalization to prevent lobby blocking.
 125. **Complete**: Updated `renderMatchHistory` in `game.js` and associated backend handlers to display both Tournament Instance ID and Match Position for enhanced historical immersion.
+126. **Complete**: Hardened tournament bracket display by associating `VBT_WIN` receipts with individual matches; upgraded `GetTournamentArchiveBadge` to Gold 'FINANCIALLY SEALED' status.

@@ -375,6 +375,7 @@ type TournamentMatch struct {
 	P2     string `json:"p2"` // Wallet Address
 	Winner string `json:"winner,omitempty"`
 	Round  int    `json:"round"`
+	ReceiptTxID string `json:"receipt_txid,omitempty"` // On-chain VBT_WIN receipt ID
 }
 
 // TournamentState tracks the progress of an automated event.
