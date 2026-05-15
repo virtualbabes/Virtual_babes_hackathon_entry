@@ -254,6 +254,7 @@
 - [FIXED] Resolved potential deadlock in `simulateTournament` by refactoring `distributeTournamentKickback` into a `Locked` variant and implemented lock pulsing during simulation loops.
 - [FIXED] Added `clean` script to `package.json` and integrated it into the `build` command to ensure fresh production artifacts.
 - [FIXED] Hardened `CalculateReputation` in `economy_service.go` by implementing a diminishing returns curve for raw wins to maintain social marker relevance during extreme simulations.
+- [DEPLOYED] Synchronized and force-pushed local hardened state to the official Virtualbabes main branch, effectively overwriting the repository for the hackathon submission.
 
 - [FIXED] Hardened `handleTournamentRegister` with concurrency throttling and duplicate verification guards to protect indexer stability.
 - [FIXED] Hardened `verifyBuyInTransaction` in `oracle_service.go` with backoff for 429 rate-limits and improved error handling for non-200 indexer responses.
