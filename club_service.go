@@ -381,21 +381,29 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 		}
 	}
 
-	club, exists = l.clubs[data.ClubID]
+	club, exists := l.clubs[data.ClubID]
 	if !exists || strings.ToLower(club.OwnerWallet) != strings.ToLower(ownerWallet) {
 		l.mutex.Unlock()
 		return
 	}
 
 	club.Territories = append(club.Territories, data.TerritoryID)
+
+	// PILLAR 1: Immediate Regional Role & Achievement Integration.
+	// If this is the second district, trigger Governor status immediately to ensure atomic UI sync.
+	if len(club.Territories) >= 2 {
+		if club.RegionName == "" {
+			club.RegionName = "Governor"
+		}
+		l.unlockAchievementLocked(strings.ToLower(club.OwnerWallet), "GOVERNOR")
+	}
+
 	l.clubs[data.ClubID] = club
 	club.LastActivity = time.Now()
 	l.mutex.Unlock()
 
 	l.logAdminAudit("TERRITORY_PURCHASED", ownerWallet, fmt.Sprintf("Club: %s (%s), Territory: %s", club.Name, club.ID, data.TerritoryID))
 	l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🗺️ Club '%s' has acquired %s!"}`, club.Name, data.TerritoryID))})
-
-	go l.refreshRegionalRoles()
 
 	// Trigger Global Sync to update territory ownership visuals
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()

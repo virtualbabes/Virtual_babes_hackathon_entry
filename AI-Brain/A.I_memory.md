@@ -405,4 +405,5 @@
 34. Complete: Implemented `calculateMojoGain` in `club_service.go` to reward shop turnover and heist defense with Governor-weighted scaling.
 35. Complete: Hardened `refreshRegionalRoles` in `lobby_manager.go` to trigger the GOVERNOR achievement upon reaching the 2-territory threshold.
 36. Complete: Hardened `CalculateReputation` in `economy_service.go` by implementing variable-weight bonuses for milestone achievements like GOVERNOR and ARENA_LEGEND.
+37. Complete: Hardened `handlePurchaseTerritory` in `club_service.go` to atomically trigger GOVERNOR status and achievement bonuses during district acquisition.
 - [x] Audited Ephemeral Cleanup: Verified `cleanupNonces` safety for spectating sessions.

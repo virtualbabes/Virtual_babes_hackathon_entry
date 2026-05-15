@@ -151,4 +151,5 @@
 - [FIXED] Implemented missing `calculateMojoGain` function in `club_service.go` to complete the Mojo lifecycle specified in the expansion plan.
 - [FIXED] Integrated the `GOVERNOR` achievement trigger into `refreshRegionalRoles` in `lobby_manager.go` to reward multi-district territory expansion.
 - [FIXED] Hardened `CalculateReputation` in `economy_service.go` to provide variable Standing bonuses for milestone achievements.
+- [FIXED] Resolved race condition in `handlePurchaseTerritory` and fixed variable scope error to ensure atomic GOVERNOR achievement triggers.
 - [FIXED] Hardened `handlePayRansom` in `handlers_criminality.go` with micro-unit precision rounding for Laundering Taxes.
