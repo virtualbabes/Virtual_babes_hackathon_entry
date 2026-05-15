@@ -73,9 +73,37 @@ export async function adminAddNetwork() { // Exported for use in app.js
 
 export async function adminBroadcast() { // Exported for use in app.js
     const text = document.getElementById("admin-msg-text").value;
+    const priority = document.getElementById("admin-msg-priority")?.value || "info"; 
     if (!text) return;
+
     const headers = await getAdminHeaders();
     } catch (err) { showToast("❌ Broadcast failed", "error"); }
+    if (!headers) return;
+
+    setTransactionStatus("Broadcasting system message...", "info");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/system-message`, {
+            method: "POST",
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text, priority })
+        });
+
+        if (response.ok) {
+            showToast("📢 Message broadcasted successfully.", "success");
+            document.getElementById("admin-msg-text").value = "";
+        } else {
+            const err = await response.text();
+            showToast(`❌ Broadcast failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Broadcast failed", "error");
+    } finally {
+        setTransactionStatus(null);
+    }
 }
 
 export async function adminUpdateRules() { // Exported for use in app.js
