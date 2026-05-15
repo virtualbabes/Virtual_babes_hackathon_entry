@@ -238,4 +238,5 @@
 - [FIXED] Updated `syncStatsFromBlockchain` in `oracle_service.go` to correctly populate `ReceiptTxID` for mirrored 'Loss' and 'DNF' records via vault metadata recovery.
 - [FIXED] Enhanced `renderMatchHistory` in `game.js` to visually indicate blockchain-verified match results using the `ReceiptTxID` field.
 - [FIXED] Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with specialized iconography and Envoi name resolution for seasonal archives.
+- [FIXED] Implemented automated recovery of `paidParticipants` from blockchain buy-in notes to ensure tournament registration state survives server restarts.
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.

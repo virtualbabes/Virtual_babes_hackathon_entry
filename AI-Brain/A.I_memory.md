@@ -140,11 +140,12 @@
 120. **Complete**: Enhanced `handleTournamentHistory` to ingest `VBT_WIN` payout receipts for high-fidelity, receipt-backed bracket verification during deep reconstruction.
 121. **Complete**: Hardened TournamentSummary archival by adding ReceiptsVerified status; updated GetTournamentArchiveBadge in main.go to visually distinguish between Checksum and Receipt verification.
 122. **Complete**: Updated `fetchTournamentHistory` in `leaderboard.js` to correctly pass `receipts_verified` to the `GetTournamentArchiveBadge` helper.
-124. **Complete**: Hardened tournament reconstruction logic to verify PayoutsHash; refactored ID generation to registration window opening to ensure payout receipts (VBT_TOURN_PAYOUT) carry authoritative TournamentIDs.
 123. **Complete**: Updated `finalizeTournament` in `tournament_manager.go` to collect reward TxIDs and include a `PayoutsHash` in the on-chain summary for deep verification; refactored to background finalization to prevent lobby blocking.
+124. **Complete**: Hardened tournament reconstruction logic to verify PayoutsHash; refactored ID generation to registration window opening to ensure payout receipts (VBT_TOURN_PAYOUT) carry authoritative TournamentIDs.
 125. **Complete**: Updated `renderMatchHistory` in `game.js` and associated backend handlers to display both Tournament Instance ID and Match Position for enhanced historical immersion.
 126. **Complete**: Hardened tournament bracket display by associating `VBT_WIN` receipts with individual matches; upgraded `GetTournamentArchiveBadge` to Gold 'FINANCIALLY SEALED' status.
 127. **Complete**: Hardened `syncStatsFromBlockchain` to capture `ReceiptTxID` for all history records (Win, Loss, DNF); updated `MatchHistory` struct to support persistent financial proof.
 128. **Complete**: Updated `renderMatchHistory` in `game.js` to display a verification checkmark for match history entries with an on-chain `ReceiptTxID`.
 129. **Complete**: Updated `handleSeasonHistory` in `oracle_service.go` and `archiveSeason` in `lobby_manager.go` to include prestigious placement highlights (Champions, Collectors, Titans) reconstructed from player history and achievements.
 130. **Complete**: Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with stylized "Hall of Valor" icons and resolved Envoi names.
+131. **Complete**: Hardened `syncStatsFromBlockchain` and `loadRegistrationsFromIndexer` to reconstruct `paidParticipants` for active tournament windows; fixed `handleTournamentRegister` timestamp bug.

@@ -193,7 +193,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 
 	l.paidParticipants = append(l.paidParticipants, targetWallet)
 	if !isElite {
-		l.registeredTxIDs[req.TxID] = time.Now()
+		l.registeredTxIDs[req.TxID] = actualRegistrationTime
 		l.faucetBalance += (buyInAmt / 2.0)
 		l.tournamentPotBonus += (buyInAmt / 2.0)
 	}

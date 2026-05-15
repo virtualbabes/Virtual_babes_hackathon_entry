@@ -665,6 +665,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
+				From          string `json:"from"`
 					Metadata      string `json:"metadata"`
 					Timestamp     int64  `json:"timestamp"`
 				} `json:"transfers"`
@@ -673,7 +674,17 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				l.mutex.Lock()
 				for _, tx := range regRes.Transfers {
 					if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:") || strings.HasPrefix(tx.Metadata, "ARENA_TOURN_BUYIN:") {
-						l.registeredTxIDs[tx.TransactionID] = time.Unix(tx.Timestamp, 0)
+						txTime := time.Unix(tx.Timestamp, 0)
+						l.registeredTxIDs[tx.TransactionID] = txTime
+
+						// PILLAR 3: Registration Reconstruction.
+						// Discover and restore tournament eligibility if a window is currently open.
+						if l.tournament.Active && l.tournament.CurrentRound == 0 && txTime.After(l.tournament.OpenTime) {
+							if !l.isWalletRegistered(wallet) {
+								l.paidParticipants = append(l.paidParticipants, wallet)
+								log.Printf("[ORACLE] Reconstructed tournament entry for %s (Tx: %s)\n", wallet, tx.TransactionID)
+							}
+						}
 					}
 				}
 				l.mutex.Unlock()
