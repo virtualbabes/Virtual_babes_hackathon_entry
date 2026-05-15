@@ -140,4 +140,5 @@
 120. **Complete**: Enhanced `handleTournamentHistory` to ingest `VBT_WIN` payout receipts for high-fidelity, receipt-backed bracket verification during deep reconstruction.
 121. **Complete**: Hardened TournamentSummary archival by adding ReceiptsVerified status; updated GetTournamentArchiveBadge in main.go to visually distinguish between Checksum and Receipt verification.
 122. **Complete**: Updated `fetchTournamentHistory` in `leaderboard.js` to correctly pass `receipts_verified` to the `GetTournamentArchiveBadge` helper.
+124. **Complete**: Hardened tournament reconstruction logic to verify PayoutsHash; refactored ID generation to registration window opening to ensure payout receipts (VBT_TOURN_PAYOUT) carry authoritative TournamentIDs.
 123. **Complete**: Updated `finalizeTournament` in `tournament_manager.go` to collect reward TxIDs and include a `PayoutsHash` in the on-chain summary for deep verification; refactored to background finalization to prevent lobby blocking.

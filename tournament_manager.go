@@ -271,7 +271,8 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 
 	uniqueSummaries := make(map[string]TournamentSummary)
 	chunkMap := make(map[string][]TournamentMatch)
-	receiptMap := make(map[string]string) // MatchID -> WinnerWallet
+	matchReceipts := make(map[string]map[string]string) // TournamentID -> MatchID -> Winner
+	payoutTxIDs := make(map[string][]string)            // TournamentID -> list of TxIDs
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
 			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_SUMM:") {
@@ -288,15 +289,23 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_DATA:")), &chunk)
 				chunkMap[tx.TransactionID] = chunk.Matches
 			} else if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
-				// PILLAR 4: Receipt-Backed Verification.
-				// Parse victory notes to associate TournamentMatchIDs with the actual recipient of funds.
+				var data struct {
+					TID string `json:"tid"` // Tournament ID
+					MID string `json:"mid"` // Match ID
+				}
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+					if data.TID != "" && data.MID != "" {
+						if matchReceipts[data.TID] == nil { matchReceipts[data.TID] = make(map[string]string) }
+						matchReceipts[data.TID][data.MID] = tx.To
+					}
+				}
+			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_PAYOUT:") {
+				// PILLAR 4: Group Payout Verification.
 				var data struct {
 					TID string `json:"tid"`
 				}
-				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
-					if data.TID != "" {
-						receiptMap[data.TID] = tx.To
-					}
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_PAYOUT:")), &data); err == nil && data.TID != "" {
+					payoutTxIDs[data.TID] = append(payoutTxIDs[data.TID], tx.TransactionID)
 				}
 			}
 		}
@@ -330,7 +339,7 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 				allReceiptsValid := true
 				for _, m := range s.Matches {
 					if m.Winner != "" && !strings.EqualFold(m.P2, "BYE") {
-						if paidWinner, exists := receiptMap[m.ID]; !exists || !strings.EqualFold(paidWinner, m.Winner) {
+						if paidWinner, exists := matchReceipts[s.ID][m.ID]; !exists || !strings.EqualFold(paidWinner, m.Winner) {
 							allReceiptsValid = false
 							log.Printf("[ARCHIVE] Receipt mismatch for match %s: Summary says %s, Payout says %s", m.ID, m.Winner, paidWinner)
 							break
@@ -338,6 +347,21 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 					}
 				}
 				s.ReceiptsVerified = allReceiptsValid
+
+				// PILLAR 4: Deep Verification - Payouts Hash check
+				if s.ReceiptsVerified && s.PayoutsHash != "" {
+					foundIDs := payoutTxIDs[s.ID]
+					if len(foundIDs) > 0 {
+						sort.Strings(foundIDs)
+						hashInput := strings.Join(foundIDs, ",")
+						h := sha256.Sum256([]byte(hashInput))
+						calculatedHash := hex.EncodeToString(h[:])
+						if calculatedHash != s.PayoutsHash {
+							log.Printf("[ARCHIVE] PayoutsHash mismatch for tournament %s", s.ID)
+							s.ReceiptsVerified = false
+						}
+					}
+				}
 			}
 		}
 		// If not deepVerify, s.Matches will only contain what was directly in the summary (potentially nil if chunked)
@@ -636,7 +660,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	}
 
 	summary := TournamentSummary{
-		ID: fmt.Sprintf("ARENA-T-%d", time.Now().Unix()), Timestamp: time.Now(),
+		ID: l.tournament.ID, Timestamp: time.Now(),
 		Pot: totalPot, Winner: winner, Matches: summaryMatches,
 		PayoutsHash: payoutsHash,
 	}
@@ -698,7 +722,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	var txns []types.Transaction
 	var skippedAssets []string
 	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
-	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"rank\":%d,\"pot_share\":%d}", rank, potShareMicro))
+	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"tid\":\"%s\",\"rank\":%d,\"pot_share\":%d}", l.tournament.ID, rank, potShareMicro))
 	var totalUnits float64
 
 	// Build Atomic Group for all active reward assets

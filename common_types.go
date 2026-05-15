@@ -207,6 +207,7 @@ type MatchState struct {
 	P2ID              string          `json:"p2_id"`
 	P1Wallet          string          `json:"p1_wallet"` // Snapshotted for penalty calculation stability
 	P2Wallet          string          `json:"p2_wallet"`
+	TournamentID      string          `json:"tournament_id,omitempty"`       // Instance ID of the tournament
 	TournamentMatchID string          `json:"tournament_match_id,omitempty"` // Link to tournament bracket
 	P1Deck            []int           `json:"p1_deck"`                       // Card IDs in P1's deck
 	P1Avatar          string          `json:"p1_avatar"`
@@ -249,7 +250,8 @@ type CapturedCardInfo struct {
 type MatchHistory struct {
 	WinnerID          string                    `json:"winner_id"`
 	Opponent          string                    `json:"opponent_wallet"`
-	TournamentMatchID string                    `json:"tournament_id"`
+	TournamentID      string                    `json:"tournament_id,omitempty"`
+	TournamentMatchID string                    `json:"match_id,omitempty"`
 	Scores            [2]int                    `json:"scores"`
 	Timestamp         time.Time                 `json:"timestamp"`
 	WinnerIndex       int                       `json:"winner_index"` // 0 for P1, 1 for P2
@@ -378,6 +380,7 @@ type TournamentMatch struct {
 // TournamentState tracks the progress of an automated event.
 type TournamentState struct {
 	Active       bool              `json:"active"`
+	ID           string            `json:"id"`
 	Matches      []TournamentMatch `json:"matches"`
 	CurrentRound int               `json:"current_round"`
 	Participants []string          `json:"participants"`

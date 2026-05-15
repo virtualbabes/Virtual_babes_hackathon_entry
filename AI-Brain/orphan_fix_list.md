@@ -233,4 +233,5 @@
 - [FIXED] Implemented `ReceiptsVerified` field in `TournamentSummary` and updated `GetTournamentArchiveBadge` in `main.go` to provide visual feedback for deep financial verification.
 - [FIXED] Updated `fetchTournamentHistory` in `leaderboard.js` to correctly pass the `receipts_verified` status to the `GetTournamentArchiveBadge` helper for enhanced UI feedback.
 - [FIXED] Hardened tournament finalization in `tournament_manager.go` by collecting reward TxIDs and recording a `PayoutsHash` in the on-chain summary for secondary financial proof.
+- [FIXED] Synchronized Tournament ID generation across lifecycle (Registration -> Payout -> Summary) to allow handleTournamentHistory to cryptographically verify receipts against the PayoutsHash.
 - [FIXED] Hardened `renderMatchHistory` in `game.js` to prioritize authoritative server-side history reconstructed from blockchain metadata, ensuring immersion even across sessions.

@@ -619,8 +619,10 @@ func (l *Lobby) handleStartTournament(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(seedMap); i += 2 {
 		matches = append(matches, TournamentMatch{ID: fmt.Sprintf("R1-M%d", (i/2)+1), P1: participants[seedMap[i]], P2: participants[seedMap[i+1]], Round: 1})
 	}
+	tID := l.tournament.ID // Preserve the ID generated at registration
 	l.tournament = TournamentState{
 		Active:       true,
+		ID:           tID,
 		Participants: participants,
 		Matches:      matches,
 		CurrentRound: 1,
@@ -646,7 +648,7 @@ func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	l.mutex.Lock()
-	l.tournament = TournamentState{Active: true, CurrentRound: 0, BuyInAmount: req.BuyIn, Matches: []TournamentMatch{}, Participants: []string{}, OpenTime: time.Now()}
+	l.tournament = TournamentState{Active: true, ID: fmt.Sprintf("ARENA-T-%d", time.Now().Unix()), CurrentRound: 0, BuyInAmount: req.BuyIn, Matches: []TournamentMatch{}, Participants: []string{}, OpenTime: time.Now()}
 	l.paidParticipants = []string{}
 	l.tournamentPotBonus = 0
 	l.mutex.Unlock()

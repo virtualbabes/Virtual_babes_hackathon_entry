@@ -532,13 +532,20 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				var data struct {
 					Opp    string `json:"opp"`
 					Scores [2]int `json:"scores"`
-					TID    string `json:"tid"`
+					TID    string `json:"tid"` // Tournament ID
+					MID    string `json:"mid"` // Match ID
 				}
 				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+					matchID := data.MID
+					if matchID == "" { matchID = data.TID } // Legacy fallback
+					tournID := data.TID
+					if data.MID == "" { tournID = "" }     // If MID is empty, TID was MatchID
+
 					matchHistory = append(matchHistory, MatchHistory{
 						Opponent:          data.Opp,
 						Scores:            data.Scores,
-						TournamentMatchID: data.TID,
+						TournamentID:      tournID,
+						TournamentMatchID: matchID,
 						Timestamp:         time.Unix(tx.Timestamp, 0),
 						WinnerIndex:       0, // Recipient of VBT_WIN is the winner
 					})
