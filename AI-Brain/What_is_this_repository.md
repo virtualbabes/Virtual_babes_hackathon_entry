@@ -99,7 +99,8 @@ Virtualbabes Arena is a blockchain-integrated card game platform blending real-t
 Managed via `oracle_service.go` and Wallet Linking.
 
 ### Supported Networks
-* **Primary (Full Tx Support):** Voi (Main network, $VBV, Tournaments), Algorand (Secondary, $AVoi, Bridging).
+* **Primary (Full Tx Support):** Voi (Main network, $VBV, Tournaments). Native NFT Standards: ARC-72 (Smart Contract), ARC-69 (Notes), ARC-19 (Reserve CID).
+* **Secondary/Bridge:** Algorand ($AVoi).
 * **Metadata-Only (NFT Discovery):** Ethereum (ERC-721/1155), Polygon, Solana (Metaplex DAS), Bitcoin (Ordinals), Flow, WAX.
 
 ### Mechanisms

@@ -533,8 +533,7 @@ oracle_service.go
 
 Hierarchy: Service/Blockchain Interaction.
 Purpose: Acts as the primary interface for reading authenticated data from various blockchain indexers and nodes, caching NFT metadata, and reconstructing game state.
-Flow:
-getVerifiedCards() and getVerifiedCardsCrossChain() fetch and cache NFT metadata (ARC-72, EVM, Solana) from configured indexers/nodes, applying power scaling.
+Flow: getVerifiedCards() utilizes a `MetadataDispatcher` to automatically identify and route discovery for ARC-72, ARC-19, and ARC-69 standards, ensuring broad asset compatibility on Voi and Algorand.
 syncStatsFromBlockchain() and refreshGlobalLeaderboard() reconstruct player wins/DNFs from on-chain transfer metadata.
 loadOnboardedWalletsFromIndexer() reconstructs historical Sybil protection state by scanning for past onboarding transactions.
 ResolveEnvoiName() resolves wallet addresses to human-readable names (e.g., .voi names) using a local cache.
