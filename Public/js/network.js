@@ -152,7 +152,7 @@ export function handleServerMessage(msg) {
             handleTournamentUI(msg.payload.tournament);
 
             if (msg.payload.faucet_balance !== undefined) window.SyncVaultBalance(msg.payload.faucet_balance);
-            if (msg.payload.rewards !== undefined) window.SyncRewards(msg.payload.rewards);
+            if (msg.payload.reward_stack !== undefined) window.SyncRewards(msg.payload.reward_stack);
             if (window.SyncClubs) window.SyncClubs(msg.payload.clubs);
             
             if (msg.payload.available_networks) {

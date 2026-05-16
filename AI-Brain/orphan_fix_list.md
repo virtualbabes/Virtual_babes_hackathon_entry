@@ -366,3 +366,5 @@
 - [FIXED] Resolved accounting leak in `handleTakeLoan` (loan_service.go); principal is no longer subtracted from `faucetBalance` immediately, as it remains in the vault until reward claim.
 - [FIXED] Resolved map key collision bug by separating global `rewardStack` from individual `playerBalances` in the Lobby struct; updated all economic services to utilize the correct ledger.
 - [FIXED] Hardened `loan_service.go` by correcting `playerBalances` targeting and removing structural syntax errors in the loan issuance path.
+- [FIXED] Implemented aggregation of `VirtualBalance` in `app.js` Rewards Dashboard; ensured industrial earnings are visible and correctly summed in the player's liquid total.
+- [FIXED] Purged massive redundant re-definitions in `app.js` to resolve logic shadowing and enforce the authoritative power of the `Public/js/` domain modules.

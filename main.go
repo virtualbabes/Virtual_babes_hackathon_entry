@@ -129,6 +129,7 @@ type Player struct {
 	Ready           bool         `json:"ready"`
 	Reputation      int          `json:"reputation"`
 	WantedLevel     int          `json:"wanted_level"`
+	VirtualBalance  uint64       `json:"virtual_balance"`
 	GloatMessage    string       `json:"gloat_message"`
 	AvatarURL       string       `json:"avatar_url"`
 	Buffs           []ActiveBuff `json:"buffs"`
@@ -615,6 +616,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.SocialRank = data.Get("social_rank").String()
 	p.JobRole = data.Get("job_role").String()
 	p.EmployerClubID = data.Get("employer_id").String()
+	p.VirtualBalance = uint64(data.Get("virtual_balance").Float())
 	p.WantedLevel = data.Get("wanted_level").Int()
 	p.AuctionsWon = data.Get("auctions_won").Int()
 	p.Cunning = data.Get("cunning").Int()
@@ -1988,6 +1990,7 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["jailed_cards"] = Game.Players[0].JailedCards
 		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
 		state["held_hostage_cards"] = Game.Players[0].HeldHostageCards
+		state["virtual_balance"] = float64(Game.Players[0].VirtualBalance) / 1000000.0
 		state["rumor_count"] = Game.Players[0].RumorCount
 		state["playstyle"] = Game.Players[0].Playstyle
 		state["favorite_card_id"] = Game.Players[0].FavoriteCardID

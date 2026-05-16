@@ -313,8 +313,8 @@ export function syncUI(scope = "all") {
         const myHeldHostageCards = state.held_hostage_cards || {};
         const wantedVal = state.wanted_level || 0;
 
-        // OPTIMIZATION: Only build and update the string if fundamental stats or collections changed
-        const dashboardStateKey = `${wantedVal}-${state.cunning}-${state.nurturing}-${Object.keys(state.rewards).length}-${Object.keys(myJailedCards).length}-${Object.keys(myKidnappedCards).length}`;
+        // PILLAR 2: Economic Aggregation. Include VirtualBalance in dashboard state tracking.
+        const dashboardStateKey = `${wantedVal}-${state.cunning}-${state.nurturing}-${state.virtual_balance}-${Object.keys(state.rewards).length}-${Object.keys(myJailedCards).length}-${Object.keys(myHeldHostageCards).length}`;
         
         if (rewardsDashboard && rewardsDashboard.dataset.stateKey !== dashboardStateKey) {
             rewardsDashboard.dataset.stateKey = dashboardStateKey;
