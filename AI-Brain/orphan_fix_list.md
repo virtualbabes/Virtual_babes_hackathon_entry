@@ -372,3 +372,4 @@
 - [FIXED] Resolved WASM compilation errors in `main.go` caused by variable typos in `simulateCaptures` and unused declarations in `GetTournamentArchiveBadge`.
 - [FIXED] Created missing `entrypoint.sh` script required by `Dockerfile` for Render deployments.
 - [FIXED] Corrected `Dockerfile` build command to use `go build .` instead of `server.go` to support modular service architecture.
+- [FIXED] Implemented `.dockerignore` to exclude local logs, node_modules, and test data from the production build context.

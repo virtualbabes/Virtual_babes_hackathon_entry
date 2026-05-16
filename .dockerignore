@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+test_data
+data
+*.log
+win_audit.log
+admin_audit.log
