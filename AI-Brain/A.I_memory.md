@@ -120,4 +120,5 @@
 *   **201**: Refactored `NetworkConfig` to support plural `IndexerURLs` and `NodeURLs`; implemented `indexerRequest` dispatcher in `oracle_service.go` with automated failover and endpoint cycling.
 *   **202**: Hardened `checkVaultBalanceOnChain`, `checkNativeVaultBalanceOnChain`, and `checkAssetOptIn` in `oracle_service.go` to support pluralized `NodeURLs` failover and cycling.
 *   **203**: Conducted comprehensive review of `oracle_service.go`; IDENTIFIED and REFACTORED payment verification, archival, and stats reconstruction to utilize the high-availability `indexerRequest` dispatcher, eliminating all remaining singular indexer bottlenecks.
+*   **204**: Audited `applyItemEffect` in `item_service.go`; implemented Mojo gain for Clubs during hardware trap deployment and added reputation ripple updates for all club employees.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.

@@ -38,8 +38,8 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 			}
 			notificationText = fmt.Sprintf("💖 %s's Loyalty increased by 10!", targetCard.Name)
 		}
-		l.inventory[data.TargetCardID] = targetCard                                // Update global card cache
-		l.persistentCardCache[data.TargetCardID] = targetCard                      // Update persistent cache
+		l.inventory[data.TargetCardID] = targetCard           // Update global card cache
+		l.persistentCardCache[data.TargetCardID] = targetCard // Update persistent cache
 		l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false)
 
 		playerStats.Playstyle = l.leaderboard[wallet].Playstyle
@@ -91,6 +91,21 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 		targetClub.ActiveBuffs[trapID] = data.ItemID
 		targetClub.BuffExpirations[trapID] = time.Now().Add(24 * time.Hour)
 		targetClub.LastActivity = time.Now() // Mark club as active
+
+		// PILLAR 1: Infrastructure Prestige.
+		// Deployment of hardware traps rewards the club with Mojo, increasing its social standing and unlocking premium tiers.
+		targetClub.Mojo += item.MojoBonus
+
+		// Ripple Effect: Update Reputation for all club employees to reflect the increased Mojo multiplier.
+		for w, s := range l.leaderboard {
+			if s.EmployerClubID == targetClub.ID {
+				s.Reputation = l.CalculateReputation(s)
+				l.leaderboard[w] = s
+				if strings.EqualFold(w, wallet) {
+					*playerStats = s // Keep the local reference in sync
+				}
+			}
+		}
 
 		l.clubs[playerStats.EmployerClubID] = targetClub
 		notificationText = fmt.Sprintf("🛰️ %s deployed in %s's territory!", item.Name, targetClub.Name)
