@@ -361,3 +361,4 @@
 - [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` by snapshotting season boundaries and ensuring consistent HTTP body closure for mirrored result recovery.
 - [FIXED] Prevented Mojo inflation in `club_service.go` by capping revenue-based gains and transitioning Regional Governor bonuses from multiplicative to additive scaling.
 - [FIXED] Resolved accounting leak in `handleHeist` (club_service.go); ensured gross looted amount returns to `faucetBalance` pool to cover future virtual reward payouts.
+- [FIXED] Resolved accounting leak in `startSalaryDispenser` (career.go); ensured gross salary amount returns to `faucetBalance` pool to maintain ledger integrity for future salary claims.

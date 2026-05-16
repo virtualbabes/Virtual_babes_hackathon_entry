@@ -38,10 +38,11 @@ func (l *Lobby) startSalaryDispenser() {
 						netSalaryMicro := stats.Salary - taxAmountMicro
 
 						l.rewards[wallet] += netSalaryMicro
-						if taxAmountMicro > 0 {
-							l.faucetBalance += float64(taxAmountMicro) / 1000000.0
-							l.applyDynamicScalingLocked()
-						}
+
+						// INDUSTRIAL LOOP: Gross salary returns from the Club Reserve to the general Faucet pool.
+						// The net portion becomes a virtual reward liability, and the tax portion increases liquidity.
+						l.faucetBalance += float64(stats.Salary) / 1000000.0
+						l.applyDynamicScalingLocked()
 
 						stats.LastSalaryPayment = time.Now()
 

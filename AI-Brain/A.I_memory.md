@@ -126,4 +126,5 @@
 *   **207**: Audited `syncStatsFromBlockchain` in `oracle_service.go`; confirmed season filtering accuracy and hardened logic with boundary snapshotting and consistent resource management.
 *   **208**: Refactored `calculateMojoGain` in `club_service.go`; implemented additive scaling for Regional Governors and per-event caps to prevent social standing inflation during peak activity.
 *   **209**: Audited `handleHeist` in `club_service.go`; resolved Industrial Loop accounting error by returning the gross looted amount to `faucetBalance` to prevent double-deduction during reward payouts.
+*   **210**: Audited `startSalaryDispenser` in `career.go`; resolved similar Industrial Loop accounting error by returning gross salary to `faucetBalance` to ensure liquid pool correctly covers net salary reward liabilities.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.
