@@ -1,7 +1,7 @@
 # Arena Development: Launch Roadmap
 
 ## Pillar 1: Production Hardening (Active)
-- [ ] **Live Stress Test**: Execute 16-player tournament bracket simulation under concurrent load to verify pot distribution and kickbacks.
+- [x] **Live Stress Test**: Execute 16-player tournament bracket simulation under concurrent load to verify pot distribution and kickbacks.
 - [ ] **Secret Security**: Finalize migration of `FAUCET_MNEMONIC` and `ADMIN_WALLETS` from `.env` to Render Environment Secrets.
 - [ ] **RPC Resilience**: Perform 24-hour health check on LlamaRPC and Nodly public endpoints.
 

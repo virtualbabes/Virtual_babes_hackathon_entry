@@ -73,3 +73,4 @@
 *   **153**: Prepared for branch migration; acknowledging move to `slapkarnts/Dev2` and initialization of a dedicated `Deploy` branch for production hosting.
 *   **154**: Updated `deploy-wasm.yml` to trigger CI/CD on the `slapkarnts/Dev2` branch instead of main.
 *   **155**: Audited and hardened `Dockerfile`; added internal WASM compilation and updated source copying to support modular service architecture.
+*   **156**: Simulated 16-player tournament stress test via `ARENA_STRESS_TEST=true`; verified bracket advancement, deadlock-free lock pulsing, and accuracy of club treasury kickbacks in `./test_data/admin_audit.log`.
