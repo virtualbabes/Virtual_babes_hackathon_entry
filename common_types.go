@@ -164,8 +164,8 @@ type ReportGloatData struct {
 type NetworkConfig struct {
 	NetworkName  string  `json:"network_name"`
 	ExplorerURL  string  `json:"explorer_url"`
-	IndexerURL   string  `json:"indexer_url"`
-	NodeURL      string  `json:"node_url"`
+	IndexerURLs  []string `json:"indexer_urls"`
+	NodeURLs     []string `json:"node_urls"`
 	FaucetURL    string  `json:"faucet_url"`
 	AssetID      string  `json:"asset_id"` // The primary game asset ID on this network
 	AppID        string  `json:"app_id"`   // The main game smart contract ID on this network

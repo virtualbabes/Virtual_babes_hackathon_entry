@@ -117,4 +117,5 @@
 *   **197**: Modified `handleServerMessage` in `network.js` to call `SyncMatchMetadata` during the challenge handshake; ensured tactical boosts and moods are synchronized before combat starts.
 *   **198**: Updated `showPowerTooltip` in `game.js` to visually display the Regional Boost (+R) modifier in the tactical breakdown, ensuring UI parity with WASM combat math.
 *   **200**: Audited `networks.json` and suggested fallback RPC/Indexer endpoints for Voi and Algorand; integrated fallback placeholders into the configuration file to improve production resilience.
+*   **201**: Refactored `NetworkConfig` to support plural `IndexerURLs` and `NodeURLs`; implemented `indexerRequest` dispatcher in `oracle_service.go` with automated failover and endpoint cycling.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.

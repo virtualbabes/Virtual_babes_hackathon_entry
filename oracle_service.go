@@ -21,6 +21,39 @@ import (
 
 const cardCacheName = "card_cache.json"
 
+// indexerRequest executes an HTTP GET request across multiple indexer endpoints with retries.
+// PILLAR 4: RPC Failover. Automatically cycles configured endpoints on 429 or 5xx errors.
+func (l *Lobby) indexerRequest(cfg NetworkConfig, path string) (*http.Response, error) {
+	var lastErr error
+	for _, baseURL := range cfg.IndexerURLs {
+		url := baseURL + path
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err := http.DefaultClient.Do(req)
+			cancel()
+			if err != nil {
+				lastErr = err
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				lastErr = fmt.Errorf("rate-limited (429) at %s", baseURL)
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			if resp.StatusCode >= 500 {
+				resp.Body.Close()
+				lastErr = fmt.Errorf("server error %d at %s", resp.StatusCode, baseURL)
+				continue
+			}
+			return resp, nil
+		}
+	}
+	return nil, fmt.Errorf("indexer request failed after cycling endpoints: %w", lastErr)
+}
+
 func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName string) (map[int]ServerCard, error) {
 	results := make(map[int]ServerCard)
 	var toFetch []int
@@ -66,23 +99,8 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 			if strings.Contains(cfg.ChainID, "algorand") {
 				// PATH 1: Standard ASA Scan (ARC-19/ARC-69)
 				// Query account info to find all held assets, regardless of contract status.
-				accUrl := fmt.Sprintf("%s/v2/accounts/%s", cfg.IndexerURL, t.addr)
-				var accResp *http.Response
-				for i := 0; i < 2; i++ {
-					ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-					req, _ := http.NewRequestWithContext(ctx, "GET", accUrl, nil)
-					accResp, err = http.DefaultClient.Do(req)
-					cancel()
-					if err == nil && accResp.StatusCode == http.StatusOK {
-						break
-					}
-					if accResp != nil {
-						accResp.Body.Close()
-					}
-					time.Sleep(500 * time.Millisecond)
-				}
-
-				if accResp != nil && accResp.StatusCode == http.StatusOK {
+				accResp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/accounts/%s", t.addr))
+				if err == nil && accResp.StatusCode == http.StatusOK {
 					var accRes struct {
 						Account struct {
 							Assets []struct {
@@ -130,34 +148,8 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 				// PATH 2: ARC-72 Collection Scan
 				// Keep existing logic to find tokens within a specific smart contract collection.
 				log.Printf("[ORACLE] Syncing tokens for %s on %s...\n", t.addr, t.network)
-				url := fmt.Sprintf("%s/tokens?owner=%s", cfg.IndexerURL, t.addr)
-
-				var resp *http.Response
-				var err error
-				for i := 0; i < 3; i++ {
-					ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-					req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-					resp, err = http.DefaultClient.Do(req)
-					cancel()
-					if err != nil {
-						if i < 2 {
-							time.Sleep(500 * time.Millisecond)
-							continue
-						}
-						break
-					}
-					if resp.StatusCode == http.StatusTooManyRequests {
-						resp.Body.Close()
-						if i < 2 {
-							time.Sleep(time.Duration(i+1) * 1 * time.Second)
-							continue
-						}
-						break
-					}
-					break
-				}
-
-				if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+				resp, err := l.indexerRequest(cfg, fmt.Sprintf("/tokens?owner=%s", t.addr))
+				if err == nil && resp.StatusCode == http.StatusOK {
 					var res struct {
 						Tokens []struct {
 							TokenID  int    `json:"tokenId"`

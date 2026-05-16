@@ -155,8 +155,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		log.Println("[CONFIG] networks.json not found, using defaults.")
 		l.availableNetworks["Voi Mainnet"] = NetworkConfig{
 			NetworkName:  "Voi Mainnet",
-			IndexerURL:   "https://mainnet-idx.voi.nodly.io",
-			NodeURL:      "https://mainnet-api.voi.nodly.io",
+			IndexerURLs:  []string{"https://mainnet-idx.voi.nodly.io", "https://mainnet-idx.voi.network"},
+			NodeURLs:     []string{"https://mainnet-api.voi.nodly.io", "https://mainnet-api.voi.network"},
 			ExplorerURL:  "https://block.voi.network",
 			AppID:        l.rewardAssetID,
 			AssetID:      l.rewardAssetID,
