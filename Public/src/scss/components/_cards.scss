@@ -101,7 +101,7 @@
     justify-items: center;
     position: relative;
 
-    .power-value {
+    div { // Targeted generic divs to match app.js template
         display: flex;
         align-items: center;
         justify-content: center;
@@ -324,6 +324,28 @@
 
     .card-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+// Ultra-narrow device support (Phase 8: Mobile Polish)
+@media (max-width: 350px) {
+    .playing-card {
+        padding: 2px; // Maximize space for visuals
+        
+        .card-name {
+            font-size: 8px; // Clamp name size for narrow cards
+            padding: 1px 0;
+        }
+
+        .power-grid {
+            font-size: 0.7rem;
+            div { font-size: 0.85rem; }
+        }
+
+        .rarity-badge, .artifact-badge, .debuff-badge {
+            font-size: 7px;
+            padding: 1px 3px;
+        }
     }
 }
 .rarity-badge {

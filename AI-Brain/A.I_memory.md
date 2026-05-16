@@ -101,3 +101,4 @@
 *   **181**: Integrated `MetadataDispatcher` into `getVerifiedCards`; enabled automatic standard resolution (ARC-72/19/69) for Algorand-based card imports and discovery.
 *   **182**: Audited `_territory.scss` for mobile responsiveness; flattened 3D map rotation and forced 3-column grid layout for mobile viewports using design tokens.
 *   **183**: Hardened `_dashboard.scss` battle grid for devices < 400px; implemented `minmax(0, 1fr)` and clamped gaps to ensure fluid scaling on narrow viewports.
+*   **184**: Audited `_cards.scss` for ultra-narrow viewports (< 350px); implemented aggressive font-scaling and tightened padding to ensure card data fits within the scaled battle grid.
