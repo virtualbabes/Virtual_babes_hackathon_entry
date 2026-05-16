@@ -223,7 +223,13 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	var skippedAssets []string
-	pk, err := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw == "" {
+		log.Println("[FAUCET CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET.")
+		return "", false, skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
+	}
+
+	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
 	if err != nil {
 		log.Printf("[FAUCET CRITICAL] Failed to convert FAUCET_MNEMONIC to private key: %v", err)
 		return "", false, skippedAssets, fmt.Errorf("faucet configuration error: invalid mnemonic")

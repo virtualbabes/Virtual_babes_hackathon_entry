@@ -728,7 +728,13 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	}
 
 	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
-	pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw == "" {
+		log.Println("[TOURNAMENT CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET. Tournament payouts will FAIL.")
+		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
+	}
+	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
+	// pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 

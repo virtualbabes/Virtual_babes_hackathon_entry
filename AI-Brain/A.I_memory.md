@@ -83,3 +83,6 @@
 *   **163**: Implemented `handleSeasonRollover` admin handler in `handlers_admin.go` to allow manual triggering of archival and leaderboard resets.
 *   **164**: Implemented `handleExportAuditLog` in `handlers_admin.go` to serve `admin_audit.log` as a CSV download for administrative reporting.
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.
+*   **166**: Hardened `handleReward` in `faucet_service.go` with explicit empty mnemonic checks to prevent runtime errors during reward dispatch.
+*   **167**: Applied mnemonic validation and error handling to `dispatchTournamentRewards` in `tournament_manager.go` for robust payout processing.
+*   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.
