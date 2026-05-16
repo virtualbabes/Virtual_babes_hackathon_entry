@@ -97,3 +97,4 @@
 *   **177**: Reviewed Oracle logic for ARC-19/69 integration; proposed a strategy involving ACFG transaction note parsing and Reserve Address CID decoding to support native Algorand NFT standards.
 *   **178**: Implemented `fetchARC69Metadata` in `oracle_service.go`; integrated indexer transaction scanning for configuration notes with 429 retry logic and semaphore throttling.
 *   **179**: Implemented `fetchARC19Metadata` in `oracle_service.go`; developed reserve address to CIDv1 conversion logic and integrated IPFS gateway retrieval for dynamic NFT metadata.
+*   **180**: Implemented `MetadataDispatcher` in `oracle_service.go` to route NFT discovery between ARC-72, ARC-19, and ARC-69 standards based on Application IDs and Asset URL patterns.

@@ -1280,6 +1280,71 @@ func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metada
 	return &meta, nil
 }
 
+// MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19) 
+// and routes the metadata retrieval request to the appropriate service.
+func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metadata, string, error) {
+	l.mutex.RLock()
+	cfg, ok := l.availableNetworks[networkName]
+	l.mutex.RUnlock()
+	if !ok {
+		return nil, "", fmt.Errorf("unsupported network for metadata dispatch: %s", networkName)
+	}
+
+	// 1. ARC-19 Detection: Fetch Asset parameters from Indexer to check for template URL.
+	// This is the most efficient first check for dynamic ASAs.
+	url := fmt.Sprintf("%s/v2/assets/%d", cfg.IndexerURL, assetID)
+	
+	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	resp, err := http.DefaultClient.Do(req)
+	cancel()
+
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var res struct {
+			Asset struct {
+				Params struct {
+					URL string `json:"url"`
+				} `json:"params"`
+			} `json:"asset"`
+		}
+		if json.NewDecoder(resp.Body).Decode(&res) == nil {
+			resp.Body.Close()
+			if strings.Contains(res.Asset.Params.URL, "template-ipfs") {
+				meta, err := l.fetchARC19Metadata(cfg.IndexerURL, assetID)
+				return meta, "ARC-19", err
+			}
+		} else {
+			resp.Body.Close()
+		}
+	} else if resp != nil {
+		resp.Body.Close()
+	}
+
+	// 2. ARC-72 Check: If network has a configured AppID, check if this ID exists as a token.
+	if cfg.AppID != "" && cfg.AppID != "0" {
+		checkURL := fmt.Sprintf("%s/tokens?contractId=%s&tokenId=%d", cfg.IndexerURL, cfg.AppID, assetID)
+		ctx72, cancel72 := context.WithTimeout(context.Background(), indexerTimeout)
+		req72, _ := http.NewRequestWithContext(ctx72, "GET", checkURL, nil)
+		resp72, err := http.DefaultClient.Do(req72)
+		cancel72()
+		if err == nil && resp72.StatusCode == http.StatusOK {
+			var res72 struct {
+				Tokens []struct { Metadata string `json:"metadata"` } `json:"tokens"`
+			}
+			if json.NewDecoder(resp72.Body).Decode(&res72) == nil && len(res72.Tokens) > 0 {
+				resp72.Body.Close()
+				var meta ARC72Metadata
+				json.Unmarshal([]byte(res72.Tokens[0].Metadata), &meta)
+				return &meta, "ARC-72", nil
+			}
+			resp72.Body.Close()
+		}
+	}
+
+	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
+	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
+	return meta, "ARC-69", err
+}
 // checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
 func (l *Lobby) checkVaultBalanceOnChain() {
 	l.mutex.RLock()
