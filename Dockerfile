@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Build the Go Binary
 # ==========================================
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install git and build-base for any potential C dependencies (though CGO is disabled)
 RUN apk add --no-cache git
@@ -26,15 +26,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server-bin .
 # ==========================================
 # STAGE 2: Minimal Runtime Image
 # ==========================================
-# Pin to a specific minor version for stability
-FROM alpine:3.18
+FROM alpine:3.20
 
 # Install CA certificates (Required for HTTPS calls to blockchain Indexers/RPCs)
-# and tzdata for correct timestamp logging
-RUN apk --no-cache add ca-certificates tzdata curl
-
-# Create a non-root user and group for better security
-RUN addgroup -S arena && adduser -S arenabot -G arena
+# tzdata for correct timestamp logging, and curl for health checks.
+RUN apk --no-cache add ca-certificates tzdata curl && \
+    addgroup -S arena && adduser -S arenabot -G arena
 
 WORKDIR /app
 

@@ -6,3 +6,9 @@ data
 *.log
 win_audit.log
 admin_audit.log
+.env
+.env.*
+AI-Brain/
+README.md
+User_manual.md
+development_plan.md

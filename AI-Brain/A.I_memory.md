@@ -137,4 +137,5 @@
 *   **218**: Acknowledged production deployment to Render (`https://nft-seduction.onrender.com/`); verified configuration alignment for high-availability Oracle and hardened accounting ledgers.
 *   **219**: Created missing `entrypoint.sh` script to resolve Render build failure and corrected `Dockerfile` build command to support modular backend architecture.
 *   **220**: Re-issued `entrypoint.sh` and `Dockerfile` hardening; implemented `.dockerignore` to optimize Render build context transfer (reducing 146MB overhead).
-*   **214**: Audited `handleRepayLoan` in `loan_service.go`; verified correct `faucetBalance` crediting of principal and interest; fixed `playerBalances` targeting and syntax errors in `handleTakeLoan`.
+*   **221**: Finalized local hardening for production push; prepared repository for transition to `slapkarnts/Dev2` branch.
+*   **222**: Refined `Dockerfile` to utilize Go 1.24 and Alpine 3.20; optimized `.dockerignore` to exclude development documentation and secured build context for faster Render deployments.
