@@ -158,28 +158,28 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 					}
 					if json.NewDecoder(resp.Body).Decode(&res) == nil {
 						for _, tok := range res.Tokens {
-						var meta *ARC72Metadata
-						var std string
+							var meta *ARC72Metadata
+							var std string
 
-						// Optimization: Try parsing the bulk metadata first (common for ARC-72 indexers)
-						if tok.Metadata != "" {
-							var m ARC72Metadata
-							if json.Unmarshal([]byte(tok.Metadata), &m) == nil {
-								meta = &m
-								std = "ARC-72"
+							// Optimization: Try parsing the bulk metadata first (common for ARC-72 indexers)
+							if tok.Metadata != "" {
+								var m ARC72Metadata
+								if json.Unmarshal([]byte(tok.Metadata), &m) == nil {
+									meta = &m
+									std = "ARC-72"
+								}
 							}
-						}
 
-						// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
-						if meta == nil {
-							m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
-							if err == nil {
-								meta = m
-								std = s
+							// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
+							if meta == nil {
+								m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
+								if err == nil {
+									meta = m
+									std = s
+								}
 							}
-						}
 
-						if meta != nil {
+							if meta != nil {
 								newCard := ServerCard{
 									ID:            tok.TokenID,
 									Name:          meta.Name,
@@ -192,7 +192,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 								l.inventory[tok.TokenID] = newCard
 								l.mutex.Unlock()
 								results[tok.TokenID] = newCard
-							log.Printf("[ORACLE] Discovered %s token during owner scan: %d\n", std, tok.TokenID)
+								log.Printf("[ORACLE] Discovered %s token during owner scan: %d\n", std, tok.TokenID)
 							}
 						}
 					}
@@ -283,7 +283,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 	}
 
 	// PILLAR 3: Multi-Standard Discovery.
-	// We iterate through missing tokens and utilize the MetadataDispatcher to identify 
+	// We iterate through missing tokens and utilize the MetadataDispatcher to identify
 	// and fetch standard-compliant metadata (ARC-72, ARC-19, or ARC-69).
 	for _, id := range toFetch {
 		meta, standard, err := l.MetadataDispatcher(networkName, id)
@@ -302,12 +302,12 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 			LastUpdated:   time.Now(),
 			MetadataValid: true,
 		}
-		
+
 		l.mutex.Lock()
 		l.inventory[id] = newCard
 		l.mutex.Unlock()
 		results[id] = newCard
-		
+
 		log.Printf("[ORACLE] Ingested %s card: %s (#%d)\n", standard, meta.Name, id)
 	}
 	return results, nil
@@ -1317,7 +1317,7 @@ func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metada
 	return &meta, nil
 }
 
-// MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19) 
+// MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19)
 // and routes the metadata retrieval request to the appropriate service.
 func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metadata, string, error) {
 	l.mutex.RLock()
@@ -1330,7 +1330,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	// 1. ARC-19 Detection: Fetch Asset parameters from Indexer to check for template URL.
 	// This is the most efficient first check for dynamic ASAs.
 	url := fmt.Sprintf("%s/v2/assets/%d", cfg.IndexerURL, assetID)
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := http.DefaultClient.Do(req)
@@ -1366,7 +1366,9 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 		cancel72()
 		if err == nil && resp72.StatusCode == http.StatusOK {
 			var res72 struct {
-				Tokens []struct { Metadata string `json:"metadata"` } `json:"tokens"`
+				Tokens []struct {
+					Metadata string `json:"metadata"`
+				} `json:"tokens"`
 			}
 			if json.NewDecoder(resp72.Body).Decode(&res72) == nil && len(res72.Tokens) > 0 {
 				resp72.Body.Close()
@@ -1382,6 +1384,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
 	return meta, "ARC-69", err
 }
+
 // checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
 func (l *Lobby) checkVaultBalanceOnChain() {
 	l.mutex.RLock()
@@ -1397,50 +1400,47 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 	rewardAppID, err := strconv.ParseUint(rewardAppIDStr, 10, 64)
 	if err != nil {
 		return
+		return
 	}
 
-	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	addrObj, _ := types.DecodeAddress(vaultAddr)
 
-	// ARC-200 Balance is stored in an application box named by the account's public key bytes.
-	var boxValue []byte
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
-		cancel()
-		if err != nil {
-			// If not found, vault is empty or not initialized
-			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-				log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
-				return
-			}
-			// Handle Node rate-limiting (429)
-			if strings.Contains(err.Error(), "429") {
-				if i < 2 {
-					time.Sleep(time.Duration(i+1) * 1 * time.Second)
-					continue
+	// PILLAR 4: RPC Failover. Cycle through available NodeURLs until balance is retrieved.
+	for _, nodeURL := range voiConfig.NodeURLs {
+		client, _ := algod.MakeClient(nodeURL, "")
+		var boxValue []byte
+		found := false
+
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
+			cancel()
+
+			if err != nil {
+				// If not found, vault is empty/not initialized on this node.
+				if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+					log.Printf("[ORACLE] Note: Vault box not found at %s (Asset: %s).\n", nodeURL, rewardAppIDStr)
+					break // Try next node if this one doesn't have the box yet
 				}
-			}
-			// Transient network errors
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
+				// Handle Node rate-limiting (429) or transient errors
+				time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
 				continue
 			}
-			log.Printf("[ORACLE ERROR] Failed to fetch vault box balance after retries: %v\n", err)
-			return
+			boxValue = boxResp.Value
+			found = true
+			break
 		}
-		boxValue = boxResp.Value
-		break
-	}
 
-	// ARC-200 balances are 32-byte uint256 values
-	if len(boxValue) >= 32 {
-		bal := new(big.Int).SetBytes(boxValue[:32]).Uint64()
-		l.mutex.Lock()
-		l.faucetBalance = float64(bal) / 1000000.0
-		l.applyDynamicScalingLocked() // Adjust reward amounts based on new liquidity level
-		l.mutex.Unlock()
-		log.Printf("[ORACLE] Vault $VBV Pool Synced: %.2f units.\n", l.faucetBalance)
+		// ARC-200 balances are 32-byte uint256 values
+		if found && len(boxValue) >= 32 {
+			bal := new(big.Int).SetBytes(boxValue[:32]).Uint64()
+			l.mutex.Lock()
+			l.faucetBalance = float64(bal) / 1000000.0
+			l.applyDynamicScalingLocked() // Adjust rewards based on new liquidity
+			l.mutex.Unlock()
+			log.Printf("[ORACLE] Vault $VBV Pool Synced via %s: %.2f units.\n", nodeURL, l.faucetBalance)
+			return // Success: exit function
+		}
 	}
 }
 
@@ -1449,42 +1449,35 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
 
-	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
+	for _, nodeURL := range voiConfig.NodeURLs {
+		client, _ := algod.MakeClient(nodeURL, "")
+		var amount uint64
+		success := false
 
-	var amount uint64
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
-		cancel()
-		if err != nil {
-			// Handle Node rate-limiting (429)
-			if strings.Contains(err.Error(), "429") {
-				if i < 2 {
-					time.Sleep(time.Duration(i+1) * 1 * time.Second)
-					continue
-				}
-			}
-			// Transient network errors
-			if i < 2 {
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
+			cancel()
+			if err != nil {
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			log.Printf("[ORACLE ERROR] Failed to fetch native vault balance after retries: %v\n", err)
-			return
+			amount = info.Amount
+			success = true
+			break
 		}
-		amount = info.Amount
-		break
-	}
 
-	l.mutex.Lock()
-	// CRITICAL GUARD: Ensure vault has at least 1 VOI for gas
-	if amount < 1000000 {
-		log.Printf("[CRITICAL] Vault is low on gas! Balance: %d microVOI", amount)
-		l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted. Reward dispatches will fail.")
+		if success {
+			l.mutex.Lock()
+			if amount < 1000000 {
+				log.Printf("[CRITICAL] Vault low on gas at %s! Balance: %d", nodeURL, amount)
+				l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted.")
+			}
+			l.faucetBalance = float64(amount) / 1000000.0
+			l.mutex.Unlock()
+			return // Success
+		}
 	}
-
-	l.faucetBalance = float64(amount) / 1000000.0 // Note: This updates faucetBalance using native VOI units
-	l.mutex.Unlock()
 }
 
 // savePersistentCardCache persists the current card inventory to a JSON file.
@@ -1653,66 +1646,36 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 		return false, 0, fmt.Errorf("network configuration not found: %s", netKey)
 	}
 
-	client, _ := algod.MakeClient(netConfig.NodeURL, "")
-
 	// 2. VOI / ARC-200 Pattern: Verify Balance Box existence
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		assetID, _ := strconv.ParseUint(assetIDStr, 10, 64)
 		addr, _ := types.DecodeAddress(wallet)
-		var err error
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, err = client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
-			cancel()
-			if err != nil {
-				// If the error contains "404" or "not found", the user is definitely not opted in.
-				if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-					return false, 0, nil
-				}
-				// Hardening: Handle Node rate-limiting (429)
-				if strings.Contains(err.Error(), "429") {
-					if i < 2 {
-						time.Sleep(time.Duration(i+1) * 1 * time.Second)
-						continue
+		var lastErr error
+
+		for _, nodeURL := range netConfig.NodeURLs {
+			client, _ := algod.MakeClient(nodeURL, "")
+			for i := 0; i < 3; i++ {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
+				cancel()
+				if err != nil {
+					if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+						return false, 0, nil // Definitively not opted in
 					}
-				}
-				// Transient network errors
-				if i < 2 {
+					lastErr = err
 					time.Sleep(500 * time.Millisecond)
 					continue
 				}
-				return false, 0, fmt.Errorf("voi node error during opt-in check: %w", err)
+				return true, 0, nil
 			}
-			return true, 0, nil
 		}
-		return false, 0, err
+		return false, 0, fmt.Errorf("voi node failover failed: %w", lastErr)
 	}
 
 	// 3. ALGORAND / ASA Pattern: Indexer Account Asset Scan
-	url := fmt.Sprintf("%s/v2/accounts/%s", netConfig.IndexerURL, wallet)
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			return false, 0, fmt.Errorf("indexer connection failed: %w", err)
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			return false, 0, fmt.Errorf("algorand indexer rate-limited (429)")
-		}
-		break
+	resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/v2/accounts/%s", wallet))
+	if err != nil {
+		return false, 0, err
 	}
 	defer resp.Body.Close()
 

@@ -353,3 +353,4 @@
 - [FIXED] Implemented explicit mnemonic validation and graceful error paths in `faucet_service.go`, `tournament_manager.go`, and `onboarding_service.go` to prevent server panics on missing secrets.
 - [FIXED] Implemented FIFO pruning for the Underworld `blackMarket` slice in `economy_processing.go` to prevent memory exhaustion during long uptimes.
 - [FIXED] Resolved ARC-19 standard support gap by implementing Reserve Address CIDv1 resolution and IPFS gateway retrieval in `oracle_service.go`.
+- [FIXED] Synchronized `oracle_service.go` call sites with pluralized `NodeURLs` and `IndexerURLs` to ensure high availability and prevent compilation errors following the type refactor.
