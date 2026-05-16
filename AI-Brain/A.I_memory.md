@@ -90,5 +90,6 @@
 *   **170**: Hardened `processLoans` in `economy_processing.go` with a size cap on the `blackMarket` slice to prevent memory bloat during long-running sessions.
 *   **171**: Implemented 5MB log rotation for `admin_audit.log` in `handlers_admin.go` to ensure production disk stability on Render.
 *   **172**: Conducted 24-hour RPC health audit; confirmed 100% uptime for Nodly and verified 429 retry effectiveness for LlamaRPC.
+*   **173**: Synchronized `.env.example` with current architectural requirements; added `DATA_DIR`, standardized `PORT`, and updated placeholders for production secrets.
 *   **168**: Hardened `handleVoiOnboarding` in `onboarding_service.go` with explicit error checking for faucet mnemonic conversion and account initialization.
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.
