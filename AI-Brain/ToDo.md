@@ -16,7 +16,7 @@
 - [x] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
 - [x] **Audit Export**: Build a tool to export `admin_audit.log` into CSV for hackathon reporting.
 - [x] **Admin UI**: Add 'Season Rollover' and 'Export Audit' buttons to the Admin Panel UI.
-- [ ] **Metadata Expansion**: Implement ARC-19 discovery logic in `oracle_service.go` (ARC-69 Complete).
+- [x] **Metadata Expansion**: Implement ARC-19 and ARC-69 discovery logic in `oracle_service.go`.
 
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).

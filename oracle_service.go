@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -1184,10 +1185,99 @@ func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metada
 
 // fetchARC19Metadata resolves a dynamic IPFS CID from the asset's reserve address.
 func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
-	// Implementation note: Fetch asset info to get reserve address.
-	// Convert reserve bytes to CIDv1 using multihash.
-	// Fetch JSON from IPFS gateway.
-	return nil, fmt.Errorf("ARC-19 logic not yet implemented")
+	// PILLAR 3: Concurrency Throttling.
+	select {
+	case l.oracleSemaphore <- struct{}{}:
+		defer func() { <-l.oracleSemaphore }()
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("oracle semaphore timeout")
+	}
+
+	// 1. Fetch Asset Information from Indexer to retrieve the Reserve Address
+	url := fmt.Sprintf("%s/v2/assets/%d", indexerURL, assetID)
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("indexer returned non-200 status: %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Asset struct {
+			Params struct {
+				Reserve string `json:"reserve"`
+			} `json:"params"`
+		} `json:"asset"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode asset info: %w", err)
+	}
+
+	if res.Asset.Params.Reserve == "" {
+		return nil, fmt.Errorf("no reserve address found for ARC-19 resolution")
+	}
+
+	// 2. Convert Reserve Address to CIDv1 (ARC-19 Standard)
+	addr, err := types.DecodeAddress(res.Asset.Params.Reserve)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode reserve address: %w", err)
+	}
+
+	// Multibase 'b' (Base32), Version 1, Raw Codec (0x55), SHA2-256 Multihash (0x12), Length 32 (0x20)
+	header := []byte{0x01, 0x55, 0x12, 0x20}
+	full := append(header, addr[:]...)
+	cid := "b" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(full))
+
+	// 3. Fetch Metadata JSON from IPFS Gateway
+	ipfsURL := "https://ipfs.io/ipfs/" + cid
+	var ipfsResp *http.Response
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", ipfsURL, nil)
+		ipfsResp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err == nil && ipfsResp.StatusCode == http.StatusOK {
+			break
+		}
+		if ipfsResp != nil { ipfsResp.Body.Close() }
+		time.Sleep(1 * time.Second)
+	}
+
+	if err != nil || ipfsResp == nil || ipfsResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch ARC-19 metadata from IPFS")
+	}
+	defer ipfsResp.Body.Close()
+
+	var meta ARC72Metadata
+	if err := json.NewDecoder(ipfsResp.Body).Decode(&meta); err != nil {
+		return nil, fmt.Errorf("failed to parse metadata: %w", err)
+	}
+	return &meta, nil
 }
 
 // checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
