@@ -526,6 +526,7 @@ export function showPowerTooltip(e, card, index, state) {
     const ownerWantedLevel = (ownerPlayerIndex === 0 ? state.p1_wanted_level : state.p2_wanted_level) || 0;
     const ownerCunning = (ownerPlayerIndex === 0 ? state.p1_cunning : state.p2_cunning) || 0;
     const ownerNurturing = (ownerPlayerIndex === 0 ? state.p1_nurturing : state.p2_nurturing) || 0;
+    const hasRegBoost = (ownerPlayerIndex === 0 ? state.p1_regional_boost : state.p2_regional_boost) || false;
 
     // Calculate player-level modifiers once
     let netWantedPenalty = 0;
@@ -539,6 +540,10 @@ export function showPowerTooltip(e, card, index, state) {
         const base = card.power[sideIndex];
         const artifactBonus = card.artifact || 0;
         
+        // PILLAR 1: Regional Power Boost (Tactical UI Sync)
+        // The 5% boost is applied to the combined base power and equipped artifacts.
+        let regBonus = hasRegBoost ? Math.floor((base + artifactBonus) * 0.05) : 0;
+
         let moodModifier = 0;
         if (state.rules?.Elemental_sync && tileMood !== "Neutral" && card.mood && card.mood !== "Neutral") {
             if (card.mood === tileMood) {
@@ -558,11 +563,14 @@ export function showPowerTooltip(e, card, index, state) {
 
         const loyaltyBonus = card.loyalty >= 100 ? 25 : 0;
 
-        const totalEffectivePower = base + artifactBonus + moodModifier + netFatiguePenalty + loyaltyBonus + netWantedPenalty;
+        const totalEffectivePower = base + regBonus + artifactBonus + moodModifier + netFatiguePenalty + loyaltyBonus + netWantedPenalty;
         const grade = window.GetLevelLabelForDisplay(totalEffectivePower);
         
         // Build the HTML for modifiers
         let modifiersHtml = '';
+        if (regBonus !== 0) {
+            modifiersHtml += `<span style="color: var(--neon-purple)">+${regBonus}R</span> `;
+        }
         if (artifactBonus !== 0) {
             modifiersHtml += `<span style="color: ${artifactBonus > 0 ? 'var(--neon-cyan)' : '#ff4b4b'}">${artifactBonus > 0 ? '+' : ''}${artifactBonus}A</span> `;
         }

@@ -115,3 +115,4 @@
 *   **195**: Reviewed Regional Governor boost logic in `lobby_manager.go`; hardened matchmaking handshake to propagate boosts, territory ID, and authoritative moods to clients.
 *   **196**: Updated WASM Engine in `main.go`; implemented Regional Boost logic in `getEffectivePower` and added `SyncMatchMetadata` to ingest tactical parameters from the handshake.
 *   **197**: Modified `handleServerMessage` in `network.js` to call `SyncMatchMetadata` during the challenge handshake; ensured tactical boosts and moods are synchronized before combat starts.
+*   **198**: Updated `showPowerTooltip` in `game.js` to visually display the Regional Boost (+R) modifier in the tactical breakdown, ensuring UI parity with WASM combat math.
