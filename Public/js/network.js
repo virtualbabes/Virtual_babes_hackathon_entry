@@ -192,6 +192,7 @@ export function handleServerMessage(msg) {
                 if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(1, msg.payload.deck);
+                if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
                 sendMatchSync(msg.from_id);
                 window.StartMatch(true);
                 if (window.triggerConnectionPulse) window.triggerConnectionPulse();
@@ -211,6 +212,7 @@ export function handleServerMessage(msg) {
                 if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(0, msg.payload.deck);
+                if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
                 window.StartMatch(true);
                 if (window.triggerConnectionPulse) window.triggerConnectionPulse();
                 if (window.playConnectionSFX) window.playConnectionSFX();
