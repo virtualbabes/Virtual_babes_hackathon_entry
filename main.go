@@ -1159,6 +1159,43 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 	return true
 }
 
+// SyncMatchMetadata ingests tactical match parameters broadcasted during matchmaking.
+func SyncMatchMetadata(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		return false
+	}
+	data := args[0]
+
+	Game.mutex.Lock()
+	defer Game.mutex.Unlock()
+
+	if t := data.Get("territory"); !t.IsUndefined() {
+		Game.TerritoryID = t.String()
+	}
+	if b1 := data.Get("p1_boost"); !b1.IsUndefined() {
+		Game.P1RegionalBoost = b1.Bool()
+	}
+	if b2 := data.Get("p2_boost"); !b2.IsUndefined() {
+		Game.P2RegionalBoost = b2.Bool()
+	}
+
+	jsMoods := data.Get("moods")
+	if jsMoods.Type() == js.TypeObject {
+		for i := 0; i < 9; i++ {
+			m := jsMoods.Index(i)
+			if m.Type() == js.TypeString {
+				Game.BoardMoods[i] = m.String()
+			} else {
+				Game.BoardMoods[i] = "Neutral"
+			}
+		}
+	}
+
+	fmt.Printf("[ENGINE] Match Metadata Synced. Territory: %s, P1Boost: %v, P2Boost: %v\n",
+		Game.TerritoryID, Game.P1RegionalBoost, Game.P2RegionalBoost)
+	return true
+}
+
 // findCard is a private helper to retrieve a card from the global inventory by ID
 func findCard(id int) (Card, bool) {
 	Game.mutex.RLock()
@@ -1324,6 +1361,18 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 // getEffectivePower applies Mood and Artifact modifiers to a card's side
 func getEffectivePower(c *Card, sideIdx int, gridIdx int, pIdx int) int {
 	base := c.Power[sideIdx] + c.Artifact
+
+	// PILLAR 1: Regional Power Boost.
+	// Global +5% power for district region owners.
+	hasBoost := false
+	if pIdx == 0 {
+		hasBoost = Game.P1RegionalBoost
+	} else {
+		hasBoost = Game.P2RegionalBoost
+	}
+	if hasBoost {
+		base += (base * 5) / 100
+	}
 
 	player := &Game.Players[pIdx]
 
@@ -2341,6 +2390,7 @@ func registerFunctions() {
 	js.Global().Set("SyncLatency", js.FuncOf(SyncLatency))
 	js.Global().Set("GetLevelLabelForDisplay", js.FuncOf(GetLevelLabelForDisplay))
 	js.Global().Set("TriggerManualSync", js.FuncOf(TriggerManualSync))
+	js.Global().Set("SyncMatchMetadata", js.FuncOf(SyncMatchMetadata))
 	js.Global().Set("SyncTournament", js.FuncOf(SyncTournament))
 	js.Global().Set("GetTournamentArchiveBadge", js.FuncOf(GetTournamentArchiveBadge))
 	js.Global().Set("SyncMove", js.FuncOf(SyncMove))
