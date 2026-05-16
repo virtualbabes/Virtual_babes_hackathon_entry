@@ -4,6 +4,7 @@
 - [x] **Live Stress Test**: Execute 16-player tournament bracket simulation under concurrent load to verify pot distribution and kickbacks.
 - [x] **Secret Security**: Finalize migration of `FAUCET_MNEMONIC` and `ADMIN_WALLETS` from `.env` to Render Environment Secrets.
 - [x] **RPC Resilience**: Perform 24-hour health check on LlamaRPC and Nodly public endpoints.
+- [x] **CORS Hardening**: Implement strict `CheckOrigin` filtering for WebSocket connections.
 
 ## Pillar 2: UI/UX & Immersion (Final Polish)
 - [x] **Mobile Responsiveness**: Standardize `$panel-width` scaling for small screens in `_variables.scss`.

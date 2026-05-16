@@ -91,5 +91,8 @@
 *   **171**: Implemented 5MB log rotation for `admin_audit.log` in `handlers_admin.go` to ensure production disk stability on Render.
 *   **172**: Conducted 24-hour RPC health audit; confirmed 100% uptime for Nodly and verified 429 retry effectiveness for LlamaRPC.
 *   **173**: Synchronized `.env.example` with current architectural requirements; added `DATA_DIR`, standardized `PORT`, and updated placeholders for production secrets.
+*   **174**: Extracted and summarized all production blockchain service endpoints from `networks.json` for environment configuration.
+*   **175**: Evaluated CORS policy requirements; confirmed `ALLOWED_ORIGINS` must only include frontend hosting domains and explicitly excluded WalletConnect service domains to maintain strict security boundaries.
+*   **176**: Hardened `CheckOrigin` in `server.go` to implement strict domain filtering using the `ALLOWED_ORIGINS` environment variable.
 *   **168**: Hardened `handleVoiOnboarding` in `onboarding_service.go` with explicit error checking for faucet mnemonic conversion and account initialization.
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.

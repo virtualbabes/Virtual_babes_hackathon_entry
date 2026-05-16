@@ -30,7 +30,18 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Adjust for production security
+		allowed := os.Getenv("ALLOWED_ORIGINS")
+		if allowed == "" || allowed == "*" {
+			return true // Permissive in dev or if explicitly wildcarded
+		}
+		origin := r.Header.Get("Origin")
+		for _, o := range strings.Split(allowed, ",") {
+			if strings.TrimSpace(o) == origin {
+				return true
+			}
+		}
+		log.Printf("[SECURITY] WebSocket connection rejected from unauthorized origin: %s", origin)
+		return false
 	},
 }
 
