@@ -124,12 +124,12 @@
         overflow: hidden;
         border-radius: $border-radius-lg;
         border: 1px solid $glass-border-color;
-        background: linear-gradient(145deg, rgba($color-bg-dark, 0.9), rgba($color-dark-grey, 0.9));
+        background: linear-gradient(145deg, rgba($color-bg-dark, 0.8), rgba($color-dark-grey, 0.8));
     }
 
     .map-grid-3d {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        grid-template-columns: repeat(3, 1fr); // Authoritative 3-column grid for territory sectors
         gap: $spacing-sm;
         transform-style: preserve-3d;
         transform: rotateX(30deg) rotateY(-15deg);
@@ -1051,7 +1051,17 @@
     }
 
     .map-perspective-container {
-        height: 300px;
+        height: 350px;
+        perspective: 1000px; // Shallower perspective for smaller viewports
+    }
+
+    .map-grid-3d {
+        transform: rotateX(20deg) rotateY(-10deg); // Flattened rotation for better mobile visibility
+        padding: $spacing-md;
+    }
+
+    .map-tile-3d {
+        height: 85px; // Compressed height for mobile tile consistency
     }
 
     .districts-grid {

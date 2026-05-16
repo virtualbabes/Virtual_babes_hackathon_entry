@@ -99,3 +99,4 @@
 *   **179**: Implemented `fetchARC19Metadata` in `oracle_service.go`; developed reserve address to CIDv1 conversion logic and integrated IPFS gateway retrieval for dynamic NFT metadata.
 *   **180**: Implemented `MetadataDispatcher` in `oracle_service.go` to route NFT discovery between ARC-72, ARC-19, and ARC-69 standards based on Application IDs and Asset URL patterns.
 *   **181**: Integrated `MetadataDispatcher` into `getVerifiedCards`; enabled automatic standard resolution (ARC-72/19/69) for Algorand-based card imports and discovery.
+*   **182**: Audited `_territory.scss` for mobile responsiveness; flattened 3D map rotation and forced 3-column grid layout for mobile viewports using design tokens.
