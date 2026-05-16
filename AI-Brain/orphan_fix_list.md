@@ -355,4 +355,5 @@
 - [FIXED] Resolved ARC-19 standard support gap by implementing Reserve Address CIDv1 resolution and IPFS gateway retrieval in `oracle_service.go`.
 - [FIXED] Synchronized `oracle_service.go` call sites with pluralized `NodeURLs` and `IndexerURLs` to ensure high availability and prevent compilation errors following the type refactor.
 - [FIXED] Ensured 'Hardware' trap deployment in `item_service.go` correctly increments Club Mojo and triggers reputation recalculations for all affiliated employees.
+- [FIXED] Integrated reputation ripple in `handleHeist` defensive path to ensure all club members' Standing reflects organizational Mojo gains immediately.
 - [FIXED] Refactored `verifyBuyInTransaction`, `handleSeasonHistory`, and `syncStatsFromBlockchain` to use the `indexerRequest` dispatcher, ensuring full failover coverage for financial events.

@@ -121,4 +121,5 @@
 *   **202**: Hardened `checkVaultBalanceOnChain`, `checkNativeVaultBalanceOnChain`, and `checkAssetOptIn` in `oracle_service.go` to support pluralized `NodeURLs` failover and cycling.
 *   **203**: Conducted comprehensive review of `oracle_service.go`; IDENTIFIED and REFACTORED payment verification, archival, and stats reconstruction to utilize the high-availability `indexerRequest` dispatcher, eliminating all remaining singular indexer bottlenecks.
 *   **204**: Audited `applyItemEffect` in `item_service.go`; implemented Mojo gain for Clubs during hardware trap deployment and added reputation ripple updates for all club employees.
+*   **205**: Audited `handleHeist` in `club_service.go`; confirmed correct Regional Governor and Master-tier trap scaling; implemented reputation ripple for defensive Mojo gains to maintain social simulation consistency.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.

@@ -56,6 +56,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		if expiry, exists := targetClub.BuffExpirations[trapID]; exists && now.After(expiry) {
 			delete(targetClub.ActiveBuffs, trapID)
 			delete(targetClub.BuffExpirations, trapID)
+			log.Printf("[INDUSTRIAL] Defense trap %s expired for club %s\n", trapID, targetClub.Name)
 			continue
 		}
 
@@ -140,6 +141,15 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		// MOJO GAIN: Reward the club for successful defense
 		mojoGain := l.calculateMojoGain(targetClub, "DEFENSE", 0)
 		targetClub.Mojo += mojoGain
+
+		// PILLAR 1: Reputation Ripple.
+		// Update standings for all club employees to reflect the increased Mojo multiplier from defense.
+		for w, s := range l.leaderboard {
+			if s.EmployerClubID == targetClub.ID {
+				s.Reputation = l.CalculateReputation(s)
+				l.leaderboard[w] = s
+			}
+		}
 
 		targetClub.LastHeistAt = now  // Trigger visual "Under Attack" state
 		targetClub.LastActivity = now // Defense engagement counts as activity
