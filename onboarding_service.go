@@ -132,13 +132,29 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 	if err == nil && accountInfo.Amount >= 1000000 { // Check if account already has 1 VOI (1,000,000 microAlgos)
 		isSkip = true
 		w.WriteHeader(http.StatusNoContent) // User already has VOI, skip starter pack
-		return // refundVBV remains true, so the defer will restore the balance
+		return                              // refundVBV remains true, so the defer will restore the balance
 	}
 
 	// 3. Dispatch Starter Pack (1 VOI + 1 VBV)
 	faucetMnemonic := os.Getenv("FAUCET_MNEMONIC")
-	pk, _ := mnemonic.ToPrivateKey(faucetMnemonic)
-	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
+	if faucetMnemonic == "" {
+		log.Println("[BRIDGE CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET.")
+		http.Error(w, "server configuration error: faucet mnemonic missing", http.StatusInternalServerError)
+		return
+	}
+
+	pk, err := mnemonic.ToPrivateKey(faucetMnemonic)
+	if err != nil {
+		log.Printf("[BRIDGE CRITICAL] Failed to convert FAUCET_MNEMONIC to private key: %v", err)
+		http.Error(w, "faucet configuration error: invalid mnemonic", http.StatusInternalServerError)
+		return
+	}
+	faucetAccount, err := crypto.AccountFromPrivateKey(pk)
+	if err != nil {
+		log.Printf("[BRIDGE CRITICAL] Failed to create account from private key: %v", err)
+		http.Error(w, "internal cryptographic error", http.StatusInternalServerError)
+		return
+	}
 	vaultAddr := l.vaultAddress
 
 	sp, _ := client.SuggestedParams().Do(context.Background())

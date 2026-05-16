@@ -85,4 +85,5 @@
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.
 *   **166**: Hardened `handleReward` in `faucet_service.go` with explicit empty mnemonic checks to prevent runtime errors during reward dispatch.
 *   **167**: Applied mnemonic validation and error handling to `dispatchTournamentRewards` in `tournament_manager.go` for robust payout processing.
+*   **168**: Hardened `handleVoiOnboarding` in `onboarding_service.go` with explicit error checking for faucet mnemonic conversion and account initialization.
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.
