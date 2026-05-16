@@ -123,11 +123,11 @@ $card-mini-height: 120px;
 $board-size: 300px;
 
 // Layout Component Tokens
-$panel-width-xs: 400px;
-$panel-width-sm: 450px;
-$panel-width-md: 600px;
-$panel-width-lg: 800px;
-$panel-width-xl: 1000px;
+$panel-width-xs: min(95vw, 400px);
+$panel-width-sm: min(95vw, 450px);
+$panel-width-md: min(95vw, 600px);
+$panel-width-lg: min(95vw, 800px);
+$panel-width-xl: min(95vw, 1000px);
 $chat-height: 300px;
 
 // Dynamic CSS Variables for Runtime Theming

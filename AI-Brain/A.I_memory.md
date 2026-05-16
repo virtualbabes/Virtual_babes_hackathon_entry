@@ -74,3 +74,7 @@
 *   **154**: Updated `deploy-wasm.yml` to trigger CI/CD on the `slapkarnts/Dev2` branch instead of main.
 *   **155**: Audited and hardened `Dockerfile`; added internal WASM compilation and updated source copying to support modular service architecture.
 *   **156**: Simulated 16-player tournament stress test via `ARENA_STRESS_TEST=true`; verified bracket advancement, deadlock-free lock pulsing, and accuracy of club treasury kickbacks in `./test_data/admin_audit.log`.
+*   **157**: Standardized mobile panel widths in `_variables.scss` using `min(95vw, ...)` scaling to prevent viewport overflow on small devices.
+*   **158**: Implemented "Underworld" atmospheric shifting; added red-tint CSS variables and updated `app.js` to toggle the `criminal-underworld` class on high-infamy states.
+*   **159**: Applied `criminal-underworld` class styling to `_main-layout.scss` for dynamic visual feedback during high-infamy states.
+*   **160**: Finalized `_neon-glass.scss` update by inserting Underworld CSS variables at the root level.

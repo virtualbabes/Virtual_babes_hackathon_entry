@@ -3,6 +3,13 @@
 // Import core variables
 @import '../base/variables';
 
+// Underworld Atmospheric Variables
+:root {
+    --underworld-bg-red: rgba(40, 5, 5, 0.8);
+    --underworld-glow-red: rgba(255, 8, 68, 0.4);
+    --underworld-border-red: rgba(255, 75, 75, 0.3);
+}
+
 // Mixin for applying the standard glassmorphism effect with dynamic theming
 @mixin neon-glass-panel {
     background: $glass-bg-color;

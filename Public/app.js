@@ -146,6 +146,7 @@ export function syncUI(scope = "all") {
             document.documentElement.style.setProperty('--arena-mood-color', moodColor);
             document.documentElement.style.setProperty('--arena-glow-intensity', isCriminal ? '1.5' : '1');
             document.body.classList.toggle('criminal-activity', isCriminal);
+            document.getElementById("main-game-container")?.classList.toggle('criminal-underworld', isCriminal);
         } else {
             document.documentElement.style.setProperty('--arena-mood-color', '#00f2fe');
             document.documentElement.style.setProperty('--arena-glow-intensity', '1');
