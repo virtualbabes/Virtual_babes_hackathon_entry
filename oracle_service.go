@@ -496,39 +496,12 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 		return
 	}
 
-	baseURL := voiConfig.IndexerURL
-
 	// PASS 1: Wins/DNFs (Vault -> Wallet)
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		baseURL, voiConfig.AssetID, vaultAddr, wallet)
+	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		voiConfig.AssetID, vaultAddr, wallet))
 
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ { // Retry up to 3 times
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel() // Ensure context is cancelled after each attempt
-		if err != nil {
-			if i < 2 { // If not the last attempt, wait and retry
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			log.Printf("[ORACLE ERROR] Failed to connect to indexer for stats sync after retries: %v\n", err)
-			return // Return on persistent network error
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 { // If not the last attempt, wait with backoff and retry
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for stats sync after retries.\n")
-			return // Return on persistent rate-limiting
-		}
-		break // Break loop on successful response
-	}
 	if err != nil {
+		log.Printf("[ORACLE ERROR] Multi-failover indexer scan failed for %s: %v\n", wallet, err)
 		return // Should be caught by the loop, but as a final safeguard
 	}
 	defer resp.Body.Close() // Ensure body is closed
@@ -597,15 +570,11 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	// PILLAR 4: Mirrored Immersion.
 	// Pass 3: Global Result Recovery. Scan the Vault's output to find matches where I was the Loser.
 	// This allows reconstructing persistent "Loss" records without extra blockchain fees.
-	globalURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=200",
-		baseURL, voiConfig.AssetID, vaultAddr)
+	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=200",
+		voiConfig.AssetID, vaultAddr))
 
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", globalURL, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
 			var gRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -674,9 +643,6 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 					}
 				}
 			}
-			resp.Body.Close()
-			break
-		}
 	}
 
 	sort.Slice(matchHistory, func(i, j int) bool { return matchHistory[i].Timestamp.After(matchHistory[j].Timestamp) })
@@ -692,15 +658,11 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 
 	// PASS 2: Buy-ins/Registrations (Wallet -> Vault)
 	// This allows the server to discover used TxIDs for the specific player joining.
-	buyInURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		baseURL, voiConfig.AssetID, wallet, vaultAddr)
+	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		voiConfig.AssetID, wallet, vaultAddr))
 
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", buyInURL, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -736,14 +698,6 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				}
 				l.mutex.Unlock()
 			}
-			resp.Body.Close()
-			break
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
 }
 
 func (l *Lobby) refreshGlobalLeaderboard() {
@@ -754,35 +708,9 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 		return
 	}
 
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
-		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress)
+	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
+		voiConfig.AssetID, l.vaultAddress))
 
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			log.Printf("[ORACLE ERROR] Failed to connect to indexer for leaderboard refresh after retries: %v\n", err)
-			return
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for leaderboard refresh after retries.\n")
-			return
-		}
-		break
-	}
 	if err != nil {
 		return
 	}
@@ -953,7 +881,7 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 
 	// Optimization: Fetch Indexer URL once under a brief lock to prevent recursive deadlock
 	var baseURL string
-	l.mutex.RLock()
+	l.mutex.RLock() // Note: This check still uses the singular for resolution, see suggested refactor
 	if cfg, ok := l.availableNetworks["Voi Mainnet"]; ok {
 		baseURL = cfg.IndexerURL
 	}
@@ -1027,32 +955,7 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 	// 2. Branch logic based on Network Type
 	if strings.Contains(strings.ToLower(netKey), "voi") {
-		// VOI Logic: Custom ARC-200 Indexer
-		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
-		var resp *http.Response
-		var err error
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-			resp, err = http.DefaultClient.Do(req)
-			cancel()
-			if err != nil {
-				if i < 2 {
-					time.Sleep(500 * time.Millisecond)
-					continue
-				}
-				return false, 0, err
-			}
-			if resp.StatusCode == http.StatusTooManyRequests {
-				resp.Body.Close()
-				if i < 2 {
-					time.Sleep(time.Duration(i+1) * 1 * time.Second)
-					continue
-				}
-				return false, 0, fmt.Errorf("voi indexer rate-limited (429)")
-			}
-			break
-		}
+		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/arc200/transfers?transactionId=%s", txid))
 		if err != nil {
 			return false, 0, err
 		}
@@ -1079,31 +982,7 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		}
 	} else {
 		// ALGORAND Logic: Standard Indexer Transaction Endpoint
-		url := fmt.Sprintf("%s/v2/transactions/%s", netConfig.IndexerURL, txid)
-		var resp *http.Response
-		var err error
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-			resp, err = http.DefaultClient.Do(req)
-			cancel()
-			if err != nil {
-				if i < 2 {
-					time.Sleep(500 * time.Millisecond)
-					continue
-				}
-				return false, 0, err
-			}
-			if resp.StatusCode == http.StatusTooManyRequests {
-				resp.Body.Close()
-				if i < 2 {
-					time.Sleep(time.Duration(i+1) * 1 * time.Second)
-					continue
-				}
-				return false, 0, fmt.Errorf("algorand indexer rate-limited (429)")
-			}
-			break
-		}
+		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/v2/transactions/%s", txid))
 		if err != nil {
 			return false, 0, err
 		}
@@ -1148,40 +1027,10 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 }
 
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
-func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
-	// PILLAR 3: Concurrency Throttling.
-	select {
-	case l.oracleSemaphore <- struct{}{}:
-		defer func() { <-l.oracleSemaphore }()
-	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("oracle semaphore timeout")
-	}
-
-	url := fmt.Sprintf("%s/v2/assets/%d/transactions?tx-type=acfg&limit=1", indexerURL, assetID)
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			return nil, err
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			return nil, fmt.Errorf("indexer rate-limited (429)")
-		}
-		break
+func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
+	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -1212,17 +1061,13 @@ func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metada
 }
 
 // fetchARC19Metadata resolves a dynamic IPFS CID from the asset's reserve address.
-func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
-	// PILLAR 3: Concurrency Throttling.
-	select {
-	case l.oracleSemaphore <- struct{}{}:
-		defer func() { <-l.oracleSemaphore }()
-	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("oracle semaphore timeout")
-	}
-
+func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
 	// 1. Fetch Asset Information from Indexer to retrieve the Reserve Address
-	url := fmt.Sprintf("%s/v2/assets/%d", indexerURL, assetID)
+	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d", assetID))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	var resp *http.Response
 	var err error
@@ -1347,7 +1192,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 		if json.NewDecoder(resp.Body).Decode(&res) == nil {
 			resp.Body.Close()
 			if strings.Contains(res.Asset.Params.URL, "template-ipfs") {
-				meta, err := l.fetchARC19Metadata(cfg.IndexerURL, assetID)
+				meta, err := l.fetchARC19Metadata(cfg, assetID)
 				return meta, "ARC-19", err
 			}
 		} else {
@@ -1359,11 +1204,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 
 	// 2. ARC-72 Check: If network has a configured AppID, check if this ID exists as a token.
 	if cfg.AppID != "" && cfg.AppID != "0" {
-		checkURL := fmt.Sprintf("%s/tokens?contractId=%s&tokenId=%d", cfg.IndexerURL, cfg.AppID, assetID)
-		ctx72, cancel72 := context.WithTimeout(context.Background(), indexerTimeout)
-		req72, _ := http.NewRequestWithContext(ctx72, "GET", checkURL, nil)
-		resp72, err := http.DefaultClient.Do(req72)
-		cancel72()
+		resp72, err := l.indexerRequest(cfg, fmt.Sprintf("/tokens?contractId=%s&tokenId=%d", cfg.AppID, assetID))
 		if err == nil && resp72.StatusCode == http.StatusOK {
 			var res72 struct {
 				Tokens []struct {
@@ -1381,7 +1222,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	}
 
 	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
-	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
+	meta, err := l.fetchARC69Metadata(cfg, assetID)
 	return meta, "ARC-69", err
 }
 
