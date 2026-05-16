@@ -28,6 +28,17 @@ func (l *Lobby) logAdminAudit(action, target, details string) {
 // logAdminAuditLocked records an administrative action, assuming the lock is held.
 func (l *Lobby) logAdminAuditLocked(action, target, details string) {
 	load := len(l.matches) / 2
+	logPath := l.getDataPath("admin_audit.log")
+
+	// PILLAR 4: Production Resilience.
+	// Implement basic log rotation: if the file exceeds 5MB, move it to .old and start fresh.
+	if info, err := os.Stat(logPath); err == nil {
+		if info.Size() > 5*1024*1024 { // 5MB Limit
+			oldPath := logPath + ".old"
+			os.Rename(logPath, oldPath)
+			log.Printf("[AUDIT] Admin log rotated. Previous size: %d bytes\n", info.Size())
+		}
+	}
 
 	entry := struct {
 		Timestamp  string `json:"timestamp"`
@@ -44,7 +55,7 @@ func (l *Lobby) logAdminAuditLocked(action, target, details string) {
 	}
 
 	b, _ := json.Marshal(entry)
-	f, err := os.OpenFile(l.getDataPath("admin_audit.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("[AUDIT ERROR] Failed to write to admin log: %v\n", err)
 		return
