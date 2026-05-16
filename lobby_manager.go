@@ -1049,6 +1049,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Wins              int            `json:"wins"`
 		Reputation        int            `json:"reputation"`
 		AuctionsWon       int            `json:"auctions_won"`
+		VirtualBalance    uint64         `json:"virtual_balance"`
 		WantedLevel       int            `json:"wanted_level"`
 		Cunning           int            `json:"cunning"`
 		Mojo              int            `json:"mojo"`
@@ -1069,8 +1070,8 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	var players []playerInfo
 	for _, client := range l.clients {
 		hasMardon := false
-		var banExpires time.Time
-		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon := 0, 0, 0, 0, 0, 0, 0
+		var banExpires time.Time 
+		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon, vBal := 0, 0, 0, 0, 0, 0, 0, uint64(0)
 		var jailedCards map[int]string
 		var matches []MatchHistory
 		var equippedFaceplate string
@@ -1084,6 +1085,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				banExpires = stats.BanExpires
 				wins = stats.Wins
 				reputation = stats.Reputation
+				vBal = l.playerBalances[wallet]
 				auctionsWon = stats.AuctionsWon
 				// UI Sync: Use Effective Mojo (including faceplate) for Career Path display
 				mojo = stats.GetEffectiveMojo()
@@ -1113,7 +1115,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
 			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation,
-			AuctionsWon: auctionsWon,
+			AuctionsWon: auctionsWon, VirtualBalance: vBal,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			MatchHistory: matches,
 			JailedCards:  jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
@@ -1129,7 +1131,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		MaintenanceTime   time.Time                `json:"maintenance_time"`
 		FaucetBalance     float64                  `json:"faucet_balance"`
 		Clubs             map[string]*Club         `json:"clubs"`
-		Rewards           map[string]uint64        `json:"rewards"`
+		RewardStack       map[string]uint64        `json:"reward_stack"`
 		ActiveMatchCount  int                      `json:"active_match_count"`
 		Tournament        TournamentState          `json:"tournament"`
 		AvailableNetworks map[string]NetworkConfig `json:"available_networks"`
@@ -1141,7 +1143,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Players: players, MaintenanceActive: l.maintenanceMode,
 		MaintenanceTime: l.maintenanceTime,
 		Clubs:           l.clubs,
-		Rewards:         l.rewards, FaucetBalance: l.faucetBalance,
+		RewardStack:     l.rewardStack, FaucetBalance: l.faucetBalance,
 		ActiveMatchCount: len(l.matches) / 2, Tournament: l.tournament,
 		AvailableNetworks: l.availableNetworks, AdminFocusNetwork: l.adminFocusNetwork,
 		Rumors:        l.rumors,

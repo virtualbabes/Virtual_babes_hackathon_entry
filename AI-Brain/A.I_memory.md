@@ -129,3 +129,4 @@
 *   **210**: Audited `startSalaryDispenser` in `career.go`; resolved similar Industrial Loop accounting error by returning gross salary to `faucetBalance` to ensure liquid pool correctly covers net salary reward liabilities.
 *   **211**: Audited `handlePayRansom` in `handlers_criminality.go`; resolved Industrial Loop accounting error by returning gross ransom to `faucetBalance` to cover future reward liabilities.
 *   **212**: Audited `handleTakeLoan` in `loan_service.go`; corrected double-deduction error by removing immediate `faucetBalance` subtraction, ensuring ledger parity with the payout service.
+*   **213**: Refactored Lobby struct to separate `rewardStack` (Asset IDs) from `playerBalances` (Wallet IDs); resolved critical map key collision bug in `dispatchReward`.

@@ -216,7 +216,7 @@ func (l *Lobby) verifyVoiPayoutOptIn(recipient string) error {
 func (l *Lobby) dispatchReward(recipient, claimant, network string, history MatchHistory) (string, bool, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
-	activeRewards := l.rewards
+	activeRewards := l.rewardStack
 	stats, hasStats := l.leaderboard[claimant] // Reputation bonus applies to the player (claimant)
 	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
@@ -266,14 +266,23 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	// Refactored: mid = Match ID, tid = Tournament Instance ID
 	winNote := []byte(fmt.Sprintf("VBT_WIN:{\"opp\":\"%s\",\"scores\":[%d,%d],\"tid\":\"%s\",\"mid\":\"%s\"}", history.Opponent, history.Scores[0], history.Scores[1], history.TournamentID, history.TournamentMatchID))
 
+	l.mutex.Lock()
+	virtualBalance := l.playerBalances[claimant]
+	l.playerBalances[claimant] = 0 // Reset virtual balance as it's being committed to this payout
+	l.mutex.Unlock()
+
 	for appIDStr, baseAmt := range activeRewards {
 		appID, err := strconv.ParseUint(appIDStr, 10, 64)
 		if err != nil {
-			log.Printf("[FAUCET] Invalid asset ID in rewards map: %s", appIDStr)
-			skippedAssets = append(skippedAssets, appIDStr)
 			continue
 		}
 		amt := uint64(float64(baseAmt) * multiplier)
+
+		// PILLAR 2: Virtual Balance Integration.
+		// Add accumulated balances from non-match activities (Salaries, Heists, Loans) to the primary reward.
+		if appIDStr == l.rewardAssetID {
+			amt += virtualBalance
+		}
 
 		// PILLAR 4: Bounty System Integration.
 		// Add the calculated bounty from MatchHistory if this is the primary Arena asset.

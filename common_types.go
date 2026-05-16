@@ -462,7 +462,8 @@ type Lobby struct {
 	linkedWallets           map[string]WalletLinkInfo
 	vaultAddress            string
 	faucetBalance           float64
-	rewards                 map[string]uint64
+	rewardStack             map[string]uint64
+	playerBalances          map[string]uint64
 	initialRewards          map[string]uint64 // Unscaled base values for all assets in the reward stack
 	holdingBonuses          map[string][]HoldingBonus
 	initialBaseReward       uint64

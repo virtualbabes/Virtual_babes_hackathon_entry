@@ -364,3 +364,4 @@
 - [FIXED] Resolved accounting leak in `startSalaryDispenser` (career.go); ensured gross salary amount returns to `faucetBalance` pool to maintain ledger integrity for future salary claims.
 - [FIXED] Resolved accounting leak in `handlePayRansom` (handlers_criminality.go); ensured gross ransom amount returns to `faucetBalance` to cover future reward liabilities.
 - [FIXED] Resolved accounting leak in `handleTakeLoan` (loan_service.go); principal is no longer subtracted from `faucetBalance` immediately, as it remains in the vault until reward claim.
+- [FIXED] Resolved map key collision bug by separating global `rewardStack` from individual `playerBalances` in the Lobby struct; updated all economic services to utilize the correct ledger.
