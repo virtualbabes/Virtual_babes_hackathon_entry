@@ -130,3 +130,4 @@
 *   **211**: Audited `handlePayRansom` in `handlers_criminality.go`; resolved Industrial Loop accounting error by returning gross ransom to `faucetBalance` to cover future reward liabilities.
 *   **212**: Audited `handleTakeLoan` in `loan_service.go`; corrected double-deduction error by removing immediate `faucetBalance` subtraction, ensuring ledger parity with the payout service.
 *   **213**: Refactored Lobby struct to separate `rewardStack` (Asset IDs) from `playerBalances` (Wallet IDs); resolved critical map key collision bug in `dispatchReward`.
+*   **214**: Audited `handleRepayLoan` in `loan_service.go`; verified correct `faucetBalance` crediting of principal and interest; fixed `playerBalances` targeting and syntax errors in `handleTakeLoan`.

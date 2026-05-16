@@ -365,3 +365,4 @@
 - [FIXED] Resolved accounting leak in `handlePayRansom` (handlers_criminality.go); ensured gross ransom amount returns to `faucetBalance` to cover future reward liabilities.
 - [FIXED] Resolved accounting leak in `handleTakeLoan` (loan_service.go); principal is no longer subtracted from `faucetBalance` immediately, as it remains in the vault until reward claim.
 - [FIXED] Resolved map key collision bug by separating global `rewardStack` from individual `playerBalances` in the Lobby struct; updated all economic services to utilize the correct ledger.
+- [FIXED] Hardened `loan_service.go` by correcting `playerBalances` targeting and removing structural syntax errors in the loan issuance path.

@@ -119,15 +119,14 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 		DueAt:            time.Now().Add(time.Duration(req.DurationHours) * time.Hour),
 		Status:           "active",
 		TerritoryID:      "the_second_hand_store", // Fixed territory for Second-Hand Store
-		return
 	}
 
-	// Dispense loan amount to player's rewards
-	l.rewards[req.Wallet] += loanAmountMicro
+	// PILLAR 2: Industrial Loop Accounting.
+	l.playerBalances[req.Wallet] += loanAmountMicro
 
 	// PILLAR 2: Industrial Loop Accounting.
-	// Principal is NOT subtracted from faucetBalance here. FaucetBalance represents 
-	// the authoritative on-chain vault total; the deduction occurs in faucet_service.go 
+	// Principal is NOT subtracted from faucetBalance here. FaucetBalance represents
+	// the authoritative on-chain vault total; the deduction occurs in faucet_service.go
 	// during reward dispatch to maintain ledger consistency across the Industrial Loop.
 
 	l.logAdminAuditLocked("LOAN_TAKEN", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f, Repay: %.2f", loanID, req.LoanAmount, float64(repaymentAmountMicro)/1000000.0))
