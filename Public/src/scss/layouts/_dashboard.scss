@@ -509,13 +509,13 @@ select.glass-input {
 @media (max-width: 768px) {
     /* 1. Force the 3x3 grid to maintain shape and fill width */
     .battle-board, #board-container {
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(3, 1fr);
-        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr)); // Allow slots to shrink below 100px
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: clamp(4px, 2vw, 10px); // Tighten gaps on small screens
         width: 95vw;
         height: 95vw; /* Maintain 1:1 Aspect Ratio */
-        max-width: 500px;
-        max-height: 500px;
+        max-width: 400px;
+        max-height: 400px;
         margin: 0 auto;
     }
 

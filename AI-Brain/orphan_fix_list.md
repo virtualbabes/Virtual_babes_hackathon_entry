@@ -344,3 +344,4 @@
 - [FIXED] Enhanced `renderMatchHistory` in `game.js` to visually indicate blockchain-verified match results using the `ReceiptTxID` field.
 - [FIXED] Updated `fetchSeasonHistory` in `leaderboard.js` to render prestigious placement highlights with specialized iconography and Envoi name resolution for seasonal archives.
 - [FIXED] Implemented automated recovery of `paidParticipants` from blockchain buy-in notes to ensure tournament registration state survives server restarts.
+- [FIXED] Resolved potential grid overflow in `_dashboard.scss` by using `minmax(0, 1fr)` for mobile battle board tracks, ensuring cards scale on devices < 400px.

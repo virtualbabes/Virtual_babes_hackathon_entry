@@ -100,3 +100,4 @@
 *   **180**: Implemented `MetadataDispatcher` in `oracle_service.go` to route NFT discovery between ARC-72, ARC-19, and ARC-69 standards based on Application IDs and Asset URL patterns.
 *   **181**: Integrated `MetadataDispatcher` into `getVerifiedCards`; enabled automatic standard resolution (ARC-72/19/69) for Algorand-based card imports and discovery.
 *   **182**: Audited `_territory.scss` for mobile responsiveness; flattened 3D map rotation and forced 3-column grid layout for mobile viewports using design tokens.
+*   **183**: Hardened `_dashboard.scss` battle grid for devices < 400px; implemented `minmax(0, 1fr)` and clamped gaps to ensure fluid scaling on narrow viewports.
