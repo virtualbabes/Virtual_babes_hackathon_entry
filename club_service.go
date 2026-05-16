@@ -614,6 +614,10 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 	case "REVENUE":
 		// Earn 1 Mojo for every 50 $VBV in turnover (Value is in base units)
 		gain = int(value / 50.0)
+		// PILLAR 1: Anti-Whale Guard.
+		if gain > 20 {
+			gain = 20 // Cap base revenue gain per transaction
+		}
 	case "DEFENSE":
 		// Successful heist defense yields a flat Mojo boost
 		gain = 15
@@ -641,17 +645,24 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 		gain = 1
 	}
 
-	// PILLAR 1: Territory Weighting.
-	// Ownership signifies infrastructure. Each additional territory increases Mojo efficiency by 25%.
-	efficiencyMult := 1.0 + (float64(len(club.Territories)-1) * 0.25)
-
-	// PILLAR 1: Regional Governor Bonus.
-	// Governors (2+ territories) receive a flat +50% synergy bonus to all Mojo gains.
-	if len(club.Territories) >= 2 {
-		efficiencyMult *= 1.5
+	// PILLAR 1: Hardened Infrastructure Scaling.
+	// Each additional territory increases Mojo efficiency by 20% (Capped at 2.0x).
+	efficiencyMult := 1.0 + (float64(len(club.Territories)-1) * 0.20)
+	if efficiencyMult > 2.0 {
+		efficiencyMult = 2.0
 	}
 
-	return int(float64(gain) * efficiencyMult)
+	// Regional Governor Synergy is now an additive 30% bonus rather than a multiplicative 50%.
+	if len(club.Territories) >= 2 {
+		efficiencyMult += 0.30
+	}
+
+	finalGain := int(float64(gain) * efficiencyMult)
+	// Global Event Cap: Prevent runaway inflation during peak tournament activity
+	if finalGain > 60 {
+		finalGain = 60
+	}
+	return finalGain
 }
 
 // distributeCourthouseFineToClubsLocked distributes a portion of the fine among clubs and governors.

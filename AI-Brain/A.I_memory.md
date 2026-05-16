@@ -124,4 +124,5 @@
 *   **205**: Audited `handleHeist` in `club_service.go`; confirmed correct Regional Governor and Master-tier trap scaling; implemented reputation ripple for defensive Mojo gains to maintain social simulation consistency.
 *   **206**: Hardened `processPlaystyleDecay` in `lobby_manager.go`; implemented epsilon snapping for 0.5 baseline normalization and added `Playstyle` to the lobby update message for narrative consistency.
 *   **207**: Audited `syncStatsFromBlockchain` in `oracle_service.go`; confirmed season filtering accuracy and hardened logic with boundary snapshotting and consistent resource management.
+*   **208**: Refactored `calculateMojoGain` in `club_service.go`; implemented additive scaling for Regional Governors and per-event caps to prevent social standing inflation during peak activity.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.
