@@ -1118,6 +1118,21 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 	return false, 0, nil
 }
 
+// fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
+func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
+	// Implementation note: Query /v2/assets/{id}/transactions?tx-type=acfg&limit=1
+	// Parse the Base64 note and unmarshal to ARC72Metadata struct.
+	return nil, fmt.Errorf("ARC-69 logic not yet implemented")
+}
+
+// fetchARC19Metadata resolves a dynamic IPFS CID from the asset's reserve address.
+func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
+	// Implementation note: Fetch asset info to get reserve address.
+	// Convert reserve bytes to CIDv1 using multihash.
+	// Fetch JSON from IPFS gateway.
+	return nil, fmt.Errorf("ARC-19 logic not yet implemented")
+}
+
 // checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
 func (l *Lobby) checkVaultBalanceOnChain() {
 	l.mutex.RLock()
