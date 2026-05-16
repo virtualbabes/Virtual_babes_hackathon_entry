@@ -151,12 +151,3 @@ Unlock unique profile badges, status boosts, and multipliers by hitting mileston
 * EXECUTIVE_PAY — Sign an employment contract worth 500+ $VBV.
 * ART_COLLECTOR — Win 3 separate Art Gallery bundle auctions.
 * REHABILITATED — Fully wipe an active Wanted Level at the Courthouse.
-
-------------------------------
-If you'd like, let me know:
-
-* Which specific colors or branding tones you want to emphasize from the Voiconomy palette
-* If you need custom markdown placeholders for hyperlinks or image assets
-* If you want to expand the breakdown of a specific combat rule or market mechanic
-
-I can refine this document layout to fit your exact web layout requirements.
