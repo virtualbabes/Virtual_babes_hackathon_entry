@@ -71,3 +71,5 @@
 *   **151**: Conducted a comprehensive documentation and status audit; confirmed readiness for Pillar 1 (Production Hardening) and 16-player stress testing.
 *   **152**: Verified development flow of past 10 pushes; confirmed logical progression from infrastructure prep to production sync.
 *   **153**: Prepared for branch migration; acknowledging move to `slapkarnts/Dev2` and initialization of a dedicated `Deploy` branch for production hosting.
+*   **154**: Updated `deploy-wasm.yml` to trigger CI/CD on the `slapkarnts/Dev2` branch instead of main.
+*   **155**: Audited and hardened `Dockerfile`; added internal WASM compilation and updated source copying to support modular service architecture.

@@ -2,7 +2,7 @@ name: Build and Deploy WASM Frontend
 
 on:
   push:
-    branches: [ main ]
+    branches: [ slapkarnts/Dev2 ]
 
 jobs:
   build-and-deploy:

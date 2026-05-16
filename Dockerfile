@@ -1,21 +1,24 @@
 # ==========================================
 # STAGE 1: Build the Go Binary
 # ==========================================
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install git and build-base for any potential C dependencies (though CGO is disabled)
 RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copy dependency manifests first to leverage Docker layer caching
+# 1. Copy dependency manifests
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the server source code
-COPY server.go ./
+# 2. Copy the entire source (required for modular service architecture)
+COPY . .
 
-# Build an optimized, static binary
+# 3. Compile the WASM Game Engine (Ensures client/server rule parity)
+RUN GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go
+
+# 4. Build the optimized, static Server binary
 # -ldflags="-w -s" removes debug information to reduce size
 # CGO_ENABLED=0 ensures the binary is statically linked
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server-bin server.go
