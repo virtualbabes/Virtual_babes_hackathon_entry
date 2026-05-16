@@ -2,7 +2,7 @@
 
 ## Pillar 1: Production Hardening (Active)
 - [x] **Live Stress Test**: Execute 16-player tournament bracket simulation under concurrent load to verify pot distribution and kickbacks.
-- [ ] **Secret Security**: Finalize migration of `FAUCET_MNEMONIC` and `ADMIN_WALLETS` from `.env` to Render Environment Secrets.
+- [x] **Secret Security**: Finalize migration of `FAUCET_MNEMONIC` and `ADMIN_WALLETS` from `.env` to Render Environment Secrets.
 - [ ] **RPC Resilience**: Perform 24-hour health check on LlamaRPC and Nodly public endpoints.
 
 ## Pillar 2: UI/UX & Immersion (Final Polish)
@@ -13,7 +13,7 @@
 
 ## Pillar 3: Administrative Automation
 - [x] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
-- [ ] **Audit Export**: Build a tool to export `admin_audit.log` into CSV for hackathon reporting.
+- [x] **Audit Export**: Build a tool to export `admin_audit.log` into CSV for hackathon reporting.
 
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).

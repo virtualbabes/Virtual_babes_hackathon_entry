@@ -689,6 +689,47 @@ func (l *Lobby) handleSeasonRollover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleExportAuditLog serves the admin_audit.log file as a downloadable CSV.
+func (l *Lobby) handleExportAuditLog(w http.ResponseWriter, r *http.Request) {
+	if !l.checkAdminAuth(w, r) {
+		return
+	}
+
+	logPath := l.getDataPath("admin_audit.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		http.Error(w, "Audit log not found or unreadable", http.StatusNotFound)
+		return
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	var csvOutput strings.Builder
+	csvOutput.WriteString("Timestamp,Action,Target,Details,ServerLoad\n")
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var entry struct {
+			Timestamp  string `json:"timestamp"`
+			Action     string `json:"action"`
+			Target     string `json:"target"`
+			Details    string `json:"details"`
+			ServerLoad int    `json:"server_load"`
+		}
+		if err := json.Unmarshal([]byte(line), &entry); err == nil {
+			details := strings.ReplaceAll(entry.Details, "\"", "\"\"")
+			target := strings.ReplaceAll(entry.Target, "\"", "\"\"")
+			csvOutput.WriteString(fmt.Sprintf("%s,%s,\"%s\",\"%s\",%d\n",
+				entry.Timestamp, entry.Action, target, details, entry.ServerLoad))
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=admin_audit_export.csv")
+	w.Write([]byte(csvOutput.String()))
+}
+
 func (l *Lobby) handleSimulateTournament(w http.ResponseWriter, r *http.Request) {
 	if !l.checkAdminAuth(w, r) {
 		return

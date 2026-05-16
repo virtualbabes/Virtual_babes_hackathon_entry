@@ -81,3 +81,5 @@
 *   **161**: Hardened `_animations.scss` by unifying shimmer keyframes and adding `.skeleton-block` utilities for cross-chain metadata loading states.
 *   **162**: Implemented typewriter effect for NPC taunts in `game.js`; added heuristic to trigger on dialogue-heavy SERVER/SYSTEM messages.
 *   **163**: Implemented `handleSeasonRollover` admin handler in `handlers_admin.go` to allow manual triggering of archival and leaderboard resets.
+*   **164**: Implemented `handleExportAuditLog` in `handlers_admin.go` to serve `admin_audit.log` as a CSV download for administrative reporting.
+*   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.

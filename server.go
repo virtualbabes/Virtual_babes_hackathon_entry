@@ -321,15 +321,18 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	// Mainnet Security Audit: Pre-validate critical secrets at startup to ensure stability
-	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
-	if mnemonicRaw == "" {
-		log.Println("[CRITICAL WARNING] FAUCET_MNEMONIC is missing! Reward payouts and onboarding features will be disabled.")
-	} else if len(strings.Fields(mnemonicRaw)) != 25 {
-		log.Println("[ERROR] FAUCET_MNEMONIC appears malformed (expected 25 words). Check your deployment configuration.")
+	secrets := []string{"FAUCET_MNEMONIC", "ADMIN_WALLETS", "VAULT_ADDRESS", "WC_PROJECT_ID"}
+	for _, s := range secrets {
+		if os.Getenv(s) == "" {
+			log.Printf("[SECURITY WARNING] Environment variable %s is missing. System functionality may be impaired.\n", s)
+		}
 	}
 
-	if os.Getenv("ADMIN_WALLETS") == "" {
-		log.Println("[WARNING] ADMIN_WALLETS is not configured. Administrative panel authentication will fail.")
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw != "" && len(strings.Fields(mnemonicRaw)) != 25 {
+		log.Println("[CRITICAL ERROR] FAUCET_MNEMONIC is malformed (expected 25 words). Payouts will FAIL.")
+	} else if mnemonicRaw != "" {
+		log.Println("[INFO] FAUCET_MNEMONIC validated for length. Faucet Service active.")
 	}
 
 	lobby, err := newLobby()
@@ -392,6 +395,7 @@ func main() {
 	http.HandleFunc("/api/admin/set-admin-focus-network", lobby.handleSetActiveNetwork)
 	http.HandleFunc("/api/admin/update-power", lobby.handleUpdatePowerScaling)
 	http.HandleFunc("/api/admin/logs", lobby.handleGetAdminLogs)
+	http.HandleFunc("/api/admin/export-logs", lobby.handleExportAuditLog)
 	http.HandleFunc("/api/admin/simulate-tournament", lobby.handleSimulateTournament)
 	http.HandleFunc("/api/admin/season-rollover", lobby.handleSeasonRollover)
 	http.HandleFunc("/api/admin/gloat-ban", lobby.handleGloatBan)
