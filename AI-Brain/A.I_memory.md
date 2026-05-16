@@ -122,4 +122,5 @@
 *   **203**: Conducted comprehensive review of `oracle_service.go`; IDENTIFIED and REFACTORED payment verification, archival, and stats reconstruction to utilize the high-availability `indexerRequest` dispatcher, eliminating all remaining singular indexer bottlenecks.
 *   **204**: Audited `applyItemEffect` in `item_service.go`; implemented Mojo gain for Clubs during hardware trap deployment and added reputation ripple updates for all club employees.
 *   **205**: Audited `handleHeist` in `club_service.go`; confirmed correct Regional Governor and Master-tier trap scaling; implemented reputation ripple for defensive Mojo gains to maintain social simulation consistency.
+*   **206**: Hardened `processPlaystyleDecay` in `lobby_manager.go`; implemented epsilon snapping for 0.5 baseline normalization and added `Playstyle` to the lobby update message for narrative consistency.
 *   **199**: Audited `verifyWinner` in `battle_service.go`; confirmed Regional Governor tax is correctly routed at the tournament finalization level in `tournament_manager.go`, adhering to architectural separation of concerns.

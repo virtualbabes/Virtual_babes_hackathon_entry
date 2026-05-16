@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ed25519"
 	crand "crypto/rand"
+	"math"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -1059,6 +1060,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		MatchHistory      []MatchHistory `json:"match_history"`      // Last 5 matches for immersion
 		HeldHostageCards  map[int]string `json:"held_hostage_cards"`
 		Achievements      []string       `json:"achievements"` // Added for UI display
+		Playstyle         PlaystyleTendencies `json:"playstyle"`
 		// JobRole and EmployerID are already present in the playerInfo struct
 		RumorCount int    `json:"rumor_count"` // Added for UI display
 		JobRole    string `json:"job_role"`    // Manager, Security, Clerk
@@ -1116,6 +1118,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			MatchHistory: matches,
 			JailedCards:  jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,
+			Playstyle: stats.Playstyle,
 			JobRole: jobRole, EmployerID: employerID,
 		})
 	}
@@ -1723,8 +1726,20 @@ func (l *Lobby) processPlaystyleDecay() {
 		// Instead of decaying to zero, we decay towards a neutral 0.5 baseline.
 		// This ensures inactive players' commentary eventually reverts to "Standard" behavior
 		// rather than retaining "Extreme" taunts from days-old matches.
-		stats.Playstyle.Aggressiveness = 0.5 + (stats.Playstyle.Aggressiveness-0.5)*decayFactor
-		stats.Playstyle.RiskTolerance = 0.5 + (stats.Playstyle.RiskTolerance-0.5)*decayFactor
+		const epsilon = 0.001
+		normalize := func(val float64) float64 {
+			if math.Abs(val-0.5) < epsilon {
+				return 0.5
+			}
+			return 0.5 + (val-0.5)*decayFactor
+		}
+
+		stats.Playstyle.Aggressiveness = normalize(stats.Playstyle.Aggressiveness)
+		stats.Playstyle.RiskTolerance = normalize(stats.Playstyle.RiskTolerance)
+
+		// PILLAR 3: Identity Sync. Ensure root trait fields match behavioral analysis.
+		stats.Aggressiveness = stats.Playstyle.Aggressiveness
+		stats.RiskTolerance = stats.Playstyle.RiskTolerance
 
 		l.leaderboard[wallet] = stats
 	}

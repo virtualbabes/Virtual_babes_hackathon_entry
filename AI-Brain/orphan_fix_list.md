@@ -357,3 +357,4 @@
 - [FIXED] Ensured 'Hardware' trap deployment in `item_service.go` correctly increments Club Mojo and triggers reputation recalculations for all affiliated employees.
 - [FIXED] Integrated reputation ripple in `handleHeist` defensive path to ensure all club members' Standing reflects organizational Mojo gains immediately.
 - [FIXED] Refactored `verifyBuyInTransaction`, `handleSeasonHistory`, and `syncStatsFromBlockchain` to use the `indexerRequest` dispatcher, ensuring full failover coverage for financial events.
+- [FIXED] Resolved data gap in lobby broadcasts by including `Playstyle` tendencies in `playerInfo` struct; hardened behavioral decay with 0.5 baseline snapping.
