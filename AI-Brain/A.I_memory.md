@@ -112,3 +112,4 @@
 *   **192**: Conducted final audit of `User_manual.md`; refined discovery instructions to emphasize the "Zero-Configuration" experience for ARC-19 and ARC-69 assets.
 *   **193**: Refined NFT discovery strategy in `oracle_service.go`; implemented dual-path scanning (ARC-72 Collection + Account holdings) to ensure native ARC-19/69 assets are discovered alongside smart contract tokens.
 *   **194**: Audited `fetchARC19Metadata` encoding logic; confirmed correct implementation of multibase 'b' (Base32) CIDv1 conversion and added 429 retry resilience for IPFS gateway retrieval.
+*   **195**: Reviewed Regional Governor boost logic in `lobby_manager.go`; hardened matchmaking handshake to propagate boosts, territory ID, and authoritative moods to clients.
