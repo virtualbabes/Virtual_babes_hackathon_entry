@@ -362,3 +362,4 @@
 - [FIXED] Prevented Mojo inflation in `club_service.go` by capping revenue-based gains and transitioning Regional Governor bonuses from multiplicative to additive scaling.
 - [FIXED] Resolved accounting leak in `handleHeist` (club_service.go); ensured gross looted amount returns to `faucetBalance` pool to cover future virtual reward payouts.
 - [FIXED] Resolved accounting leak in `startSalaryDispenser` (career.go); ensured gross salary amount returns to `faucetBalance` pool to maintain ledger integrity for future salary claims.
+- [FIXED] Resolved accounting leak in `handlePayRansom` (handlers_criminality.go); ensured gross ransom amount returns to `faucetBalance` to cover future reward liabilities.
