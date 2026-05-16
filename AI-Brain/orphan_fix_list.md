@@ -370,3 +370,5 @@
 - [FIXED] Purged massive redundant re-definitions in `app.js` to resolve logic shadowing and enforce the authoritative power of the `Public/js/` domain modules.
 - [FIXED] Resolved remaining map name inconsistencies in `club_service.go` and `economy_service.go` following the Ledger separation refactor.
 - [FIXED] Resolved WASM compilation errors in `main.go` caused by variable typos in `simulateCaptures` and unused declarations in `GetTournamentArchiveBadge`.
+- [FIXED] Created missing `entrypoint.sh` script required by `Dockerfile` for Render deployments.
+- [FIXED] Corrected `Dockerfile` build command to use `go build .` instead of `server.go` to support modular service architecture.

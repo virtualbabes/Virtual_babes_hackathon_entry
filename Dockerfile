@@ -21,7 +21,7 @@ RUN GOOS=js GOARCH=wasm go build -o Public/main.wasm main.go
 # 4. Build the optimized, static Server binary
 # -ldflags="-w -s" removes debug information to reduce size
 # CGO_ENABLED=0 ensures the binary is statically linked
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server-bin server.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o server-bin .
 
 # ==========================================
 # STAGE 2: Minimal Runtime Image
