@@ -95,5 +95,6 @@
 *   **175**: Evaluated CORS policy requirements; confirmed `ALLOWED_ORIGINS` must only include frontend hosting domains and explicitly excluded WalletConnect service domains to maintain strict security boundaries.
 *   **176**: Hardened `CheckOrigin` in `server.go` to implement strict domain filtering using the `ALLOWED_ORIGINS` environment variable.
 *   **177**: Reviewed Oracle logic for ARC-19/69 integration; proposed a strategy involving ACFG transaction note parsing and Reserve Address CID decoding to support native Algorand NFT standards.
+*   **178**: Implemented `fetchARC69Metadata` in `oracle_service.go`; integrated indexer transaction scanning for configuration notes with 429 retry logic and semaphore throttling.
 *   **168**: Hardened `handleVoiOnboarding` in `onboarding_service.go` with explicit error checking for faucet mnemonic conversion and account initialization.
 *   **165**: Audited secret management in `server.go`; enhanced startup validation for `FAUCET_MNEMONIC` and `WC_PROJECT_ID` to ensure production readiness on Render.

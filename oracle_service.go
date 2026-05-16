@@ -1120,9 +1120,66 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
 func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
-	// Implementation note: Query /v2/assets/{id}/transactions?tx-type=acfg&limit=1
-	// Parse the Base64 note and unmarshal to ARC72Metadata struct.
-	return nil, fmt.Errorf("ARC-69 logic not yet implemented")
+	// PILLAR 3: Concurrency Throttling.
+	select {
+	case l.oracleSemaphore <- struct{}{}:
+		defer func() { <-l.oracleSemaphore }()
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("oracle semaphore timeout")
+	}
+
+	url := fmt.Sprintf("%s/v2/assets/%d/transactions?tx-type=acfg&limit=1", indexerURL, assetID)
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("indexer returned non-200 status: %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Transactions []struct {
+			Note []byte `json:"note"`
+		} `json:"transactions"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("failed to decode transaction history: %w", err)
+	}
+
+	if len(res.Transactions) == 0 || len(res.Transactions[0].Note) == 0 {
+		return nil, fmt.Errorf("no metadata found in asset configuration history")
+	}
+
+	var meta ARC72Metadata
+	if err := json.Unmarshal(res.Transactions[0].Note, &meta); err != nil {
+		return nil, fmt.Errorf("failed to parse ARC-69 JSON note: %w", err)
+	}
+
+	return &meta, nil
 }
 
 // fetchARC19Metadata resolves a dynamic IPFS CID from the asset's reserve address.
