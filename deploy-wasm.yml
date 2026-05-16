@@ -27,8 +27,8 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: deploy
           publish_dir: .
-          # We keep the Assets and Public_assets directories in the deployment
-          exclude_assets: '.github,server.go,go.mod,go.sum,Dockerfile,.env.example,ToDo.md,App_Flow.md,A.I_memory.md,deploy-wasm.yml'
+          # PILLAR 4: Render Build Support. We must include the source and Docker files so Render can build from this branch.
+          exclude_assets: '.github,.env.example,ToDo.md,App_Flow.md,A.I_memory.md,deploy-wasm.yml'
 
       - name: Trigger Render Deployment
         if: success()

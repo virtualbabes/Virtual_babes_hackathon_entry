@@ -18,6 +18,10 @@
 - [x] **Admin UI**: Add 'Season Rollover' and 'Export Audit' buttons to the Admin Panel UI.
 - [x] **Metadata Expansion**: Implement ARC-19, ARC-69, and Dispatcher logic in `oracle_service.go`.
 
+## Pillar 4: Live Deployment & Monitoring (Next)
+- [ ] **Health Check Hardening**: Audit `handleHealthCheck` to verify RPC connectivity and Faucet liquidity for Render monitoring.
+- [ ] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
+
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).
 *   [x] Milestone 2: Industrial Loop (Fee Rerouting & Card Leasing).

@@ -139,3 +139,6 @@
 *   **220**: Re-issued `entrypoint.sh` and `Dockerfile` hardening; implemented `.dockerignore` to optimize Render build context transfer (reducing 146MB overhead).
 *   **221**: Finalized local hardening for production push; prepared repository for transition to `slapkarnts/Dev2` branch.
 *   **222**: Refined `Dockerfile` to utilize Go 1.24 and Alpine 3.20; optimized `.dockerignore` to exclude development documentation and secured build context for faster Render deployments.
+*   **223**: Troubleshooting Git push error; provided corrected refspec syntax (`HEAD:slapkarnts/Dev2`) and force flag to resolve branch naming mismatch during production deployment.
+*   **224**: Successfully force-pushed local `Dev2` state to remote `slapkarnts/Dev2`; confirmed local branch configuration matches deployment targets.
+*   **225**: Hardened `deploy-wasm.yml` by removing critical build files from `exclude_assets`; resolved Render build failure caused by missing `entrypoint.sh` and Go source on the `deploy` branch.
