@@ -663,12 +663,30 @@ func (l *Lobby) handleOpenRegistration(w http.ResponseWriter, r *http.Request) {
 	l.mutex.Unlock()
 	l.broadcastTournamentState()
 
-	// PILLAR 3: Sync Hardening. 
+	// PILLAR 3: Sync Hardening.
 	// Trigger global lobby update to ensure OpenTime is correctly synchronized for all clients.
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 
 	l.logAdminAudit("OPEN_REGISTRATION", "GLOBAL", fmt.Sprintf("Buy-in: %.2f", req.BuyIn))
 	json.NewEncoder(w).Encode(l.tournament)
+}
+
+// handleSeasonRollover allows an administrator to manually trigger the season archival and reset logic.
+func (l *Lobby) handleSeasonRollover(w http.ResponseWriter, r *http.Request) {
+	if !l.checkAdminAuth(w, r) {
+		return
+	}
+
+	// Trigger the existing archival and reset logic defined in lobby_manager.go
+	go l.archiveSeason()
+
+	l.logAdminAudit("SEASON_ROLLOVER_MANUAL", "GLOBAL", "Manual trigger via Admin Panel")
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "Season rollover initiated. Standings are being archived to the blockchain.",
+	})
 }
 
 func (l *Lobby) handleSimulateTournament(w http.ResponseWriter, r *http.Request) {

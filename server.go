@@ -393,6 +393,7 @@ func main() {
 	http.HandleFunc("/api/admin/update-power", lobby.handleUpdatePowerScaling)
 	http.HandleFunc("/api/admin/logs", lobby.handleGetAdminLogs)
 	http.HandleFunc("/api/admin/simulate-tournament", lobby.handleSimulateTournament)
+	http.HandleFunc("/api/admin/season-rollover", lobby.handleSeasonRollover)
 	http.HandleFunc("/api/admin/gloat-ban", lobby.handleGloatBan)
 	http.HandleFunc("/api/admin/avatar-ban", lobby.handleAvatarBan)
 	http.HandleFunc("/api/admin/start-tournament", lobby.handleStartTournament)

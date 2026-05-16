@@ -12,7 +12,7 @@
 - [x] **Narrative Depth**: Integrate typewriter effects for NPC taunts in the global chat.
 
 ## Pillar 3: Administrative Automation
-- [ ] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
+- [x] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
 - [ ] **Audit Export**: Build a tool to export `admin_audit.log` into CSV for hackathon reporting.
 
 ## Completed & Hardened (Reference)

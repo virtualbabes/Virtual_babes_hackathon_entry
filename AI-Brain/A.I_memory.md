@@ -80,3 +80,4 @@
 *   **160**: Finalized `_neon-glass.scss` update by inserting Underworld CSS variables at the root level.
 *   **161**: Hardened `_animations.scss` by unifying shimmer keyframes and adding `.skeleton-block` utilities for cross-chain metadata loading states.
 *   **162**: Implemented typewriter effect for NPC taunts in `game.js`; added heuristic to trigger on dialogue-heavy SERVER/SYSTEM messages.
+*   **163**: Implemented `handleSeasonRollover` admin handler in `handlers_admin.go` to allow manual triggering of archival and leaderboard resets.
