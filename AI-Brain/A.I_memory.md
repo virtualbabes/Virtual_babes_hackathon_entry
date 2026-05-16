@@ -98,3 +98,4 @@
 *   **178**: Implemented `fetchARC69Metadata` in `oracle_service.go`; integrated indexer transaction scanning for configuration notes with 429 retry logic and semaphore throttling.
 *   **179**: Implemented `fetchARC19Metadata` in `oracle_service.go`; developed reserve address to CIDv1 conversion logic and integrated IPFS gateway retrieval for dynamic NFT metadata.
 *   **180**: Implemented `MetadataDispatcher` in `oracle_service.go` to route NFT discovery between ARC-72, ARC-19, and ARC-69 standards based on Application IDs and Asset URL patterns.
+*   **181**: Integrated `MetadataDispatcher` into `getVerifiedCards`; enabled automatic standard resolution (ARC-72/19/69) for Algorand-based card imports and discovery.

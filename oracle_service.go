@@ -101,8 +101,28 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 					}
 					if json.NewDecoder(resp.Body).Decode(&res) == nil {
 						for _, tok := range res.Tokens {
-							var meta ARC72Metadata
-							if json.Unmarshal([]byte(tok.Metadata), &meta) == nil {
+						var meta *ARC72Metadata
+						var std string
+
+						// Optimization: Try parsing the bulk metadata first (common for ARC-72 indexers)
+						if tok.Metadata != "" {
+							var m ARC72Metadata
+							if json.Unmarshal([]byte(tok.Metadata), &m) == nil {
+								meta = &m
+								std = "ARC-72"
+							}
+						}
+
+						// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
+						if meta == nil {
+							m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
+							if err == nil {
+								meta = m
+								std = s
+							}
+						}
+
+						if meta != nil {
 								newCard := ServerCard{
 									ID:            tok.TokenID,
 									Name:          meta.Name,
@@ -115,6 +135,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 								l.inventory[tok.TokenID] = newCard
 								l.mutex.Unlock()
 								results[tok.TokenID] = newCard
+							log.Printf("[ORACLE] Discovered %s token during owner scan: %d\n", std, tok.TokenID)
 							}
 						}
 					}
@@ -204,83 +225,33 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 		return l.getVerifiedCardsCrossChain(tokenIDs, netConfig)
 	}
 
-	baseURL := netConfig.IndexerURL
-	contractID := netConfig.AppID
-
-	type metaResult struct {
-		mintRound   int
-		name, image string
-		exists      bool
-	}
-	tokenMeta := make(map[int]metaResult)
-
-	ids := make([]string, len(toFetch))
-	for i, id := range toFetch {
-		ids[i] = strconv.Itoa(id)
-	}
-	url := fmt.Sprintf("%s/tokens?contractId=%s&tokenId=%s", baseURL, contractID, strings.Join(ids, ","))
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			log.Printf("[ORACLE] Indexer request failed for %s after retries: %v\n", url, err)
-			return nil, err
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			log.Printf("[ORACLE] Indexer rate-limited (429) for %s after retries.\n", url)
-			return nil, fmt.Errorf("indexer rate-limited (429)")
-		}
-		break
-	}
-
-	if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
-		defer resp.Body.Close()
-		var res struct {
-			Tokens []struct {
-				TokenID   int    `json:"tokenId"`
-				MintRound int    `json:"mintRound"`
-				Metadata  string `json:"metadata"`
-			} `json:"tokens"`
-		}
-		if json.NewDecoder(resp.Body).Decode(&res) == nil {
-			for _, t := range res.Tokens {
-				var meta ARC72Metadata
-				json.Unmarshal([]byte(t.Metadata), &meta)
-				tokenMeta[t.TokenID] = metaResult{mintRound: t.MintRound, name: meta.Name, image: meta.Image, exists: true}
-			}
-		}
-	} else if resp != nil {
-		defer resp.Body.Close()
-		log.Printf("[ORACLE] Indexer returned non-200 status for %s: %d %s\n", url, resp.StatusCode, resp.Status)
-	} else {
-		log.Printf("[ORACLE] Indexer request failed for %s\n", url)
-	}
-
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
+	// PILLAR 3: Multi-Standard Discovery.
+	// We iterate through missing tokens and utilize the MetadataDispatcher to identify 
+	// and fetch standard-compliant metadata (ARC-72, ARC-19, or ARC-69).
 	for _, id := range toFetch {
-		meta := tokenMeta[id]
-		newCard := ServerCard{
-			ID: id, Name: meta.name, Image: meta.image,
-			Power:       [4]int{netConfig.PowerBase, 10, netConfig.PowerBase, 10},
-			LastUpdated: time.Now(),
+		meta, standard, err := l.MetadataDispatcher(networkName, id)
+		if err != nil {
+			log.Printf("[ORACLE] Metadata resolution failed for %s #%d: %v\n", networkName, id, err)
+			// Cache a placeholder to prevent repeated hits for invalid assets
+			l.mutex.Lock()
+			l.inventory[id] = ServerCard{ID: id, Name: "Unknown Artifact", LastUpdated: time.Now()}
+			l.mutex.Unlock()
+			continue
 		}
+
+		newCard := ServerCard{
+			ID: id, Name: meta.Name, Image: meta.Image,
+			Power:         [4]int{netConfig.PowerBase, 10, netConfig.PowerBase, 10},
+			LastUpdated:   time.Now(),
+			MetadataValid: true,
+		}
+		
+		l.mutex.Lock()
 		l.inventory[id] = newCard
+		l.mutex.Unlock()
 		results[id] = newCard
+		
+		log.Printf("[ORACLE] Ingested %s card: %s (#%d)\n", standard, meta.Name, id)
 	}
 	return results, nil
 }
