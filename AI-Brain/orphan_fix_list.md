@@ -363,3 +363,4 @@
 - [FIXED] Resolved accounting leak in `handleHeist` (club_service.go); ensured gross looted amount returns to `faucetBalance` pool to cover future virtual reward payouts.
 - [FIXED] Resolved accounting leak in `startSalaryDispenser` (career.go); ensured gross salary amount returns to `faucetBalance` pool to maintain ledger integrity for future salary claims.
 - [FIXED] Resolved accounting leak in `handlePayRansom` (handlers_criminality.go); ensured gross ransom amount returns to `faucetBalance` to cover future reward liabilities.
+- [FIXED] Resolved accounting leak in `handleTakeLoan` (loan_service.go); principal is no longer subtracted from `faucetBalance` immediately, as it remains in the vault until reward claim.
