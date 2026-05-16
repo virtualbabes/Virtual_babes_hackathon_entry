@@ -491,8 +491,17 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	vaultAddr := l.vaultAddress
+
+	// PILLAR 3: Boundary Snapshot.
+	// Snapshot temporal boundaries to ensure consistency if rollover occurs during scan.
+	seasonStartUnix := l.seasonStart.Unix()
+	activeTournID := l.tournament.ID
+	tournOpenTime := l.tournament.OpenTime
+	isTournActive := l.tournament.Active
+	tournRound := l.tournament.CurrentRound
 	l.mutex.RUnlock()
-	if !ok {
+
+	if !ok || vaultAddr == "" {
 		return
 	}
 
@@ -525,7 +534,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	// Pass 1: Scan transactions RECEIVED by the wallet (My Wins)
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
-			if tx.Timestamp < l.seasonStart.Unix() {
+			if tx.Timestamp < seasonStartUnix {
 				continue
 			}
 			if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
@@ -573,8 +582,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=200",
 		voiConfig.AssetID, vaultAddr))
 
-	if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil {
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
 			var gRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -585,7 +595,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			}
 			if json.NewDecoder(resp.Body).Decode(&gRes) == nil {
 				for _, tx := range gRes.Transfers {
-					if tx.Timestamp < l.seasonStart.Unix() {
+					if tx.Timestamp < seasonStartUnix {
 						continue
 					}
 
@@ -661,8 +671,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.AssetID, wallet, vaultAddr))
 
-	if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil {
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -682,13 +693,13 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						// Use TournamentID for precise reconstruction if available in note
 						parts := strings.Split(tx.Metadata, ":")
 						matchesCurrent := false
-						if len(parts) >= 2 && parts[1] == l.tournament.ID {
+						if len(parts) >= 2 && parts[1] == activeTournID {
 							matchesCurrent = true
-						} else if txTime.After(l.tournament.OpenTime) {
+						} else if txTime.After(tournOpenTime) {
 							matchesCurrent = true // Legacy fallback
 						}
 
-						if l.tournament.Active && l.tournament.CurrentRound == 0 && matchesCurrent {
+						if isTournActive && tournRound == 0 && matchesCurrent {
 							if !l.isWalletRegistered(wallet) {
 								l.paidParticipants = append(l.paidParticipants, wallet)
 								log.Printf("[ORACLE] Reconstructed tournament entry for %s (Tx: %s)\n", wallet, tx.TransactionID)

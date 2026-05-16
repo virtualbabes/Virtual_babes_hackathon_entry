@@ -358,3 +358,4 @@
 - [FIXED] Integrated reputation ripple in `handleHeist` defensive path to ensure all club members' Standing reflects organizational Mojo gains immediately.
 - [FIXED] Refactored `verifyBuyInTransaction`, `handleSeasonHistory`, and `syncStatsFromBlockchain` to use the `indexerRequest` dispatcher, ensuring full failover coverage for financial events.
 - [FIXED] Resolved data gap in lobby broadcasts by including `Playstyle` tendencies in `playerInfo` struct; hardened behavioral decay with 0.5 baseline snapping.
+- [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` by snapshotting season boundaries and ensuring consistent HTTP body closure for mirrored result recovery.
