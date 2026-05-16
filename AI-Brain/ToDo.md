@@ -14,6 +14,7 @@
 ## Pillar 3: Administrative Automation
 - [x] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
 - [x] **Audit Export**: Build a tool to export `admin_audit.log` into CSV for hackathon reporting.
+- [x] **Admin UI**: Add 'Season Rollover' and 'Export Audit' buttons to the Admin Panel UI.
 
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).

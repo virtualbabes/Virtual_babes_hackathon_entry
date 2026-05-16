@@ -43,10 +43,10 @@ func (l *Lobby) processLoans() {
 			if owningClub != nil {
 				liquidationFee := float64(loan.LoanAmount) * 0.05 / 1000000.0
 				owningClub.Treasury += liquidationFee
-				
+
 				// INDUSTRIAL LOOP: Deduct distributed fee from liquid faucet balance
 				l.faucetBalance -= liquidationFee
-				
+
 				owningClub.LastActivity = now
 				l.logAdminAuditLocked("LOAN_LIQUIDATION_FEE", loan.TerritoryID, fmt.Sprintf("Club %s earned %.2f $VBV liquidation fee", owningClub.Name, liquidationFee))
 			}
@@ -55,8 +55,12 @@ func (l *Lobby) processLoans() {
 			l.updatePlayerPlaystyleTendenciesLocked(borrowerWallet, false, [2]int{}, []int{}, false, false)
 			l.logAdminAuditLocked("LOAN_LIQUIDATED", borrowerWallet, fmt.Sprintf("ID: %s, Tokens: %d", loan.ID, tokenReward))
 
-			// Add the defaulted loan to the black market
+			// Add the defaulted loan to the black market with a size cap to prevent memory bloat.
+			// We maintain a FIFO buffer of 50 items to keep the Underworld market fresh.
 			l.blackMarket = append(l.blackMarket, *loan)
+			if len(l.blackMarket) > 50 {
+				l.blackMarket = l.blackMarket[1:] // Prune oldest entry
+			}
 
 			delete(l.loans, id)
 			anyProcessed = true

@@ -81,6 +81,106 @@ export async function getAdminHeaders() {
     }
 }
 
+// New admin functions for Season Rollover and Audit Export
+
+/**
+ * adminSeasonRollover triggers a manual season archival and leaderboard reset.
+ * Requires admin authentication.
+ */
+export async function adminSeasonRollover() {
+    if (!confirm("⚠️ CRITICAL: Are you sure you want to manually trigger a Season Rollover? This will archive current standings and reset the leaderboard.")) {
+        return;
+    }
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Initiating season rollover...", "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/season-rollover`, {
+            method: "POST",
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            showToast("✅ Season rollover initiated. Check logs for archival status.", "success", 10000);
+            // Optionally trigger a full lobby update to reflect new season number, etc.
+            // window.syncUI("all"); // Assuming syncUI is globally available
+        } else {
+            const err = await response.text();
+            showToast(`❌ Season rollover failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Server connection error during season rollover.", "error");
+    } finally {
+        setTransactionStatus(null);
+    }
+}
+
+/**
+ * adminExportAuditLog triggers a download of the admin_audit.log as a CSV file.
+ * Requires admin authentication.
+ */
+export async function adminExportAuditLog() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Exporting audit logs...", "info");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/export-logs`, {
+            method: "GET",
+            headers: headers
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'admin_audit_export.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+            showToast("✅ Audit logs exported successfully.", "success");
+        } else {
+            const err = await response.text();
+            showToast(`❌ Audit log export failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Server connection error during audit log export.", "error");
+    } finally {
+        setTransactionStatus(null);
+    }
+}
+
+/**
+ * Renders the automation and reporting buttons in the Admin Panel UI.
+ * Assumes a div with id="admin-automation-section" exists in the Admin Panel HTML.
+ */
+export function renderAdminAutomationButtons() {
+    const container = document.getElementById("admin-automation-section");
+    if (!container) {
+        console.warn("Admin automation section (id='admin-automation-section') not found in DOM. Cannot render buttons.");
+        return;
+    }
+
+    // Clear existing content to prevent duplicates on re-render
+    container.innerHTML = `
+        <h3 class="section-title">Automation & Reporting</h3>
+        <div class="section-actions">
+            <button class="danger" onclick="adminSeasonRollover()">SEASON ROLLOVER</button>
+            <button class="outline" onclick="adminExportAuditLog()">EXPORT AUDIT LOGS</button>
+        </div>
+    `;
+}
+
 export function ignoreReporter(wallet) { // Exported for use in app.js
     if (!wallet) return;
     ignoredReporters.add(wallet);
@@ -229,6 +329,7 @@ export let adminLogTicker = null; // Exported for use in app.js
 export function startAdminLogPolling() { // Exported for use in app.js
     if (adminLogTicker) return;
     adminLogTicker = setInterval(fetchLastAdminAction, 15000); // Check every 15s for status bar
+    renderAdminAutomationButtons(); // Render automation buttons when polling starts (admin panel is active)
 }
 
 export async function fetchLastAdminAction() { // Exported for use in app.js
