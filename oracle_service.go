@@ -1284,7 +1284,8 @@ func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metada
 		return nil, fmt.Errorf("failed to decode reserve address: %w", err)
 	}
 
-	// Multibase 'b' (Base32), Version 1, Raw Codec (0x55), SHA2-256 Multihash (0x12), Length 32 (0x20)
+	// PILLAR 4: ARC-19 CIDv1 Conversion.
+	// binary: [0x01 (v1), 0x55 (raw), 0x12 (sha2-256), 0x20 (len), <32_byte_pubkey>]
 	header := []byte{0x01, 0x55, 0x12, 0x20}
 	full := append(header, addr[:]...)
 	cid := "b" + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(full))
@@ -1296,12 +1297,20 @@ func (l *Lobby) fetchARC19Metadata(indexerURL string, assetID int) (*ARC72Metada
 		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 		req, _ := http.NewRequestWithContext(ctx, "GET", ipfsURL, nil)
 		ipfsResp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err == nil && ipfsResp.StatusCode == http.StatusOK {
-			break
+		cancel() // Release resources early
+
+		if err == nil && ipfsResp != nil {
+			if ipfsResp.StatusCode == http.StatusOK {
+				break
+			}
+			if ipfsResp.StatusCode == http.StatusTooManyRequests {
+				ipfsResp.Body.Close()
+				time.Sleep(time.Duration(i+1) * 1 * time.Second) // Exponential backoff
+				continue
+			}
+			ipfsResp.Body.Close()
 		}
-		if ipfsResp != nil { ipfsResp.Body.Close() }
-		time.Sleep(1 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	if err != nil || ipfsResp == nil || ipfsResp.StatusCode != http.StatusOK {
