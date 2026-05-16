@@ -360,3 +360,4 @@
 - [FIXED] Resolved data gap in lobby broadcasts by including `Playstyle` tendencies in `playerInfo` struct; hardened behavioral decay with 0.5 baseline snapping.
 - [FIXED] Hardened `syncStatsFromBlockchain` in `oracle_service.go` by snapshotting season boundaries and ensuring consistent HTTP body closure for mirrored result recovery.
 - [FIXED] Prevented Mojo inflation in `club_service.go` by capping revenue-based gains and transitioning Regional Governor bonuses from multiplicative to additive scaling.
+- [FIXED] Resolved accounting leak in `handleHeist` (club_service.go); ensured gross looted amount returns to `faucetBalance` pool to cover future virtual reward payouts.

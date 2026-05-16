@@ -111,8 +111,11 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		fenceFee = float64(fenceFeeMicro) / 1000000.0
 		netLoot = float64(netLootMicro) / 1000000.0
 
-		if fenceFeeMicro > 0 {
-			l.faucetBalance += fenceFee
+		// INDUSTRIAL LOOP: Stolen tokens return from the Club Reserve to the general Faucet pool.
+		// We add the gross loot back to faucetBalance to maintain parity with the on-chain vault total,
+		// as the netLoot portion is now a virtual reward liability that will be deducted upon payout.
+		if lootMicro > 0 {
+			l.faucetBalance += float64(lootMicro) / 1000000.0
 			l.applyDynamicScalingLocked()
 		}
 		playerStats.Playstyle.RiskTolerance += 0.05
