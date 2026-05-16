@@ -16,7 +16,7 @@ Your public address acts as your unique player identity.
 ## C. Building Your Deck
 Decks require exactly 5 cards. Manage assets via the Deck Manager:
 
-* **Inventory Auto-Discovery**: The Arena automatically scans your wallet for compatible NFTs. We natively support **ARC-72** (Smart Contract), **ARC-19** (Dynamic/Reserve-based), and **ARC-69** (Note-based) standards.
+* **Inventory Auto-Discovery**: The Arena automatically scans your wallet for compatible NFTs. We natively support **ARC-72** (Smart Contract), **ARC-19** (Dynamic/Reserve-based), and **ARC-69** (Note-based) standards. **Zero Configuration**: No manual import is required; your diverse collections appear instantly upon connection.
 * **Legacy Support**: Older Algorand Standard Assets (ASAs) using transaction notes for metadata are fully ingested by our multi-standard Oracle.
 * **Verification**: Assets are cryptographically verified against the blockchain indexer to ensure you are playing with authentic collectibles.
 * Deck Slots: Unlock additional slots by increasing your Reputation.

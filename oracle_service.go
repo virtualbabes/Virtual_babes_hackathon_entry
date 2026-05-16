@@ -64,6 +64,71 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 			}
 
 			if strings.Contains(cfg.ChainID, "algorand") {
+				// PATH 1: Standard ASA Scan (ARC-19/ARC-69)
+				// Query account info to find all held assets, regardless of contract status.
+				accUrl := fmt.Sprintf("%s/v2/accounts/%s", cfg.IndexerURL, t.addr)
+				var accResp *http.Response
+				for i := 0; i < 2; i++ {
+					ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+					req, _ := http.NewRequestWithContext(ctx, "GET", accUrl, nil)
+					accResp, err = http.DefaultClient.Do(req)
+					cancel()
+					if err == nil && accResp.StatusCode == http.StatusOK {
+						break
+					}
+					if accResp != nil {
+						accResp.Body.Close()
+					}
+					time.Sleep(500 * time.Millisecond)
+				}
+
+				if accResp != nil && accResp.StatusCode == http.StatusOK {
+					var accRes struct {
+						Account struct {
+							Assets []struct {
+								AssetID uint64 `json:"asset-id"`
+								Deleted bool   `json:"deleted"`
+								Amount  uint64 `json:"amount"`
+							} `json:"assets"`
+						} `json:"account"`
+					}
+					if json.NewDecoder(accResp.Body).Decode(&accRes) == nil {
+						for _, as := range accRes.Account.Assets {
+							if as.Deleted || as.Amount == 0 {
+								continue
+							}
+							// Check cache first to avoid re-dispatching known assets
+							l.mutex.RLock()
+							_, exists := l.inventory[int(as.AssetID)]
+							l.mutex.RUnlock()
+							if exists {
+								continue
+							}
+
+							// Use the Dispatcher to resolve ARC-19 or ARC-69 metadata
+							meta, std, err := l.MetadataDispatcher(t.network, int(as.AssetID))
+							if err == nil && meta != nil {
+								newCard := ServerCard{
+									ID:            int(as.AssetID),
+									Name:          meta.Name,
+									Image:         meta.Image,
+									Power:         [4]int{cfg.PowerBase, 10, cfg.PowerBase, 10},
+									LastUpdated:   time.Now(),
+									MetadataValid: true,
+								}
+								l.mutex.Lock()
+								l.inventory[int(as.AssetID)] = newCard
+								l.mutex.Unlock()
+								results[int(as.AssetID)] = newCard
+								log.Printf("[ORACLE] Discovered %s asset via account scan: %d\n", std, as.AssetID)
+							}
+						}
+					}
+					accResp.Body.Close()
+				}
+
+				// PATH 2: ARC-72 Collection Scan
+				// Keep existing logic to find tokens within a specific smart contract collection.
 				log.Printf("[ORACLE] Syncing tokens for %s on %s...\n", t.addr, t.network)
 				url := fmt.Sprintf("%s/tokens?owner=%s", cfg.IndexerURL, t.addr)
 
