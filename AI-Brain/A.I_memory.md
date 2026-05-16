@@ -105,3 +105,6 @@
 *   **185**: Audited `_cards.scss` for ultra-narrow viewports (< 350px); implemented aggressive font-scaling and tightened padding to ensure card data fits within the scaled battle grid.
 *   **186**: Conducted comprehensive documentation alignment; synchronized `ToDo.md`, `orphan_fix_list.md`, and architectural guides with the multi-standard Oracle and UI hardening milestones.
 *   **187**: Reviewed Infrastructure Hardening block (171-176); confirmed production resilience of log rotation, RPC health, and strict CORS origin filtering.
+*   **188**: Audited and updated `User_manual.md`; added player-friendly instructions for ARC-19 and ARC-69 auto-discovery and clarified multi-standard Oracle support.
+*   **189**: Audited and hardened `README.md` for hackathon reviewers; updated technical architecture to reflect modular service model and expanded Industrial Loop section with Governor Tax/Kickback details.
+*   **190**: Audited `development_plan.md`; synchronized milestones with the current hardened state, moving stress testing and multi-chain identity to Complete and adding the Phase 3 launch readiness summary.

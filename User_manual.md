@@ -16,7 +16,9 @@ Your public address acts as your unique player identity.
 ## C. Building Your Deck
 Decks require exactly 5 cards. Manage assets via the Deck Manager:
 
-* Inventory: View your complete owned card collection.
+* **Inventory Auto-Discovery**: The Arena automatically scans your wallet for compatible NFTs. We natively support **ARC-72** (Smart Contract), **ARC-19** (Dynamic/Reserve-based), and **ARC-69** (Note-based) standards.
+* **Legacy Support**: Older Algorand Standard Assets (ASAs) using transaction notes for metadata are fully ingested by our multi-standard Oracle.
+* **Verification**: Assets are cryptographically verified against the blockchain indexer to ensure you are playing with authentic collectibles.
 * Deck Slots: Unlock additional slots by increasing your Reputation.
 * Auto-Build: Deploy system optimization to generate maximum power decks instantly.
 
@@ -129,6 +131,13 @@ Automated system hosts structured 8-player or 16-player bracket events.
 ## 7. SOCIAL STANDING & ACHIEVEMENTS## A. Reputation Dynamics
 Your global social status scales dynamically based on live ecosystem inputs:
 
+### Technical Note: Asset Standards
+The Virtualbabes Oracle utilizes an intelligent **Metadata Dispatcher** to provide the broadest compatibility in the ecosystem:
+1. **ARC-72**: High-performance smart-contract tokens.
+2. **ARC-19**: Dynamic NFTs where metadata evolves via the Reserve Address.
+3. **ARC-69**: Classic Algorand NFTs utilizing transaction notes.
+4. **Cross-Chain**: Discover metadata from Ethereum, Polygon, and Solana via linked wallets.
+
 ➕ INCREASES STATUS              ➖ DECREASES STATUS
 • Match Victories                • DNF / Disconnect Streaks
 • Achievement Unlocks            • High Wanted Levels
@@ -151,4 +160,3 @@ If you'd like, let me know:
 * If you want to expand the breakdown of a specific combat rule or market mechanic
 
 I can refine this document layout to fit your exact web layout requirements.
-
