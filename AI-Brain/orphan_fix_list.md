@@ -369,3 +369,4 @@
 - [FIXED] Implemented aggregation of `VirtualBalance` in `app.js` Rewards Dashboard; ensured industrial earnings are visible and correctly summed in the player's liquid total.
 - [FIXED] Purged massive redundant re-definitions in `app.js` to resolve logic shadowing and enforce the authoritative power of the `Public/js/` domain modules.
 - [FIXED] Resolved remaining map name inconsistencies in `club_service.go` and `economy_service.go` following the Ledger separation refactor.
+- [FIXED] Resolved WASM compilation errors in `main.go` caused by variable typos in `simulateCaptures` and unused declarations in `GetTournamentArchiveBadge`.

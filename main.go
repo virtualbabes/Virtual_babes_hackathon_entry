@@ -1818,7 +1818,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 				if flipped[nbIdx] { nOwner = placedCard.Owner }
 
 				if nOwner != placedCard.Owner && !flipped[nbIdx] {
-					if getEffectivePower(currentCard, n.placedPowerIdx, currIdx, placedCard.Owner) > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx, nOwner) {
+					if getEffectivePower(currCard, n.placedPowerIdx, currIdx, placedCard.Owner) > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx, nOwner) {
 						flipped[nbIdx] = true
 						totalScore += comboFlipWeight // Combo flip weight
 						comboQueue = append(comboQueue, nbIdx)
@@ -2428,7 +2428,6 @@ func GetTournamentArchiveBadge(this js.Value, args []js.Value) interface{} {
 	isVerified := args[0].Bool()
 	jsLinks := args[1] // This is a JS array
 	receiptsVerified := args[2].Bool()
-	payoutsHash := args[3].String()
 
 	var links []string
 	if jsLinks.Type() == js.TypeObject && jsLinks.Get("length").Truthy() {

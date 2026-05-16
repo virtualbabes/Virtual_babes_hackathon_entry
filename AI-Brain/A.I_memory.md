@@ -133,4 +133,5 @@
 *   **214**: Audited `handleRepayLoan` in `loan_service.go`; verified correct `faucetBalance` crediting of principal and interest; fixed `playerBalances` targeting and syntax errors in `handleTakeLoan`.
 *   **215**: Updated WASM engine and `syncUI` in `app.js` to correctly aggregate and display `VirtualBalance` in the Rewards Dashboard; purged redundant re-implementations from `app.js` to enforce modular authority.
 *   **216**: Audited `club_service.go` and `economy_service.go`; synchronized `handleHeist`, `handleTakeLease`, and `applyDynamicScalingLocked` with the new `playerBalances` and `rewardStack` ledgers to ensure compilation and logical consistency.
+*   **217**: Resolved WASM compilation errors in `main.go`; corrected `currCard` naming mismatch in AI simulation and removed unused `payoutsHash` in badge rendering.
 *   **214**: Audited `handleRepayLoan` in `loan_service.go`; verified correct `faucetBalance` crediting of principal and interest; fixed `playerBalances` targeting and syntax errors in `handleTakeLoan`.
