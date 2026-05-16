@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -119,7 +120,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		targetClub.Treasury -= float64(lootMicro) / 1000000.0
 		targetClub.LastActivity = now // Consistent activity tracking
 		playerStats.WantedLevel += 5
-		playerStats.Cunning += 1                                    // Successful heists improve Cunning
+		playerStats.Cunning += 1 // Successful heists improve Cunning
 
 		// Add net loot to player's rewards
 		l.rewards[wallet] += netLootMicro
@@ -621,7 +622,7 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 		gain = 5
 
 		// PILLAR 1: Regional Security Synergy.
-		// Governors (2+ territories) have interlocked security grids that yield 
+		// Governors (2+ territories) have interlocked security grids that yield
 		// more prestige upon successful defense.
 		if len(club.Territories) >= 2 {
 			gain += 10
