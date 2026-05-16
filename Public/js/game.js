@@ -144,16 +144,33 @@ export function handleChatKey(e) {
 
 export function renderChatMessage(sender, text) {
     const display = document.getElementById("chat-display");
+    if (!display) return;
+
     const msgDiv = document.createElement("div");
     msgDiv.className = "chat-msg";
     
-    if (sender === "SERVER") msgDiv.classList.add("system");
-    
-    msgDiv.innerHTML = `<b>${sender}:</b> ${text}`;
-    display.appendChild(msgDiv);
-    
-    // Auto-scroll to bottom
-    display.scrollTop = display.scrollHeight;
+    const isNpcTaunt = (sender === "SERVER" || sender === "SYSTEM") && text.includes('"');
+    if (sender === "SERVER" || sender === "SYSTEM") msgDiv.classList.add("system");
+
+    if (isNpcTaunt) {
+        msgDiv.innerHTML = `<b>${sender}:</b> <span class="typewriter-content"></span>`;
+        display.appendChild(msgDiv);
+        const content = msgDiv.querySelector(".typewriter-content");
+        let i = 0;
+        const typeWriter = () => {
+            if (i < text.length) {
+                content.textContent += text.charAt(i);
+                i++;
+                display.scrollTop = display.scrollHeight;
+                setTimeout(typeWriter, 30);
+            }
+        };
+        typeWriter();
+    } else {
+        msgDiv.innerHTML = `<b>${sender}:</b> ${text}`;
+        display.appendChild(msgDiv);
+        display.scrollTop = display.scrollHeight;
+    }
 }
 
 export async function saveMatchResult(state) {

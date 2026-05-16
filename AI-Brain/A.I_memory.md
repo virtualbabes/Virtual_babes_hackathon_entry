@@ -79,3 +79,4 @@
 *   **159**: Applied `criminal-underworld` class styling to `_main-layout.scss` for dynamic visual feedback during high-infamy states.
 *   **160**: Finalized `_neon-glass.scss` update by inserting Underworld CSS variables at the root level.
 *   **161**: Hardened `_animations.scss` by unifying shimmer keyframes and adding `.skeleton-block` utilities for cross-chain metadata loading states.
+*   **162**: Implemented typewriter effect for NPC taunts in `game.js`; added heuristic to trigger on dialogue-heavy SERVER/SYSTEM messages.

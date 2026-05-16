@@ -9,7 +9,7 @@
 - [x] **Mobile Responsiveness**: Standardize `$panel-width` scaling for small screens in `_variables.scss`.
 - [x] **Atmospheric Shifting**: Trigger red-tint background CSS variables during criminal "Underworld" phases.
 - [x] **Visual Feedback**: Add loading shimmer states (`.animate-shimmer`) for cross-chain metadata retrieval.
-- [ ] **Narrative Depth**: Integrate typewriter effects for NPC taunts in the global chat.
+- [x] **Narrative Depth**: Integrate typewriter effects for NPC taunts in the global chat.
 
 ## Pillar 3: Administrative Automation
 - [ ] **Season Cycle Tool**: Implement an admin command to manually trigger season rollover for testing archival receipts.
