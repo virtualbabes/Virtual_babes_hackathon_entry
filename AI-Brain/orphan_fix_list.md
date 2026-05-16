@@ -368,3 +368,4 @@
 - [FIXED] Hardened `loan_service.go` by correcting `playerBalances` targeting and removing structural syntax errors in the loan issuance path.
 - [FIXED] Implemented aggregation of `VirtualBalance` in `app.js` Rewards Dashboard; ensured industrial earnings are visible and correctly summed in the player's liquid total.
 - [FIXED] Purged massive redundant re-definitions in `app.js` to resolve logic shadowing and enforce the authoritative power of the `Public/js/` domain modules.
+- [FIXED] Resolved remaining map name inconsistencies in `club_service.go` and `economy_service.go` following the Ledger separation refactor.

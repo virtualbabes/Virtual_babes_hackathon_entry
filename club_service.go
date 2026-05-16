@@ -126,7 +126,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.Cunning += 1 // Successful heists improve Cunning
 
 		// Add net loot to player's rewards
-		l.rewards[wallet] += netLootMicro
+		l.playerBalances[wallet] += netLootMicro
 
 		// Update local reputation and leaderboard before achievement to ensure accuracy
 		playerStats.Reputation = l.CalculateReputation(playerStats)
@@ -793,7 +793,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	}
 
 	priceMicro := uint64(lease.Price * 1000000)
-	if l.rewards[borrowerWallet] < priceMicro {
+	if l.playerBalances[borrowerWallet] < priceMicro {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Lease Error: Insufficient funds."}`)})
 		return
 	}
@@ -801,7 +801,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	// PILLAR 1: Industrial Lease Revenue Distribution.
 	// Split: 50% Lender, 20% Faucet (Tax), 20% Club Treasury, 10% Members.
 	// We use micro-unit math to ensure absolute ledger integrity.
-	l.rewards[borrowerWallet] -= priceMicro
+	l.playerBalances[borrowerWallet] -= priceMicro
 
 	faucetShareMicro := (priceMicro * 20) / 100
 	clubShareMicro := (priceMicro * 20) / 100
@@ -816,7 +816,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	if numMembers > 0 {
 		perMemberMicro := memberShareTotalMicro / numMembers
 		for m := range club.Members {
-			l.rewards[strings.ToLower(m)] += perMemberMicro
+			l.playerBalances[strings.ToLower(m)] += perMemberMicro
 		}
 
 		// Precision Recovery: Redirect division remainder to Club Treasury.
@@ -828,7 +828,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 		clubShareMicro += memberShareTotalMicro
 	}
 
-	l.rewards[strings.ToLower(lease.LenderWallet)] += lenderShareMicro
+	l.playerBalances[strings.ToLower(lease.LenderWallet)] += lenderShareMicro
 	club.Treasury += float64(clubShareMicro) / 1000000.0
 
 	// Execute lease

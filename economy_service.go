@@ -42,7 +42,7 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	// 2. Iterate through the entire reward stack and scale based on unscaled initial values
 	for assetID, initialAmt := range l.initialRewards {
 		scaledAmt := uint64(float64(initialAmt) * ratio)
-		l.rewards[assetID] = scaledAmt
+		l.rewardStack[assetID] = scaledAmt
 	}
 
 	log.Printf("[ECONOMY] Dynamic Scaling Applied (Ratio: %.2f). Faucet Capacity: %.2f units.\n", ratio, l.faucetBalance)
