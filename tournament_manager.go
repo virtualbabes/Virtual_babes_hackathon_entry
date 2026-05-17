@@ -634,20 +634,20 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			}
 			// Calculate Pot Share (Primary Asset)
 			shareMicro := uint64(effectivePot * payoutPercentages[i] * 1000000)
-
+			
 			wg.Add(1)
 			// Dispatch grouped rewards
 			go func(p string, rank int, amt uint64) {
 				defer wg.Done()
-				txid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
+				gid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
 				if err != nil {
 					log.Printf("[TOURNAMENT ERROR] Payout failed for rank %d (%s): %v\n", rank+1, p, err)
 				} else {
 					mu.Lock()
-					payoutTxIDs = append(payoutTxIDs, txid)
+					payoutTxIDs = append(payoutTxIDs, hex.EncodeToString(gid[:])) // Append GID as hex string
 					mu.Unlock()
-					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). Tx: %s. Skipped: %v\n", rank+1, p, txid, skipped)
-					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received rewards. Tx: %s. (Skipped: %v)", rank+1, p, txid, strings.Join(skipped, ", ")))
+					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). GID: %s. Skipped: %v\n", rank+1, p, hex.EncodeToString(gid[:]), strings.Join(skipped, ", ")))
+					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received rewards. GID: %s. (Skipped: %v)", rank+1, p, hex.EncodeToString(gid[:]), strings.Join(skipped, ", ")))
 				}
 			}(player, i, shareMicro)
 		}
@@ -660,7 +660,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	if len(payoutTxIDs) > 0 {
 		sort.Strings(payoutTxIDs) // Ensure determinism
 		hashInput := strings.Join(payoutTxIDs, ",")
-		h := sha256.Sum256([]byte(hashInput))
+		h := sha256.Sum256([]byte(hashInput)) // Hash of GIDs
 		payoutsHash = hex.EncodeToString(h[:])
 		log.Printf("[TOURNAMENT] Payouts Hash generated: %s (from %d TxIDs)\n", payoutsHash, len(payoutTxIDs))
 	}
@@ -788,10 +788,10 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	}
 
 	if len(txns) == 0 {
-		if len(skippedAssets) > 0 {
-			return "", skippedAssets, fmt.Errorf("all attempted assets skipped due to opt-in or balance failures")
+		if len(skippedAssets) > 0 { // If no transactions were built, but some were skipped
+			return types.Digest{}, skippedAssets, fmt.Errorf("all attempted assets skipped due to opt-in or balance failures")
 		}
-		return "", nil, fmt.Errorf("no reward assets configured for payout")
+		return types.Digest{}, nil, fmt.Errorf("no reward assets configured for payout")
 	}
 
 	gid, _ := crypto.ComputeGroupID(txns)
@@ -816,7 +816,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	l.applyDynamicScalingLocked()
 	l.mutex.Unlock()
 
-	return firstTxID, skippedAssets, nil
+	return gid, skippedAssets, nil
 }
 
 func (l *Lobby) broadcastTournamentState() {

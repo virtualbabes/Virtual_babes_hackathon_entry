@@ -418,6 +418,7 @@
 - [FIXED] Hardened `updatePlayerPlaystyleTendenciesLocked` (lobby_manager.go) to factor aggressive item usage into playstyle trait calculations.
 - [FIXED] Resolved spectator rating inaccuracy in `handleActiveMatches` (handlers_public.go) by snapshotting the match tier at initiation to survive hand pruning and Sudden Death.
 - [FIXED] Resolved WASM engine desync for Player 2 (P2) by refactoring profile and deck sync to respect `LocalPlayerIndex`.
+- [FIXED] Ensured `PayoutsHash` in `finalizeTournament` (tournament_manager.go) correctly hashes the `groupID` of multi-asset reward transactions for robust financial proof.
 - [FIXED] Ensured Regional Governor boosts are correctly applied to P2 by standardizing JSON keys and implementing ownership reconciliation in `StartMatch`.
 - [FIXED] Resolved `TerritoryID` desynchronization for fixed shops; Second-Hand Store and Art Gallery now correctly route revenue to district owners (`south_slums` and `the_archive`).
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
