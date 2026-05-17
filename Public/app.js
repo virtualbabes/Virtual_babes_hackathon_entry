@@ -1,6 +1,6 @@
 import { CONFIG } from './js/config.js';
 import { initWebSocket, handleServerMessage } from './js/network.js';
-import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, showToast, setTransactionStatus, openSettingsOverlay, closeSettingsOverlay, showTournamentTransition, shareTournamentVictory, showQuickCastMenu, movePowerTooltip, hidePowerTooltip, generateBracketHTML, updateTournamentPaginationUI, openClubFoundry, openTerritoryMapOverlay, openTerritoryView, openPortfolioView, switchPortfolioTab, openSecuritySentry, openBountyBoard, openBlackMarket, openArtGalleryOverlay, loadGalleryItems, openConsignmentOverlay, openRumorMill, openSocialPanelOverlay, switchSocialTab, openClubLeaseBoard, adjustMapZoom } from './js/ui.js';
+import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, showToast, setTransactionStatus, openSettingsOverlay, closeSettingsOverlay, showTournamentTransition, shareTournamentVictory, showQuickCastMenu, movePowerTooltip, hidePowerTooltip, generateBracketHTML, updateTournamentPaginationUI, openClubFoundry, openTerritoryMapOverlay, openTerritoryView, openPortfolioView, switchPortfolioTab, openSecuritySentry, openBountyBoard, openBlackMarket, openArtGalleryOverlay, loadGalleryItems, openConsignmentOverlay, openRumorMill, openSocialPanelOverlay, switchSocialTab, openClubLeaseBoard, adjustMapZoom, updateSpectatorHUD } from './js/ui.js';
 import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress, connectWith, updatePayoutUI } from './js/wallet.js';
 import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket, handleTournamentUI, renderTournamentBracket } from './js/leaderboard.js';
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
@@ -149,6 +149,11 @@ export function syncUI(scope = "all") {
     if (!state) return;
 
     const isAll = scope === "all";
+
+    // PILLAR 4: Spectator Immersion
+    if (isAll || scope === "combat" || scope === "meta") {
+        updateSpectatorHUD(state);
+    }
 
     // Scope: Territory Map
     if (isAll || scope === "meta") {

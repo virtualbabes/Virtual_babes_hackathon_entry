@@ -843,3 +843,58 @@ export function closeTournamentBracket() {
         window.syncUI();
     }
 }
+
+/**
+ * Updates the spectator-specific HUD overlay.
+ * Displays VBT Synergy (Arena Resonance) and Match metadata for immersive viewing.
+ */
+export function updateSpectatorHUD(state) {
+    let hud = document.getElementById("spectator-hud");
+    
+    // Only show HUD if we are in an active match and spectating
+    const isSpectating = spectatorMatchState !== null;
+    
+    if (!isSpectating || state.phase !== "Active") {
+        if (hud) hud.classList.add("hidden");
+        return;
+    }
+
+    if (!hud) {
+        hud = document.createElement("div");
+        hud.id = "spectator-hud";
+        hud.className = "spectator-hud glass-panel animate-fade-in";
+        hud.style.cssText = "position: fixed; top: 100px; right: 20px; z-index: 100; pointer-events: none; padding: 15px; border-color: rgba(0, 242, 254, 0.4); min-width: 250px;";
+        document.body.appendChild(hud);
+    }
+    hud.classList.remove("hidden");
+
+    // Calculate VBT Synergy (Arena Resonance)
+    // Logic: Base (100) + Buffs (15/ea) + Mood Alignments (25/ea)
+    let synergy = 100;
+    if (state.active_item_buffs) {
+        Object.values(state.active_item_buffs).forEach(pb => synergy += Object.keys(pb).length * 15);
+    }
+    if (state.board && state.board_moods) {
+        state.board.forEach((c, i) => {
+            if (c && c.mood === state.board_moods[i] && c.mood !== "Neutral") synergy += 25;
+        });
+    }
+
+    const matchID = state.tournament_match_id || "ARENA-STND";
+    const territory = (state.territory_id || "Arena Center").replace(/_/g, ' ').toUpperCase();
+    const rulesCount = Object.values(state.rules || {}).filter(v => v).length;
+
+    hud.innerHTML = `
+        <div style="border-bottom: 1px solid rgba(0, 242, 254, 0.3); padding-bottom: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.6em; color: var(--neon-cyan); letter-spacing: 2px; font-weight: bold;">LIVE BROADCAST</span>
+            <span style="font-size: 0.7em; opacity: 0.8; font-family: monospace;">#${matchID.substring(0, 10)}</span>
+        </div>
+        <div class="flex-row gap-20" style="justify-content: space-between;">
+            <div style="text-align: center;"><small style="display: block; font-size: 0.6em; opacity: 0.5;">VBT SYNERGY</small><b class="text-neon-green" style="font-size: 1.3em;">${synergy}</b></div>
+            <div style="text-align: center;"><small style="display: block; font-size: 0.6em; opacity: 0.5;">LOCATION</small><b class="text-neon-cyan" style="font-size: 0.9em; letter-spacing: 1px;">${territory}</b></div>
+            <div style="text-align: center;"><small style="display: block; font-size: 0.6em; opacity: 0.5;">RULES</small><b class="text-neon-purple" style="font-size: 0.9em;">${rulesCount} ACTIVE</b></div>
+        </div>
+        <div style="margin-top: 12px; font-size: 0.7em; text-align: center; color: #888; font-style: italic; border-top: 1px solid rgba(255,255,255,0.05); pt-5">
+            RESONANCE: ${synergy > 150 ? 'PEAK' : synergy > 120 ? 'STABLE' : 'SYNCING...'}
+        </div>`;
+}
