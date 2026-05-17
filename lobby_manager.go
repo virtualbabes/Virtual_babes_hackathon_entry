@@ -1957,6 +1957,11 @@ func (l *Lobby) processMojoDecay() {
 				minDecay = 15
 			}
 
+			// PILLAR 1: Inactive Member Scaling.
+			// Larger clubs lose Mojo faster when stagnant to reflect organizational overhead.
+			// Add 0.2% to the decay rate for every member (e.g. 50 members = +10% rate).
+			decayRate += float64(len(club.Members)) * 0.002
+
 			decayAmount := int(float64(club.Mojo)*decayRate + 0.5)
 			if decayAmount < minDecay {
 				decayAmount = minDecay
