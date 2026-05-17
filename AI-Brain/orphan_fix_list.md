@@ -424,6 +424,8 @@
 - [FIXED] Resolved `TerritoryID` desynchronization for fixed shops; Second-Hand Store and Art Gallery now correctly route revenue to district owners (`south_slums` and `the_archive`).
 - [FIXED] Aligned `VBT_HEIST_LOG` note keys in `handleHeist` (club_service.go) to use authoritative IDs and explicit naming for forensic audits.
 - [FIXED] Implemented on-chain `VBT_RANSOM_LOG` notes in `handlePayRansom` (handlers_criminality.go) to provide immutable proof of kidnap settlements and laundering tax routing.
+- [FIXED] Implemented on-chain `VBT_INSURANCE_RETURN` notes in `processInsuranceRecovery` (handlers_criminality.go) to archive automated recovery events.
+- [FIXED] Implemented on-chain `VBT_BAIL_LOG` notes in `handleBailCard` (handlers_criminality.go) to provide immutable proof of bail payments and organizational revenue.
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
 - [FIXED] Implemented dynamic "REPUTATION_GATE" in `handleJoinClub` (club_service.go) to enforce minimum player Reputation requirements for joining elite clubs.

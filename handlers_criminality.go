@@ -388,6 +388,23 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 	l.leaderboard[playerWallet] = playerStats
 
 	l.logAdminAuditLocked("CARD_BAILED", playerWallet, fmt.Sprintf("Card #%d bailed from Club %s for %.2f $VBV", data.CardID, club.Name, bailAmountBase))
+
+	// PILLAR 3: Financial Proof.
+	// Record bail settlement on-chain for the immutable audit trail.
+	bailDetails := map[string]interface{}{
+		"card_id": data.CardID,
+		"bailer":  playerWallet,
+		"club_id": data.ClubID,
+		"amount":  bailAmountBase,
+		"ts":      time.Now().Unix(),
+	}
+
+	// Dispatch on-chain log for financial verification
+	go func(bd interface{}) {
+		jsonPayload, _ := json.Marshal(bd)
+		l.sendNoteTx(fmt.Sprintf("VBT_BAIL_LOG:%s", string(jsonPayload)))
+	}(bailDetails)
+
 	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>BAIL PAID:</b> Your card '%s' has been released from %s's jail!"}`, escapeHTML(jailedCard.Name), escapeHTML(club.Name)))})
 
 	// Notify club owner/members (optional, but good for transparency)
@@ -438,9 +455,24 @@ func (l *Lobby) processInsuranceRecovery() {
 		perpStats.Reputation = l.CalculateReputation(perpStats)
 		l.leaderboard[state.PerpWallet] = perpStats
 
+		// PILLAR 3: Financial Proof.
+		// Record automated recovery on-chain for the immutable audit trail.
+		recoveryDetails := map[string]interface{}{
+			"card_id": cardID,
+			"victim":  state.VictimWallet,
+			"perp":    state.PerpWallet,
+			"ts":      now.Unix(),
+		}
+
 		delete(l.activeKidnappings, cardID)
 
 		l.logAdminAuditLocked("INSURANCE_RECOVERY", state.VictimWallet, fmt.Sprintf("Card #%d automatically returned from %s", cardID, state.PerpWallet))
+
+		// Dispatch on-chain log for immutable verification
+		go func(rd interface{}) {
+			jsonPayload, _ := json.Marshal(rd)
+			l.sendNoteTx(fmt.Sprintf("VBT_INSURANCE_RETURN:%s", string(jsonPayload)))
+		}(recoveryDetails)
 
 		// Notify Players
 		if vCID := l.getClientIDFromWalletLocked(state.VictimWallet); vCID != "" {
