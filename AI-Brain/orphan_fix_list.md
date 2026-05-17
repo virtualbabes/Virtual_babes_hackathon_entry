@@ -430,6 +430,7 @@
 - [FIXED] Hardened `applyDynamicScalingLocked` (economy_service.go) to subtract the 1.0 VOI gas floor from faucet balance before calculating the reward ratio.
 - [FIXED] Implemented persistence for `Playstyle` data and `playerBalances` via local JSON storage, ensuring behavioral traits and virtual rewards survive server restarts.
 - [FIXED] Resolved compilation error in `item_service.go` by aligning `updatePlayerPlaystyleTendenciesLocked` calls with the updated method signature.
+- [FIXED] Implemented on-chain `VBT_LOAN_LIQUIDATE` notes in `processLoans` (economy_processing.go) to provide immutable proof of loan defaults, including TerritoryID and fee routing.
 - [FIXED] Resolved compilation error and telemetry gap in `handleActiveMatches` (handlers_public.go); implemented `StartTime` tracking and filtered out unpaired matches from discovery results.
 - [FIXED] Removed orphaned closing brace at end of `handlers_public.go`.
 - [VERIFIED] Per-wallet claim lock in `handleVoiOnboarding` (onboarding_service.go) correctly prevents concurrent multi-click exploits; synchronized bridge payouts with dynamic reward scaling.
