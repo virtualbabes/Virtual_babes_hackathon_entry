@@ -248,15 +248,13 @@ func (l *Lobby) processAuctions() {
 				l.playerBalances[auction.SellerWallet] += netPayoutToSellerMicro
 
 				// 4. Distribute commission
-				artGalleryClub := l.getClubByTerritoryID(auction.TerritoryID) // "the_art_gallery"
+				artGalleryClub := l.getClubByTerritoryID(auction.TerritoryID) // "the_archive"
 				if artGalleryClub != nil {
-					artGalleryClub.Treasury += float64(commissionMicro) / 1000000.0
+					totalCommissionBase := float64(commissionMicro) / 1000000.0
+					artGalleryClub.Treasury += totalCommissionBase
 					artGalleryClub.LastActivity = now
-					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_CLUB", artGalleryClub.ID, fmt.Sprintf("Auction: %s, Commission: %.2f", id, float64(commissionMicro)/1000000.0))
-				} else {
-					// If no club owns the Art Gallery, commission goes to the Faucet
-					l.faucetBalance += float64(commissionMicro) / 1000000.0
-					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_FAUCET", "GLOBAL", fmt.Sprintf("Auction: %s, Commission: %.2f", id, float64(commissionMicro)/1000000.0))
+					l.faucetBalance -= totalCommissionBase // Transfer from reserved pool to club reserve
+					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_CLUB", artGalleryClub.ID, fmt.Sprintf("Auction: %s, Commission: %.2f", id, totalCommissionBase))
 				}
 
 				// 5. Update Faucet balance and dynamic scaling (as funds move through the system)

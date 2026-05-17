@@ -420,7 +420,9 @@
 - [FIXED] Resolved WASM engine desync for Player 2 (P2) by refactoring profile and deck sync to respect `LocalPlayerIndex`.
 - [FIXED] Ensured `PayoutsHash` in `finalizeTournament` (tournament_manager.go) correctly hashes the `groupID` of multi-asset reward transactions for robust financial proof.
 - [FIXED] Ensured Regional Governor boosts are correctly applied to P2 by standardizing JSON keys and implementing ownership reconciliation in `StartMatch`.
+- [FIXED] Resolved $VBV inflation leak in `processAuctions` (auction_service.go) during commission distribution; hardened `sendNoteTx` with multi-node failover for on-chain archival.
 - [FIXED] Resolved `TerritoryID` desynchronization for fixed shops; Second-Hand Store and Art Gallery now correctly route revenue to district owners (`south_slums` and `the_archive`).
+- [FIXED] Aligned `VBT_HEIST_LOG` note keys in `handleHeist` (club_service.go) to use authoritative IDs and explicit naming for forensic audits.
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
 - [FIXED] Implemented dynamic "REPUTATION_GATE" in `handleJoinClub` (club_service.go) to enforce minimum player Reputation requirements for joining elite clubs.

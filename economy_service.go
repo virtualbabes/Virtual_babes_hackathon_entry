@@ -73,21 +73,30 @@ func (l *Lobby) sendNoteTx(note string) (string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
-	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
+
 	pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
-	sp, _ := client.SuggestedParams().Do(context.Background())
 	senderAddr, _ := types.DecodeAddress(l.vaultAddress)
-
 	appID, _ := strconv.ParseUint(voiConfig.AppID, 10, 64)
-	txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, nil, nil, nil, sp, senderAddr, []byte(note), types.Digest{}, [32]byte{}, types.Address{})
-	_, stxn, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
-	txid, err := client.SendRawTransaction(stxn).Do(context.Background())
-	if err != nil {
-		log.Printf("[ECONOMY ERROR] sendNoteTx failed: %v\n", err)
-		return "", err
+
+	var lastErr error
+	for _, nodeURL := range voiConfig.NodeURLs {
+		client, _ := algod.MakeClient(nodeURL, "")
+		sp, err := client.SuggestedParams().Do(context.Background())
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, nil, nil, nil, sp, senderAddr, []byte(note), types.Digest{}, [32]byte{}, types.Address{})
+		_, stxn, _ := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
+		txid, err := client.SendRawTransaction(stxn).Do(context.Background())
+		if err == nil {
+			return txid, nil
+		}
+		lastErr = err
 	}
-	return txid, nil
+	return "", fmt.Errorf("all nodes failed to dispatch note: %w", lastErr)
 }
 
 func (l *Lobby) recordWinOnChain(winnerWallet string, history MatchHistory) {

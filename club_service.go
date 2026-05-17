@@ -116,7 +116,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		// PILLAR 3: Financial Proof.
 		// Record successful heist on-chain for the immutable audit trail.
 		heistDetails := map[string]interface{}{
-			"target":    data.TargetClubID,
+			"target_id": targetClub.ID,
 			"perp":      wallet,
 			"fence_fee": fenceFee,
 			"net_loot":  netLoot,
