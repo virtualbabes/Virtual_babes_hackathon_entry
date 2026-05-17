@@ -382,6 +382,9 @@
 - [FIXED] Systemic resolution of Go/JS compilation and syntax errors following the Pluralization and Ledger refactors.
 - [FIXED] Synchronized `career.go` with the dual-ledger system by migrating salary distributions to the `playerBalances` map.
 - [FIXED] Corrected logic error in `finalizeMatchResultLocked` (battle_service.go) where loser records were incorrectly marked as Wins (0) if P2 won; mirrored records now always reflect a Loss (1).
+- [VERIFIED] `initiateSuddenDeath` in `battle_service.go` correctly handles duplicate card IDs during deck redistribution using frequency maps to ensure no card instances are lost or duplicated.
 - [FIXED] Ensured `handleReward` (faucet_service.go) updates the player's persistent history with the `ReceiptTxID` after successful dispatch, providing verification continuity for both winners and losers.
 - [FIXED] Synchronized `handleTournamentHistory` and `loadOnboardedWalletsFromIndexer` with the high-availability `indexerRequest` dispatcher to resolve orphaned singular indexer calls.
 - [VERIFIED] Regional Governor power boost initialization in `lobby_manager.go` is correctly snapshotted and synchronized for both combat validation and UI feedback.
+- [FIXED] Ensured `handleMove` in `lobby_manager.go` correctly prunes the player's hand slice (`P1Deck`/`P2Deck`) when a card is played to the board.
+- [FIXED] Restored functional logic to `Public/js/utils.js` after identifying a regression caused by the Task 241 modularity cleanup.

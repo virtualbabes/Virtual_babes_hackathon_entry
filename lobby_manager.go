@@ -388,6 +388,19 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 			// serverCheckCaptures now returns captured cards, append them to match state
 			_, flips := l.serverCheckCaptures(match, move.GridIndex, pIdx)
 			match.CapturedCards = append(match.CapturedCards, flips...)
+
+			// PILLAR 3: Hand Integrity.
+			// Remove the card from the player's hand slice to prevent reuse and ensure score accuracy.
+			hand := &match.P1Deck
+			if pIdx == 1 {
+				hand = &match.P2Deck
+			}
+			for i, id := range *hand {
+				if id == move.CardID {
+					*hand = append((*hand)[:i], (*hand)[i+1:]...)
+					break
+				}
+			}
 		}
 		full := true
 		for _, slot := range match.Board {

@@ -158,4 +158,7 @@
 *   **240**: Hardened `syncUI` in `app.js` with a persistent `dashboardCache` to eliminate flickering during partial state syncs; stabilized `dashboardStateKey` calculation and purged redundant code re-definitions.
 *   **230**: Finalized structural audit of `oracle_service.go`; resolved fragmented logic in `fetchARC19Metadata` and removed illegal braces/duplicate declarations halting the Linux binary build on Render.
 *   **245**: Verified buy-in prefix alignment between `app.js` and `tournament_manager.go`; refactored `handleTournamentHistory` and `loadOnboardedWalletsFromIndexer` to use the resilient `indexerRequest` dispatcher.
+*   **246**: Audited `initiateSuddenDeath` in `battle_service.go`; verified that frequency-map based redistribution correctly accounts for duplicate card IDs in tie-breaker hand reconstruction.
+*   **247**: Hardened `handleMove` in `lobby_manager.go`; implemented hand pruning to remove cards from `P1Deck`/`P2Deck` slices upon placement, ensuring score accuracy and preventing double-play exploits.
+*   **248**: Restored missing utility logic to `js/utils.js`; implemented `getAssetSymbol`, `resolveEnvoiName`, and `getNetworkConfig` to satisfy cross-module dependencies following the modularity purge.
 *   **229**: Conducted recursive structural audit; resolved illegal `break` statements and functional scope leaks in `oracle_service.go` to finalize Linux binary build stability on Render.
