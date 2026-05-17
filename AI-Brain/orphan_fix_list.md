@@ -428,6 +428,7 @@
 - [FIXED] Implemented on-chain `VBT_BAIL_LOG` notes in `handleBailCard` (handlers_criminality.go) to provide immutable proof of bail payments and organizational revenue.
 - [FIXED] Optimized `processMojoDecay` (lobby_manager.go) with a batch-ripple update pattern to prevent performance degradation during large-scale club stagnation.
 - [FIXED] Hardened `applyDynamicScalingLocked` (economy_service.go) to subtract the 1.0 VOI gas floor from faucet balance before calculating the reward ratio.
+- [VERIFIED] Per-wallet claim lock in `handleVoiOnboarding` (onboarding_service.go) correctly prevents concurrent multi-click exploits; synchronized bridge payouts with dynamic reward scaling.
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
 - [FIXED] Implemented dynamic "REPUTATION_GATE" in `handleJoinClub` (club_service.go) to enforce minimum player Reputation requirements for joining elite clubs.

@@ -112,8 +112,9 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Vault is low on VBV, please try again later.", http.StatusServiceUnavailable)
 		return
 	}
-	l.faucetBalance -= 1.0 // Decrement for 1 VBV
-	l.mutex.Unlock()       // Release lock before network I/O
+	l.faucetBalance -= 1.0        // Decrement for 1 VBV
+	l.applyDynamicScalingLocked() // Recalculate reward stack based on new liquidity
+	l.mutex.Unlock()              // Release lock before network I/O
 
 	// --- Transaction Dispatch Logic ---
 	// Ensure the VBV is refunded if the transaction fails
@@ -123,6 +124,7 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 		if refundVBV {
 			l.mutex.Lock()
 			l.faucetBalance += 1.0 // Refund VBV
+			l.applyDynamicScalingLocked()
 			l.mutex.Unlock()
 			if !isSkip {
 				log.Printf("[BRIDGE] VBV refunded to vault for %s due to transaction failure.\n", targetWallet)
