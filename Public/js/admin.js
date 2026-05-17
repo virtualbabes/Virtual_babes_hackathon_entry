@@ -200,15 +200,20 @@ export async function fetchAdminLogs() { // Exported for use in app.js
         if (data.status === "success") {
             renderAdminLogs(data.logs);
         }
-    } catch (err) { console.error("Log fetch failed", err); }
+    } catch (err) { 
+        console.error("Log fetch failed", err); 
     }
 }
 
 export async function adminRefillVault() { // Exported for use in app.js
-    const amount = parseFloat(document.getElementById("admin-refill-amt").value);
-    if (isNaN(amount)) return;
-    const headers = await getAdminHeaders();
-    } catch (err) { showToast("❌ Refill failed", "error"); }
+    try {
+        const amount = parseFloat(document.getElementById("admin-refill-amt").value);
+        if (isNaN(amount)) return;
+        const headers = await getAdminHeaders();
+        // Implementation logic...
+    } catch (err) { 
+        showToast("❌ Refill failed", "error"); 
+    }
 }
 
 export function updateAdminRewardList(rewards) { // Exported for use in app.js

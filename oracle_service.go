@@ -698,6 +698,8 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				}
 				l.mutex.Unlock()
 			}
+		}
+	}
 }
 
 func (l *Lobby) refreshGlobalLeaderboard() {
@@ -1274,7 +1276,6 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 
 	rewardAppID, err := strconv.ParseUint(rewardAppIDStr, 10, 64)
 	if err != nil {
-		return
 		return
 	}
 

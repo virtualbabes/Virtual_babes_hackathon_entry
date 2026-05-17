@@ -23,8 +23,11 @@
 - [x] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
 
 ## Pillar 5: Build Stabilization & Logic Scrub (Pending)
-- [ ] **Backend vs WASM Isolation**: Apply `//go:build !js || !wasm` tags to service files (`black_market`, `courthouse`, `employment`, `handlers_rumor`) to resolve undefined lobby methods in WASM build.
-- [ ] **Resolve Redeclarations**: Fix `GlobalSentiment` duplicate in `common_types.go` and `server.go`, and `main()` in `main.go` and `server.go`.
+
+## Pillar 5: Build Stabilization & Logic Scrub (Active)
+- [x] **Backend vs WASM Isolation**: Applied build tags to isolate server logic.
+- [x] **Resolve Redeclarations**: Fixed `GlobalSentiment` and `main()` conflicts.
+- [x] **Syntax Repair**: Repaired function boundaries in `oracle_service.go` and JS syntax in `admin.js`.
 - [ ] **Pluralization Audit**: Update singular `NodeURL` to `NodeURLs` in `economy_service.go` and `handlers_admin.go`.
 - [ ] **Ledger Synchronization**: Replace `l.rewards` with `l.playerBalances` in `handlers_admin.go` and `lobby_manager.go`.
 - [ ] **Syntax Repair**:

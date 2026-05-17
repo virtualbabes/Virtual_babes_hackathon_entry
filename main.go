@@ -630,7 +630,7 @@ func SyncPortfolio(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		return false
 	}
-	p := &Game.Players[Game.LocalPlayerIndex]
+	jsMap := args[0]
 
 	Game.mutex.Lock()
 	defer Game.mutex.Unlock()
