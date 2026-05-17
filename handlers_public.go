@@ -165,4 +165,46 @@ func (l *Lobby) getVerifiedCard(wallet string, tokenID int, networkName string) 
 		return ServerCard{}, err
 	}
 	return cards[tokenID], nil
+
+// handleActiveMatches returns a list of ongoing matches for the spectator portals.
+func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	type matchSummary struct {
+		ID        string   `json:"id"`
+		P1        string   `json:"p1_id"`
+		P2        string   `json:"p2_id"`
+		Rating    string   `json:"rating"`
+		Territory string   `json:"territory"`
+		Spectators int     `json:"spectator_count"`
+		StartTime  time.Time `json:"start_time"`
+	}
+
+	var active []matchSummary
+	seen := make(map[*MatchState]bool)
+
+	for _, m := range l.matches {
+		if seen[m] || m.IsFinished {
+			continue
+		}
+		
+		// Use P1's ID as the primary Match ID for routing
+		active = append(active, matchSummary{
+			ID:        m.P1ID,
+			P1:        m.P1ID,
+			P2:        m.P2ID,
+			Rating:    l.calculateDeckRating(m.P1Deck),
+			Territory: m.TerritoryID,
+			Spectators: len(m.Spectators),
+		})
+		seen[m] = true
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"count":   len(active),
+		"matches": active,
+	})
+}
 }

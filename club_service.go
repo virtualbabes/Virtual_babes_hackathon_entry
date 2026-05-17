@@ -486,6 +486,35 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 		l.unlockAchievementLocked(strings.ToLower(club.OwnerWallet), "GOVERNOR")
 	}
 
+	// PILLAR 1: Regional Governor Protocol Fee.
+	// A portion (5%) of the territory purchase cost is distributed to existing Regional Governors.
+	var governorProtocolFee float64
+	var governors []*Club
+	for _, c := range l.clubs {
+		// Check if it's a Regional Governor (club with 2+ territories)
+		if len(c.Territories) >= 2 {
+			governors = append(governors, c)
+		}
+	}
+
+	if len(governors) > 0 {
+		// Calculate 5% of the purchase cost as a protocol fee.
+		// Use micro-unit math for precision.
+		protocolFeeMicro := uint64(purchaseCost * 0.05 * divisor)
+		governorProtocolFee = float64(protocolFeeMicro) / divisor
+
+		feePerGovernor := governorProtocolFee / float64(len(governors))
+		for _, govClub := range governors {
+			govClub.Treasury += feePerGovernor
+			govClub.LastActivity = time.Now()
+		}
+
+		// INDUSTRIAL LOOP: Deduct distributed fee from liquid faucet balance.
+		l.faucetBalance -= governorProtocolFee
+		l.applyDynamicScalingLocked() // Re-evaluate scaling due to faucet change
+		l.logAdminAuditLocked("TERRITORY_PROTOCOL_FEE", data.TerritoryID, fmt.Sprintf("Distributed %.2f $VBV to %d Governors.", governorProtocolFee, len(governors)))
+	}
+
 	l.clubs[data.ClubID] = club
 	club.LastActivity = time.Now()
 	l.mutex.Unlock()

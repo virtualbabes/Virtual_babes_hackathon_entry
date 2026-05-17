@@ -69,6 +69,17 @@ window.onload = async () => {
                 setTimeout(() => connectWith(lastProvider), 500); // Small delay for WASM stability
             }
         }
+
+        // PILLAR 4: Spectator Portal Hook.
+        // Check for deep-link spectate request in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const spectateID = urlParams.get('spectate');
+        if (spectateID) {
+            setTimeout(() => {
+                console.log(`[PORTAL] Auto-joining stream for: ${spectateID}`);
+                socket.send(JSON.stringify({ type: "spectate", payload: { target_id: spectateID } }));
+            }, 2000); // Allow WASM engine and WS to stabilize
+        }
     } catch (err) {
         console.error("WASM Load Fail:", err);
         document.getElementById("engine-status").innerHTML = "<span style='color: #ff0844;'>OFFLINE</span>";

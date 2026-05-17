@@ -365,6 +365,7 @@ func main() {
 	http.HandleFunc("/api/leaderboard", lobby.handleLeaderboard)
 	http.HandleFunc("/api/reward", lobby.handleReward) // Now in faucet_service.go
 	http.HandleFunc("/api/status", lobby.handlePublicStatus)
+	http.HandleFunc("/api/matches/active", lobby.handleActiveMatches)
 	http.HandleFunc("/api/health", lobby.handleHealthCheck)
 	http.HandleFunc("/api/card-stats", lobby.handleCardStats)
 	http.HandleFunc("/api/card-details", lobby.handleGetCardDetails)

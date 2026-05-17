@@ -169,6 +169,8 @@
 *   **272**: Audited `handleHeist` in `club_service.go`; verified Regional Governor security bonuses (+15 level) and hardware synergy (1.5x) are correctly integrated into combat math.
 *   **273**: Hardened `ensurePlayerStatsMapsInitialized` in `lobby_manager.go`; ensured the `Wallet` field is populated to correctly trigger Governor reputation multipliers.
 *   **274**: Hardened `handleJoinClub` in `club_service.go`; implemented dual Reputation/Mojo gates for elite clubs and synchronized real-time standing reconciliation during joining protocols.
+*   **275**: Hardened `handlePurchaseTerritory` in `club_service.go`; implemented a 5% "Regional Governor Protocol Fee" on territory purchases, distributed to all existing Governors, and synchronized with the Industrial Loop.
+*   **276**: Operationalized "Spectator Portals" for external sites; implemented `/api/matches/active` match discovery and added deep-link detection in `app.js` to support automated live feed rotation.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
 *   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.
