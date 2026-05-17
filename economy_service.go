@@ -31,7 +31,15 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	if l.maxFaucetCapacity <= 0 {
 		return
 	}
-	ratio := l.faucetBalance / l.maxFaucetCapacity
+
+	// PILLAR 2: Usable Liquidity.
+	// Reserve 1.0 units for gas/fees. Scaling applies only to the surplus balance.
+	usableBalance := l.faucetBalance - 1.0
+	if usableBalance < 0 {
+		usableBalance = 0
+	}
+
+	ratio := usableBalance / l.maxFaucetCapacity
 	if ratio > 1.0 {
 		ratio = 1.0
 	}
