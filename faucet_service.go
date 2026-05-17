@@ -186,9 +186,36 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l.mutex.Lock() // Lock to delete match history after successful dispatch
+	l.mutex.Lock()
+	// PILLAR 4: Historical Immersion.
+	// Update both winner and loser history records with the on-chain Receipt ID.
+	// This ensures the verification checkmark appears in the UI for both parties.
+	claimantLower := strings.ToLower(req.Claimant)
+	if stats, exists := l.leaderboard[claimantLower]; exists {
+		for i := range stats.History {
+			if stats.History[i].Timestamp.Equal(history.Timestamp) {
+				stats.History[i].ReceiptTxID = txid
+				l.leaderboard[claimantLower] = stats
+				break
+			}
+		}
+	}
+	if history.Opponent != "" && history.Opponent != "DRAW" {
+		loserLower := strings.ToLower(history.Opponent)
+		if lStats, exists := l.leaderboard[loserLower]; exists {
+			for i := range lStats.History {
+				if lStats.History[i].Timestamp.Equal(history.Timestamp) {
+					lStats.History[i].ReceiptTxID = txid
+					l.leaderboard[loserLower] = lStats
+					break
+				}
+			}
+		}
+	}
 	delete(l.matchHistory, req.ClientID)
+	updateMsg := l.getLobbyUpdateMsgLocked()
 	l.mutex.Unlock()
+	l.broadcast <- updateMsg
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

@@ -382,4 +382,5 @@
 - [FIXED] Systemic resolution of Go/JS compilation and syntax errors following the Pluralization and Ledger refactors.
 - [FIXED] Synchronized `career.go` with the dual-ledger system by migrating salary distributions to the `playerBalances` map.
 - [FIXED] Corrected logic error in `finalizeMatchResultLocked` (battle_service.go) where loser records were incorrectly marked as Wins (0) if P2 won; mirrored records now always reflect a Loss (1).
+- [FIXED] Ensured `handleReward` (faucet_service.go) updates the player's persistent history with the `ReceiptTxID` after successful dispatch, providing verification continuity for both winners and losers.
 - [VERIFIED] Regional Governor power boost initialization in `lobby_manager.go` is correctly snapshotted and synchronized for both combat validation and UI feedback.
