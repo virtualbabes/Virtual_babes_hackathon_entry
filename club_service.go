@@ -113,7 +113,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		fenceFee = float64(fenceFeeMicro) / 1000000.0
 		netLoot = float64(netLootMicro) / 1000000.0
 
-		// PILLAR 3: Financial Proof. 
+		// PILLAR 3: Financial Proof.
 		// Record successful heist on-chain for the immutable audit trail.
 		heistDetails := map[string]interface{}{
 			"target":    data.TargetClubID,
