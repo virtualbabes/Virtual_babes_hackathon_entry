@@ -397,3 +397,5 @@
 - [FIXED] Resolved accounting leak in `finalizeTournament` (tournament_manager.go); ensured Governor Tax is deducted from `faucetBalance` and implemented precision rounding.
 - [FIXED] Weighted Regional Governor status in tournament tie-breakers within `determineTop5` (tournament_manager.go) to reward territorial influence.
 - [FIXED] Resolved `tradeDetails` undefined error in `market_service.go`; ensures high-value trades are recorded on-chain with share quantity and asset symbol metadata.
+- [FIXED] Hardened `processAuctions` (auction_service.go) to include on-chain `VBT_AUCTION_SETTLE` notes for immutable proof of settlement, including card ID and final bid amounts.
+- [FIXED] Implemented on-chain `VBT_HEIST_LOG` notes in `handleHeist` (club_service.go) to provide immutable proof of criminal loot and protocol fee routing.

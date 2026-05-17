@@ -113,6 +113,16 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		fenceFee = float64(fenceFeeMicro) / 1000000.0
 		netLoot = float64(netLootMicro) / 1000000.0
 
+		// PILLAR 3: Financial Proof. 
+		// Record successful heist on-chain for the immutable audit trail.
+		heistDetails := map[string]interface{}{
+			"target":    data.TargetClubID,
+			"perp":      wallet,
+			"fence_fee": fenceFee,
+			"net_loot":  netLoot,
+			"ts":        now.Unix(),
+		}
+
 		// INDUSTRIAL LOOP: Stolen tokens return from the Club Reserve to the general Faucet pool.
 		// We add the gross loot back to faucetBalance to maintain parity with the on-chain vault total,
 		// as the netLoot portion is now a virtual reward liability that will be deducted upon payout.
@@ -133,6 +143,12 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		// Update local reputation and leaderboard before achievement to ensure accuracy
 		playerStats.Reputation = l.CalculateReputation(playerStats)
 		l.leaderboard[wallet] = playerStats
+
+		// Dispatch on-chain log for financial verification
+		go func(hd interface{}) {
+			jsonPayload, _ := json.Marshal(hd)
+			l.sendNoteTx(fmt.Sprintf("VBT_HEIST_LOG:%s", string(jsonPayload)))
+		}(heistDetails)
 
 		// Achievement unlock uses the Locked variant since we already hold the lobby mutex.
 		l.unlockAchievementLocked(wallet, "FIRST_HEIST")

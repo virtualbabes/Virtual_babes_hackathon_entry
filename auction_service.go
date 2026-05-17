@@ -233,6 +233,17 @@ func (l *Lobby) processAuctions() {
 				commissionMicro := (auction.CurrentBid*10 + 50) / 100 // Round to nearest micro-unit
 				netPayoutToSellerMicro := auction.CurrentBid - commissionMicro
 
+				// PILLAR 3: Financial Proof.
+				// Record auction settlement on-chain for the audit trail.
+				settleDetails := map[string]interface{}{
+					"id":      id,
+					"winner":  auction.HighestBidder,
+					"seller":  auction.SellerWallet,
+					"card_id": auction.Bundle.CardID,
+					"amount":  float64(auction.CurrentBid) / 1000000.0,
+					"ts":      now.Unix(),
+				}
+
 				// 3. Pay seller
 				l.playerBalances[auction.SellerWallet] += netPayoutToSellerMicro
 
@@ -264,6 +275,12 @@ func (l *Lobby) processAuctions() {
 
 				l.logAdminAuditLocked("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Winner: %s, Seller: %s, Amount: %.2f (Net: %.2f, Commission: %.2f)",
 					id, auction.HighestBidder, auction.SellerWallet, float64(auction.CurrentBid)/1000000.0, float64(netPayoutToSellerMicro)/1000000.0, float64(commissionMicro)/1000000.0))
+
+				// Record on-chain settlement for immutable verification
+				go func(sd interface{}) {
+					jsonPayload, _ := json.Marshal(sd)
+					l.sendNoteTx(fmt.Sprintf("VBT_AUCTION_SETTLE:%s", string(jsonPayload)))
+				}(settleDetails)
 
 				// Notify winner and seller
 				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.HighestBidder), Envelope{
