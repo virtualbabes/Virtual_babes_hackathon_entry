@@ -8,7 +8,10 @@ import { masterVolume, musicVolume, sfxVolume } from './audio.js';
 import { updateAdminRewardList, fetchAdminLogs, adminLogTicker, startAdminLogPolling, stopAdminLogPolling } from './admin.js';
 import { updateActiveRumors, renderRumorBoard } from './criminality.js';
 import { seasonEnd, totalTournaments, tournamentLimit, currentTournamentPage, fetchTournamentHistory, fetchSeasonHistory } from './leaderboard.js';
-import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName } from './utils.js';
+import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './utils.js';
+import { globalClubs, availableNetworks } from './admin.js';
+import { buyClubItem, submitClubFoundry, tradeShares, buyBlackMarketItem, submitConsignment, takeLease } from './economy.js';
+import { initiateBail, deployTrap, payRansom, releaseHostage, spreadRumor } from './criminality.js';
 
 export let tooltipEl = document.getElementById("power-tooltip");
 export let maintenanceTicker = null;
@@ -16,6 +19,20 @@ export let maintenanceTicker = null;
 // PERFORMANCE OPTIMIZATION: Move static maps outside the render loop to prevent re-allocation
 const MOOD_CLASS_MAP = { "Volatile": "fire", "Serene": "water", "Spirited": "lightning", "Grounded": "earth" };
 const MOOD_EMOJI_MAP = { "Volatile": "🔥", "Serene": "💧", "Spirited": "⚡", "Grounded": "🌿" };
+
+const TERRITORY_MAP = [
+    { id: "the_lab", name: "The Lab", icon: "🧪" },
+    { id: "north_district", name: "North Gate", icon: "⛩️" },
+    { id: "the_archive", name: "The Archive", icon: "📜" },
+    { id: "west_port", name: "West Port", icon: "⚓" },
+    { id: "arena_center", name: "Arena Center", icon: "⚔️" },
+    { id: "east_gate", name: "East Gate", icon: "🏯" },
+    { id: "south_slums", name: "The Slums", icon: "🏚️" },
+    { id: "casino", name: "The Casino", icon: "🎰" },
+    { id: "data_haven", name: "Data Haven", icon: "💾" }
+];
+
+export let mapZoom = 1.0;
 
 // --- Transaction Feedback (Toast) ---
 export function showToast(message, type = 'info', duration = 5000) {
@@ -33,6 +50,316 @@ export function showToast(message, type = 'info', duration = 5000) {
             setTimeout(() => toast.remove(), 500);
         }, 500); // Allow transition to complete before removing
     }
+}
+
+export function openClubFoundry() {
+    const available = TERRITORY_MAP.filter(t => !Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id)));
+    const overlay = document.createElement("div");
+    overlay.id = "club-foundry-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel medium" style="text-align: center;">
+            <h2 class="text-neon-purple">CLUB FOUNDRY</h2>
+            <p style="font-size: 0.9em; opacity: 0.8;">Founding a club costs a fortune (5,000 $VBV).<br>Owners earn commissions from relative buffs sold in their territory.</p>
+            <div class="flex-col gap-10 mt-20">
+                <input type="text" id="foundry-club-name" class="glass-input w-full" placeholder="Enter Club Name (max 20 chars)" maxlength="20">
+                <select id="foundry-shop-type" class="glass-input w-full" aria-label="Select Shop Specialization" title="Shop Type">
+                    <option value="Elemental">Elemental Forge (Mood Buffs)</option>
+                    <option value="Tactical">Tactical Syndicate (Rule Mastery)</option>
+                    <option value="Vitality">Vitality Lab (Health/Loyalty)</option>
+                </select>
+                <select id="foundry-territory" class="glass-input w-full" ${available.length === 0 ? 'disabled' : ''} aria-label="Select territory to claim" title="District Selection">
+                    ${available.length > 0 ? available.map(t => `<option value="${t.id}">${t.name}</option>`).join('') : '<option value="">NO DISTRICTS AVAILABLE</option>'}
+                </select>
+            </div>
+            <div class="mt-20 flex-row justify-center gap-15">
+                <button class="outline" onclick="document.getElementById('club-foundry-overlay').remove()">CANCEL</button>
+                <button id="foundry-submit-btn" onclick="submitClubFoundry()">FOUND CLUB (5,000 $VBV)</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+export function adjustMapZoom(delta) {
+    mapZoom += delta;
+    if (mapZoom < 0.5) mapZoom = 0.5;
+    if (mapZoom > 2.0) mapZoom = 2.0;
+    const grid = document.getElementById("map-3d-grid");
+    if (grid) grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${mapZoom})`;
+}
+
+export function openTerritoryMapOverlay() {
+    const grid = document.getElementById("map-3d-grid");
+    if (!grid) return;
+    mapZoom = 1.0;
+    grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${mapZoom})`;
+    grid.innerHTML = "";
+    TERRITORY_MAP.forEach(t => {
+        const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(t.id));
+        const isOwned = !!club;
+        const isGovernor = isOwned && club.region_name;
+        let isUnderAttack = false;
+        if (isOwned && club.last_heist_at) {
+            isUnderAttack = (Date.now() - new Date(club.last_heist_at).getTime()) < 300000;
+        }
+        const tile = document.createElement("div");
+        tile.className = `map-tile-3d accelerated ${isGovernor ? 'governor-controlled' : isOwned ? 'controlled' : 'neutral'}`;
+        tile.onclick = () => { hideAllOverlays(); openTerritoryView(t.id); };
+        tile.innerHTML = `
+            <div class="tile-label">
+                <div class="tile-icon">${t.icon}</div>
+                <div class="tile-name">${t.name.toUpperCase()}</div>
+                <div class="tile-owner">${isOwned ? club.name : 'NEUTRAL ZONE'}</div>
+                ${isOwned ? `<div class="tile-stats"><span class="stat population">${Object.keys(club.staff || {}).length}</span><span class="stat resources">${club.treasury.toFixed(0)}</span></div>` : ''}
+            </div>
+            <div class="tile-status ${isUnderAttack ? 'under-attack' : isGovernor ? 'developing' : ''}"></div>`;
+        grid.appendChild(tile);
+    });
+    document.getElementById("territory-map-overlay").classList.remove("hidden");
+}
+
+export function openTerritoryView(territoryId) {
+    const club = Object.values(globalClubs).find(c => c.territory === territoryId);
+    const overlay = document.createElement("div");
+    overlay.id = "territory-view-overlay";
+    overlay.className = "overlay";
+    let body = `<p style="opacity: 0.7;">This territory is currently unclaimed. Found a Club to take control!</p>`;
+    if (club) {
+        const items = { "Elemental": [{ id: "mood_catalyst", name: "Mood Catalyst", price: 100, desc: "+50 Mood Bonus" }], "Tactical": [{ id: "rule_breaker", name: "Rule Breaker", price: 150, desc: "Force PLUS trigger" }], "Vitality": [{ id: "stamina_stim", name: "Stamina Stim", price: 100, desc: "-20 Fatigue" }] }[club.type] || [];
+        body = `<div class="flex-col gap-10">${items.map(i => `
+            <div class="shop-item-row glass-panel p-15 m-0 flex-row justify-between align-center animate-shimmer">
+                <div class="text-left"><b>${i.name}</b><div class="font-size-0-8em opacity-6">${i.desc}</div></div>
+                <button class="outline" onclick="buyClubItem('${club.id}', '${i.id}', ${i.price}, '${territoryId}')">${i.price} $VBV</button>
+            </div>`).join('')}</div>`;
+    }
+    overlay.innerHTML = `<div class="glass-panel medium" style="text-align: center;"><h2>TERRITORY: ${territoryId.replace('_',' ').toUpperCase()}</h2>${body}
+        <div class="mt-20"><button class="outline" onclick="document.getElementById('territory-view-overlay').remove()">CLOSE</button>${!club ? `<button onclick="document.getElementById('territory-view-overlay').remove(); openClubFoundry()">FOUND CLUB</button>` : ''}</div></div>`;
+    document.body.appendChild(overlay);
+}
+
+export async function openPortfolioView(initialTab = 'portfolio') {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "portfolio-view-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel medium" style="text-align: center;">
+            <h2 class="text-neon-cyan">ENTITY PORTFOLIO</h2>
+            <div class="flex-row justify-center gap-10 mt-10 mb-20">
+                <button id="tab-holdings" class="tab-btn" onclick="switchPortfolioTab('portfolio')">📈 HOLDINGS</button>
+                <button id="tab-jailed" class="tab-btn" onclick="switchPortfolioTab('jailed')">⛓️ JAILED</button>
+                <button id="tab-kidnapped" class="tab-btn" onclick="switchPortfolioTab('kidnapped')">😈 KIDNAPPED</button>
+                <button id="tab-hostage" class="tab-btn" onclick="switchPortfolioTab('hostage')">🛑 HOSTAGE</button>
+            </div>
+            <div id="portfolio-content-area" class="flex-col gap-10" style="max-height: 400px; overflow-y: auto;"></div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('portfolio-view-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    switchPortfolioTab(initialTab);
+}
+
+export async function switchPortfolioTab(tab) {
+    const container = document.getElementById("portfolio-content-area");
+    const state = window.GetGameState();
+    document.querySelectorAll('#portfolio-view-overlay .tab-btn').forEach(b => b.classList.toggle('active', b.id.includes(tab)));
+    container.innerHTML = `<div class="opacity-5 py-20">Decrypting assets...</div>`;
+
+    if (tab === 'portfolio') {
+        const entries = Object.entries(state.portfolio || {});
+        if (entries.length === 0) { container.innerHTML = `<div class="py-40 opacity-5">No active investments found.</div>`; return; }
+        await Promise.all(entries.map(([w]) => resolveEnvoiName(w)));
+        container.innerHTML = `<div class="portfolio-view">${entries.map(([id, amt]) => `
+            <div class="portfolio-item glass-panel m-0 mb-10">
+                <div class="text-left"><div class="item-name text-neon-cyan">${getCachedEnvoiName(id)}</div><div class="opacity-5 font-size-0-75em">Shares: ${amt.toFixed(2)}</div></div>
+                <button class="outline x-small border-error" onclick="tradeShares('${id}', 'sell', ${amt})">SELL ALL</button>
+            </div>`).join('')}</div>`;
+    } else if (tab === 'jailed') {
+        const jailed = Object.keys(state.jailed_cards || {});
+        if (jailed.length === 0) { container.innerHTML = `<div class="py-40 opacity-5">No cards in custody.</div>`; return; }
+        container.innerHTML = jailed.map(id => `
+            <div class="player-item" style="border-color: #ff4b4b;">
+                <div class="text-left"><b class="text-error">ID: #${id}</b></div>
+                <button class="outline x-small border-green" onclick="initiateBail(${id}, '${state.jailed_cards[id]}')">PAY BAIL</button>
+            </div>`).join('');
+    } else if (tab === 'hostage') {
+        const hostage = Object.keys(state.held_hostage_cards || {});
+        if (hostage.length === 0) { container.innerHTML = `<div class="py-40 opacity-5">No cards held hostage.</div>`; return; }
+        container.innerHTML = hostage.map(id => `
+            <div class="player-item" style="border-color: #ffd700;">
+                <div class="text-left"><b class="text-gold">ID: #${id}</b></div>
+                <button class="outline x-small border-error" onclick="payRansom(${id}, '${state.held_hostage_cards[id]}')">PAY RANSOM</button>
+            </div>`).join('');
+    }
+}
+
+export function openSecuritySentry() {
+    const state = window.GetGameState();
+    const club = globalClubs[state.employer_id];
+    if (!club) return;
+    const overlay = document.createElement("div");
+    overlay.id = "security-sentry-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 550px; text-align: center;">
+            <h2 class="text-neon-cyan">🛡️ SECURITY SENTRY: ${club.name.toUpperCase()}</h2>
+            <div class="flex-col gap-10 mt-20">
+                ${[{id:"tripwire", name:"Tripwire"}, {id:"sentry_turret", name:"Turret"}, {id:"guard_dog", name:"Guard Dog"}].map(t => `
+                    <div class="glass-panel p-10 m-0 flex-row justify-between align-center">
+                        <b>${t.name}</b>
+                        <button class="outline" ${state.inventory[t.id] > 0 ? '' : 'disabled'} onclick="deployTrap('${t.id}')">DEPLOY</button>
+                    </div>`).join('')}
+            </div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('security-sentry-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+export async function openBountyBoard() {
+    const outlaws = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
+    const overlay = document.createElement("div");
+    overlay.id = "bounty-board-overlay";
+    overlay.className = "overlay";
+    if (outlaws.length > 0) await Promise.all(outlaws.map(p => resolveEnvoiName(p.wallet)));
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 500px; text-align: center; border-color: #ffd700;">
+            <h2 style="color: #ffd700;">🎯 BOUNTY BOARD</h2>
+            <div class="flex-col gap-10 mt-20">${outlaws.length === 0 ? '<div class="opacity-5 py-20">No active bounties.</div>' : outlaws.map(p => `
+                <div class="player-item" style="border-color: #ffd700;">
+                    <div class="text-left"><b>${getCachedEnvoiName(p.wallet)}</b><br><small>Wanted: ${p.wanted_level}</small></div>
+                    <button class="outline x-small" onclick="document.getElementById('bounty-board-overlay').remove(); window.sendChallenge('${p.id}')">HUNT</button>
+                </div>`).join('')}</div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('bounty-board-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+export async function openBlackMarket() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "black-market-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="economy-panel black-market" style="width: 650px;">
+            <div class="market-header"><span class="market-title">THE UNDERWORLD</span></div>
+            <div id="black-market-grid" class="market-grid p-20">Loading hot items...</div>
+            <button class="outline mt-20" onclick="document.getElementById('black-market-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    try {
+        const res = await fetch(`${CONFIG.API_BASE}/api/black-market?wallet=${userAddress}`);
+        const items = await res.json();
+        const grid = document.getElementById("black-market-grid");
+        if (items.length === 0) { grid.innerHTML = `<div class="opacity-5">No hot items currently available.</div>`; return; }
+        grid.innerHTML = items.map(i => `
+            <div class="player-item" style="border-color: #ff4b4b;">
+                <div class="text-left"><b>Hot Bundle: CARD-#${i.collateral_bundle.card_id}</b></div>
+                <button class="outline x-small border-error" onclick="buyBlackMarketItem('${i.id}', 100)">BUY (RISKY)</button>
+            </div>`).join('');
+    } catch (e) { document.getElementById("black-market-grid").innerHTML = `<div class="text-error">Uplink Failed.</div>`; }
+}
+
+export function openArtGalleryOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = "art-gallery-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="economy-panel gallery-panel" style="width: 900px;">
+            <div class="economy-header"><span class="economy-title">THE ART GALLERY</span>
+                <button class="outline x-small border-error" onclick="document.getElementById('art-gallery-overlay').remove()">CLOSE</button>
+            </div>
+            <div id="gallery-items-container" class="gallery-grid p-20"></div>
+        </div>`;
+    document.body.appendChild(overlay);
+    loadGalleryItems();
+}
+
+export async function loadGalleryItems() {
+    const container = document.getElementById("gallery-items-container");
+    try {
+        const res = await fetch(`${CONFIG.API_BASE}/api/auctions`);
+        const auctions = await res.json();
+        if (!auctions || auctions.length === 0) { container.innerHTML = `<div class="opacity-5 py-40">Gallery floor is vacant.</div>`; return; }
+        container.innerHTML = auctions.map(a => `
+            <div class="gallery-grid__item-bundle glass-panel">
+                <div class="item-title font-bold text-neon-cyan">${a.bundle.weapon_id || 'Tactical Artifact'}</div>
+                <button class="outline mt-15 w-full border-cyan" onclick="promptBid('${a.id}', ${a.current_bid})">PLACE BID</button>
+            </div>`).join('');
+    } catch (e) { container.innerHTML = `<div class="text-error">Gallery Indexer Offline.</div>`; }
+}
+
+export function openConsignmentOverlay() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "consignment-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="economy-panel consignment-panel" style="width: 550px;">
+            <div class="market-header"><span class="market-title">ASSET CONSIGNMENT</span></div>
+            <div class="p-20"><p class="opacity-6">Select an asset from your collection to list.</p>
+                <button class="outline mt-20 w-full" onclick="document.getElementById('consignment-overlay').remove()">ABORT</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+export function openRumorMill() {
+    const overlay = document.createElement("div");
+    overlay.id = "rumor-mill-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 600px; text-align: center;">
+            <h2 class="text-neon-green">RUMOR MILL</h2>
+            <div id="rumor-targets" class="flex-col gap-10 mt-20"></div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('rumor-mill-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    const otherPlayers = lastLobbyPlayers.filter(p => p.id !== myClientId);
+    document.getElementById("rumor-targets").innerHTML = otherPlayers.map(p => `
+        <div class="player-item">
+            <div class="text-left"><b>${p.id}</b></div>
+            <button class="outline x-small" onclick="spreadRumor('${p.wallet}', 'positive', 1.1, 60)">SPREAD</button>
+        </div>`).join('');
+}
+
+export function openSocialPanelOverlay(initialTab = 'alliances') {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "social-hub-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="social-panel glass-panel" style="width: 750px;">
+            <div class="social-header"><span class="social-title">NEON SOCIAL HUB</span></div>
+            <div class="flex-row justify-center gap-10 mt-10 mb-20">
+                <button id="social-tab-alliances" class="tab-btn" onclick="switchSocialTab('alliances')">🤝 ALLIANCES</button>
+                <button id="social-tab-career" class="tab-btn" onclick="switchSocialTab('career')">💼 CAREER</button>
+            </div>
+            <div id="social-content-hub" class="flex-col gap-15"></div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('social-hub-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+    switchSocialTab(initialTab);
+}
+
+export function switchSocialTab(tab) {
+    const container = document.getElementById("social-content-hub");
+    document.querySelectorAll('#social-hub-overlay .tab-btn').forEach(b => b.classList.toggle('active', b.id.includes(tab)));
+    container.innerHTML = `<div class="opacity-5 py-40">Loading social hub...</div>`;
+    if (tab === 'career') {
+        container.innerHTML = `<div class="career-system"><div class="career-title">PATH: FREELANCER</div></div>`;
+    }
+}
+
+export function openClubLeaseBoard() {
+    const overlay = document.createElement("div");
+    overlay.id = "lease-board-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="glass-panel" style="width: 700px; text-align: center;">
+            <h2 class="text-neon-purple">INDUSTRIAL LEASE BOARD</h2>
+            <div id="lease-list-container" class="flex-col gap-10 mt-20"></div>
+            <button class="outline mt-20 w-full" onclick="document.getElementById('lease-board-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
 }
 
 // Global function to manage transaction status display

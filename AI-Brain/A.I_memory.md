@@ -145,6 +145,7 @@
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **244**: Hardened `handleReward` in `faucet_service.go`; implemented post-payout history synchronization to update both winner and loser records with the `ReceiptTxID`, ensuring on-chain verification icons appear in the UI.
 *   **250**: Finalized tournament modularity; migrated season timers, bracket rendering, and tab switching from `leaderboard.js` to `ui.js`; purged shadowed definitions from `app.js`.
+*   **251**: Finalized economy and criminality UI modularity; migrated Map, Shops, Portfolio, and Criminality overlay orchestration to `ui.js`; purged redundant shadowed logic from `app.js` to restore domain-driven authority.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
 *   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.

@@ -390,3 +390,4 @@
 - [FIXED] Restored functional logic to `Public/js/utils.js` after identifying a regression caused by the Task 241 modularity cleanup.
 - [FIXED] Resolved logic shadowing in `app.js` by migrating legacy tournament UI helpers to `ui.js` and enforcing modular authority for `leaderboard.js`.
 - [FIXED] Enforced modular authority for the Leaderboard domain; moved purely visual toggles and layout orchestration from `leaderboard.js` to `ui.js`.
+- [FIXED] Resolved logic shadowing in the Economy domain; centralized high-finance UI orchestration and overlay generation in `ui.js`, delegating data logic back to `economy.js`.
