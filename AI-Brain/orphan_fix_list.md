@@ -399,3 +399,5 @@
 - [FIXED] Resolved `tradeDetails` undefined error in `market_service.go`; ensures high-value trades are recorded on-chain with share quantity and asset symbol metadata.
 - [FIXED] Hardened `processAuctions` (auction_service.go) to include on-chain `VBT_AUCTION_SETTLE` notes for immutable proof of settlement, including card ID and final bid amounts.
 - [FIXED] Implemented on-chain `VBT_HEIST_LOG` notes in `handleHeist` (club_service.go) to provide immutable proof of criminal loot and protocol fee routing.
+- [FIXED] Implemented on-chain `VBT_BLACK_MARKET_SALE` notes in `handleBuyBlackMarket` (black_market_service.go) to provide immutable proof of Underworld trades, including risk penalties and original borrower metadata.
+- [FIXED] Implemented on-chain `VBT_LOAN_PAYBACK` notes in `handleRepayLoan` (loan_service.go) to provide immutable proof of loan settlement, including interest and collateral details.

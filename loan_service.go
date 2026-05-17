@@ -178,6 +178,18 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PILLAR 3: Financial Proof.
+	// Record loan repayment on-chain for the audit trail.
+	interestMicro := loan.RepaymentAmount - loan.LoanAmount
+	paybackDetails := map[string]interface{}{
+		"id":         loan.ID,
+		"wallet":     req.Wallet,
+		"principal":  float64(loan.LoanAmount) / 1000000.0,
+		"interest":   float64(interestMicro) / 1000000.0,
+		"collateral": loan.CollateralBundle,
+		"ts":         time.Now().Unix(),
+	}
+
 	// Add the full repayment amount (principal + interest) to the faucet balance
 	l.faucetBalance += float64(loan.RepaymentAmount) / 1000000.0
 	l.applyDynamicScalingLocked() // Recalculate rewards based on new faucet balance
@@ -201,6 +213,13 @@ func (l *Lobby) handleRepayLoan(w http.ResponseWriter, r *http.Request) {
 	// No need to update BorrowerName here, as the loan is being deleted.
 
 	l.logAdminAuditLocked("LOAN_REPAID", req.Wallet, fmt.Sprintf("Loan ID: %s, Amount: %.2f", loan.ID, float64(loan.RepaymentAmount)/1000000.0))
+
+	// Dispatch on-chain log for financial verification
+	go func(pd interface{}) {
+		jsonPayload, _ := json.Marshal(pd)
+		l.sendNoteTx(fmt.Sprintf("VBT_LOAN_PAYBACK:%s", string(jsonPayload)))
+	}(paybackDetails)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Collateral returned."})
 

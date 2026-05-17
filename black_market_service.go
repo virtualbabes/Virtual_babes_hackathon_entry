@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // handleGetBlackMarket returns liquidated items available for purchase.
@@ -59,7 +60,7 @@ func (l *Lobby) handleSellMarketTokens(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats.MarketTokens -= req.Amount
-	l.rewards[wallet] += vbvGainMicro
+	l.playerBalances[wallet] += vbvGainMicro
 	l.leaderboard[wallet] = stats
 
 	// Industrial Loop: Deduct payout from Faucet and trigger scaling
@@ -112,14 +113,26 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 	// Scavenger Price: 75% of the original repayment amount (Rounded to nearest micro-unit)
 	scavengePrice := (loan.RepaymentAmount*75 + 50) / 100
 
-	if l.rewards[wallet] < scavengePrice {
+	if l.playerBalances[wallet] < scavengePrice {
 		http.Error(w, "Insufficient reward balance to scavenge this bundle", http.StatusPaymentRequired)
 		return
 	}
 
+	// PILLAR 3: Financial Proof.
+	// Record black market transaction on-chain for the audit trail.
+	const wantedPenalty = 5
+	saleDetails := map[string]interface{}{
+		"id":             loan.ID,
+		"buyer":          wallet,
+		"original_owner": loan.BorrowerWallet,
+		"price":          float64(scavengePrice) / 1000000.0,
+		"wanted_penalty": wantedPenalty,
+		"ts":             time.Now().Unix(),
+	}
+
 	// Execute scavenge
-	l.rewards[wallet] -= scavengePrice
-	
+	l.playerBalances[wallet] -= scavengePrice
+
 	// Recovery: Add scavenge proceeds back to faucet and trigger scaling
 	l.faucetBalance += float64(scavengePrice) / 1000000.0
 	l.applyDynamicScalingLocked() // Prevent deadlock since lock is already held
@@ -139,9 +152,15 @@ func (l *Lobby) handleBuyBlackMarket(w http.ResponseWriter, r *http.Request) {
 		stats.Inventory[loan.CollateralBundle.FaceplateID]++
 	}
 
-	stats.WantedLevel += 5 // Scavenging stolen goods increases infamy
+	stats.WantedLevel += wantedPenalty              // Scavenging stolen goods increases infamy
 	stats.Reputation = l.CalculateReputation(stats) // Recalculate after Wanted Level increase
 	l.leaderboard[wallet] = stats
+
+	// Dispatch on-chain log for financial verification
+	go func(sd interface{}) {
+		jsonPayload, _ := json.Marshal(sd)
+		l.sendNoteTx(fmt.Sprintf("VBT_BLACK_MARKET_SALE:%s", string(jsonPayload)))
+	}(saleDetails)
 
 	l.blackMarket = append(l.blackMarket[:idx], l.blackMarket[idx+1:]...)
 	l.logAdminAudit("BLACK_MARKET_BUY", wallet, fmt.Sprintf("Scavenged %s for %.2f $VBV", loan.ID, float64(scavengePrice)/1000000.0))
