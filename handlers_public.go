@@ -80,12 +80,20 @@ func (l *Lobby) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	isHealthy := true
 	var errs []string
 
-	// 1. Verify RPC Connectivity (Ping the primary Voi node)
+	// 1. Verify RPC Connectivity (Cycle through all available nodes)
+	rpcResponded := false
 	if ok && len(voiConfig.NodeURLs) > 0 {
-		client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := client.HealthCheck().Do(ctx); err != nil {
+		for _, url := range voiConfig.NodeURLs {
+			client, _ := algod.MakeClient(url, "")
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			err := client.HealthCheck().Do(ctx)
+			cancel()
+			if err == nil {
+				rpcResponded = true
+				break
+			}
+		}
+		if !rpcResponded {
 			isHealthy = false
 			errs = append(errs, "rpc_unreachable")
 		}

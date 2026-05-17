@@ -1324,31 +1324,22 @@ func (l *Lobby) checkNativeVaultBalanceOnChain() {
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
 
+	// PILLAR 4: Multi-Node Failover.
+	// Cycle through all configured nodes to perform the gas check, utilizing 
+	// the streamlined pattern from the public health check.
 	for _, nodeURL := range voiConfig.NodeURLs {
 		client, _ := algod.MakeClient(nodeURL, "")
-		var amount uint64
-		success := false
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
+		cancel()
 
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
-			cancel()
-			if err != nil {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			amount = info.Amount
-			success = true
-			break
-		}
-
-		if success {
+		if err == nil {
+			amount := info.Amount
 			l.mutex.Lock()
-			if amount < 1000000 {
-				log.Printf("[CRITICAL] Vault low on gas at %s! Balance: %d", nodeURL, amount)
-				l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted.")
+			if amount < 1000000 { // 1.0 VOI threshold for gas alerts
+				log.Printf("[CRITICAL] Vault gas low at %s! Balance: %d\n", nodeURL, amount)
+				go l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted.")
 			}
-			l.faucetBalance = float64(amount) / 1000000.0
 			l.mutex.Unlock()
 			return // Success
 		}

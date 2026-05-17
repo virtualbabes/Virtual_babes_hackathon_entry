@@ -433,6 +433,10 @@
 - [FIXED] Resolved recursive deadlock and performance bottleneck in `handlePlaceBid` (auction_service.go) by moving indexer-based name resolution outside the global mutex.
 - [FIXED] Hardened on-chain audit trail for auctions; settlements are now archived via `sendNoteTx` only for high-value transactions (>= 100 $VBV).
 - [VERIFIED] `processAuctions` (auction_service.go) correctly handles neutral districts by leaving commissions in `faucetBalance` without double-crediting, ensuring economic circularity.
+- [FIXED] Hardened `applyDynamicScalingLocked` (economy_service.go) to deduct all virtual liabilities, reserves, and tournament pots from the vault pool, ensuring reward scaling remains sustainable during payout bursts.
+- [FIXED] Refactored `handleHealthCheck` (handlers_public.go) to iterate through NodeURLs, preventing single-node failures from triggering 503 Service Unavailable on Render.
+- [FIXED] Hardened `checkNativeVaultBalanceOnChain` (oracle_service.go) with Multi-Node Failover and resolved inflation/scaling corruption caused by overwriting `faucetBalance` with native gas totals.
+- [FIXED] Ensured `VBT_BLACK_MARKET_SALE` note in `handleBuyBlackMarket` (black_market_service.go) correctly includes the `BorrowerWallet` for forensic on-chain auditing.
 - [FIXED] Implemented on-chain `VBT_LOAN_LIQUIDATE` notes in `processLoans` (economy_processing.go) to provide immutable proof of loan defaults, including TerritoryID and fee routing.
 - [FIXED] Resolved compilation error and telemetry gap in `handleActiveMatches` (handlers_public.go); implemented `StartTime` tracking and filtered out unpaired matches from discovery results.
 - [FIXED] Removed orphaned closing brace at end of `handlers_public.go`.

@@ -60,6 +60,7 @@ func (l *Lobby) processLoans() {
 				"id":            loan.ID,
 				"wallet":        borrowerWallet,
 				"collateral":    loan.CollateralBundle,
+				"borrower":      loan.BorrowerWallet, // PILLAR 3: Forensic Archival.
 				"territory_id":  loan.TerritoryID,
 				"fee_recipient": feeRecipient,
 				"fee_amount":    liquidationFeeBase,

@@ -33,8 +33,27 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	}
 
 	// PILLAR 2: Usable Liquidity.
-	// Reserve 1.0 units for gas/fees. Scaling applies only to the surplus balance.
-	usableBalance := l.faucetBalance - 1.0
+	// The authoritative unreserved liquidity equals the physical vault balance minus the
+	// 1.0 unit gas floor, all outstanding virtual reward liabilities (playerBalances),
+	// Club treasuries, and the currently committed tournament pot. This ensures the
+	// reward ratio correctly accounts for committed funds during high-concurrency
+	// events like tournament payouts.
+	totalLiabilities := 0.0
+	for _, bal := range l.playerBalances {
+		totalLiabilities += float64(bal) / 1000000.0
+	}
+
+	totalClubReserves := 0.0
+	for _, club := range l.clubs {
+		totalClubReserves += club.Treasury
+	}
+
+	tournamentCommitment := l.tournamentPotBonus
+	if l.tournament.Active {
+		tournamentCommitment += l.tournament.Pot
+	}
+
+	usableBalance := l.faucetBalance - 1.0 - totalLiabilities - totalClubReserves - tournamentCommitment
 	if usableBalance < 0 {
 		usableBalance = 0
 	}
