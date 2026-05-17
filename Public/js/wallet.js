@@ -274,3 +274,4 @@ export async function disconnectUserWallet() {
     } catch (err) {
         console.error("Disconnect failed", err);
     }
+}
