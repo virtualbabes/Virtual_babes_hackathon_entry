@@ -351,6 +351,19 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 			return
 		}
 
+		// PILLAR 1: Reputation Gate. Elite clubs can set a minimum reputation for joining.
+		// The minimum reputation scales with the club's Mojo, reflecting its elite status.
+		minReputationRequired := 0
+		if club.Mojo >= 500 { // Example: Clubs with 500+ Mojo are considered "elite"
+			minReputationRequired = club.Mojo / 5 // Example: 500 Mojo -> 100 Rep required
+		}
+		playerStats := l.leaderboard[strings.ToLower(wallet)]
+		if minReputationRequired > 0 && playerStats.Reputation < minReputationRequired {
+			l.mutex.Unlock()
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Club Entry Failed: Minimum %d Reputation required to join elite club %s."}`, minReputationRequired, club.Name))})
+			return
+		}
+
 		club.Members[strings.ToLower(wallet)] = time.Now()
 		club.Treasury += 250.0
 		club.LastActivity = time.Now()
