@@ -1,0 +1,92 @@
+# Exported from Render on 2026-05-17T18:50:25Z
+version: "1"
+projects:
+- name: VOiconomy faucet
+  environments:
+  - name: Deployment
+    services:
+    - type: web
+      name: NFT-Seduction
+      runtime: docker
+      repo: https://github.com/slapkarnts/NFT-Seduction
+      branch: Dev2
+      plan: free
+      envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ARENA_STRESS_TEST
+        sync: false
+      - key: ETH_CHAIN_ID
+        sync: false
+      - key: ALGO_CHAIN_ID
+        sync: false
+      - key: VOI_CHAIN_ID
+        sync: false
+      - key: WC_PROJECT_ID
+        sync: false
+      - key: ADMIN_WALLETS
+        sync: false
+      - key: ADMIN_KEY
+        sync: false
+      - key: MIN_REPUTATION_FOR_REWARD
+        sync: false
+      - key: BASE_REWARD
+        sync: false
+      - key: VOI_GAS_THRESHOLD
+        sync: false
+      - key: FALLBACK_REWARD_ASSET_ID
+        sync: false
+      - key: MAX_FAUCET_CAPACITY
+        sync: false
+      - key: REWARD_ASSET_ID
+        sync: false
+      - key: COLLECTION_ID
+        sync: false
+      - key: FAUCET_MNEMONIC
+        sync: false
+      - key: AVOI_ASSET_ID
+        sync: false
+      - key: VBV_ASSET_ID
+        sync: false
+      - key: VAULT_ADDRESS
+        sync: false
+      - key: FLOW_INDEXER_URL
+        sync: false
+      - key: FLOW_NODE_URL
+        sync: false
+      - key: WAX_INDEXER_URL
+        sync: false
+      - key: WAX_NODE_URL
+        sync: false
+      - key: BITCOIN_NODE_URL
+        sync: false
+      - key: SOLANA_INDEXER_URL
+        sync: false
+      - key: SOLANA_NODE_URL
+        sync: false
+      - key: POLYGON_INDEXER_URL
+        sync: false
+      - key: POLYGON_NODE_URL
+        sync: false
+      - key: ETH_INDEXER_URL
+        sync: false
+      - key: ETH_NODE_URL
+        sync: false
+      - key: INDEXER_URL_VOI
+        sync: false
+      - key: ALGOD_TOKEN_VOI
+        sync: false
+      - key: ALGOD_URL_VOI
+        sync: false
+      - key: INDEXER_URL_ALGO
+        sync: false
+      - key: ALGOD_URL_ALGO
+        sync: false
+      - key: DATA_DIR
+        sync: false
+      - key: DEFAULT_NETWORK
+        sync: false
+      region: virginia
+      dockerContext: .
+      dockerfilePath: ./Dockerfile
+      autoDeployTrigger: commit
