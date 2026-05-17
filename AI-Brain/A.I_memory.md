@@ -162,6 +162,7 @@
 *   **307**: Systemic build stabilization pass; resolved Go redeclarations and syntax errors in `oracle_service.go`, fixed corrupted `try-catch` blocks in `admin.js`, and isolated backend services from WASM compilation using build tags. Resolved Render 503 and Carrd SyntaxErrors.
 *   **308**: Audited `handleBuyBlackMarket` in `black_market_service.go`; confirmed `VBT_BLACK_MARKET_SALE` note correctly captures the origin borrower wallet via the "original_owner" field.
 *   **309**: Audited `processMojoDecay` in `lobby_manager.go`; confirmed 'Inactive Member Scaling' correctly adjusts Mojo decay rate based on club membership size.
+*   **310**: Audited `handleHeist` in `club_service.go`; confirmed 'Kidnap Gambit' success chance is correctly influenced by the target club's 'Security' staff count.
 *   **306**: Ingested comprehensive diagnostic payload; identified critical build tags gap and syntax corruption in `app.js` and `admin.js`. Expanded Pillar 5 of the roadmap to track stabilization.
 *   **303**: Hardened `handleHealthCheck` in `handlers_public.go` with Multi-Node Failover; refactored logic to cycle all NodeURLs before reporting `rpc_unreachable`, resolving 503 errors on Render and subsequent Carrd SyntaxErrors.
 *   **304**: Audited `applyDynamicScalingLocked` in `economy_service.go`; hardened the reward ratio calculation by subtracting `playerBalances`, `club.Treasury`, and the committed tournament pot from the physical balance to ensure scaling correctly accounts for all committed funds.
