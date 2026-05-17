@@ -35,7 +35,7 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 
 	// Cost to spread a rumor: 500 $VBV (in micro-units)
 	const rumorCost = 500 * 1000000
-	if l.rewards[spreaderWallet] < rumorCost {
+	if l.playerBalances[spreaderWallet] < rumorCost {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Insufficient $VBV to spread rumors."}`)})
 		return
 	}
@@ -58,7 +58,7 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 	}
 
 	// INDUSTRIAL LOOP: Fee Redistribution & Spreader Standing
-	l.rewards[spreaderWallet] -= rumorCost
+	l.playerBalances[spreaderWallet] -= rumorCost
 
 	feeBase := float64(rumorCost) / 1000000.0
 	var governors []*Club

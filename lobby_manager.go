@@ -1511,7 +1511,7 @@ func (l *Lobby) getLobbyUpdateMsg() []byte {
 
 // loadRegisteredTxIDs loads tournament registration transaction IDs from a file.
 func (l *Lobby) loadRegisteredTxIDs() {
-	data, err := os.ReadFile(regCacheFileName)
+	data, err := os.ReadFile(l.getDataPath(regCacheName))
 	if err != nil {
 		return
 	}

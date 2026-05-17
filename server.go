@@ -1,5 +1,3 @@
-//go:build !js || !wasm
-
 package main
 
 import (
@@ -169,8 +167,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["Algorand Mainnet"] = NetworkConfig{
 			NetworkName:  "Algorand Mainnet",
-			IndexerURL:   "https://mainnet-idx.algonode.cloud",
-			NodeURL:      "https://mainnet-api.algonode.cloud",
+			IndexerURLs:  []string{"https://mainnet-idx.algonode.cloud", "https://mainnet-idx.algonodly.io"},
+			NodeURLs:     []string{"https://mainnet-api.algonode.cloud", "https://mainnet-api.algonodly.io"},
 			ExplorerURL:  "https://explorer.perawallet.app",
 			AppID:        "0",             // No game app on Algo, assets only
 			AssetID:      l.rewardAssetID, // Placeholder or specific mapping
@@ -181,8 +179,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		// Other chains added as Metadata sources only - No transaction capability implied
 		l.availableNetworks["Ethereum"] = NetworkConfig{
 			NetworkName:  "Ethereum",
-			IndexerURL:   "https://api.etherscan.io",
-			NodeURL:      "https://mainnet.infura.io/v3/your-project-id",
+			IndexerURLs:  []string{"https://api.etherscan.io"},
+			NodeURLs:     []string{"https://eth.llamarpc.com"},
 			ExplorerURL:  "https://etherscan.io",
 			ChainID:      "eip155:1",
 			PowerDivisor: 1e18, // standard ETH decimals
@@ -190,8 +188,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["Solana"] = NetworkConfig{
 			NetworkName:  "Solana",
-			IndexerURL:   "https://api.mainnet-beta.solana.com",
-			NodeURL:      "https://api.mainnet-beta.solana.com",
+			IndexerURLs:  []string{"https://api.mainnet-beta.solana.com"},
+			NodeURLs:     []string{"https://api.mainnet-beta.solana.com"},
 			ExplorerURL:  "https://solscan.io",
 			ChainID:      "solana:5eykt4UsFvXYfy2khQbSsLurFBXY",
 			PowerDivisor: 1e9, // standard SOL decimals
@@ -199,8 +197,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["Polygon"] = NetworkConfig{
 			NetworkName:  "Polygon",
-			IndexerURL:   "https://api.polygonscan.com",
-			NodeURL:      "https://polygon-mainnet.infura.io/v3/your-project-id",
+			IndexerURLs:  []string{"https://api.polygonscan.com"},
+			NodeURLs:     []string{"https://polygon.llamarpc.com"},
 			ExplorerURL:  "https://polygonscan.com",
 			ChainID:      "eip155:137",
 			PowerDivisor: 1e18,
@@ -208,8 +206,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["Bitcoin"] = NetworkConfig{
 			NetworkName:  "Bitcoin",
-			IndexerURL:   "https://ordinals.com",
-			NodeURL:      "https://ordinals.com",
+			IndexerURLs:  []string{"https://ordinals.com"},
+			NodeURLs:     []string{"https://ordinals.com"},
 			ExplorerURL:  "https://ordiscan.com",
 			ChainID:      "bip122:000000000019d6689c085ae165831e93",
 			PowerDivisor: 1, // Ordinals are individual inscriptions
@@ -217,8 +215,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["Flow"] = NetworkConfig{
 			NetworkName:  "Flow",
-			IndexerURL:   "https://rest-mainnet.onflow.org",
-			NodeURL:      "https://access-mainnet-beta.onflow.org",
+			IndexerURLs:  []string{"https://rest-mainnet.onflow.org"},
+			NodeURLs:     []string{"https://access-mainnet-beta.onflow.org"},
 			ExplorerURL:  "https://flowscan.org",
 			ChainID:      "flow:mainnet",
 			PowerDivisor: 1e8,
@@ -226,8 +224,8 @@ func (l *Lobby) loadNetworkConfigs() {
 		}
 		l.availableNetworks["WAX"] = NetworkConfig{
 			NetworkName:  "WAX",
-			IndexerURL:   "https://wax.api.atomicassets.io",
-			NodeURL:      "https://wax.greymass.com",
+			IndexerURLs:  []string{"https://wax.api.atomicassets.io"},
+			NodeURLs:     []string{"https://wax.greymass.com"},
 			ExplorerURL:  "https://wax.bloks.io",
 			ChainID:      "wax:1064487b3cd1a897ce03ae5b6a865651",
 			PowerDivisor: 1e8,

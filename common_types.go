@@ -162,16 +162,16 @@ type ReportGloatData struct {
 
 // NetworkConfig holds the configuration details for a specific blockchain network.
 type NetworkConfig struct {
-	NetworkName  string  `json:"network_name"`
-	ExplorerURL  string  `json:"explorer_url"`
+	NetworkName  string   `json:"network_name"`
+	ExplorerURL  string   `json:"explorer_url"`
 	IndexerURLs  []string `json:"indexer_urls"`
 	NodeURLs     []string `json:"node_urls"`
-	FaucetURL    string  `json:"faucet_url"`
-	AssetID      string  `json:"asset_id"` // The primary game asset ID on this network
-	AppID        string  `json:"app_id"`   // The main game smart contract ID on this network
-	ChainID      string  `json:"chain_id"` // WalletConnect / CAIP-2 Chain ID
-	PowerDivisor float64 `json:"power_divisor"`
-	PowerBase    int     `json:"power_base"`
+	FaucetURL    string   `json:"faucet_url"`
+	AssetID      string   `json:"asset_id"` // The primary game asset ID on this network
+	AppID        string   `json:"app_id"`   // The main game smart contract ID on this network
+	ChainID      string   `json:"chain_id"` // WalletConnect / CAIP-2 Chain ID
+	PowerDivisor float64  `json:"power_divisor"`
+	PowerBase    int      `json:"power_base"`
 }
 
 // ServerCard mirrors the client Card for verification logic.
@@ -494,4 +494,12 @@ type Lobby struct {
 	WCProjectID             string            // WalletConnect Project ID from environment variable
 	DataDir                 string            // Path to persistent data directory for volumes
 	mutex                   sync.RWMutex
+}
+
+// GlobalSentiment aggregates playstyle data to identify meta-trends.
+type GlobalSentiment struct {
+	AvgAggressiveness float64            `json:"avg_aggressiveness"`
+	AvgRiskTolerance  float64            `json:"avg_risk_tolerance"`
+	DominantRules     map[string]float64 `json:"dominant_rules"`
+	UpdatedAt         time.Time          `json:"updated_at"`
 }

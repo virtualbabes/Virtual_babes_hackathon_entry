@@ -13,6 +13,16 @@ import { initParticleSystem, triggerCaptureParticles, animateParticles } from '.
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './js/utils.js';
 
 let lastBoardMoods = Array(9).fill(null);
+let lastTauntPhase = null;
+let lastTauntTurn = null;
+
+// PILLAR 2: Economic UI Persistence. 
+// Stores last known values to prevent flickering during partial state syncs.
+const dashboardCache = {
+    wanted: 0, cunning: 0, nurturing: 0, vbal: 0,
+    rewards: {}, jailed: 0, kidnapped: 0, hostage: 0
+};
+
 // 1. Initialize Go WASM Engine
 window.onload = async () => {
     const go = new Go();
@@ -308,53 +318,22 @@ export function syncUI(scope = "all") {
     // --- Update Rewards Dashboard (Economy Scope) ---
     if (state.rewards !== undefined) { // Imported from economy.js
         const rewardsDashboard = document.getElementById("rewards-dashboard");
-        const myJailedCards = state.jailed_cards || {};
-        const myKidnappedCards = state.kidnapped_cards || {};
-        const myHeldHostageCards = state.held_hostage_cards || {};
-        const wantedVal = state.wanted_level || 0;
-
-        // PILLAR 2: Economic Aggregation. Include VirtualBalance in dashboard state tracking.
-        const dashboardStateKey = `${wantedVal}-${state.cunning}-${state.nurturing}-${state.virtual_balance}-${Object.keys(state.rewards).length}-${Object.keys(myJailedCards).length}-${Object.keys(myHeldHostageCards).length}`;
-        
-        if (rewardsDashboard && rewardsDashboard.dataset.stateKey !== dashboardStateKey) {
-            rewardsDashboard.dataset.stateKey = dashboardStateKey;
-            
-            let totalValue = 0;
-            let rewardItems = [];
-            
-            const rewardEntries = Object.entries(state.rewards || {});
-            for (const [id, amt] of rewardEntries) {
-                totalValue += amt;
-                const symbol = getAssetSymbol(id);
-                rewardItems.push(`<span style="color: var(--neon-green)">${amt.toFixed(1)}</span> <small>${symbol}</small>`);
-            }
-
-            const playerRewards = state.rewards[CONFIG.VBV_ASSET_ID] || 0;
-            const rumorCost = 500; // Match server.go cost
-            const cunningVal = state.cunning || 0;
-            const nurturingVal = state.nurturing || 0;
-            const jobRole = state.job_role || "";
-            const outlawsInLobby = (lastLobbyPlayers || []).filter(p => (p.wanted_level || 0) >= 10);
-
-            const courthouseBtn = wantedVal > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openCourthouse()">⚖️ COURTHOUSE (${wantedVal})</button>` : '';
-            const blackMarketBtn = (wantedVal >= 5 && cunningVal >= 10) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openBlackMarket()">🏴‍☠️ BLACK MARKET</button>` : '';
-            const rumorMillBtn = (playerRewards >= rumorCost) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-green); color: var(--neon-green);" onclick="openRumorMill()">📢 RUMOR MILL</button>` : '';
             const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : ''; // Imported from criminality.js
             const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : ''; // Imported from criminality.js
             const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`; // Imported from economy.js
 			const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`; // Imported from criminality.js
 			const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`; // Imported from economy.js
 
-            const newHTML = `Win Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") + // Display total win value
-                ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${cunningVal}</span>` + // Display Cunning
-                ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${nurturingVal}</span>` + // Display Nurturing
+            const newHTML = `Liquid Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") + 
+                ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${dashboardCache.cunning}</span>` + 
+                ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${dashboardCache.nurturing}</span>` + 
 				socialHubBtn + galleryBtn +
 				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` + // Imported from criminality.js
                 ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + // Imported from economy.js
                 courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
-                (Object.keys(myJailedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${Object.keys(myJailedCards).length})</button>` : '') + // Imported from economy.js
-                (Object.keys(myKidnappedCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${Object.keys(myKidnappedCards).length})</button>` : '') + // Imported from economy.js
-                (Object.keys(myHeldHostageCards).length > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${Object.keys(myHeldHostageCards).length})</button>` : ''); // Imported from economy.js
+                (dashboardCache.jailed > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${dashboardCache.jailed})</button>` : '') + 
+                (dashboardCache.kidnapped > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${dashboardCache.kidnapped})</button>` : '') + 
+                (dashboardCache.hostage > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${dashboardCache.hostage})</button>` : '');
             
             if (rewardsDashboard.innerHTML !== newHTML) {
                 rewardsDashboard.innerHTML = newHTML;

@@ -192,6 +192,15 @@ export async function fetchAdminLogs() { // Exported for use in app.js
     const headers = await getAdminHeaders();
     if (!headers) return;
 
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/logs?filter=${document.getElementById("admin-log-filter")?.value || ""}`, {
+            headers: headers
+        });
+        const data = await response.json();
+        if (data.status === "success") {
+            renderAdminLogs(data.logs);
+        }
+    } catch (err) { console.error("Log fetch failed", err); }
     }
 }
 

@@ -3,12 +3,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
 )
 
 func (l *Lobby) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
@@ -65,13 +68,52 @@ func (l *Lobby) handlePublicStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *Lobby) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	// PILLAR 4: High-Fidelity Health Monitoring.
+	// This endpoint allows Render's load balancer to verify that the server
+	// is not just responsive, but has active connectivity and liquidity.
 	l.mutex.RLock()
-	defer l.mutex.RUnlock()
+	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	balance := l.faucetBalance
+	clientsCount := len(l.clients)
+	l.mutex.RUnlock()
+
+	isHealthy := true
+	var errs []string
+
+	// 1. Verify RPC Connectivity (Ping the primary Voi node)
+	if ok && len(voiConfig.NodeURLs) > 0 {
+		client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := client.HealthCheck().Do(ctx); err != nil {
+			isHealthy = false
+			errs = append(errs, "rpc_unreachable")
+		}
+	} else {
+		isHealthy = false
+		errs = append(errs, "config_missing")
+	}
+
+	// 2. Verify Faucet Liquidity (Gas Check)
+	// The Arena requires at least 1.0 VOI/VBV in the vault to function correctly.
+	if balance < 1.0 {
+		isHealthy = false
+		errs = append(errs, "low_liquidity")
+	}
+
 	status := struct {
-		Status      string  `json:"status"`
-		Connections int     `json:"connections"`
-		Vault       float64 `json:"vault_balance"`
-	}{Status: "ok", Connections: len(l.clients), Vault: l.faucetBalance}
+		Status      string   `json:"status"`
+		Connections int      `json:"connections"`
+		Vault       float64  `json:"vault_balance"`
+		Errors      []string `json:"errors,omitempty"`
+	}{Status: "ok", Connections: clientsCount, Vault: balance}
+
+	if !isHealthy {
+		status.Status = "unhealthy"
+		status.Errors = errs
+		w.WriteHeader(http.StatusServiceUnavailable) // Return 503 so Render triggers a restart
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
 }

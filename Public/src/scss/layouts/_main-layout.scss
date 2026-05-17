@@ -211,5 +211,6 @@
     box-shadow: inset 0 0 100px var(--underworld-glow-red), 0 0 30px var(--underworld-glow-red);
     transition: background-color var(--transition-slow), border-color var(--transition-slow), box-shadow var(--transition-slow);
     
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
     backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
 }

@@ -19,7 +19,7 @@
 - [x] **Metadata Expansion**: Implement ARC-19, ARC-69, and Dispatcher logic in `oracle_service.go`.
 
 ## Pillar 4: Live Deployment & Monitoring (Next)
-- [ ] **Health Check Hardening**: Audit `handleHealthCheck` in `handlers_public.go` to verify RPC connectivity and Faucet liquidity for Render monitoring.
+- [x] **Health Check Hardening**: Audit `handleHealthCheck` in `handlers_public.go` to verify RPC connectivity and Faucet liquidity for Render monitoring.
 - [ ] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
 
 ## Completed & Hardened (Reference)

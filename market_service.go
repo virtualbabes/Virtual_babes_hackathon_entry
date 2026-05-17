@@ -72,8 +72,8 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	}
 
 	if data.Action == "buy" {
-		if l.rewards[wallet] >= totalValueMicro {
-			l.rewards[wallet] -= totalValueMicro
+		if l.playerBalances[wallet] >= totalValueMicro {
+			l.playerBalances[wallet] -= totalValueMicro
 			currentShares := stats.Portfolio[targetWallet]
 			stats.Portfolio[targetWallet] = currentShares + data.Amount
 
@@ -100,7 +100,7 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 				delete(stats.Portfolio, targetWallet)
 			}
 
-			l.rewards[wallet] += totalValueMicro
+			l.playerBalances[wallet] += totalValueMicro
 
 			// Industrial Loop: Payout from Faucet
 			l.faucetBalance -= totalValueBase

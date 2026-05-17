@@ -39,7 +39,7 @@ func (l *Lobby) startSalaryDispenser() {
 						taxAmountMicro := uint64(float64(stats.Salary)*taxRate + 0.5)
 						netSalaryMicro := stats.Salary - taxAmountMicro
 
-						l.rewards[wallet] += netSalaryMicro
+						l.playerBalances[wallet] += netSalaryMicro
 
 						// INDUSTRIAL LOOP: Gross salary returns from the Club Reserve to the general Faucet pool.
 						// The net portion becomes a virtual reward liability, and the tax portion increases liquidity.
