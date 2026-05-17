@@ -146,5 +146,8 @@
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
+*   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.
+*   **232**: Resolved `DuplicateDecl` and `main` redeclaration errors in `main.go` and `server.go`; added build tags to server-side files and purged redundant types from WASM engine to ensure clean multi-target compilation.
+*   **233**: Conducted comprehensive build-tag audit; applied `//go:build !js || !wasm` to all backend service and handler files to isolate server logic from the WASM engine and prevent namespace collisions.
 *   **230**: Finalized structural audit of `oracle_service.go`; resolved fragmented logic in `fetchARC19Metadata` and removed illegal braces/duplicate declarations halting the Linux binary build on Render.
 *   **229**: Conducted recursive structural audit; resolved illegal `break` statements and functional scope leaks in `oracle_service.go` to finalize Linux binary build stability on Render.

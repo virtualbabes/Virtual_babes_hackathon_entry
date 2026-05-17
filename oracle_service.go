@@ -1,3 +1,5 @@
+//go:build !js || !wasm
+
 package main
 
 import (
@@ -674,8 +676,6 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 					}
 				}
 			}
-		}
-	}
 
 	sort.Slice(matchHistory, func(i, j int) bool { return matchHistory[i].Timestamp.After(matchHistory[j].Timestamp) })
 
@@ -695,8 +695,8 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 
 	if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 		defer resp.Body.Close()
-			var regRes struct {
-				Transfers []struct {
+		var regRes struct {
+			Transfers []struct {
 					TransactionID string `json:"transactionId"`
 					From          string `json:"from"`
 					Metadata      string `json:"metadata"`
@@ -729,8 +729,6 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 					}
 				}
 				l.mutex.Unlock()
-			}
-		}
 	}
 }
 
@@ -1016,7 +1014,12 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 	// 2. Branch logic based on Network Type
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		// VOI Logic: Custom ARC-200 Indexer
-		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
+		if len(netConfig.IndexerURLs) == 0 {
+			return false, 0, fmt.Errorf("no indexers configured for %s", netKey)
+		}
+
+		// PILLAR 4: Resilient Verification. Utilizing primary indexer for point lookups.
+		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURLs[0], txid)
 		var resp *http.Response
 		var err error
 		for i := 0; i < 3; i++ {
@@ -1136,10 +1139,40 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 }
 
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
-func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
-	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
-	if err != nil {
-		return nil, err
+func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
+	// PILLAR 3: Concurrency Throttling.
+	select {
+	case l.oracleSemaphore <- struct{}{}:
+		defer func() { <-l.oracleSemaphore }()
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("oracle semaphore timeout")
+	}
+
+	url := fmt.Sprintf("%s/v2/assets/%d/transactions?tx-type=acfg&limit=1", indexerURL, assetID)
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
 	}
 	defer resp.Body.Close()
 
@@ -1177,6 +1210,36 @@ func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metada
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("indexer returned non-200 status: %d", resp.StatusCode)
+	}
 
 	var res struct {
 		Asset struct {
@@ -1271,7 +1334,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 		if json.NewDecoder(resp.Body).Decode(&res) == nil {
 			resp.Body.Close()
 			if strings.Contains(res.Asset.Params.URL, "template-ipfs") {
-				meta, err := l.fetchARC19Metadata(cfg.IndexerURL, assetID)
+				meta, err := l.fetchARC19Metadata(cfg, assetID)
 				return meta, "ARC-19", err
 			}
 		} else {

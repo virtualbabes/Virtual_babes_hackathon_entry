@@ -376,3 +376,5 @@
 - [FIXED] Resolved `skippedAssets` undefined compiler error in `tournament_manager.go`.
 - [FIXED] Synchronized all `algod` client initializations with pluralized `NodeURLs` to prevent compilation failure following the NetworkConfig refactor.
 - [FIXED] Resolved structural syntax errors and illegal `break` statements in `oracle_service.go` causing Render build failures.
+- [FIXED] Resolved `DuplicateDecl` and `main` redeclaration errors by implementing build tags in `server.go` and removing redundant types from `main.go`.
+- [FIXED] Standardized multi-target compilation by applying build tags to all backend-specific Go files, ensuring only shared types and the WASM engine are included in `main.wasm`.

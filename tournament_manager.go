@@ -1,3 +1,5 @@
+//go:build !js || !wasm
+
 package main
 
 import (
@@ -215,46 +217,13 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	l.mutex.RUnlock()
 
 	// PILLAR 4: Global Result Recovery.
-	// Fetch all transfers FROM the vault to capture Summaries, Data Chunks, AND Payout Receipts (VBT_WIN).
-	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
-		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress)
+	// PILLAR 4: RPC Failover. Utilizing unified dispatcher for resilient history retrieval.
+	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
+		voiConfig.AssetID, l.vaultAddress))
 
-	// PILLAR 3: Concurrency Throttling.
-	// Protect the indexer from redundant history requests during peak traffic.
-	select {
-	case l.oracleSemaphore <- struct{}{}:
-		// Acquired slot
-	case <-time.After(5 * time.Second):
-		http.Error(w, "Arena Indexer is busy. Please try again later.", http.StatusServiceUnavailable)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("History retrieval failed: %v", err), http.StatusInternalServerError)
 		return
-	}
-	defer func() { <-l.oracleSemaphore }()
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			http.Error(w, "Failed to connect to indexer", http.StatusInternalServerError)
-			return
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			http.Error(w, "Indexer rate-limited (429)", http.StatusTooManyRequests)
-			return
-		}
-		break
 	}
 	defer resp.Body.Close()
 
@@ -739,7 +708,9 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
 	}
 	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
-	if err != nil { return "", nil, fmt.Errorf("invalid mnemonic: %v", err) }
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid mnemonic: %v", err)
+	}
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 
