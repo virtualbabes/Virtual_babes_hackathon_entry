@@ -211,7 +211,7 @@ func (l *Lobby) handleAdminRemoveReward(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	l.mutex.Lock()
-	delete(l.rewards, req.AssetID)
+	delete(l.rewardStack, req.AssetID)
 	delete(l.initialRewards, req.AssetID)
 	l.saveSeasonMetadataLocked() // Ensure persistence
 	l.mutex.Unlock()

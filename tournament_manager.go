@@ -507,6 +507,17 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 		}
 	}
 
+	// PILLAR 1: Political Maneuvering.
+	// Helper to identify Regional Governors (2+ territories) for ranking priority.
+	isGov := func(wallet string) bool {
+		for _, club := range l.clubs {
+			if strings.EqualFold(club.OwnerWallet, wallet) && len(club.Territories) >= 2 {
+				return true
+			}
+		}
+		return false
+	}
+
 	// 3rd & 4th: Losers of semi-finals (Sorted by Reputation)
 	semiLosers := []string{}
 	for _, m := range matches {
@@ -522,8 +533,12 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 			}
 		}
 	}
-	// PILLAR 1: Performance Tie-breaker
+	// PILLAR 1: Tiered Tie-breaker. Prefer Regional Governors, then Reputation.
 	sort.Slice(semiLosers, func(i, j int) bool {
+		govI, govJ := isGov(semiLosers[i]), isGov(semiLosers[j])
+		if govI != govJ {
+			return govI // Prioritize Governor
+		}
 		return l.leaderboard[semiLosers[i]].Reputation > l.leaderboard[semiLosers[j]].Reputation
 	})
 	top5 = append(top5, semiLosers...)
@@ -544,7 +559,12 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 				}
 			}
 		}
+		// PILLAR 1: Tiered Tie-breaker.
 		sort.Slice(quartLosers, func(i, j int) bool {
+			govI, govJ := isGov(quartLosers[i]), isGov(quartLosers[j])
+			if govI != govJ {
+				return govI
+			}
 			return l.leaderboard[quartLosers[i]].Reputation > l.leaderboard[quartLosers[j]].Reputation
 		})
 		for _, lsr := range quartLosers {
@@ -706,7 +726,9 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
 	}
 	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
-	if err != nil { return "", nil, fmt.Errorf("invalid mnemonic: %v", err) }
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid mnemonic: %v", err)
+	}
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 

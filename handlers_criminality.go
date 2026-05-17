@@ -153,7 +153,7 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	}
 
 	// Financial Transaction
-	if l.rewards[victimWallet] < data.RansomAmount {
+	if l.playerBalances[victimWallet] < data.RansomAmount {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Payment Failed: Insufficient reward balance."}`)})
 		return
 	}
@@ -164,13 +164,13 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 		return
 	}
 
-	l.rewards[victimWallet] -= data.RansomAmount
+	l.playerBalances[victimWallet] -= data.RansomAmount
 
 	// INDUSTRIAL LOOP: Gross ransom returns to the general Faucet pool.
 	// Use integer math with rounding to the nearest micro-unit to prevent dust leaks.
 	arenaFeeMicro := (data.RansomAmount*20 + 50) / 100
 	perpShareMicro := data.RansomAmount - arenaFeeMicro
-	l.rewards[data.PerpWallet] += perpShareMicro
+	l.playerBalances[data.PerpWallet] += perpShareMicro
 
 	// Add gross amount to cover future virtual reward liability and capture tax.
 	l.faucetBalance += float64(data.RansomAmount) / 1000000.0

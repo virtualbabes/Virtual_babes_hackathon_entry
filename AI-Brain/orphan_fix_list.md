@@ -391,3 +391,5 @@
 - [FIXED] Resolved logic shadowing in `app.js` by migrating legacy tournament UI helpers to `ui.js` and enforcing modular authority for `leaderboard.js`.
 - [FIXED] Enforced modular authority for the Leaderboard domain; moved purely visual toggles and layout orchestration from `leaderboard.js` to `ui.js`.
 - [FIXED] Resolved logic shadowing in the Economy domain; centralized high-finance UI orchestration and overlay generation in `ui.js`, delegating data logic back to `economy.js`.
+- [FIXED] Resolved lingering `l.rewards` name mismatches in `handlers_admin.go`, `auction_service.go`, and `handlers_criminality.go` following the Ledger separation refactor.
+- [FIXED] Weighted Regional Governor status in tournament tie-breakers within `determineTop5` (tournament_manager.go) to reward territorial influence.

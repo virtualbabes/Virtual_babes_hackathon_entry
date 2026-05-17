@@ -41,7 +41,9 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	// 1. Scale the primary base reward (for internal tracking/legacy logic)
 	l.baseReward = uint64(float64(l.initialBaseReward) * ratio)
 
-	// 2. Iterate through the entire reward stack and scale based on unscaled initial values
+	// 2. Iterate through the entire reward stack and scale based on unscaled initial values.
+	// We clear the stack first to ensure assets removed from the template are purged.
+	l.rewardStack = make(map[string]uint64)
 	for assetID, initialAmt := range l.initialRewards {
 		scaledAmt := uint64(float64(initialAmt) * ratio)
 		l.rewardStack[assetID] = scaledAmt

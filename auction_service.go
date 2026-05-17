@@ -159,7 +159,7 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if l.rewards[req.Bidder] < req.Amount {
+	if l.playerBalances[req.Bidder] < req.Amount {
 		http.Error(w, "Insufficient reward balance for bid", http.StatusBadRequest)
 		return
 	}
@@ -181,11 +181,11 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Deduct new bid from current bidder
-	l.rewards[req.Bidder] -= req.Amount
+	l.playerBalances[req.Bidder] -= req.Amount
 
 	// 2. Refund previous highest bidder (if any)
 	if previousHighestBidder != "" {
-		l.rewards[previousHighestBidder] += previousHighestBid
+		l.playerBalances[previousHighestBidder] += previousHighestBid
 		// Notify previous bidder of refund
 		l.sendToClientLocked(l.getClientIDFromWalletLocked(previousHighestBidder), Envelope{
 			Type:    "admin_notification",
@@ -234,7 +234,7 @@ func (l *Lobby) processAuctions() {
 				netPayoutToSellerMicro := auction.CurrentBid - commissionMicro
 
 				// 3. Pay seller
-				l.rewards[auction.SellerWallet] += netPayoutToSellerMicro
+				l.playerBalances[auction.SellerWallet] += netPayoutToSellerMicro
 
 				// 4. Distribute commission
 				artGalleryClub := l.getClubByTerritoryID(auction.TerritoryID) // "the_art_gallery"
