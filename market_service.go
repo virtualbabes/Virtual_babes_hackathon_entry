@@ -66,6 +66,16 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	totalValueMicro := uint64(math.Round(data.Amount * pricePerShare * 1000000.0))
 	totalValueBase := float64(totalValueMicro) / 1000000.0
 
+	// PILLAR 3: Financial Proof.
+	// Define trade details for the on-chain audit trail.
+	tradeDetails := map[string]interface{}{
+		"action": data.Action,
+		"symbol": l.ResolveEnvoiName(targetWallet), // Asset Symbol (Envoi Name)
+		"qty":    data.Amount,                      // Share Quantity
+		"price":  pricePerShare,
+		"total":  totalValueBase,
+	}
+
 	stats := l.leaderboard[wallet]
 	if stats.Portfolio == nil {
 		stats.Portfolio = make(map[string]float64)
@@ -81,6 +91,14 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			l.faucetBalance += totalValueBase
 			l.applyDynamicScalingLocked()
 			l.logAdminAuditLocked("STOCK_BUY", wallet, fmt.Sprintf("Bought %.2f shares of %s", data.Amount, targetWallet))
+
+			// Record high-value buy on-chain for the audit trail
+			if totalValueBase >= 100.0 {
+				go func(td interface{}) {
+					jsonPayload, _ := json.Marshal(td)
+					l.sendNoteTx(fmt.Sprintf("VBT_SHARE_TRADE:%s", string(jsonPayload)))
+				}(tradeDetails)
+			}
 		} else {
 			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient reward balance."}`)})
 			return
@@ -107,12 +125,12 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 			l.applyDynamicScalingLocked()
 			l.logAdminAuditLocked("STOCK_SELL", wallet, fmt.Sprintf("Sold %.2f shares of %s", data.Amount, targetWallet))
 
-			// PILLAR 3: Financial Proof. Record high-value share sale on-chain.
+			// PILLAR 3: Financial Proof. Record high-value share sale on-chain for the audit trail.
 			if totalValueBase >= 100.0 {
-				go func() {
-					jsonPayload, _ := json.Marshal(tradeDetails)
+				go func(td interface{}) {
+					jsonPayload, _ := json.Marshal(td)
 					l.sendNoteTx(fmt.Sprintf("VBT_SHARE_TRADE:%s", string(jsonPayload)))
-				}()
+				}(tradeDetails)
 			}
 		} else {
 			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient shares."}`)})

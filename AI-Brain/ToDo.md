@@ -20,7 +20,7 @@
 
 ## Pillar 4: Live Deployment & Monitoring (Next)
 - [x] **Health Check Hardening**: Audit `handleHealthCheck` in `handlers_public.go` to verify RPC connectivity and Faucet liquidity for Render monitoring.
-- [ ] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
+- [x] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
 
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).

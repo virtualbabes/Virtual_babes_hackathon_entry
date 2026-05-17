@@ -538,6 +538,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 
 	p := &Game.Players[0]
 	p.Reputation = data.Get("reputation").Int()
+	p.Wins = data.Get("wins").Int()
 	p.Mojo = data.Get("mojo").Int()
 	p.SocialRank = data.Get("social_rank").String()
 	p.JobRole = data.Get("job_role").String()
@@ -572,8 +573,49 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 		}
 	}
 
-	p.KidnappedCards = make(map[int]string) // Reset ephemeral criminal tracking for sync
+	// PILLAR 3: Identity & Asset Sync.
+	// Synchronize criminal metrics to ensure UI reflects active kidnappings and ransoms.
+	p.KidnappedCards = make(map[int]string)
+	jsKidnapped := data.Get("kidnapped_cards")
+	if jsKidnapped.Type() == js.TypeObject {
+		keys := js.Global().Get("Object").Call("keys", jsKidnapped)
+		for i := 0; i < keys.Length(); i++ {
+			k := keys.Index(i).String()
+			id, _ := strconv.Atoi(k)
+			p.KidnappedCards[id] = jsKidnapped.Get(k).String()
+		}
+	}
+
 	p.HeldHostageCards = make(map[int]string)
+	jsHostage := data.Get("held_hostage_cards")
+	if jsHostage.Type() == js.TypeObject {
+		keys := js.Global().Get("Object").Call("keys", jsHostage)
+		for i := 0; i < keys.Length(); i++ {
+			k := keys.Index(i).String()
+			id, _ := strconv.Atoi(k)
+			p.HeldHostageCards[id] = jsHostage.Get(k).String()
+		}
+	}
+
+	// PILLAR 4: Historical Immersion. 
+	// Ingest archived match history for display in the player profile.
+	p.History = []MatchHistory{}
+	jsHistory := data.Get("match_history")
+	if jsHistory.Type() == js.TypeObject && jsHistory.Get("length").Truthy() {
+		historyJSON := js.Global().Get("JSON").Call("stringify", jsHistory).String()
+		if err := json.Unmarshal([]byte(historyJSON), &p.History); err != nil {
+			fmt.Printf("[ENGINE ERROR] Match History Unmarshal failed: %v\n", err)
+		}
+	}
+
+	// Synchronize Playstyle Tendencies for AI taunts and narrative intelligence.
+	jsPlaystyle := data.Get("playstyle")
+	if jsPlaystyle.Type() == js.TypeObject {
+		psJSON := js.Global().Get("JSON").Call("stringify", jsPlaystyle).String()
+		if err := json.Unmarshal([]byte(psJSON), &p.Playstyle); err != nil {
+			fmt.Printf("[ENGINE ERROR] Playstyle Unmarshal failed: %v\n", err)
+		}
+	}
 
 	fmt.Printf("[ENGINE] Profile Synergized: %d Achievements, %d REP, Faceplate: %s, Fav Card: %d\n", len(p.Achievements), p.Reputation, p.EquippedFaceplate, p.FavoriteCardID)
 	return true

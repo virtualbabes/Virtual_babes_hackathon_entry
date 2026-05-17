@@ -396,3 +396,4 @@
 - [FIXED] Resolved scope error and missing criminal metric mappings in `getLobbyUpdateMsgLocked` (lobby_manager.go) to ensure accurate player dashboard synchronization.
 - [FIXED] Resolved accounting leak in `finalizeTournament` (tournament_manager.go); ensured Governor Tax is deducted from `faucetBalance` and implemented precision rounding.
 - [FIXED] Weighted Regional Governor status in tournament tie-breakers within `determineTop5` (tournament_manager.go) to reward territorial influence.
+- [FIXED] Resolved `tradeDetails` undefined error in `market_service.go`; ensures high-value trades are recorded on-chain with share quantity and asset symbol metadata.
