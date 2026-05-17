@@ -173,12 +173,12 @@ func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {
 	defer l.mutex.RUnlock()
 
 	type matchSummary struct {
-		ID        string   `json:"id"`
-		P1        string   `json:"p1_id"`
-		P2        string   `json:"p2_id"`
-		Rating    string   `json:"rating"`
-		Territory string   `json:"territory"`
-		Spectators int     `json:"spectator_count"`
+		ID         string    `json:"id"`
+		P1         string    `json:"p1_id"`
+		P2         string    `json:"p2_id"`
+		Rating     string    `json:"rating"`
+		Territory  string    `json:"territory"`
+		Spectators int       `json:"spectator_count"`
 		StartTime  time.Time `json:"start_time"`
 	}
 
@@ -186,17 +186,20 @@ func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {
 	seen := make(map[*MatchState]bool)
 
 	for _, m := range l.matches {
-		if seen[m] || m.IsFinished {
+		// PILLAR 4: Broadcasting Accuracy.
+		// Only show matches that have been paired (P2ID present) and are actively in combat.
+		if seen[m] || m.IsFinished || m.P2ID == "" {
 			continue
 		}
-		
+
 		// Use P1's ID as the primary Match ID for routing
 		active = append(active, matchSummary{
-			ID:        m.P1ID,
-			P1:        m.P1ID,
-			P2:        m.P2ID,
-			Rating:    m.MatchRating,
-			Territory: m.TerritoryID,
+			ID:         m.P1ID,
+			P1:         m.P1ID,
+			P2:         m.P2ID,
+			Rating:     m.MatchRating, // Correctly uses snapshot to survive Sudden Death
+			StartTime:  m.StartTime,
+			Territory:  m.TerritoryID,
 			Spectators: len(m.Spectators),
 		})
 		seen[m] = true
@@ -207,5 +210,4 @@ func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {
 		"count":   len(active),
 		"matches": active,
 	})
-}
 }
