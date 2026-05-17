@@ -22,6 +22,20 @@
 - [x] **Health Check Hardening**: Audit `handleHealthCheck` in `handlers_public.go` to verify RPC connectivity and Faucet liquidity for Render monitoring.
 - [x] **Post-Deployment Audit**: Verify WASM Engine status ('ACTIVE') and Ledger aggregation ('Liquid Balance') on the live site.
 
+## Pillar 5: Build Stabilization & Logic Scrub (Pending)
+- [ ] **Backend vs WASM Isolation**: Apply `//go:build !js || !wasm` tags to service files (`black_market`, `courthouse`, `employment`, `handlers_rumor`) to resolve undefined lobby methods in WASM build.
+- [ ] **Resolve Redeclarations**: Fix `GlobalSentiment` duplicate in `common_types.go` and `server.go`, and `main()` in `main.go` and `server.go`.
+- [ ] **Pluralization Audit**: Update singular `NodeURL` to `NodeURLs` in `economy_service.go` and `handlers_admin.go`.
+- [ ] **Ledger Synchronization**: Replace `l.rewards` with `l.playerBalances` in `handlers_admin.go` and `lobby_manager.go`.
+- [ ] **Syntax Repair**:
+    - `oracle_service.go`: Fix expected `;` found `{` at line 703.
+    - `tournament_manager.go`: Fix expected statement found `)` at line 649.
+    - `Public/app.js`: Fix missing braces and malformed logic around line 586/2173.
+    - `Public/js/admin.js`: Repair malformed `try-catch` blocks and missing statements (line 205-369).
+    - `Public/js/wallet.js`: Fix missing closing brace at line 276.
+- [ ] **Compiler Compliance**: Resolve unused `pIdx` in `battle_service.go` and unused `p` in `main.go`. Fix `:=` shadowing in `achievement_service.go` and `club_service.go`.
+- [ ] **Data Model Restoration**: Restore missing `Wallet` field to `PlayerStats` struct and fix `jsMap` references in `main.go`.
+
 ## Completed & Hardened (Reference)
 *   [x] Milestone 1: Domain-Driven Refactor (Battle, Economy, Oracle).
 *   [x] Milestone 2: Industrial Loop (Fee Rerouting & Card Leasing).
