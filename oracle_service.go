@@ -690,12 +690,15 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 
 	// PASS 2: Buy-ins/Registrations (Wallet -> Vault)
 	// This allows the server to discover used TxIDs for the specific player joining.
-	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		voiConfig.AssetID, wallet, vaultAddr))
+	buyInURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		baseURL, voiConfig.AssetID, wallet, vaultAddr)
 
-	if err == nil && resp != nil {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", buyInURL, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err == nil && resp.StatusCode == http.StatusOK {
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -1137,40 +1140,10 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 }
 
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
-func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
-	// PILLAR 3: Concurrency Throttling.
-	select {
-	case l.oracleSemaphore <- struct{}{}:
-		defer func() { <-l.oracleSemaphore }()
-	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("oracle semaphore timeout")
-	}
-
-	url := fmt.Sprintf("%s/v2/assets/%d/transactions?tx-type=acfg&limit=1", indexerURL, assetID)
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			return nil, err
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			return nil, fmt.Errorf("indexer rate-limited (429)")
-		}
-		break
+func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
+	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -1364,7 +1337,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	}
 
 	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
-	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
+	meta, err := l.fetchARC69Metadata(cfg, assetID)
 	return meta, "ARC-69", err
 }
 

@@ -716,7 +716,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	var skippedAssets []string
-	activeRewards := l.rewards
+	activeRewards := l.rewardStack
 	rewardAsset := l.rewardAssetID
 	stats, hasStats := l.leaderboard[recipient]
 	l.mutex.RUnlock()

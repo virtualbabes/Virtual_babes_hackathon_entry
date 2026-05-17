@@ -375,3 +375,4 @@
 - [FIXED] Implemented `.dockerignore` to exclude local logs, node_modules, and test data from the production build context.
 - [FIXED] Resolved `skippedAssets` undefined compiler error in `tournament_manager.go`.
 - [FIXED] Synchronized all `algod` client initializations with pluralized `NodeURLs` to prevent compilation failure following the NetworkConfig refactor.
+- [FIXED] Resolved structural syntax errors and illegal `break` statements in `oracle_service.go` causing Render build failures.
