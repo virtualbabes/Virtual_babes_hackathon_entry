@@ -17,6 +17,7 @@ func (l *Lobby) startSalaryDispenser() {
 	for range salaryTicker.C {
 		log.Println("[CAREER] Running daily salary dispenser...")
 		l.mutex.Lock()
+		anyPaid := false
 		for wallet, stats := range l.leaderboard {
 			if stats.JobRole != "" && stats.EmployerClubID != "" && stats.Salary > 0 {
 				if time.Since(stats.LastSalaryPayment) >= 24*time.Hour {
@@ -44,7 +45,6 @@ func (l *Lobby) startSalaryDispenser() {
 						// INDUSTRIAL LOOP: Gross salary returns from the Club Reserve to the general Faucet pool.
 						// The net portion becomes a virtual reward liability, and the tax portion increases liquidity.
 						l.faucetBalance += float64(stats.Salary) / 1000000.0
-						l.applyDynamicScalingLocked()
 
 						stats.LastSalaryPayment = time.Now()
 
@@ -56,13 +56,23 @@ func (l *Lobby) startSalaryDispenser() {
 						l.logAdminAuditLocked("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Net: %.2f, Tax: %.2f", club.Name, float64(netSalaryMicro)/1000000.0, float64(taxAmountMicro)/1000000.0))
 						notification := fmt.Sprintf(`{"text":"💰 <b>SALARY PAID:</b> You received %.2f $VBV from %s! (Outlaw Tax: %.2f $VBV)"}`, float64(netSalaryMicro)/1000000.0, club.Name, float64(taxAmountMicro)/1000000.0)
 						l.sendToClientLocked(l.getClientIDFromWalletLocked(wallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(notification)})
+						anyPaid = true
 					} else {
 						log.Printf("[CAREER] Club %s has insufficient funds to pay %s's salary or club not found.\n", stats.EmployerClubID, wallet)
 					}
 				}
 			}
 		}
+
+		if anyPaid {
+			l.applyDynamicScalingLocked()
+		}
 		l.mutex.Unlock()
+
+		if anyPaid {
+			go l.saveLeaderboard()
+			go l.saveEconomyState()
+		}
 		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	}
 }
