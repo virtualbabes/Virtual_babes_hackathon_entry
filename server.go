@@ -132,6 +132,8 @@ func newLobby() (*Lobby, error) {
 	l.loadNetworkConfigs()
 	l.loadRegisteredTxIDs()
 	l.loadLinkedWallets()
+	l.loadLeaderboard()                    // Reconstruct Playstyles before sync
+	l.loadEconomyState()                   // Reconstruct Virtual Balances
 	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
 	go l.loadRegistrationsFromIndexer()    // Reconstruct tournament registration state
 

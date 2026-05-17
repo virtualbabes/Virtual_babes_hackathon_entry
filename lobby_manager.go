@@ -134,6 +134,8 @@ func (l *Lobby) run() {
 			go l.savePersistentCardCache()
 			go l.saveRegisteredTxIDs()
 			go l.saveLinkedWallets()
+			go l.saveLeaderboard()  // PILLAR 3: Persistent Behavioral Analysis
+			go l.saveEconomyState() // PILLAR 2: Persistent Virtual Ledger
 		case <-vaultCheckTicker.C:
 			go l.checkVaultBalanceOnChain() // Monitor $VBV Reward Pool
 			go l.checkNativeVaultBalanceOnChain()
@@ -148,6 +150,64 @@ func (l *Lobby) run() {
 		case message := <-l.broadcast:
 			l.handleBroadcast(message)
 		}
+	}
+}
+
+// loadLeaderboard loads player statistics and playstyle tendencies from a file.
+func (l *Lobby) loadLeaderboard() {
+	data, err := os.ReadFile(l.getDataPath("leaderboard.json"))
+	if err != nil {
+		return
+	}
+	l.mutex.Lock()
+	json.Unmarshal(data, &l.leaderboard)
+	l.mutex.Unlock()
+	log.Printf("[CACHE] Loaded %d player records (Playstyles) from persistent storage.\n", len(l.leaderboard))
+}
+
+// saveLeaderboard saves player statistics and playstyle tendencies to a file.
+func (l *Lobby) saveLeaderboard() {
+	l.mutex.RLock()
+	data, err := json.Marshal(l.leaderboard)
+	l.mutex.RUnlock()
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(l.getDataPath("leaderboard.json"), data, 0644); err != nil {
+		log.Printf("[CACHE ERROR] Failed to save leaderboard: %v\n", err)
+	}
+}
+
+// loadEconomyState restores virtual balances (salaries/heists) from persistent storage.
+func (l *Lobby) loadEconomyState() {
+	data, err := os.ReadFile(l.getDataPath("economy_state.json"))
+	if err != nil {
+		return
+	}
+	var state struct {
+		Balances map[string]uint64 `json:"balances"`
+	}
+	if err := json.Unmarshal(data, &state); err == nil {
+		l.mutex.Lock()
+		l.playerBalances = state.Balances
+		l.mutex.Unlock()
+		log.Printf("[CACHE] Loaded economy state with %d active balances.\n", len(l.playerBalances))
+	}
+}
+
+// saveEconomyState persists virtual balances to ensure they survive server resets.
+func (l *Lobby) saveEconomyState() {
+	l.mutex.RLock()
+	state := struct {
+		Balances map[string]uint64 `json:"balances"`
+	}{Balances: l.playerBalances}
+	data, err := json.Marshal(state)
+	l.mutex.RUnlock()
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(l.getDataPath("economy_state.json"), data, 0644); err != nil {
+		log.Printf("[CACHE ERROR] Failed to save economy state: %v\n", err)
 	}
 }
 

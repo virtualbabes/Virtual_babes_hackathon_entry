@@ -428,6 +428,8 @@
 - [FIXED] Implemented on-chain `VBT_BAIL_LOG` notes in `handleBailCard` (handlers_criminality.go) to provide immutable proof of bail payments and organizational revenue.
 - [FIXED] Optimized `processMojoDecay` (lobby_manager.go) with a batch-ripple update pattern to prevent performance degradation during large-scale club stagnation.
 - [FIXED] Hardened `applyDynamicScalingLocked` (economy_service.go) to subtract the 1.0 VOI gas floor from faucet balance before calculating the reward ratio.
+- [FIXED] Implemented persistence for `Playstyle` data and `playerBalances` via local JSON storage, ensuring behavioral traits and virtual rewards survive server restarts.
+- [FIXED] Resolved compilation error in `item_service.go` by aligning `updatePlayerPlaystyleTendenciesLocked` calls with the updated method signature.
 - [FIXED] Resolved compilation error and telemetry gap in `handleActiveMatches` (handlers_public.go); implemented `StartTime` tracking and filtered out unpaired matches from discovery results.
 - [FIXED] Removed orphaned closing brace at end of `handlers_public.go`.
 - [VERIFIED] Per-wallet claim lock in `handleVoiOnboarding` (onboarding_service.go) correctly prevents concurrent multi-click exploits; synchronized bridge payouts with dynamic reward scaling.

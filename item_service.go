@@ -42,7 +42,13 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 		}
 		l.inventory[data.TargetCardID] = targetCard           // Update global card cache
 		l.persistentCardCache[data.TargetCardID] = targetCard // Update persistent cache
-		l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, false)
+
+		isBounty := false
+		isTourney := false
+		if inMatch {
+			isBounty, isTourney = match.IsBountyMatch, match.TournamentMatchID != ""
+		}
+		l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, []int{}, isBounty, isTourney)
 
 		playerStats.Playstyle = l.leaderboard[wallet].Playstyle
 		playerStats.Reputation = l.CalculateReputation(*playerStats)
@@ -54,7 +60,13 @@ func (l *Lobby) applyItemEffect(env *Envelope, data UseItemData, wallet string, 
 		// Delegate to battle_service for in-match effects
 		l.applyItemEffectToMatch(match, env.FromID, data.ItemID, data.TargetCardID, data.TargetGridIndex)
 		notificationText = fmt.Sprintf("✨ %s activated!", item.Name)
-		l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, false)
+
+		isBounty := false
+		isTourney := false
+		if inMatch {
+			isBounty, isTourney = match.IsBountyMatch, match.TournamentMatchID != ""
+		}
+		l.updatePlayerPlaystyleTendenciesLocked(wallet, true, [2]int{}, []int{}, isBounty, isTourney)
 
 		playerStats.Playstyle = l.leaderboard[wallet].Playstyle
 		playerStats.Reputation = l.CalculateReputation(*playerStats)
