@@ -404,4 +404,5 @@
 - [FIXED] Implemented on-chain `VBT_LEASE_RETURN` notes in `processLeaseExpirations` (club_service.go) to archive the industrial revenue split for card rentals.
 - [FIXED] Implemented on-chain `VBT_LEASE_TAKE` notes in `handleTakeLease` (club_service.go) to provide immutable proof of lease initiation and expected revenue splits.
 - [FIXED] Synchronized `receipt_txid` identifier between the Go Backend, WASM engine, and `game.js` UI to ensure blockchain verification badges appear correctly in player history.
+- [VERIFIED] `determineTop5` in `tournament_manager.go` correctly weights Regional Governor status (owner of club with 2+ territories) in tie-breakers for prize distribution.
 - [FIXED] Resolved recursive deadlock in `processLeaseExpirations` (club_service.go) by switching to `logAdminAuditLocked` while holding the lobby mutex.
