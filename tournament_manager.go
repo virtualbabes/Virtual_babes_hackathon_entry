@@ -634,7 +634,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 			}
 			// Calculate Pot Share (Primary Asset)
 			shareMicro := uint64(effectivePot * payoutPercentages[i] * 1000000)
-			
+
 			wg.Add(1)
 			// Dispatch grouped rewards
 			go func(p string, rank int, amt uint64) {
@@ -646,7 +646,7 @@ func (l *Lobby) finalizeTournament(winners []string) {
 					mu.Lock()
 					payoutTxIDs = append(payoutTxIDs, hex.EncodeToString(gid[:])) // Append GID as hex string
 					mu.Unlock()
-					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). GID: %s. Skipped: %v\n", rank+1, p, hex.EncodeToString(gid[:]), strings.Join(skipped, ", ")))
+					log.Printf("[TOURNAMENT] Payout successful for rank %d (%s). GID: %s. Skipped: %v\n", rank+1, p, hex.EncodeToString(gid[:]), strings.Join(skipped, ", "))
 					l.broadcastToAdmins(fmt.Sprintf("🏆 <b>TOURNAMENT PAYOUT:</b> Rank %d (%s) received rewards. GID: %s. (Skipped: %v)", rank+1, p, hex.EncodeToString(gid[:]), strings.Join(skipped, ", ")))
 				}
 			}(player, i, shareMicro)
@@ -705,7 +705,7 @@ func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
 }
 
 // dispatchTournamentRewards handles multi-asset distribution for tournament finishers.
-func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (string, []string, error) {
+func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (types.Digest, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	var skippedAssets []string
@@ -722,18 +722,18 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	}
 
 	if len(voiConfig.NodeURLs) == 0 {
-		return "", nil, fmt.Errorf("no Voi nodes configured")
+		return types.Digest{}, nil, fmt.Errorf("no Voi nodes configured")
 	}
 
 	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
 	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
 	if mnemonicRaw == "" {
 		log.Println("[TOURNAMENT CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET. Tournament payouts will FAIL.")
-		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
+		return types.Digest{}, skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
 	}
 	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
 	if err != nil {
-		return "", nil, fmt.Errorf("invalid mnemonic: %v", err)
+		return types.Digest{}, nil, fmt.Errorf("invalid mnemonic: %v", err)
 	}
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
@@ -807,7 +807,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 	}
 
 	if _, err := client.SendRawTransaction(signedGroup).Do(context.Background()); err != nil {
-		return "", skippedAssets, err
+		return types.Digest{}, skippedAssets, err
 	}
 
 	// INDUSTRIAL LOOP: Deduct payout from liquid faucet balance and trigger scaling.

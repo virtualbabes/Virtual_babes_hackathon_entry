@@ -441,6 +441,7 @@
 - [VERIFIED] `handleHeist` (club_service.go) correctly influences 'Kidnap Gambit' success chance based on the target club's 'Security' staff count.
 - [FIXED] Hardened `handleTradeShares` (market_service.go) to include `sector_id` in the on-chain audit payload for localized economic tracking.
 - [VERIFIED] `processLoans` (economy_processing.go) correctly calculates 'Market Tokens' at 15% residual value and updates `borrowerStats.MarketTokens` persistently, maintaining ledger integrity.
+- [FIXED] Resolved syntax error and return type mismatch in `finalizeTournament` (tournament_manager.go), ensuring `PayoutsHash` correctly aggregates on-chain Group IDs.
 - [FIXED] Hardened `processInsuranceRecovery` (handlers_criminality.go) to utilize `ensurePlayerStatsMapsInitialized`, ensuring victims' recovered cards are correctly restored to persistent inventory.
 - [FIXED] Implemented on-chain `VBT_LOAN_LIQUIDATE` notes in `processLoans` (economy_processing.go) to provide immutable proof of loan defaults, including TerritoryID and fee routing.
 - [FIXED] Resolved compilation error and telemetry gap in `handleActiveMatches` (handlers_public.go); implemented `StartTime` tracking and filtered out unpaired matches from discovery results.
