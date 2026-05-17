@@ -382,22 +382,25 @@ export function syncUI(scope = "all") {
     // --- Update Rewards Dashboard (Economy Scope) ---
     if (state.rewards !== undefined) { // Imported from economy.js
         const rewardsDashboard = document.getElementById("rewards-dashboard");
-            const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : ''; // Imported from criminality.js
-            const bountyBoardBtn = (outlawsInLobby.length > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsInLobby.length})</button>` : ''; // Imported from criminality.js
-            const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`; // Imported from economy.js
-			const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`; // Imported from criminality.js
-			const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`; // Imported from economy.js
+        if (rewardsDashboard) {
+            const jobRole = state.job_role || "Freelancer";
+            const wantedVal = state.wanted_level || 0;
+            const totalValue = state.virtual_balance || 0;
+            const outlawsCount = (lastLobbyPlayers || []).filter(p => p.wanted_level >= 10).length;
 
-            const newHTML = `Liquid Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + rewardItems.join(" + ") + 
-                ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${dashboardCache.cunning}</span>` + 
-                ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${dashboardCache.nurturing}</span>` + 
-				socialHubBtn + galleryBtn +
-				` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` + // Imported from criminality.js
-                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` + // Imported from economy.js
-                courthouseBtn + blackMarketBtn + rumorMillBtn + securityBtn + bountyBoardBtn + leaseBoardBtn + 
-                (dashboardCache.jailed > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('jailed')">⛓️ JAILED CARDS (${dashboardCache.jailed})</button>` : '') + 
-                (dashboardCache.kidnapped > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openPortfolioView('kidnapped')">😈 KIDNAPPED (${dashboardCache.kidnapped})</button>` : '') + 
-                (dashboardCache.hostage > 0 ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openPortfolioView('hostage')">🛑 HOSTAGE (${dashboardCache.hostage})</button>` : '');
+            const securityBtn = (jobRole === "Security") ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openSecuritySentry()">🛡️ SECURITY SENTRY</button>` : '';
+            const bountyBoardBtn = (outlawsCount > 0 || wantedVal <= 2) ? ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ffd700; color: #ffd700;" onclick="openBountyBoard()">🎯 BOUNTY BOARD (${outlawsCount})</button>` : '';
+            const leaseBoardBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openClubLeaseBoard()">📜 LEASE BOARD</button>`;
+            const socialHubBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="openSocialPanelOverlay()">👥 SOCIAL HUB</button>`;
+            const galleryBtn = ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-cyan); color: var(--neon-cyan);" onclick="openArtGalleryOverlay()">🎨 ART GALLERY</button>`;
+
+            const newHTML = `Liquid Total: <b style="color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green);">${totalValue.toFixed(1)}</b> | ` + 
+                ` <span style="margin-left: 10px; color: var(--neon-cyan); font-weight: bold;">CUNNING: ${state.cunning}</span>` + 
+                ` <span style="margin-left: 10px; color: var(--neon-purple); font-weight: bold;">NURTURING: ${state.nurturing}</span>` + 
+                socialHubBtn + galleryBtn +
+                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: #ff4b4b; color: #ff4b4b;" onclick="openHeistPlanningOverlay()">🔪 HEIST TERMINAL</button>` +
+                ` <button class="outline" style="padding: 2px 8px; font-size: 10px; margin-left: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="openPortfolioView()">VIEW PORTFOLIO</button>` +
+                securityBtn + bountyBoardBtn + leaseBoardBtn;
             
             if (rewardsDashboard.innerHTML !== newHTML) {
                 rewardsDashboard.innerHTML = newHTML;
@@ -2170,8 +2173,7 @@ window.applyAvatarFilters = () => {
     renderAvatarGrid(filtered);
 }
 
-window.updateDynamicArenaFloor = (state) => {
-function updateDynamicArenaFloor(state) { 
+window.updateDynamicArenaFloor = (state) => { 
     let texture = "var(--texture-solo)"; // Default AI/Solo
 
     if (state.phase === "TournamentLobby") {
@@ -3176,3 +3178,4 @@ window.triggerCaptureParticles = (gridIndex, owner) => {
         particleAnimationId = requestAnimationFrame(animateParticles);
     }
 };
+} // Closure for line 2173/3179 expected brace

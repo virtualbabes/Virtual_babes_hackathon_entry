@@ -33,7 +33,7 @@
 - [ ] **Syntax Repair**:
     - [x] `oracle_service.go`: Fixed expected `;` found `{` and redundant returns.
     - [x] `tournament_manager.go`: Fixed expected statement found `)` at line 649.
-    - `Public/app.js`: Fix missing braces and malformed logic around line 586/2173.
+    - [x] `Public/app.js`: Repaired braces in syncUI rewards block and fixed updateDynamicArenaFloor declaration.
     - `Public/js/admin.js`: Repair malformed `try-catch` blocks and missing statements (line 205-369).
     - `Public/js/wallet.js`: Fix missing closing brace at line 276.
 - [ ] **Compiler Compliance**: Resolve unused variables (`pIdx` in `battle_service.go`) and `:=` shadowing in `club_service.go`. (Shadowing fixed in achievement_service.go).
