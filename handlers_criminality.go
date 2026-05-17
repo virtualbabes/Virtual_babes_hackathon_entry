@@ -166,6 +166,10 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 
 	l.playerBalances[victimWallet] -= data.RansomAmount
 
+	// PILLAR 3: Identity Hardening. Ensure records are fully initialized before state modification.
+	l.ensurePlayerStatsMapsInitialized(victimWallet)
+	l.ensurePlayerStatsMapsInitialized(data.PerpWallet)
+
 	// INDUSTRIAL LOOP: Gross ransom returns to the general Faucet pool.
 	// Use integer math with rounding to the nearest micro-unit to prevent dust leaks.
 	arenaFeeMicro := (data.RansomAmount*20 + 50) / 100
@@ -191,9 +195,6 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	delete(victimStats.HeldHostageCards, data.CardID)
 	// Hardening: Restore card instance to victim's inventory
 	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
-	if victimStats.Inventory == nil {
-		victimStats.Inventory = make(map[string]int)
-	}
 	victimStats.Inventory[cardKey]++
 
 	victimStats.Reputation = l.CalculateReputation(victimStats)
@@ -259,11 +260,12 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 
 	victimWallet := kidnapState.VictimWallet
 	victimStats, victimExists := l.leaderboard[victimWallet] // Check if victim stats exist
-	if !victimExists {
-		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Release Failed: Victim player stats not found."}`)})
-		return
-	}
-	if victimStats.HeldHostageCards == nil || victimStats.HeldHostageCards[data.CardID] != perpWallet {
+
+	// PILLAR 3: Identity Hardening.
+	l.ensurePlayerStatsMapsInitialized(perpWallet)
+	l.ensurePlayerStatsMapsInitialized(victimWallet)
+
+	if !victimExists || victimStats.HeldHostageCards[data.CardID] != perpWallet {
 		return
 	}
 
@@ -274,9 +276,6 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 	delete(victimStats.HeldHostageCards, data.CardID)
 	// Hardening: Restore card instance to victim's inventory
 	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
-	if victimStats.Inventory == nil {
-		victimStats.Inventory = make(map[string]int)
-	}
 	victimStats.Inventory[cardKey]++
 
 	victimStats.Reputation = l.CalculateReputation(victimStats)
@@ -437,14 +436,17 @@ func (l *Lobby) processInsuranceRecovery() {
 	for _, cardID := range toRelease {
 		state := l.activeKidnappings[cardID]
 
+		// PILLAR 3: Identity Hardening.
+		// Ensure player records are initialized to prevent nil map panics or
+		// orphaned wallets without reputation multipliers.
+		l.ensurePlayerStatsMapsInitialized(state.VictimWallet)
+		l.ensurePlayerStatsMapsInitialized(state.PerpWallet)
+
 		// Automatic Return: No VBV exchange
 		victimStats := l.leaderboard[state.VictimWallet]
 		delete(victimStats.HeldHostageCards, cardID)
-		// CRITICAL FIX: Add the card back to the victim's inventory
+
 		cardKey := fmt.Sprintf("CARD-%d", cardID)
-		if victimStats.Inventory == nil {
-			victimStats.Inventory = make(map[string]int)
-		}
 		victimStats.Inventory[cardKey]++ // Increment count, assuming it was decremented by 1
 
 		victimStats.Reputation = l.CalculateReputation(victimStats)
