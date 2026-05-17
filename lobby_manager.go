@@ -1445,11 +1445,11 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 
 	p1Sync, _ := json.Marshal(Envelope{
 		Type: "challenge", FromID: id2, ToID: id1,
-		Payload: json.RawMessage(fmt.Sprintf(`{"action":"accept","deck":%v,"wanted_level":%d,"territory":"%s","p1_boost":%v,"p2_boost":%v,"moods":%v}`, jsonList(match.P2Deck), match.P2WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, jsonListString(match.BoardMoods[:]))),
+		Payload: json.RawMessage(fmt.Sprintf(`{"action":"accept","deck":%v,"wanted_level":%d,"territory":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"moods":%v}`, jsonList(match.P2Deck), match.P2WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, jsonListString(match.BoardMoods[:]))),
 	})
 	p2Sync, _ := json.Marshal(Envelope{
 		Type: "challenge", FromID: id1, ToID: id2,
-		Payload: json.RawMessage(fmt.Sprintf(`{"action":"sync_back","deck":%v,"wanted_level":%d,"territory":"%s","p1_boost":%v,"p2_boost":%v,"moods":%v}`, jsonList(match.P1Deck), match.P1WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, jsonListString(match.BoardMoods[:]))),
+		Payload: json.RawMessage(fmt.Sprintf(`{"action":"sync_back","deck":%v,"wanted_level":%d,"territory":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"moods":%v}`, jsonList(match.P1Deck), match.P1WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, jsonListString(match.BoardMoods[:]))),
 	})
 
 	if c1, ok := l.clients[id1]; ok {

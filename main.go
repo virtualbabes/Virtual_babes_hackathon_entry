@@ -439,7 +439,7 @@ func AddToDeck(this js.Value, args []js.Value) interface{} {
 	}
 
 	if c, found := findCard(cardID); found {
-		c.Owner = 0
+		c.Owner = Game.LocalPlayerIndex
 		p.Decks[activeSlot] = append(p.Decks[activeSlot], c)
 		PlaySound("click.mp3")
 		UpdateAmbientMusic()
@@ -539,7 +539,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	Game.mutex.Lock()
 	defer Game.mutex.Unlock()
 
-	p := &Game.Players[0]
+	p := &Game.Players[Game.LocalPlayerIndex]
 	p.Reputation = data.Get("reputation").Int()
 	p.Wins = data.Get("wins").Int()
 	p.Mojo = data.Get("mojo").Int()
@@ -630,7 +630,7 @@ func SyncPortfolio(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		return false
 	}
-	jsMap := args[0]
+	p := &Game.Players[Game.LocalPlayerIndex]
 
 	Game.mutex.Lock()
 	defer Game.mutex.Unlock()
@@ -1086,6 +1086,13 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 		Game.TerritoryID = tid.String()
 	}
 
+	if b1 := data.Get("p1_regional_boost"); !b1.IsUndefined() {
+		Game.P1RegionalBoost = b1.Bool()
+	}
+	if b2 := data.Get("p2_regional_boost"); !b2.IsUndefined() {
+		Game.P2RegionalBoost = b2.Bool()
+	}
+
 	// 5.1 Sync Active Item Buffs
 	jsActiveItemBuffs := data.Get("active_item_buffs")
 	if jsActiveItemBuffs.Type() == js.TypeObject {
@@ -1146,10 +1153,10 @@ func SyncMatchMetadata(this js.Value, args []js.Value) interface{} {
 	if t := data.Get("territory"); !t.IsUndefined() {
 		Game.TerritoryID = t.String()
 	}
-	if b1 := data.Get("p1_boost"); !b1.IsUndefined() {
+	if b1 := data.Get("p1_regional_boost"); !b1.IsUndefined() {
 		Game.P1RegionalBoost = b1.Bool()
 	}
-	if b2 := data.Get("p2_boost"); !b2.IsUndefined() {
+	if b2 := data.Get("p2_regional_boost"); !b2.IsUndefined() {
 		Game.P2RegionalBoost = b2.Bool()
 	}
 
@@ -1249,6 +1256,16 @@ func StartMatch(this js.Value, args []js.Value) interface{} {
 
 	Game.Winner = -1
 	Game.Scores = [2]int{0, 0}
+
+	// PILLAR 3: Identity & Boost Sync.
+	// Ensure card ownership is correctly attributed before combat starts.
+	// This allows getEffectivePower to correctly map the Regional Boost flags.
+	for i := range Game.Players[0].Decks[Game.Players[0].ActiveDeck] {
+		Game.Players[0].Decks[Game.Players[0].ActiveDeck][i].Owner = 0
+	}
+	for i := range Game.Players[1].Decks[Game.Players[1].ActiveDeck] {
+		Game.Players[1].Decks[Game.Players[1].ActiveDeck][i].Owner = 1
+	}
 
 	UpdateAmbientMusic()
 	fmt.Println("=================================")
