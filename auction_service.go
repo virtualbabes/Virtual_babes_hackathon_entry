@@ -145,6 +145,10 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// PILLAR 5: Performance & Safety.
+	// Resolve names before acquiring the global lock to prevent I/O blocking and deadlocks.
+	bidderName := l.ResolveEnvoiName(req.Bidder)
+
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
@@ -167,7 +171,6 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	// Store previous highest bidder and their bid for refund
 	previousHighestBidder := auction.HighestBidder
 	previousHighestBid := auction.CurrentBid
-	bidderName := l.ResolveEnvoiName(req.Bidder)
 
 	nonceData, ok := l.nonces[req.ClientID]
 	if !ok || time.Since(nonceData.CreatedAt) > 5*time.Minute {
@@ -232,6 +235,7 @@ func (l *Lobby) processAuctions() {
 				// PILLAR 1: Precision Rounding for the Industrial Loop.
 				commissionMicro := (auction.CurrentBid*10 + 50) / 100 // Round to nearest micro-unit
 				netPayoutToSellerMicro := auction.CurrentBid - commissionMicro
+				amountBase := float64(auction.CurrentBid) / 1000000.0
 
 				// PILLAR 3: Financial Proof.
 				// Record auction settlement on-chain for the audit trail.
@@ -240,7 +244,7 @@ func (l *Lobby) processAuctions() {
 					"winner":  auction.HighestBidder,
 					"seller":  auction.SellerWallet,
 					"card_id": auction.Bundle.CardID,
-					"amount":  float64(auction.CurrentBid) / 1000000.0,
+					"amount":  amountBase,
 					"ts":      now.Unix(),
 				}
 
@@ -272,13 +276,16 @@ func (l *Lobby) processAuctions() {
 				}
 
 				l.logAdminAuditLocked("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Winner: %s, Seller: %s, Amount: %.2f (Net: %.2f, Commission: %.2f)",
-					id, auction.HighestBidder, auction.SellerWallet, float64(auction.CurrentBid)/1000000.0, float64(netPayoutToSellerMicro)/1000000.0, float64(commissionMicro)/1000000.0))
+					id, auction.HighestBidder, auction.SellerWallet, amountBase, float64(netPayoutToSellerMicro)/1000000.0, float64(commissionMicro)/1000000.0))
 
-				// Record on-chain settlement for immutable verification
-				go func(sd interface{}) {
-					jsonPayload, _ := json.Marshal(sd)
-					l.sendNoteTx(fmt.Sprintf("VBT_AUCTION_SETTLE:%s", string(jsonPayload)))
-				}(settleDetails)
+				// PILLAR 3: Financial Proof. Record high-value auction settlement on-chain.
+				if amountBase >= 100.0 {
+					// Record on-chain settlement for immutable verification
+					go func(sd interface{}) {
+						jsonPayload, _ := json.Marshal(sd)
+						l.sendNoteTx(fmt.Sprintf("VBT_AUCTION_SETTLE:%s", string(jsonPayload)))
+					}(settleDetails)
+				}
 
 				// Notify winner and seller
 				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.HighestBidder), Envelope{
