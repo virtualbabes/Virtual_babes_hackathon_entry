@@ -1,5 +1,3 @@
-//go:build !js || !wasm
-
 package main
 
 import (
@@ -214,12 +212,12 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
+	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
 
-	// PILLAR 4: Global Result Recovery.
 	// PILLAR 4: RPC Failover. Utilizing unified dispatcher for resilient history retrieval.
 	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
-		voiConfig.AssetID, l.vaultAddress))
+		voiConfig.AssetID, vaultAddr))
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("History retrieval failed: %v", err), http.StatusInternalServerError)
@@ -708,9 +706,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
 	}
 	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
-	if err != nil {
-		return "", nil, fmt.Errorf("invalid mnemonic: %v", err)
-	}
+	if err != nil { return "", nil, fmt.Errorf("invalid mnemonic: %v", err) }
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 

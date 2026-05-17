@@ -783,37 +783,11 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 	totalRestored := 0
 
 	for {
-		url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=%d&offset=%d",
-			voiConfig.IndexerURL, rewardAsset, vaultAddr, limit, offset)
-
-		var resp *http.Response
-		var err error
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-			resp, err = http.DefaultClient.Do(req)
-			cancel()
-			if err != nil {
-				if i < 2 {
-					time.Sleep(500 * time.Millisecond)
-					continue
-				}
-				log.Printf("[ORACLE ERROR] Indexer connection failed during onboarding sync after retries: %v\n", err)
-				return
-			}
-			if resp.StatusCode == http.StatusTooManyRequests {
-				resp.Body.Close()
-				if i < 2 {
-					time.Sleep(time.Duration(i+1) * 1 * time.Second)
-					continue
-				}
-				log.Printf("[ORACLE ERROR] Indexer rate-limited (429) during onboarding sync after retries.\n")
-				return
-			}
-			break
-		}
+		resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=%d&offset=%d",
+			rewardAsset, vaultAddr, limit, offset))
 
 		if err != nil {
+			log.Printf("[ORACLE ERROR] Onboarding sync failed: %v\n", err)
 			return // Keep SybilSyncComplete as false
 		}
 		if resp.StatusCode != http.StatusOK {
@@ -899,9 +873,8 @@ func (l *Lobby) loadRegistrationsFromIndexer() {
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		l.mutex.Lock()
 		for _, tx := range res.Transfers {
-			// PILLAR 3: Bound Verification. Look for notes targeting the specific active tournament.
-			// Prefix: "VBT_TOURN_BUYIN:ARENA-T-123456:timestamp"
-			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:"+activeTournID) {
+			// PILLAR 3: Bound Verification. Use trailing colon for absolute ID isolation.
+			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:"+activeTournID+":") {
 				l.registeredTxIDs[tx.TransactionID] = time.Unix(tx.Timestamp, 0)
 				
 				// Add to participants list if not already present

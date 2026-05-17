@@ -157,4 +157,5 @@
 *   **239**: Audited and hardened `handleHealthCheck` in `handlers_public.go`; implemented primary RPC connectivity verification and Faucet liquidity (gas) floor checks to ensure high-fidelity Render monitoring.
 *   **240**: Hardened `syncUI` in `app.js` with a persistent `dashboardCache` to eliminate flickering during partial state syncs; stabilized `dashboardStateKey` calculation and purged redundant code re-definitions.
 *   **230**: Finalized structural audit of `oracle_service.go`; resolved fragmented logic in `fetchARC19Metadata` and removed illegal braces/duplicate declarations halting the Linux binary build on Render.
+*   **245**: Verified buy-in prefix alignment between `app.js` and `tournament_manager.go`; refactored `handleTournamentHistory` and `loadOnboardedWalletsFromIndexer` to use the resilient `indexerRequest` dispatcher.
 *   **229**: Conducted recursive structural audit; resolved illegal `break` statements and functional scope leaks in `oracle_service.go` to finalize Linux binary build stability on Render.
