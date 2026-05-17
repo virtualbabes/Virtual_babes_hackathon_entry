@@ -214,6 +214,7 @@ type MatchState struct {
 	P1Gloat           string          `json:"p1_gloat"`
 	P2Deck            []int           `json:"p2_deck"` // Card IDs in P2's deck
 	P2Avatar          string          `json:"p2_avatar"`
+	MatchRating       string          `json:"match_rating"`
 	BoardMoods        [9]string       `json:"board_moods"` // Moods assigned to specific tiles
 	P2Gloat           string          `json:"p2_gloat"`
 	Board             [9]*ServerCard  `json:"board"`

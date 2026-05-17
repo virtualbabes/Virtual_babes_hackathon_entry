@@ -195,7 +195,7 @@ func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {
 			ID:        m.P1ID,
 			P1:        m.P1ID,
 			P2:        m.P2ID,
-			Rating:    l.calculateDeckRating(m.P1Deck),
+			Rating:    m.MatchRating,
 			Territory: m.TerritoryID,
 			Spectators: len(m.Spectators),
 		})

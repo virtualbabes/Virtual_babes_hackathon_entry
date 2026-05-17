@@ -232,7 +232,11 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 				ClientID: env.FromID, Wallet: wallet, Reputation: l.leaderboard[wallet].Reputation,
 				DeckRating: data.DeckRating, JoinedAt: time.Now(), // FavoriteCardID is not part of QueueEntry
 			})
-			l.matches[env.FromID] = &MatchState{P1ID: env.FromID, P1Deck: data.Deck}                  // Initialize match state
+			l.matches[env.FromID] = &MatchState{
+				P1ID:        env.FromID,
+				P1Deck:      data.Deck,
+				MatchRating: data.DeckRating,
+			} // Initialize match state
 			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false, false) // Update playstyle based on deck
 
 			go l.generateNPCCommentary(env.FromID, "MATCH_START")
@@ -1413,6 +1417,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	match := &MatchState{
 		P1ID: id1, P2ID: id2, P1Deck: m1.P1Deck, P2Deck: m2.P1Deck,
 		P1Wallet:        p1Wallet,
+		MatchRating:     m1.MatchRating, // PILLAR 4: Tier Snapshotting.
 		P2Wallet:        p2Wallet,
 		Rules:           matchRules,
 		BoardMoods:      boardMoods,
