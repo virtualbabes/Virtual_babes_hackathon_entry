@@ -401,3 +401,7 @@
 - [FIXED] Implemented on-chain `VBT_HEIST_LOG` notes in `handleHeist` (club_service.go) to provide immutable proof of criminal loot and protocol fee routing.
 - [FIXED] Implemented on-chain `VBT_BLACK_MARKET_SALE` notes in `handleBuyBlackMarket` (black_market_service.go) to provide immutable proof of Underworld trades, including risk penalties and original borrower metadata.
 - [FIXED] Implemented on-chain `VBT_LOAN_PAYBACK` notes in `handleRepayLoan` (loan_service.go) to provide immutable proof of loan settlement, including interest and collateral details.
+- [FIXED] Implemented on-chain `VBT_LEASE_RETURN` notes in `processLeaseExpirations` (club_service.go) to archive the industrial revenue split for card rentals.
+- [FIXED] Implemented on-chain `VBT_LEASE_TAKE` notes in `handleTakeLease` (club_service.go) to provide immutable proof of lease initiation and expected revenue splits.
+- [FIXED] Synchronized `receipt_txid` identifier between the Go Backend, WASM engine, and `game.js` UI to ensure blockchain verification badges appear correctly in player history.
+- [FIXED] Resolved recursive deadlock in `processLeaseExpirations` (club_service.go) by switching to `logAdminAuditLocked` while holding the lobby mutex.

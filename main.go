@@ -55,6 +55,7 @@ type Player struct {
 	Ready           bool         `json:"ready"`
 	Reputation      int          `json:"reputation"`
 	WantedLevel     int          `json:"wanted_level"`
+	Wins            int          `json:"wins"`
 	VirtualBalance  uint64       `json:"virtual_balance"`
 	GloatMessage    string       `json:"gloat_message"`
 	AvatarURL       string       `json:"avatar_url"`
@@ -66,11 +67,13 @@ type Player struct {
 	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
 	EmployerClubID  string       `json:"employer_club_id"` // The club currently paying this user
 	AuctionsWon     int          `json:"auctions_won"`
+	BestRating      string       `json:"best_rating"`
 	Cunning         int          `json:"cunning"`
 	Nurturing       int          `json:"nurturing"`
 	Achievements    []string     `json:"achievements"`
 	// EmployerClubID string             `json:"employer_club_id"` // The club currently paying this user
 	JailedCards      map[int]string      `json:"jailed_cards"`       // CardID -> ClubID (cards currently in jail)
+	History          []MatchHistory      `json:"match_history"`
 	KidnappedCards   map[int]string      `json:"kidnapped_cards"`    // CardID -> VictimWallet (cards player has kidnapped)
 	HeldHostageCards map[int]string      `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
 	FavoriteCardID   int                 `json:"favorite_card_id"`   // Added for Collective Intelligence
@@ -541,6 +544,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.Wins = data.Get("wins").Int()
 	p.Mojo = data.Get("mojo").Int()
 	p.SocialRank = data.Get("social_rank").String()
+	p.BestRating = data.Get("best_rating").String()
 	p.JobRole = data.Get("job_role").String()
 	p.EmployerClubID = data.Get("employer_id").String()
 	p.VirtualBalance = uint64(data.Get("virtual_balance").Float())

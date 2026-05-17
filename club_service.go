@@ -826,6 +826,19 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	lenderShareMicro := (priceMicro * 50) / 100
 	memberShareTotalMicro := priceMicro - faucetShareMicro - clubShareMicro - lenderShareMicro
 
+	// PILLAR 3: Financial Proof. 
+	// Record lease initiation on-chain to archive the expected revenue distribution.
+	takeDetails := map[string]interface{}{
+		"id":       lease.ID,
+		"lender":   lease.LenderWallet,
+		"borrower": borrowerWallet,
+		"card_id":  lease.CardID,
+		"price":    lease.Price,
+		"duration": lease.DurationHours,
+		"split":    map[string]float64{"lender": float64(lenderShareMicro)/1000000.0, "faucet": float64(faucetShareMicro)/1000000.0, "club": float64(clubShareMicro)/1000000.0, "members": float64(memberShareTotalMicro)/1000000.0},
+		"ts":       time.Now().Unix(),
+	}
+
 	l.faucetBalance += float64(faucetShareMicro) / 1000000.0
 	club.LastActivity = time.Now() // Club is active when a lease is taken
 	l.applyDynamicScalingLocked()
@@ -862,6 +875,13 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 
 	l.logAdminAuditLocked("LEASE_TAKEN", borrowerWallet, fmt.Sprintf("ID: %s, Price: %.2f", lease.ID, lease.Price))
 	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 <b>LEASE SECURED:</b> You have rented %s."}`, lease.CardName))})
+
+	// Dispatch on-chain log for financial verification
+	go func(td interface{}) {
+		jsonPayload, _ := json.Marshal(td)
+		l.sendNoteTx(fmt.Sprintf("VBT_LEASE_TAKE:%s", string(jsonPayload)))
+	}(takeDetails)
+
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
@@ -874,25 +894,57 @@ func (l *Lobby) processLeaseExpirations() {
 	for _, club := range l.clubs {
 		for id, lease := range club.Leases {
 			if lease.Borrower != "" && now.After(lease.ExpiresAt) {
-				bStats := l.leaderboard[lease.Borrower]
+				// PILLAR 3: Financial Proof.
+				// Reconstruct the revenue split for the on-chain audit trail.
+				priceMicro := uint64(lease.Price * 1000000)
+				faucetShareMicro := (priceMicro * 20) / 100
+				clubShareMicro := (priceMicro * 20) / 100
+				lenderShareMicro := (priceMicro * 50) / 100
+				memberShareTotalMicro := priceMicro - faucetShareMicro - clubShareMicro - lenderShareMicro
+
+				returnDetails := map[string]interface{}{
+					"id":       lease.ID,
+					"lender":   lease.LenderWallet,
+					"borrower": lease.Borrower,
+					"card_id":  lease.CardID,
+					"price":    lease.Price,
+					"split": map[string]float64{
+						"lender":  float64(lenderShareMicro) / 1000000.0,
+						"faucet":  float64(faucetShareMicro) / 1000000.0,
+						"club":    float64(clubShareMicro) / 1000000.0,
+						"members": float64(memberShareTotalMicro) / 1000000.0,
+					},
+					"ts": now.Unix(),
+				}
+
+				if bStats, bExists := l.leaderboard[lease.Borrower]; bExists {
 				cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
 				if bStats.Inventory[cardKey] > 0 {
 					bStats.Inventory[cardKey]--
 				}
-				l.leaderboard[lease.Borrower] = bStats
-				// Recalculate borrower's reputation after card return
 				bStats.Reputation = l.CalculateReputation(bStats)
 				l.leaderboard[lease.Borrower] = bStats
-
-				lStats := l.leaderboard[lease.LenderWallet]
-				if lStats.Inventory == nil {
-					lStats.Inventory = make(map[string]int)
 				}
-				lStats.Inventory[cardKey]++
-				l.leaderboard[lease.LenderWallet] = lStats
+
+				if lStats, lExists := l.leaderboard[lease.LenderWallet]; lExists {
+					cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
+					if lStats.Inventory == nil {
+						lStats.Inventory = make(map[string]int)
+					}
+					lStats.Inventory[cardKey]++
+					lStats.Reputation = l.CalculateReputation(lStats)
+					l.leaderboard[lease.LenderWallet] = lStats
+				}
+
+				// Dispatch on-chain log for financial verification
+				go func(rd interface{}) {
+					jsonPayload, _ := json.Marshal(rd)
+					l.sendNoteTx(fmt.Sprintf("VBT_LEASE_RETURN:%s", string(jsonPayload)))
+				}(returnDetails)
 
 				delete(club.Leases, id)
-				l.logAdminAudit("LEASE_EXPIRED", lease.LenderWallet, fmt.Sprintf("Card %d returned from %s", lease.CardID, lease.Borrower))
+				// PILLAR 5: Deadlock Resolution. Use Locked variant while holding the mutex.
+				l.logAdminAuditLocked("LEASE_EXPIRED", lease.LenderWallet, fmt.Sprintf("Card %d returned from %s", lease.CardID, lease.Borrower))
 				leasesExpired = true
 			}
 		}

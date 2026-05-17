@@ -207,7 +207,7 @@ export async function renderMatchHistory() {
             timestamp: new Date(m.timestamp).toLocaleString(),
             tournamentId: m.tournament_id,
             matchId: m.match_id,
-            receiptTxId: m.receipt_tx_id // Include the new receiptTxId
+            receiptTxId: m.receipt_txid // Sync with authoritative common_types.go JSON tag
         }));
     } else {
         // Fallback to local storage for guest sessions or non-indexed wins
