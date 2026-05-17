@@ -1982,6 +1982,7 @@ func (l *Lobby) processMojoDecay() {
 	now := time.Now()
 	stagnationThreshold := 48 * time.Hour
 	decayOccurred := false
+	decayedClubIDs := make(map[string]bool)
 
 	for _, club := range l.clubs {
 		if club.Mojo <= 0 {
@@ -2018,18 +2019,23 @@ func (l *Lobby) processMojoDecay() {
 				club.Mojo = 0
 			}
 			decayOccurred = true
+			decayedClubIDs[club.ID] = true
 			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay (isRegion: %v). New Mojo: %d\n", club.Name, isRegion, club.Mojo)
 
-			// PILLAR 1: Rippled Standing Decay.
-			// Recalculate reputation for all employees whose standing relies on this club's Mojo.
-			for wallet, stats := range l.leaderboard {
-				if stats.EmployerClubID == club.ID {
-					stats.Reputation = l.CalculateReputation(stats)
-					l.leaderboard[wallet] = stats
-				}
-			}
 			// Reset clock to 'now' so decay is periodic (e.g., every 48h) rather than continuous
 			club.LastActivity = now
+		}
+	}
+
+	// PILLAR 1: Performance-Optimized Reputation Ripple.
+	// If any clubs decayed, perform a single pass over the leaderboard to update 
+	// employee standings, preventing O(N^2) complexity.
+	if len(decayedClubIDs) > 0 {
+		for wallet, stats := range l.leaderboard {
+			if decayedClubIDs[stats.EmployerClubID] {
+				stats.Reputation = l.CalculateReputation(stats)
+				l.leaderboard[wallet] = stats
+			}
 		}
 	}
 
