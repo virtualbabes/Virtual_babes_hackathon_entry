@@ -413,6 +413,7 @@
 - [FIXED] Hardened `handleSpectate` in `lobby_manager.go` to prevent players in active matches from abandoning their session to join a stream.
 - [FIXED] Corrected server load calculation logic in `lobby_manager.go` and `handlers_public.go` to accurately count unique active matches and exclude spectator sessions from the load metric.
 - [FIXED] Hardened `handleJoinClub` (club_service.go) by implementing player Mojo requirements for elite clubs and ensuring standing reconciliation during the gate check.
+- [VERIFIED] `syncUI` in `app.js` correctly aggregates and displays multiple assets from the `rewardStack` and `VirtualBalance` in the 'Liquid Total' dashboard.
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
 - [FIXED] Implemented dynamic "REPUTATION_GATE" in `handleJoinClub` (club_service.go) to enforce minimum player Reputation requirements for joining elite clubs.
