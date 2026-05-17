@@ -73,11 +73,12 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	// PILLAR 3: Financial Proof.
 	// Define trade details for the on-chain audit trail.
 	tradeDetails := map[string]interface{}{
-		"action": data.Action,
-		"symbol": entityName,  // Asset Symbol (Envoi Name)
-		"qty":    data.Amount, // Share Quantity
-		"price":  pricePerShare,
-		"total":  totalValueBase,
+		"action":    data.Action,
+		"symbol":    entityName,  // Asset Symbol (Envoi Name)
+		"qty":       data.Amount, // Share Quantity
+		"price":     pricePerShare,
+		"total":     totalValueBase,
+		"sector_id": "arena_center", // PILLAR 3: Localized Economic Auditing.
 	}
 
 	stats := l.leaderboard[wallet]
