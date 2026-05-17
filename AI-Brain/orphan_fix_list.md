@@ -393,4 +393,6 @@
 - [FIXED] Resolved logic shadowing in the Economy domain; centralized high-finance UI orchestration and overlay generation in `ui.js`, delegating data logic back to `economy.js`.
 - [FIXED] Resolved lingering `l.rewards` name mismatches in `handlers_admin.go`, `auction_service.go`, and `handlers_criminality.go` following the Ledger separation refactor.
 - [FIXED] Hardened `processLoans` (economy_processing.go) liquidation math with micro-unit rounding and synchronized behavioral penalties with the central Reputation model.
+- [FIXED] Resolved scope error and missing criminal metric mappings in `getLobbyUpdateMsgLocked` (lobby_manager.go) to ensure accurate player dashboard synchronization.
+- [FIXED] Resolved accounting leak in `finalizeTournament` (tournament_manager.go); ensured Governor Tax is deducted from `faucetBalance` and implemented precision rounding.
 - [FIXED] Weighted Regional Governor status in tournament tie-breakers within `determineTop5` (tournament_manager.go) to reward territorial influence.

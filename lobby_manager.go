@@ -1087,7 +1087,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		hasMardon := false
 		var banExpires time.Time 
 		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon, vBal := 0, 0, 0, 0, 0, 0, 0, uint64(0)
-		var jailedCards map[int]string
+		var jailedCards, kidnappedCards, heldHostageCards map[int]string
 		var matches []MatchHistory
 		var equippedFaceplate string
 		var socialRank string
@@ -1095,6 +1095,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		var jobRole string
 		var employerID string
 		var rumorCount int
+		var playstyle PlaystyleTendencies
 		if wallet, ok := l.wallets[client.id]; ok {
 			if stats, exists := l.leaderboard[wallet]; exists {
 				banExpires = stats.BanExpires
@@ -1110,6 +1111,9 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				cunning = stats.GetEffectiveCunning()
 				nurturing = stats.Nurturing
 				jailedCards = stats.JailedCards
+				kidnappedCards = stats.KidnappedCards
+				heldHostageCards = stats.HeldHostageCards
+				playstyle = stats.Playstyle
 				equippedFaceplate = stats.EquippedFaceplate
 				socialRank = stats.SocialRank
 				jobRole = stats.JobRole
@@ -1133,9 +1137,12 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			AuctionsWon: auctionsWon, VirtualBalance: vBal,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			MatchHistory: matches,
-			JailedCards:  jailedCards, SocialRank: socialRank, EquippedFaceplate: equippedFaceplate,
-			Achievements: achievements, RumorCount: rumorCount,
-			Playstyle: stats.Playstyle,
+			JailedCards:      jailedCards,
+			KidnappedCards:   kidnappedCards,
+			HeldHostageCards: heldHostageCards,
+			SocialRank:       socialRank, EquippedFaceplate: equippedFaceplate,
+			Achievements:     achievements, RumorCount: rumorCount,
+			Playstyle:        playstyle,
 			JobRole: jobRole, EmployerID: employerID,
 		})
 	}

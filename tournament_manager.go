@@ -590,10 +590,16 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	var govTax float64
 	centerClub := l.getClubByTerritoryID("arena_center")
 	if centerClub != nil {
-		govTax = l.tournament.Pot * 0.05
+		// PILLAR 3: Economic Precision. Use micro-unit rounding to prevent dust leaks.
+		govTaxMicro := uint64(l.tournament.Pot*0.05*1000000 + 0.5)
+		govTax = float64(govTaxMicro) / 1000000.0
 		centerClub.Treasury += govTax
 		centerClub.LastActivity = time.Now()
 		l.logAdminAuditLocked("GOVERNOR_TAX_PAID", centerClub.ID, fmt.Sprintf("Tournament Pot Tax: %.2f $VBV", govTax))
+
+		// INDUSTRIAL LOOP: Deduct distributed tax from liquid faucet balance.
+		l.faucetBalance -= govTax
+		l.applyDynamicScalingLocked()
 	}
 	// Calculate effective pot available for player distribution
 	effectivePot := l.tournament.Pot - govTax
