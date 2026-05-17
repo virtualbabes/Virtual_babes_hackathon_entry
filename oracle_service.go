@@ -690,15 +690,11 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 
 	// PASS 2: Buy-ins/Registrations (Wallet -> Vault)
 	// This allows the server to discover used TxIDs for the specific player joining.
-	buyInURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		baseURL, voiConfig.AssetID, wallet, vaultAddr)
+	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		voiConfig.AssetID, wallet, vaultAddr))
 
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", buyInURL, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err == nil && resp.StatusCode == http.StatusOK {
+	if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
 			var regRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -1182,36 +1178,6 @@ func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metada
 	}
 	defer resp.Body.Close()
 
-	var resp *http.Response
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-		resp, err = http.DefaultClient.Do(req)
-		cancel()
-		if err != nil {
-			if i < 2 {
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			return nil, err
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if i < 2 {
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			return nil, fmt.Errorf("indexer rate-limited (429)")
-		}
-		break
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("indexer returned non-200 status: %d", resp.StatusCode)
-	}
-
 	var res struct {
 		Asset struct {
 			Params struct {
@@ -1305,7 +1271,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 		if json.NewDecoder(resp.Body).Decode(&res) == nil {
 			resp.Body.Close()
 			if strings.Contains(res.Asset.Params.URL, "template-ipfs") {
-				meta, err := l.fetchARC19Metadata(cfg, assetID)
+				meta, err := l.fetchARC19Metadata(cfg.IndexerURL, assetID)
 				return meta, "ARC-19", err
 			}
 		} else {
@@ -1337,7 +1303,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	}
 
 	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
-	meta, err := l.fetchARC69Metadata(cfg, assetID)
+	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
 	return meta, "ARC-69", err
 }
 
