@@ -1413,10 +1413,11 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 
 	l.sendToClient(id1, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(`{"status":"match_found"}`)})
 	l.sendToClient(id2, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(`{"status":"match_found"}`)})
+
+	log.Printf("[MATCHMAKING] Duel started on %s between %s and %s. Boosts - P1: %v, P2: %v\n", 
+		territoryID, p1Wallet, p2Wallet, p1Boost, p2Boost)
 	return true
 }
-
-// assignMatchTerritoryLocked assigns a territory ID based on current Club ownership.
 // This prioritizes owned territories to trigger Industrial Loop mechanics (jailing/revenue).
 func (l *Lobby) assignMatchTerritoryLocked() string {
 	// 1. Compile pool of territories currently claimed by Clubs

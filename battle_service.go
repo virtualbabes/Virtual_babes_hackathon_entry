@@ -602,12 +602,9 @@ func (l *Lobby) finalizeMatchResultLocked(winnerID string, deck []int, history M
 			loserRecord.Opponent = wWallet
 		}
 
-		// Flip WinnerIndex to reflect a Loss (1) relative to the loser's profile
-		if history.WinnerIndex == 0 {
-			loserRecord.WinnerIndex = 1
-		} else if history.WinnerIndex == 1 {
-			loserRecord.WinnerIndex = 0
-		}
+		// PILLAR 4: Historical Immersion.
+		// Mirrored logic: The loser's record always reflects a relative Loss (1) in their personal history.
+		loserRecord.WinnerIndex = 1
 
 		lStats.History = append([]MatchHistory{loserRecord}, lStats.History...)
 		if len(lStats.History) > 15 {

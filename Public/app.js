@@ -121,6 +121,8 @@ window.executeKidnap = executeKidnap;
 window.payRansom = payRansom;
 window.releaseHostage = releaseHostage;
 window.shareTournamentVictory = shareTournamentVictory;
+window.syncUI = syncUI;
+window.showQuickCastMenu = showQuickCastMenu;
 
 const UI_CACHE = new Map();
 const getEl = (id) => {

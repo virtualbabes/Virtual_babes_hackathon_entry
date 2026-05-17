@@ -143,8 +143,6 @@
 *   **224**: Successfully force-pushed local `Dev2` state to remote `slapkarnts/Dev2`; confirmed local branch configuration matches deployment targets.
 *   **225**: Hardened `deploy-wasm.yml` by removing critical build files from `exclude_assets`; resolved Render build failure caused by missing `entrypoint.sh` and Go source on the `deploy` branch.
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
-*   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
-*   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
 *   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.
@@ -157,5 +155,8 @@
 *   **238**: Synchronized `career.go` with the new dual-ledger system; migrated salary credits from the deprecated `rewards` map to `playerBalances` to resolve compilation errors.
 *   **239**: Audited and hardened `handleHealthCheck` in `handlers_public.go`; implemented primary RPC connectivity verification and Faucet liquidity (gas) floor checks to ensure high-fidelity Render monitoring.
 *   **240**: Hardened `syncUI` in `app.js` with a persistent `dashboardCache` to eliminate flickering during partial state syncs; stabilized `dashboardStateKey` calculation and purged redundant code re-definitions.
+*   **241**: Conducted final modularity audit of `Public/app.js`; purged legacy redundant re-definitions and `Initial UI State` shadowing to enforce domain-driven authority and finalize synchronization logic.
+*   **242**: Audited `processMatchmaking` in `lobby_manager.go`; confirmed correct initialization and synchronization of Regional Governor power boosts (+5%) across server and WASM layers.
 *   **230**: Finalized structural audit of `oracle_service.go`; resolved fragmented logic in `fetchARC19Metadata` and removed illegal braces/duplicate declarations halting the Linux binary build on Render.
+*   **243**: Audited `finalizeMatchResultLocked` in `battle_service.go`; corrected relative `WinnerIndex` logic for mirrored loser records and verified `ReceiptTxID` propagation for historical immersion.
 *   **229**: Conducted recursive structural audit; resolved illegal `break` statements and functional scope leaks in `oracle_service.go` to finalize Linux binary build stability on Render.
