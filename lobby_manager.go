@@ -1086,6 +1086,21 @@ func (l *Lobby) handleSpectate(env *Envelope) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	// PILLAR 4: Spectator Portal Hardening.
+	// If the client is already watching a match, remove them from that match's 
+	// spectator list before transitioning to the new one.
+	if existing, ok := l.matches[env.FromID]; ok {
+		if env.FromID != existing.P1ID && env.FromID != existing.P2ID {
+			var remaining []string
+			for _, sID := range existing.Spectators {
+				if sID != env.FromID {
+					remaining = append(remaining, sID)
+				}
+			}
+			existing.Spectators = remaining
+		}
+	}
+
 	// SECURITY: Prevent active players from abandoning their match to spectate.
 	// This ensures that participants in tourney matches cannot trigger a DNF by switching to a stream.
 	if existing, ok := l.matches[env.FromID]; ok {

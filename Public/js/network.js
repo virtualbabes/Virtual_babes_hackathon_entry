@@ -40,6 +40,9 @@ export function initWebSocket(messageHandler) {
     socket.onopen = () => {
         console.log("[WS] Connected to Live Lobby");
 
+        // Notify parent HUD
+        window.parent.postMessage({ spectatorStatus: "LIVE • Connected" }, "*");
+
         // WATCHDOG: Start 5s timer for identity sync validation.
         // If identity is not received, attempt reconnection.
         if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
@@ -66,6 +69,10 @@ export function initWebSocket(messageHandler) {
     socket.onclose = () => {
         console.warn("[WS] Disconnected. Retrying...");
         if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
+
+        // Notify parent HUD
+        window.parent.postMessage({ spectatorStatus: "OFFLINE • Reconnecting…" }, "*");
+
         // Only attempt immediate reconnect if not due to identity sync timeout already handling it
         if (identitySyncTimeout && reconnectAttempts < 3) {
             setTimeout(() => initWebSocket(messageHandler), 3000);

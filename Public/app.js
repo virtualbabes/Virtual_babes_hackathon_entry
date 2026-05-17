@@ -23,6 +23,54 @@ const dashboardCache = {
     rewards: {}, jailed: 0, kidnapped: 0, hostage: 0
 };
 
+// PILLAR 4: Spectator Portal Orchestration.
+// Manages the lifecycle of live broadcasts and responds to HUD commands.
+const Spectator = {
+    async rotateToNextMatch() {
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/api/matches/active`);
+            const data = await res.json();
+            const matches = data.matches || [];
+
+            if (matches.length === 0) {
+                window.parent.postMessage({ spectatorStatus: "NO MATCHES • Lobby" }, "*");
+                return;
+            }
+
+            // Select a random match from the discovery feed
+            const match = matches[Math.floor(Math.random() * matches.length)];
+            const newUrl = `${window.location.origin}/?spectate=${match.id}`;
+            
+            // Update URL without reloading to support deep-linking/sharing
+            history.replaceState({}, "", newUrl);
+
+            this.start(match.id);
+        } catch (e) {
+            console.error("[SPECTATOR] Match discovery failed", e);
+        }
+    },
+    start(matchId) {
+        const execute = () => {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                console.log(`[PORTAL] Synchronizing stream for: ${matchId}`);
+                socket.send(JSON.stringify({ type: "spectate", payload: { target_id: matchId } }));
+                window.parent.postMessage({ spectatorStatus: `LIVE • Match ${matchId.substring(0,8)}` }, "*");
+            } else {
+                // Retry if socket is still initializing
+                setTimeout(execute, 500);
+            }
+        };
+        execute();
+    }
+};
+
+// Listen for HUD → Game commands from the Carrd parent
+window.addEventListener("message", (e) => {
+    if (e.data && e.data.switchFeed) {
+        Spectator.rotateToNextMatch();
+    }
+});
+
 // 1. Initialize Go WASM Engine
 window.onload = async () => {
     const go = new Go();
@@ -74,12 +122,8 @@ window.onload = async () => {
         // Check for deep-link spectate request in URL
         const urlParams = new URLSearchParams(window.location.search);
         const spectateID = urlParams.get('spectate');
-        if (spectateID) {
-            setTimeout(() => {
-                console.log(`[PORTAL] Auto-joining stream for: ${spectateID}`);
-                socket.send(JSON.stringify({ type: "spectate", payload: { target_id: spectateID } }));
-            }, 2000); // Allow WASM engine and WS to stabilize
-        }
+        if (spectateID) Spectator.start(spectateID);
+
     } catch (err) {
         console.error("WASM Load Fail:", err);
         document.getElementById("engine-status").innerHTML = "<span style='color: #ff0844;'>OFFLINE</span>";
