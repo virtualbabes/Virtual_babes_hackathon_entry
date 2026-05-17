@@ -145,3 +145,4 @@
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
+*   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.

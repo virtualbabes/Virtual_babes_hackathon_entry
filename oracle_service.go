@@ -158,28 +158,28 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 					}
 					if json.NewDecoder(resp.Body).Decode(&res) == nil {
 						for _, tok := range res.Tokens {
-							var meta *ARC72Metadata
-							var std string
+						var meta *ARC72Metadata
+						var std string
 
-							// Optimization: Try parsing the bulk metadata first (common for ARC-72 indexers)
-							if tok.Metadata != "" {
-								var m ARC72Metadata
-								if json.Unmarshal([]byte(tok.Metadata), &m) == nil {
-									meta = &m
-									std = "ARC-72"
-								}
+						// Optimization: Try parsing the bulk metadata first (common for ARC-72 indexers)
+						if tok.Metadata != "" {
+							var m ARC72Metadata
+							if json.Unmarshal([]byte(tok.Metadata), &m) == nil {
+								meta = &m
+								std = "ARC-72"
 							}
+						}
 
-							// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
-							if meta == nil {
-								m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
-								if err == nil {
-									meta = m
-									std = s
-								}
+						// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
+						if meta == nil {
+							m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
+							if err == nil {
+								meta = m
+								std = s
 							}
+						}
 
-							if meta != nil {
+						if meta != nil {
 								newCard := ServerCard{
 									ID:            tok.TokenID,
 									Name:          meta.Name,
@@ -192,7 +192,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 								l.inventory[tok.TokenID] = newCard
 								l.mutex.Unlock()
 								results[tok.TokenID] = newCard
-								log.Printf("[ORACLE] Discovered %s token during owner scan: %d\n", std, tok.TokenID)
+							log.Printf("[ORACLE] Discovered %s token during owner scan: %d\n", std, tok.TokenID)
 							}
 						}
 					}
@@ -283,7 +283,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 	}
 
 	// PILLAR 3: Multi-Standard Discovery.
-	// We iterate through missing tokens and utilize the MetadataDispatcher to identify
+	// We iterate through missing tokens and utilize the MetadataDispatcher to identify 
 	// and fetch standard-compliant metadata (ARC-72, ARC-19, or ARC-69).
 	for _, id := range toFetch {
 		meta, standard, err := l.MetadataDispatcher(networkName, id)
@@ -302,12 +302,12 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 			LastUpdated:   time.Now(),
 			MetadataValid: true,
 		}
-
+		
 		l.mutex.Lock()
 		l.inventory[id] = newCard
 		l.mutex.Unlock()
 		results[id] = newCard
-
+		
 		log.Printf("[ORACLE] Ingested %s card: %s (#%d)\n", standard, meta.Name, id)
 	}
 	return results, nil
@@ -491,26 +491,44 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	vaultAddr := l.vaultAddress
-
-	// PILLAR 3: Boundary Snapshot.
-	// Snapshot temporal boundaries to ensure consistency if rollover occurs during scan.
-	seasonStartUnix := l.seasonStart.Unix()
-	activeTournID := l.tournament.ID
-	tournOpenTime := l.tournament.OpenTime
-	isTournActive := l.tournament.Active
-	tournRound := l.tournament.CurrentRound
 	l.mutex.RUnlock()
-
-	if !ok || vaultAddr == "" {
+	if !ok {
 		return
 	}
 
-	// PASS 1: Wins/DNFs (Vault -> Wallet)
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
-		voiConfig.AssetID, vaultAddr, wallet))
+	baseURL := voiConfig.IndexerURL
 
+	// PASS 1: Wins/DNFs (Vault -> Wallet)
+	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+		baseURL, voiConfig.AssetID, vaultAddr, wallet)
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ { // Retry up to 3 times
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel() // Ensure context is cancelled after each attempt
+		if err != nil {
+			if i < 2 { // If not the last attempt, wait and retry
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to connect to indexer for stats sync after retries: %v\n", err)
+			return // Return on persistent network error
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 { // If not the last attempt, wait with backoff and retry
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for stats sync after retries.\n")
+			return // Return on persistent rate-limiting
+		}
+		break // Break loop on successful response
+	}
 	if err != nil {
-		log.Printf("[ORACLE ERROR] Multi-failover indexer scan failed for %s: %v\n", wallet, err)
 		return // Should be caught by the loop, but as a final safeguard
 	}
 	defer resp.Body.Close() // Ensure body is closed
@@ -534,7 +552,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	// Pass 1: Scan transactions RECEIVED by the wallet (My Wins)
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
-			if tx.Timestamp < seasonStartUnix {
+			if tx.Timestamp < l.seasonStart.Unix() {
 				continue
 			}
 			if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
@@ -579,12 +597,15 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	// PILLAR 4: Mirrored Immersion.
 	// Pass 3: Global Result Recovery. Scan the Vault's output to find matches where I was the Loser.
 	// This allows reconstructing persistent "Loss" records without extra blockchain fees.
-	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=200",
-		voiConfig.AssetID, vaultAddr))
+	globalURL := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=200",
+		baseURL, voiConfig.AssetID, vaultAddr)
 
-	if err == nil {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", globalURL, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err == nil && resp.StatusCode == http.StatusOK {
 			var gRes struct {
 				Transfers []struct {
 					TransactionID string `json:"transactionId"`
@@ -595,7 +616,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 			}
 			if json.NewDecoder(resp.Body).Decode(&gRes) == nil {
 				for _, tx := range gRes.Transfers {
-					if tx.Timestamp < seasonStartUnix {
+					if tx.Timestamp < l.seasonStart.Unix() {
 						continue
 					}
 
@@ -653,6 +674,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 					}
 				}
 			}
+		}
 	}
 
 	sort.Slice(matchHistory, func(i, j int) bool { return matchHistory[i].Timestamp.After(matchHistory[j].Timestamp) })
@@ -671,7 +693,7 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.AssetID, wallet, vaultAddr))
 
-	if err == nil {
+	if err == nil && resp != nil {
 		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			var regRes struct {
@@ -693,13 +715,13 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						// Use TournamentID for precise reconstruction if available in note
 						parts := strings.Split(tx.Metadata, ":")
 						matchesCurrent := false
-						if len(parts) >= 2 && parts[1] == activeTournID {
+						if len(parts) >= 2 && parts[1] == l.tournament.ID {
 							matchesCurrent = true
-						} else if txTime.After(tournOpenTime) {
+						} else if txTime.After(l.tournament.OpenTime) {
 							matchesCurrent = true // Legacy fallback
 						}
 
-						if isTournActive && tournRound == 0 && matchesCurrent {
+						if l.tournament.Active && l.tournament.CurrentRound == 0 && matchesCurrent {
 							if !l.isWalletRegistered(wallet) {
 								l.paidParticipants = append(l.paidParticipants, wallet)
 								log.Printf("[ORACLE] Reconstructed tournament entry for %s (Tx: %s)\n", wallet, tx.TransactionID)
@@ -709,6 +731,8 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 				}
 				l.mutex.Unlock()
 			}
+		}
+	}
 }
 
 func (l *Lobby) refreshGlobalLeaderboard() {
@@ -719,9 +743,35 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 		return
 	}
 
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
-		voiConfig.AssetID, l.vaultAddress))
+	url := fmt.Sprintf("%s/arc200/transfers?contractId=%s&from=%s&limit=1000",
+		voiConfig.IndexerURL, voiConfig.AssetID, l.vaultAddress)
 
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Failed to connect to indexer for leaderboard refresh after retries: %v\n", err)
+			return
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			log.Printf("[ORACLE ERROR] Indexer rate-limited (429) for leaderboard refresh after retries.\n")
+			return
+		}
+		break
+	}
 	if err != nil {
 		return
 	}
@@ -892,7 +942,7 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 
 	// Optimization: Fetch Indexer URL once under a brief lock to prevent recursive deadlock
 	var baseURL string
-	l.mutex.RLock() // Note: This check still uses the singular for resolution, see suggested refactor
+	l.mutex.RLock()
 	if cfg, ok := l.availableNetworks["Voi Mainnet"]; ok {
 		baseURL = cfg.IndexerURL
 	}
@@ -966,7 +1016,32 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 	// 2. Branch logic based on Network Type
 	if strings.Contains(strings.ToLower(netKey), "voi") {
-		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/arc200/transfers?transactionId=%s", txid))
+		// VOI Logic: Custom ARC-200 Indexer
+		url := fmt.Sprintf("%s/arc200/transfers?transactionId=%s", netConfig.IndexerURL, txid)
+		var resp *http.Response
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
+			cancel()
+			if err != nil {
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return false, 0, err
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+				return false, 0, fmt.Errorf("voi indexer rate-limited (429)")
+			}
+			break
+		}
 		if err != nil {
 			return false, 0, err
 		}
@@ -993,7 +1068,31 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		}
 	} else {
 		// ALGORAND Logic: Standard Indexer Transaction Endpoint
-		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/v2/transactions/%s", txid))
+		url := fmt.Sprintf("%s/v2/transactions/%s", netConfig.IndexerURL, txid)
+		var resp *http.Response
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			resp, err = http.DefaultClient.Do(req)
+			cancel()
+			if err != nil {
+				if i < 2 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				return false, 0, err
+			}
+			if resp.StatusCode == http.StatusTooManyRequests {
+				resp.Body.Close()
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
+				}
+				return false, 0, fmt.Errorf("algorand indexer rate-limited (429)")
+			}
+			break
+		}
 		if err != nil {
 			return false, 0, err
 		}
@@ -1038,10 +1137,40 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 }
 
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
-func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
-	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
-	if err != nil {
-		return nil, err
+func (l *Lobby) fetchARC69Metadata(indexerURL string, assetID int) (*ARC72Metadata, error) {
+	// PILLAR 3: Concurrency Throttling.
+	select {
+	case l.oracleSemaphore <- struct{}{}:
+		defer func() { <-l.oracleSemaphore }()
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("oracle semaphore timeout")
+	}
+
+	url := fmt.Sprintf("%s/v2/assets/%d/transactions?tx-type=acfg&limit=1", indexerURL, assetID)
+
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err = http.DefaultClient.Do(req)
+		cancel()
+		if err != nil {
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			return nil, err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if i < 2 {
+				time.Sleep(time.Duration(i+1) * 1 * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("indexer rate-limited (429)")
+		}
+		break
 	}
 	defer resp.Body.Close()
 
@@ -1173,7 +1302,7 @@ func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metada
 	return &meta, nil
 }
 
-// MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19)
+// MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19) 
 // and routes the metadata retrieval request to the appropriate service.
 func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metadata, string, error) {
 	l.mutex.RLock()
@@ -1186,7 +1315,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	// 1. ARC-19 Detection: Fetch Asset parameters from Indexer to check for template URL.
 	// This is the most efficient first check for dynamic ASAs.
 	url := fmt.Sprintf("%s/v2/assets/%d", cfg.IndexerURL, assetID)
-
+	
 	ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	resp, err := http.DefaultClient.Do(req)
@@ -1215,12 +1344,14 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 
 	// 2. ARC-72 Check: If network has a configured AppID, check if this ID exists as a token.
 	if cfg.AppID != "" && cfg.AppID != "0" {
-		resp72, err := l.indexerRequest(cfg, fmt.Sprintf("/tokens?contractId=%s&tokenId=%d", cfg.AppID, assetID))
+		checkURL := fmt.Sprintf("%s/tokens?contractId=%s&tokenId=%d", cfg.IndexerURL, cfg.AppID, assetID)
+		ctx72, cancel72 := context.WithTimeout(context.Background(), indexerTimeout)
+		req72, _ := http.NewRequestWithContext(ctx72, "GET", checkURL, nil)
+		resp72, err := http.DefaultClient.Do(req72)
+		cancel72()
 		if err == nil && resp72.StatusCode == http.StatusOK {
 			var res72 struct {
-				Tokens []struct {
-					Metadata string `json:"metadata"`
-				} `json:"tokens"`
+				Tokens []struct { Metadata string `json:"metadata"` } `json:"tokens"`
 			}
 			if json.NewDecoder(resp72.Body).Decode(&res72) == nil && len(res72.Tokens) > 0 {
 				resp72.Body.Close()
@@ -1233,7 +1364,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	}
 
 	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
-	meta, err := l.fetchARC69Metadata(cfg, assetID)
+	meta, err := l.fetchARC69Metadata(cfg.IndexerURL, assetID)
 	return meta, "ARC-69", err
 }
 
@@ -1252,47 +1383,50 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 	rewardAppID, err := strconv.ParseUint(rewardAppIDStr, 10, 64)
 	if err != nil {
 		return
-		return
 	}
 
+	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
 	addrObj, _ := types.DecodeAddress(vaultAddr)
 
-	// PILLAR 4: RPC Failover. Cycle through available NodeURLs until balance is retrieved.
-	for _, nodeURL := range voiConfig.NodeURLs {
-		client, _ := algod.MakeClient(nodeURL, "")
-		var boxValue []byte
-		found := false
-
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
-			cancel()
-
-			if err != nil {
-				// If not found, vault is empty/not initialized on this node.
-				if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-					log.Printf("[ORACLE] Note: Vault box not found at %s (Asset: %s).\n", nodeURL, rewardAppIDStr)
-					break // Try next node if this one doesn't have the box yet
+	// ARC-200 Balance is stored in an application box named by the account's public key bytes.
+	var boxValue []byte
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
+		cancel()
+		if err != nil {
+			// If not found, vault is empty or not initialized
+			if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+				log.Printf("[ORACLE] Note: Vault has no $VBV balance box yet (Asset: %s).\n", rewardAppIDStr)
+				return
+			}
+			// Handle Node rate-limiting (429)
+			if strings.Contains(err.Error(), "429") {
+				if i < 2 {
+					time.Sleep(time.Duration(i+1) * 1 * time.Second)
+					continue
 				}
-				// Handle Node rate-limiting (429) or transient errors
-				time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			}
+			// Transient network errors
+			if i < 2 {
+				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			boxValue = boxResp.Value
-			found = true
-			break
+			log.Printf("[ORACLE ERROR] Failed to fetch vault box balance after retries: %v\n", err)
+			return
 		}
+		boxValue = boxResp.Value
+		break
+	}
 
-		// ARC-200 balances are 32-byte uint256 values
-		if found && len(boxValue) >= 32 {
-			bal := new(big.Int).SetBytes(boxValue[:32]).Uint64()
-			l.mutex.Lock()
-			l.faucetBalance = float64(bal) / 1000000.0
-			l.applyDynamicScalingLocked() // Adjust rewards based on new liquidity
-			l.mutex.Unlock()
-			log.Printf("[ORACLE] Vault $VBV Pool Synced via %s: %.2f units.\n", nodeURL, l.faucetBalance)
-			return // Success: exit function
-		}
+	// ARC-200 balances are 32-byte uint256 values
+	if len(boxValue) >= 32 {
+		bal := new(big.Int).SetBytes(boxValue[:32]).Uint64()
+		l.mutex.Lock()
+		l.faucetBalance = float64(bal) / 1000000.0
+		l.applyDynamicScalingLocked() // Adjust reward amounts based on new liquidity level
+		l.mutex.Unlock()
+		log.Printf("[ORACLE] Vault $VBV Pool Synced: %.2f units.\n", l.faucetBalance)
 	}
 }
 
