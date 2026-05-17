@@ -715,6 +715,7 @@ func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
 func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (string, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
+	var skippedAssets []string
 	activeRewards := l.rewards
 	rewardAsset := l.rewardAssetID
 	stats, hasStats := l.leaderboard[recipient]
@@ -727,19 +728,22 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		multiplier = 1.1
 	}
 
-	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
+	if len(voiConfig.NodeURLs) == 0 {
+		return "", nil, fmt.Errorf("no Voi nodes configured")
+	}
+
+	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
 	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
 	if mnemonicRaw == "" {
 		log.Println("[TOURNAMENT CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET. Tournament payouts will FAIL.")
 		return "", skippedAssets, fmt.Errorf("server configuration error: faucet mnemonic missing")
 	}
 	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
-	// pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	if err != nil { return "", nil, fmt.Errorf("invalid mnemonic: %v", err) }
 	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
 	sp, _ := client.SuggestedParams().Do(context.Background())
 
 	var txns []types.Transaction
-	var skippedAssets []string
 	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
 	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"tid\":\"%s\",\"rank\":%d,\"pot_share\":%d}", l.tournament.ID, rank, potShareMicro))
 	var totalUnits float64

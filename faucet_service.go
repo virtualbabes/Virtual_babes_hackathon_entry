@@ -221,7 +221,11 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
 
-	client, _ := algod.MakeClient(voiConfig.NodeURL, "")
+	if len(voiConfig.NodeURLs) == 0 {
+		return "", false, nil, fmt.Errorf("no Voi nodes configured")
+	}
+
+	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
 	var skippedAssets []string
 	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
 	if mnemonicRaw == "" {

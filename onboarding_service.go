@@ -93,8 +93,11 @@ func (l *Lobby) handleVoiOnboarding(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Voi Mainnet configuration not found", http.StatusInternalServerError)
 		return
 	}
-	voiNodeURL := voiConfig.NodeURL
-	client, err := algod.MakeClient(voiNodeURL, "")
+	if len(voiConfig.NodeURLs) == 0 {
+		http.Error(w, "No nodes configured", http.StatusInternalServerError)
+		return
+	}
+	client, err := algod.MakeClient(voiConfig.NodeURLs[0], "")
 	if err != nil {
 		http.Error(w, "Internal Node Error", http.StatusInternalServerError)
 		return

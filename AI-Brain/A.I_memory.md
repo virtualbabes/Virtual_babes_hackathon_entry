@@ -144,3 +144,4 @@
 *   **225**: Hardened `deploy-wasm.yml` by removing critical build files from `exclude_assets`; resolved Render build failure caused by missing `entrypoint.sh` and Go source on the `deploy` branch.
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
 *   **226**: Verified successful Render Docker build sequence; confirmed WASM engine and server binary compilation using Go 1.24 and modular service pathing.
+*   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.

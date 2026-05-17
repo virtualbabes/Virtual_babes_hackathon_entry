@@ -373,3 +373,5 @@
 - [FIXED] Created missing `entrypoint.sh` script required by `Dockerfile` for Render deployments.
 - [FIXED] Corrected `Dockerfile` build command to use `go build .` instead of `server.go` to support modular service architecture.
 - [FIXED] Implemented `.dockerignore` to exclude local logs, node_modules, and test data from the production build context.
+- [FIXED] Resolved `skippedAssets` undefined compiler error in `tournament_manager.go`.
+- [FIXED] Synchronized all `algod` client initializations with pluralized `NodeURLs` to prevent compilation failure following the NetworkConfig refactor.
