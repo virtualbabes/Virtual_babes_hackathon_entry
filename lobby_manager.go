@@ -1663,6 +1663,9 @@ func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchCont
 	if stats.Playstyle.PreferredCardMoods == nil {
 		stats.Playstyle.PreferredCardMoods = make(map[string]float64)
 	}
+	if stats.Playstyle.PreferredItems == nil {
+		stats.Playstyle.PreferredItems = make(map[string]float64)
+	}
 
 	// 1. Aggressiveness (Direct captures vs Rule-based)
 	// For now, we use a scoring heuristic based on victory margins
@@ -1673,6 +1676,21 @@ func (l *Lobby) updatePlayerPlaystyleTendenciesLocked(wallet string, inMatchCont
 			matchAgg = 0.9
 		} // Crushing victory
 	}
+
+	// PILLAR 3: Item-Driven Aggressiveness.
+	// Certain items reflect offensive intent. We calculate a "Tactical Intent Boost"
+	// based on the usage frequency of aggressive hardware and stims.
+	itemAggBoost := 0.0
+	aggItems := []string{"mood_catalyst", "rule_breaker", "stamina_stim", "sentry_turret"}
+	for _, itemID := range aggItems {
+		if score, ok := stats.Playstyle.PreferredItems[itemID]; ok {
+			itemAggBoost += score * 0.05 // Incremental boost based on usage weight
+		}
+	}
+	if itemAggBoost > 0.2 { itemAggBoost = 0.2 } // Cap the intent boost
+	matchAgg += itemAggBoost
+	if matchAgg > 1.0 { matchAgg = 1.0 }
+
 	stats.Playstyle.Aggressiveness = (matchAgg * alpha) + (stats.Playstyle.Aggressiveness * (1 - alpha))
 
 	// 2. Risk Tolerance (Based on Wanted Level and Heist success)
