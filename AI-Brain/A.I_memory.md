@@ -184,6 +184,7 @@
 *   **298**: Engineered VBT Cyber-HUD for external Carrd portals; implemented neon-glass overlay with pulsing status badges and two-way control wiring to support remote match rotation and engine telemetry.
 *   **299**: Audited `handleSpectate` in `lobby_manager.go`; implemented Participant Guard in move handler to prevent spectators from triggering AI thinking delays and synchronized `multiplayer` flag across server and WASM layers.
 *   **300**: Hardened `auction_service.go`; implemented high-value threshold (>= 100 $VBV) for `VBT_AUCTION_SETTLE:` on-chain notes and resolved a recursive deadlock in `handlePlaceBid` by migrating name resolution outside the lobby mutex.
+*   **301**: Re-audited `processAuctions` in `auction_service.go`; confirmed neutral district commission routing correctly avoids double-crediting `faucetBalance` by leaving unreserved liquidity in the pool.
 *   **283**: Audited `initiatePairedMatch` logic; resolved WASM engine desync where local P2 players incorrectly utilized P1 boosts; implemented card ownership re-synchronization in `StartMatch` and standardized boost handshake keys.
 *   **284**: Hardened `finalizeTournament` in `tournament_manager.go`; ensured `PayoutsHash` correctly includes the `groupID` of multi-asset reward transactions for immutable financial proof.
 *   **285**: Audited `processAuctions` in `auction_service.go`; verified `VBT_AUCTION_SETTLE:` note metadata and resolved an inflation leak where neutral district commissions were double-credited to the faucet pool.
