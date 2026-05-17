@@ -26,11 +26,10 @@ func (l *Lobby) processLoans() {
 			borrowerStats, exists := l.leaderboard[borrowerWallet]
 			if exists {
 				borrowerStats.MarketTokens += tokenReward
-				borrowerStats.Reputation -= 50
-				if borrowerStats.Reputation < 0 {
-					borrowerStats.Reputation = 0
-				}
-				// RECONCILE: Ensure calculated stats are in sync
+				// PILLAR 3: Behavioral Consequence.
+				// Defaulting on a loan increases infamy (Wanted Level), which
+				// is then naturally reflected in the Reputation calculation.
+				borrowerStats.WantedLevel += 5
 				borrowerStats.Reputation = l.CalculateReputation(borrowerStats)
 				l.leaderboard[borrowerWallet] = borrowerStats
 
@@ -43,14 +42,16 @@ func (l *Lobby) processLoans() {
 			// INDUSTRIAL LOOP: 5% Liquidation Fee to the Second-Hand Store district owner
 			owningClub := l.getClubByTerritoryID(loan.TerritoryID)
 			if owningClub != nil {
-				liquidationFee := float64(loan.LoanAmount) * 0.05 / 1000000.0
-				owningClub.Treasury += liquidationFee
+				// Use micro-unit math for absolute ledger integrity
+				liquidationFeeMicro := (loan.LoanAmount*5 + 50) / 100
+				liquidationFeeBase := float64(liquidationFeeMicro) / 1000000.0
+				owningClub.Treasury += liquidationFeeBase
 
 				// INDUSTRIAL LOOP: Deduct distributed fee from liquid faucet balance
-				l.faucetBalance -= liquidationFee
+				l.faucetBalance -= liquidationFeeBase
 
 				owningClub.LastActivity = now
-				l.logAdminAuditLocked("LOAN_LIQUIDATION_FEE", loan.TerritoryID, fmt.Sprintf("Club %s earned %.2f $VBV liquidation fee", owningClub.Name, liquidationFee))
+				l.logAdminAuditLocked("LOAN_LIQUIDATION_FEE", loan.TerritoryID, fmt.Sprintf("Club %s earned %.2f $VBV liquidation fee", owningClub.Name, liquidationFeeBase))
 			}
 
 			// Update playstyle on loan default (Internal call to avoid deadlock)
