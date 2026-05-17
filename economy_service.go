@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
@@ -179,7 +180,17 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// 4. Marketability Multiplier (Aggressiveness & Risk rewarded as "Marketable Traits")
 	// Instead of a flat bonus, playstyle now acts as a multiplier to scale with player performance.
 	// Aggressiveness: Max +15%, Risk Tolerance: Max +10% (Total potential: 1.25x)
-	marketabilityMult := 1.0 + (stats.Playstyle.Aggressiveness * 0.15) + (stats.Playstyle.RiskTolerance * 0.10)
+
+	// PILLAR 1: Corporate Synergy.
+	// A player's personal brand (Playstyle) is amplified by the prestige (Mojo) of their employer.
+	brandAmper := 1.0
+	if stats.EmployerClubID != "" {
+		if club, exists := l.clubs[stats.EmployerClubID]; exists {
+			brandAmper = 1.0 + (float64(club.Mojo) / 4000.0) // Max +25% synergy boost
+		}
+	}
+
+	marketabilityMult := (1.0 + (stats.Playstyle.Aggressiveness * 0.15) + (stats.Playstyle.RiskTolerance * 0.10)) * brandAmper
 	rep = int(float64(rep) * marketabilityMult)
 
 	// 5. Employment Multiplier (Social Trust from high-Mojo Clubs)
@@ -192,6 +203,14 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 			if multiplier > 1.5 {
 				multiplier = 1.5
 			}
+
+			// PILLAR 1: Regional Governor Administrative Bonus.
+			// Club owners managing a region (2+ districts) receive a +10% bonus to reflect
+			// their superior administrative influence.
+			if strings.EqualFold(club.OwnerWallet, stats.Wallet) && len(club.Territories) >= 2 {
+				multiplier += 0.10
+			}
+
 			rep = int(float64(rep) * multiplier)
 		}
 	}
