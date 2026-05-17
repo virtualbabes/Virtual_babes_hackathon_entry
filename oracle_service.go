@@ -696,10 +696,9 @@ func (l *Lobby) syncStatsFromBlockchain(clientID, wallet string) {
 						}
 					}
 				}
+				}
 				l.mutex.Unlock()
 			}
-		}
-	}
 }
 
 func (l *Lobby) refreshGlobalLeaderboard() {

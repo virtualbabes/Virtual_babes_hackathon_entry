@@ -31,7 +31,7 @@
 - [ ] **Pluralization Audit**: Update singular `NodeURL` to `NodeURLs` in `economy_service.go` and `handlers_admin.go`.
 - [ ] **Ledger Synchronization**: Replace `l.rewards` with `l.playerBalances` in `handlers_admin.go` and `lobby_manager.go`.
 - [ ] **Syntax Repair**:
-    - `oracle_service.go`: Fix expected `;` found `{` at line 703.
+    - [x] `oracle_service.go`: Fixed expected `;` found `{` and redundant returns.
     - [x] `tournament_manager.go`: Fixed expected statement found `)` at line 649.
     - `Public/app.js`: Fix missing braces and malformed logic around line 586/2173.
     - `Public/js/admin.js`: Repair malformed `try-catch` blocks and missing statements (line 205-369).
