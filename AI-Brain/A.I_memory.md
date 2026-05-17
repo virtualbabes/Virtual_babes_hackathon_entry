@@ -164,6 +164,7 @@
 *   **309**: Audited `processMojoDecay` in `lobby_manager.go`; confirmed 'Inactive Member Scaling' correctly adjusts Mojo decay rate based on club membership size.
 *   **310**: Audited `handleHeist` in `club_service.go`; confirmed 'Kidnap Gambit' success chance is correctly influenced by the target club's 'Security' staff count.
 *   **311**: Hardened `handleTradeShares` in `market_service.go`; added `sector_id` ("arena_center") to the `tradeDetails` payload for localized on-chain economic auditing.
+*   **312**: Audited `processLoans` in `economy_processing.go`; verified that 'Market Tokens' (15% residual value) are correctly calculated with micro-unit rounding and persistently added to the borrower's `PlayerStats` upon collateral default.
 *   **306**: Ingested comprehensive diagnostic payload; identified critical build tags gap and syntax corruption in `app.js` and `admin.js`. Expanded Pillar 5 of the roadmap to track stabilization.
 *   **303**: Hardened `handleHealthCheck` in `handlers_public.go` with Multi-Node Failover; refactored logic to cycle all NodeURLs before reporting `rpc_unreachable`, resolving 503 errors on Render and subsequent Carrd SyntaxErrors.
 *   **304**: Audited `applyDynamicScalingLocked` in `economy_service.go`; hardened the reward ratio calculation by subtracting `playerBalances`, `club.Treasury`, and the committed tournament pot from the physical balance to ensure scaling correctly accounts for all committed funds.
