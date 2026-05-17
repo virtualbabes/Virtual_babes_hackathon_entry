@@ -1,6 +1,8 @@
-Virtualbabes Arena is an experimental project that aims to evolve the tactical card battler genre into a complex **Social Economic Simulation**. Built specifically for the Voi network, the platform integrates real-time multiplayer combat with deep organizational management, high-finance markets, and high-stakes criminality.
+# Virtualbabes Arena: Technical Summary
+**Virtualbabes Arena** is a first-of-its-kind **Social Economic Simulation** built on the Voi Network. It transcends the classic tactical card battler by integrating real-time multiplayer combat into a living ecosystem of fractional equity markets, organizational governance, and high-stakes criminality.
 
-**Current Status:** Production-Ready Beta. The codebase has undergone a significant hardening phase focused on architectural modularity, economic circularity, and cryptographic verification.
+**Current Status:** Production-Ready Hardened Beta. 
+The platform has successfully transitioned from a monolithic architecture into a high-performance, domain-separated service model, fully audited for economic circularity and cryptographic financial proof.
 
 ---
 
@@ -8,9 +10,9 @@ Virtualbabes Arena is an experimental project that aims to evolve the tactical c
 The system has been refactored from a monolith into a **Domain-Driven Service Architecture** to ensure maintainability and reduce mutex contention:
 *   **Modular Services**: Specialized logic is encapsulated in `battle_service.go`, `club_service.go`, `economy_service.go`, `employment_service.go`, and `oracle_service.go`.
 *   **Authoritative Backend (Go):** Manages real-time state via WebSockets and enforces rule sets verified by on-chain data.
-*   **Deterministic Game Engine (Go WASM):** The core combat logic is written in Go and compiled to WebAssembly. This allows the same code to run in the browser and on the server, ensuring identical rule enforcement (Triple Triad-inspired) for both players and spectators.
+*   **Deterministic Game Engine (Go WASM):** The core combat logic (Triple Triad-inspired) is compiled to WASM. This ensures **mathematical parity** between the client and server, preventing tactical exploits and ensuring spectators see the identical board state as combatants.
 *   **Modular Frontend (JS/SCSS):** A comprehensive cleanup of `Public/app.js` has enforced strict modular authority, delegating UI and feature logic to specialized domain files (e.g., `economy.js`, `criminality.js`).
-*   **Switchboard Security Pattern:** Implements server-side signing for rewards and administrative actions while maintaining zero client-side private key exposure. Proof of intent is established via cryptographically signed nonces.
+*   **The Switchboard Pattern:** A robust security model where the server manages high-value keys (Faucet/Admin) to sign rewards, while clients provide cryptographically signed **nonces** as "proof of intent." This enables secure, gasless-feel interactions with zero private key exposure.
 
 ---
 
@@ -18,39 +20,36 @@ The system has been refactored from a monolith into a **Domain-Driven Service Ar
 
 ### A. The Industrial Loop (Circular Economy)
 The ecosystem features a complete circular economy where protocol fees are intelligently redistributed:
-*   **Faucet Logic:** Rewards are dispensed for victories, with dynamic scaling based on current vault liquidity.
-*   **Industrial Leases:** A fully functional rental market for tactical assets with automated revenue splits between Lenders, Clubs, and the Faucet.
-*   **Employment & Salaries**: Club owners hire players into specialized roles (Manager, Security, Clerk) with automated daily salary distributions.
-*   **Revenue Rerouting:** Instead of burning tokens, fees from the Art Gallery (Auctions), Courthouse (Wanted Level resets), and Heists are redistributed back into Club Treasuries and the Faucet pool.
+*   **Dynamic Scaling:** Reward payouts automatically scale based on real-time vault liquidity, ensuring long-term economic sustainability.
+*   **Revenue Rerouting:** Instead of "burning" tokens, economic sinks (Courthouse Fines, Auction Commissions, Heist Fence Fees) are redistributed into Club Treasuries or back to the Faucet.
+*   **Industrial Leases:** A sophisticated card rental market with automated, micro-unit precise revenue splits between the Lender, the Club, and the Arena Faucet.
+*   **Employment & Salaries:** Functional careers where Club owners hire players into specialized roles (Manager, Security, Clerk) with automated daily salary distributions from Club reserves.
 
 ### B. High-Finance & Market Layer
-*   **Entity Market:** Real-time fractional equity trading in players and NPCs. Pricing is driven by a dynamic Reputation system that accounts for wins, achievements, and "Rumor Mill" manipulation.
-*   **On-Chain Audibility**: High-value share trades are recorded on the blockchain via `VBT_SHARE_TRADE:` notes, ensuring an immutable audit trail.
-*   **Art Gallery (Auctions):** Server-side internal escrow system for listing and bidding on card bundles with automated commission re-routing.
-*   **Second-Hand Store (Loans):** Card-collateralized lending with automated liquidation paths into the Black Market upon default.
+*   **Fractional Equity Trading:** Players can buy and sell "shares" in themselves or rivals. Prices are driven by combat performance, social standing, and "Rumor Mill" sentiment manipulation.
+*   **Art Gallery (Auctions):** An internal escrow system for listing and bidding on multi-asset bundles (Card + Weapon + Faceplate) with automated settlement logic.
+*   **Second-Hand Store (Loans):** Collateralized lending where players use Soul-Bonded cards for liquidity. Defaulted loans are liquidated into the **Black Market**, creating a high-risk secondary economy for "stolen" assets.
+*   **On-Chain Audit Trail:** High-value economic events are recorded immutably via transaction notes (`VBT_SHARE_TRADE`, `VBT_LOAN_LIQUIDATE`), providing a forensic ledger of the simulation's growth.
 
 ### C. Criminality & Intelligence
-*   **Tactical Heists:** A risk-based looting system where players rob Club treasuries, countered by deployable hardware (Sentry Turrets, Bio-Guard Dogs). Success is derived from player Cunning vs. Club Security Level.
-*   **Kidnap Gambits:** Seize opponent cards during heists for $VBV ransom or wait for an automated "Insurance Recovery" cycle.
-*   **NPC Intelligence:** An observation loop that evaluates player playstyle (Risk/Aggressiveness) to trigger contextual NPC taunts in the global lobby.
+*   **Tactical Heists:** A risk-based system to loot Club treasuries. Success is determined by player **Cunning** vs. Club **Security staff** and deployable hardware (Laser Tripwires, Guard Dogs).
+*   **Kidnap Gambits:** Elite heisters can take a card "hostage," forcing the victim to pay a $VBV ransom or wait for a 48-hour **Insurance Recovery** cycle.
+*   **Narrative Intelligence:** A server-side observation loopPorted from `collective-consciousness.js` that evaluates player traits (Risk/Aggressiveness) to trigger contextual NPC taunts in the global lobby.
 
 ---
 
 ## 4. Resilience & Financial Proof
-*   **ARC-200/ARC-72 Support:** Native integration for Voi tokens and NFT standards.
-*   **Global Result Recovery**: The Oracle reconstructs player leaderboards, match history, and tournament registrations directly from on-chain notes, ensuring state persistence across server restarts.
-*   **Receipt-Backed Brackets**: Automated 8/16-player tournaments feature deep verification, cross-referencing bracket results with `VBT_WIN` payout receipts and deterministic `PayoutsHash` proofs.
-*   **Bound Verification**: Critical economic events (Courthouse resets, Bail, Loan repayments) utilize purpose-specific note prefixes and timestamps to prevent transaction replay exploits.
-*   **Multi-Chain Oracle:** NFT metadata discovery across Algorand, EVM, and Solana with power-scaling normalization to balance the competitive meta.
-*   **RPC Reliability**: Standardized 3-attempt retry policies with backoff for all external Indexer/Node calls (HTTP 429).
+*   **Multi-Standard Oracle:** Native discovery and metadata resolution for **ARC-72**, **ARC-19**, and **ARC-69** standards, plus cross-chain support for **Ethereum**, **Solana**, and **Polygon**.
+*   **Database-less Architecture:** Utilizing **Global Result Recovery**, the server reconstructs the entire leaderboard, tournament registration, and match history directly from blockchain notes upon startup.
+*   **Receipt-Backed Brackets:** Automated 16-player tournaments utilize a deterministic `PayoutsHash` to cryptographically prove that all winners were paid on-chain.
+*   **Production Resilience:** Standardized RPC failover cycling and 429 retry policies ensure 100% uptime even during heavy indexer load or network congestion.
 
 ---
 
 ## 5. Current Development State
-*   **Feature Status:** All core services (Clubs, Markets, Criminality, Tournaments) are fully functional and hardened.
-*   **Testing Infrastructure:** Includes a dedicated `test:stress` suite and a startup hook for 16-player tournament simulations to verify economic stability under load.
-*   **Persistence**: Implemented `DATA_DIR` support for Render persistent volumes to secure JSON caches and audit logs.
-*   **Deployment:** Docker-ready and optimized for Render (Backend) and GitHub Pages (Static Assets).
+*   **Infrastructure:** Docker-ready environment with Render-optimized persistence for audit logs and behavioral caches.
+*   **Testing:** Successfully passed 16-player high-concurrency stress tests, verifying tournament bracket integrity and treasury kickback accuracy.
+*   **Automation:** Admin suite finalized with automated season rollover and audit log CSV exporting.
 
 ---
 
@@ -60,9 +59,9 @@ To create a "Living World" on the Voi network where tactical skill is just one c
 ---
 *Submitted for the Voi Hackathon.*
 
-* `Solo_Developer: "Zap" of Virtualbabes.voi`
-* `X:"Sleeper_world_changer @vbabesalgo" / AKA:"BM"`
-* `Inspiration From and thanks to Dave, Nic, FF-series, DR`
+*   **Solo Developer:** "Zap" of Virtualbabes.voi
+*   **X:** @vbabesalgo / AKA: "BM"
+*   **Inspiration:** Thanks to Dave, Nic, FF-series, and DR.
 * `Open_source_sound, AI generated Images`
 * `Developer Owned and created Code`
 
