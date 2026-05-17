@@ -166,6 +166,8 @@
 *   **269**: Audited and hardened `CalculateReputation` in `economy_service.go`; implemented "Corporate Synergy" to amplify player marketability via Club Mojo and added a +10% administrative bonus for Regional Governors.
 *   **270**: Audited `handleJoinClub` in `club_service.go`; implemented a dynamic "REPUTATION_GATE" that scales with `club.Mojo` to ensure elite clubs correctly filter prospective members based on social standing.
 *   **271**: Audited and hardened `processMojoDecay` in `lobby_manager.go`; implemented "Inactive Member Scaling" where the Mojo decay rate increases by 0.2% per member to reflect the organizational overhead of larger clubs.
+*   **272**: Audited `handleHeist` in `club_service.go`; verified Regional Governor security bonuses (+15 level) and hardware synergy (1.5x) are correctly integrated into combat math.
+*   **273**: Hardened `ensurePlayerStatsMapsInitialized` in `lobby_manager.go`; ensured the `Wallet` field is populated to correctly trigger Governor reputation multipliers.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
 *   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.

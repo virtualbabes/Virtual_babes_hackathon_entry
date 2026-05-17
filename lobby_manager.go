@@ -2093,6 +2093,11 @@ func (l *Lobby) archiveSeason() {
 // ensurePlayerStatsMapsInitialized ensures that all map fields in PlayerStats are initialized.
 func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	stats := l.leaderboard[wallet]
+
+	// PILLAR 3: Identity Persistence.
+	// Populate the Wallet field to enable Governor and Owner-based reputation multipliers.
+	stats.Wallet = wallet
+
 	if stats.Inventory == nil {
 		stats.Inventory = make(map[string]int)
 	}

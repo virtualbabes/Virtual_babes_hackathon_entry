@@ -407,6 +407,8 @@
 - [VERIFIED] `determineTop5` in `tournament_manager.go` correctly weights Regional Governor status (owner of club with 2+ territories) in tie-breakers for prize distribution.
 - [VERIFIED] Regional Governor security bonuses (+15 level) and hardware multipliers (1.5x) are correctly handled in `handleHeist` (club_service.go) success calculations.
 - [FIXED] Hardened `CalculateReputation` (economy_service.go) to synergize Player Marketability with Club Mojo and added administrative standing bonuses for Regional Governors.
+- [FIXED] Resolved bug in `ensurePlayerStatsMapsInitialized` (lobby_manager.go) where `stats.Wallet` was not populated, preventing Governor Standing bonuses from being applied.
+- [VERIFIED] `handleHeist` (club_service.go) correctly accounts for Regional Governor security floors and hardware multipliers in success calculations.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
 - [FIXED] Implemented dynamic "REPUTATION_GATE" in `handleJoinClub` (club_service.go) to enforce minimum player Reputation requirements for joining elite clubs.
 - [FIXED] Resolved recursive deadlock in `processLeaseExpirations` (club_service.go) by switching to `logAdminAuditLocked` while holding the lobby mutex.
