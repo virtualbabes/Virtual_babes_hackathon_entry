@@ -181,6 +181,7 @@
 *   **284**: Hardened `finalizeTournament` in `tournament_manager.go`; ensured `PayoutsHash` correctly includes the `groupID` of multi-asset reward transactions for immutable financial proof.
 *   **285**: Audited `processAuctions` in `auction_service.go`; verified `VBT_AUCTION_SETTLE:` note metadata and resolved an inflation leak where neutral district commissions were double-credited to the faucet pool.
 *   **286**: Audited `handleHeist` in `club_service.go`; verified Fence Fee accuracy (10% of haul) and hardened `VBT_HEIST_LOG:` keys to use authoritative IDs for forensic clarity.
+*   **287**: Hardened `handlePayRansom` in `handlers_criminality.go`; implemented on-chain ransom recording via `VBT_RANSOM_LOG:` note, capturing victim wallet, laundering tax, and net payout for immutable financial proof.
 *   **227**: Resolved server-side compilation errors; corrected `skippedAssets` scoping in `tournament_manager.go` and synchronized `algod` client calls with pluralized `NodeURLs` across Faucet, Tournament, and Onboarding services.
 *   **228**: Fixed critical structural syntax errors in `oracle_service.go`; closed unclosed logic blocks in `syncStatsFromBlockchain` and synchronized all singular RPC/Indexer references with the pluralized `NetworkConfig` schema to restore build stability.
 *   **231**: Resolved recursive compiler errors in `tournament_manager.go`; synchronized `handleTournamentHistory` with pluralized `NetworkConfig` via `indexerRequest` dispatcher and repaired structural corruption in `oracle_service.go`.

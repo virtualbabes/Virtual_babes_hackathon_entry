@@ -172,6 +172,17 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	perpShareMicro := data.RansomAmount - arenaFeeMicro
 	l.playerBalances[data.PerpWallet] += perpShareMicro
 
+	// PILLAR 3: Financial Proof.
+	// Record successful ransom on-chain for the immutable audit trail.
+	ransomDetails := map[string]interface{}{
+		"card_id":     data.CardID,
+		"victim":      victimWallet,
+		"perp":        data.PerpWallet,
+		"laundry_tax": float64(arenaFeeMicro) / 1000000.0,
+		"net_payout":  float64(perpShareMicro) / 1000000.0,
+		"ts":          time.Now().Unix(),
+	}
+
 	// Add gross amount to cover future virtual reward liability and capture tax.
 	l.faucetBalance += float64(data.RansomAmount) / 1000000.0
 	l.applyDynamicScalingLocked()
@@ -196,6 +207,12 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	delete(l.activeKidnappings, data.CardID)
 
 	l.logAdminAuditLocked("RANSOM_PAID", victimWallet, fmt.Sprintf("Paid %d to %s for Card #%d (Fee: %d)", data.RansomAmount, data.PerpWallet, data.CardID, arenaFeeMicro))
+
+	// Dispatch on-chain log for financial verification
+	go func(rd interface{}) {
+		jsonPayload, _ := json.Marshal(rd)
+		l.sendNoteTx(fmt.Sprintf("VBT_RANSOM_LOG:%s", string(jsonPayload)))
+	}(ransomDetails)
 
 	// Notify Perp
 	perpClientID := l.getClientIDFromWalletLocked(data.PerpWallet)
