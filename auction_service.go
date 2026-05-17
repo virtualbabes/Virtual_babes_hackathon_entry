@@ -123,7 +123,7 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 		Bundle:       req.Bundle,
 		CurrentBid:   uint64(req.StartPrice * 1000000),
 		EndsAt:       time.Now().Add(time.Duration(req.Duration) * time.Hour),
-		TerritoryID:  "the_art_gallery",
+		TerritoryID:  "the_archive", // Fixed territory for Art Gallery Commissions
 	}
 
 	// PILLAR 2: High-Finance Audit. Use Locked variant to prevent recursive deadlock.

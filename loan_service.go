@@ -120,7 +120,7 @@ func (l *Lobby) handleTakeLoan(w http.ResponseWriter, r *http.Request) {
 		RepaymentAmount:  repaymentAmountMicro,
 		DueAt:            time.Now().Add(time.Duration(req.DurationHours) * time.Hour),
 		Status:           "active",
-		TerritoryID:      "the_second_hand_store", // Fixed territory for Second-Hand Store
+		TerritoryID:      "south_slums", // Fixed territory for Second-Hand Store (Loan Office)
 	}
 
 	// PILLAR 2: Industrial Loop Accounting.

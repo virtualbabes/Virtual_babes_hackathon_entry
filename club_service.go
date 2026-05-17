@@ -262,7 +262,8 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 		verifyNet = "Algorand"
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, 5000*1000000, assetID, wallet, vaultAddr)
+	// PILLAR 3: Bound Verification for Club Foundry.
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, 5000*1000000, assetID, wallet, vaultAddr, "FOUND_CLUB:")
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Club Foundry Error: Payment verification failed."}`)})
 		return
@@ -332,7 +333,8 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 		divisor = netCfg.PowerDivisor
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(joinFee*divisor), assetID, wallet, vaultAddr)
+	// PILLAR 3: Bound Verification for Club Entry.
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(joinFee*divisor), assetID, wallet, vaultAddr, "JOIN_CLUB:")
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Club Entry Error: Payment verification failed."}`)})
 		return
@@ -451,7 +453,8 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 		divisor = netCfg.PowerDivisor
 	}
 
-	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*divisor), assetID, ownerWallet, vaultAddr)
+	// PILLAR 3: Bound Verification for Territory Acquisition.
+	verified, _, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*divisor), assetID, ownerWallet, vaultAddr, "CLAIM_DISTRICT:")
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Payment verification failed."}`)})
 		return
