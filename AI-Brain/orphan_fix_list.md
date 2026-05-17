@@ -437,6 +437,7 @@
 - [FIXED] Refactored `handleHealthCheck` (handlers_public.go) to iterate through NodeURLs, preventing single-node failures from triggering 503 Service Unavailable on Render.
 - [FIXED] Hardened `checkNativeVaultBalanceOnChain` (oracle_service.go) with Multi-Node Failover and resolved inflation/scaling corruption caused by overwriting `faucetBalance` with native gas totals.
 - [VERIFIED] `VBT_BLACK_MARKET_SALE` note in `handleBuyBlackMarket` (black_market_service.go) correctly includes the `BorrowerWallet` via the "original_owner" field for forensic on-chain auditing.
+- [VERIFIED] `processMojoDecay` (lobby_manager.go) correctly scales 'Inactive Member' penalty with club membership size, increasing decay rate by 0.2% per member.
 - [FIXED] Implemented on-chain `VBT_LOAN_LIQUIDATE` notes in `processLoans` (economy_processing.go) to provide immutable proof of loan defaults, including TerritoryID and fee routing.
 - [FIXED] Resolved compilation error and telemetry gap in `handleActiveMatches` (handlers_public.go); implemented `StartTime` tracking and filtered out unpaired matches from discovery results.
 - [FIXED] Removed orphaned closing brace at end of `handlers_public.go`.
