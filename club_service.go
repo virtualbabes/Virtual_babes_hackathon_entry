@@ -351,16 +351,24 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 			return
 		}
 
-		// PILLAR 1: Reputation Gate. Elite clubs can set a minimum reputation for joining.
-		// The minimum reputation scales with the club's Mojo, reflecting its elite status.
+		// PILLAR 1: Reputation & Mojo Gate. Elite clubs can set minimum requirements for joining.
+		// These requirements scale with the club's Mojo, reflecting its elite status.
 		minReputationRequired := 0
-		if club.Mojo >= 500 { // Example: Clubs with 500+ Mojo are considered "elite"
-			minReputationRequired = club.Mojo / 5 // Example: 500 Mojo -> 100 Rep required
+		minMojoRequired := 0
+		if club.Mojo >= 500 { // Elite status starts at 500 Mojo
+			minReputationRequired = club.Mojo / 5 // e.g., 500 Mojo -> 100 Rep required
+			minMojoRequired = club.Mojo / 10      // e.g., 500 Mojo -> 50 Mojo required
 		}
-		playerStats := l.leaderboard[strings.ToLower(wallet)]
-		if minReputationRequired > 0 && playerStats.Reputation < minReputationRequired {
+
+		playerStats := l.leaderboard[wallet]
+		// PILLAR 1: Real-time Standing Verification. Ensure we check the most current Reputation.
+		playerStats.Reputation = l.CalculateReputation(playerStats)
+		l.leaderboard[wallet] = playerStats
+
+		if minReputationRequired > 0 && (playerStats.Reputation < minReputationRequired || playerStats.GetEffectiveMojo() < minMojoRequired) {
 			l.mutex.Unlock()
-			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Club Entry Failed: Minimum %d Reputation required to join elite club %s."}`, minReputationRequired, club.Name))})
+			msg := fmt.Sprintf(`{"text":"❌ Club Entry Failed: Elite club %s requires %d Reputation and %d Mojo social standing to join."}`, club.Name, minReputationRequired, minMojoRequired)
+			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(msg)})
 			return
 		}
 
