@@ -879,7 +879,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	lenderShareMicro := (priceMicro * 50) / 100
 	memberShareTotalMicro := priceMicro - faucetShareMicro - clubShareMicro - lenderShareMicro
 
-	// PILLAR 3: Financial Proof. 
+	// PILLAR 3: Financial Proof.
 	// Record lease initiation on-chain to archive the expected revenue distribution.
 	takeDetails := map[string]interface{}{
 		"id":       lease.ID,
@@ -888,7 +888,7 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 		"card_id":  lease.CardID,
 		"price":    lease.Price,
 		"duration": lease.DurationHours,
-		"split":    map[string]float64{"lender": float64(lenderShareMicro)/1000000.0, "faucet": float64(faucetShareMicro)/1000000.0, "club": float64(clubShareMicro)/1000000.0, "members": float64(memberShareTotalMicro)/1000000.0},
+		"split":    map[string]float64{"lender": float64(lenderShareMicro) / 1000000.0, "faucet": float64(faucetShareMicro) / 1000000.0, "club": float64(clubShareMicro) / 1000000.0, "members": float64(memberShareTotalMicro) / 1000000.0},
 		"ts":       time.Now().Unix(),
 	}
 
@@ -970,20 +970,21 @@ func (l *Lobby) processLeaseExpirations() {
 					"ts": now.Unix(),
 				}
 
+				// PILLAR 3: Identity Hardening.
+				l.ensurePlayerStatsMapsInitialized(lease.Borrower)
+				l.ensurePlayerStatsMapsInitialized(lease.LenderWallet)
+
 				if bStats, bExists := l.leaderboard[lease.Borrower]; bExists {
-				cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
-				if bStats.Inventory[cardKey] > 0 {
-					bStats.Inventory[cardKey]--
-				}
-				bStats.Reputation = l.CalculateReputation(bStats)
-				l.leaderboard[lease.Borrower] = bStats
+					cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
+					if bStats.Inventory[cardKey] > 0 {
+						bStats.Inventory[cardKey]--
+					}
+					bStats.Reputation = l.CalculateReputation(bStats)
+					l.leaderboard[lease.Borrower] = bStats
 				}
 
 				if lStats, lExists := l.leaderboard[lease.LenderWallet]; lExists {
 					cardKey := fmt.Sprintf("CARD-%d", lease.CardID)
-					if lStats.Inventory == nil {
-						lStats.Inventory = make(map[string]int)
-					}
 					lStats.Inventory[cardKey]++
 					lStats.Reputation = l.CalculateReputation(lStats)
 					l.leaderboard[lease.LenderWallet] = lStats
