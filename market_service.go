@@ -27,13 +27,17 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 		return
 	}
 
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
 	wallet, ok := l.wallets[env.FromID]
 	if !ok {
 		return
 	}
+
+	// PILLAR 5: Performance Hardening.
+	// Resolve names and metadata before acquiring the global lock to prevent I/O blocking.
+	entityName := l.ResolveEnvoiName(data.EntityID)
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
 
 	// Resolve target wallet: check active session map first, then leaderboard (NPCs/Offline), then fallback to direct address
 	var targetWallet string
@@ -70,8 +74,8 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 	// Define trade details for the on-chain audit trail.
 	tradeDetails := map[string]interface{}{
 		"action": data.Action,
-		"symbol": l.ResolveEnvoiName(targetWallet), // Asset Symbol (Envoi Name)
-		"qty":    data.Amount,                      // Share Quantity
+		"symbol": entityName,  // Asset Symbol (Envoi Name)
+		"qty":    data.Amount, // Share Quantity
 		"price":  pricePerShare,
 		"total":  totalValueBase,
 	}
