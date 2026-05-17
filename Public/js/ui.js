@@ -7,8 +7,8 @@ import { myPlayerIndex, currentOpponentId, spectatorMatchState, lastTauntPhase, 
 import { masterVolume, musicVolume, sfxVolume } from './audio.js';
 import { updateAdminRewardList, fetchAdminLogs, adminLogTicker, startAdminLogPolling, stopAdminLogPolling } from './admin.js';
 import { updateActiveRumors, renderRumorBoard } from './criminality.js';
-import { startSeasonTimer, seasonEnd, setSeasonEnd } from './leaderboard.js';
-import { getAssetSymbol } from './utils.js';
+import { seasonEnd, totalTournaments, tournamentLimit, currentTournamentPage, fetchTournamentHistory, fetchSeasonHistory } from './leaderboard.js';
+import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName } from './utils.js';
 
 export let tooltipEl = document.getElementById("power-tooltip");
 export let maintenanceTicker = null;
@@ -343,4 +343,176 @@ export function openSettingsOverlay() {
 
 export function closeSettingsOverlay() {
     document.getElementById("settings-overlay").classList.add("hidden");
+}
+
+/**
+ * Generates the HTML structure for the tournament bracket.
+ * PILLAR 4: Modular UI. Moved from legacy app.js to enforce UI authority.
+ */
+export function generateBracketHTML(matches, activeRound = -1) {
+    if (!matches || matches.length === 0) {
+        const msg = activeRound === -1 ? "Match data pending blockchain verification or unavailable." : "Matches will be generated once tournament starts...";
+        return `<div style="color: #888; font-style: italic; padding: 10px; text-align: center; width: 100%;">${msg}</div>`;
+    }
+
+    const rounds = {};
+    matches.forEach(m => {
+        if (!rounds[m.round]) rounds[m.round] = [];
+        rounds[m.round].push(m);
+    });
+
+    const sortedRounds = Object.keys(rounds).sort((a, b) => a - b);
+    let html = "";
+
+    sortedRounds.forEach(r => {
+        const isCurrentRound = (activeRound == r);
+        html += `<div class="bracket-round">`;
+        html += `<div class="bracket-round-title">ROUND ${r}</div>`;
+        rounds[r].forEach(m => {
+            const p1Short = getCachedEnvoiName(m.p1);
+            const p2Short = getCachedEnvoiName(m.p2);
+            let p1Class = "", p2Class = "";
+            if (m.winner) {
+                if (m.winner === m.p1) { p1Class = "winner"; p2Class = "loser"; }
+                else if (m.winner === m.p2) { p2Class = "winner"; p1Class = "loser"; }
+            }
+            html += `
+                <div class="bracket-match ${isCurrentRound && !m.winner ? 'active' : ''}">
+                    <div class="bracket-player ${p1Class}">${p1Short}</div>
+                    <div class="vs-label">VS</div>
+                    <div class="bracket-player ${p2Class}">${p2Short}</div>
+                </div>`;
+        });
+        html += `</div>`;
+    });
+    return html;
+}
+
+/**
+ * Updates the tournament history pagination controls.
+ */
+export function updateTournamentPaginationUI() {
+    const prevBtn = document.getElementById("prev-tournament-btn");
+    const nextBtn = document.getElementById("next-tournament-btn");
+    const info = document.getElementById("tournament-page-info");
+    
+    if (!prevBtn || !nextBtn || !info) return;
+
+    const totalPages = Math.ceil(totalTournaments / tournamentLimit);
+    info.innerText = `Page ${currentTournamentPage} of ${totalPages || 1}`;
+
+    prevBtn.disabled = (currentTournamentPage <= 1);
+    nextBtn.disabled = (currentTournamentPage >= totalPages || totalPages === 0);
+
+    prevBtn.onclick = () => {
+        fetchTournamentHistory(currentTournamentPage - 1);
+        document.getElementById("hof-history-view").scrollTop = 0;
+    };
+    nextBtn.onclick = () => {
+        fetchTournamentHistory(currentTournamentPage + 1);
+        document.getElementById("hof-history-view").scrollTop = 0;
+    };
+}
+
+export let seasonTimerInterval = null;
+export function startSeasonTimer() {
+    if (seasonTimerInterval) clearInterval(seasonTimerInterval);
+    const timerEl = document.getElementById("season-timer");
+    if (!timerEl) return;
+
+    const update = () => {
+        if (!seasonEnd) return;
+        const now = new Date();
+        const diff = seasonEnd - now;
+        if (diff <= 0) {
+            timerEl.innerText = "SEASON ENDED - ROLLOVER IN PROGRESS";
+            clearInterval(seasonTimerInterval);
+            return;
+        }
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        timerEl.innerText = `${days}d ${hours}h ${mins}m REMAINING`;
+    };
+    update();
+    seasonTimerInterval = setInterval(update, 60000);
+}
+
+export function switchHofTab(tab) {
+    const views = ["hof-rankings-view", "hof-history-view", "hof-seasons-view"];
+    views.forEach(v => document.getElementById(v).classList.add("hidden"));
+    document.querySelectorAll(".hof-tab").forEach(t => t.classList.remove("active"));
+    const target = document.getElementById(`hof-${tab}-view`);
+    if (target) target.classList.remove("hidden");
+    const activeTab = Array.from(document.querySelectorAll(".hof-tab")).find(t => t.onclick.toString().includes(tab));
+    if (activeTab) activeTab.classList.add("active");
+
+    if (tab === 'history') fetchTournamentHistory(1);
+    if (tab === 'seasons') fetchSeasonHistory();
+}
+
+export function toggleTournamentDetails(id) {
+    const details = document.getElementById(`details-${id}`);
+    if (details) details.classList.toggle("hidden");
+}
+
+export function handleTournamentUI(tournamentState) {
+    const banner = document.getElementById("tournament-banner");
+    const statusText = document.getElementById("tournament-status-text");
+    const regBtn = document.getElementById("tournament-reg-btn");
+
+    if (!tournamentState || !tournamentState.active) {
+        if (banner) banner.classList.add("hidden");
+        return;
+    }
+
+    if (banner) banner.classList.remove("hidden");
+    if (statusText) {
+        const network = window.GetGameState()?.network || "VOI";
+        const currency = network === "VOI" ? "$VBV" : "$AVoi";
+
+        if (tournamentState.current_round === 0) {
+            statusText.innerText = `Registration Open! Buy-in: ${tournamentState.buy_in_amount} ${currency}`;
+            const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
+            if (CONFIG.VAULT_ADDRESS && assetId) {
+                if (regBtn) regBtn.classList.remove("hidden");
+            } else {
+                statusText.innerText += " (Establishing Secure Sync...)";
+                if (regBtn) regBtn.classList.add("hidden");
+            }
+        } else {
+            statusText.innerText = `Tournament Active - Round ${tournamentState.current_round}`;
+            if (regBtn) regBtn.classList.add("hidden");
+        }
+    }
+}
+
+export async function renderTournamentBracket(state) {
+    const participants = new Set();
+    state.matches.forEach(m => {
+        if (m.p1) participants.add(m.p1);
+        if (m.p2) participants.add(m.p2);
+        if (m.winner) participants.add(m.winner);
+    });
+    await Promise.all(Array.from(participants).filter(p => p && p !== "TBD").map(p => resolveEnvoiName(p)));
+
+    const potEl = document.getElementById("tournament-pot-display");
+    if (potEl) potEl.innerText = `POT: ${state.pot.toFixed(1)} $VBV`;
+    
+    const visualization = document.getElementById("bracket-visualization");
+    if (visualization) visualization.innerHTML = generateBracketHTML(state.matches, state.current_round);
+}
+
+export function openTournamentBracket() {
+    if (window.SetPhase) {
+        window.SetPhase("TournamentLobby");
+        window.syncUI();
+    }
+}
+
+export function closeTournamentBracket() {
+    if (window.SetPhase) {
+        window.SetPhase("Lobby");
+        window.syncUI();
+    }
 }

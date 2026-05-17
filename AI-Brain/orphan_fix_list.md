@@ -388,3 +388,5 @@
 - [VERIFIED] Regional Governor power boost initialization in `lobby_manager.go` is correctly snapshotted and synchronized for both combat validation and UI feedback.
 - [FIXED] Ensured `handleMove` in `lobby_manager.go` correctly prunes the player's hand slice (`P1Deck`/`P2Deck`) when a card is played to the board.
 - [FIXED] Restored functional logic to `Public/js/utils.js` after identifying a regression caused by the Task 241 modularity cleanup.
+- [FIXED] Resolved logic shadowing in `app.js` by migrating legacy tournament UI helpers to `ui.js` and enforcing modular authority for `leaderboard.js`.
+- [FIXED] Enforced modular authority for the Leaderboard domain; moved purely visual toggles and layout orchestration from `leaderboard.js` to `ui.js`.

@@ -1,8 +1,8 @@
 import { CONFIG } from './js/config.js';
 import { initWebSocket, handleServerMessage } from './js/network.js';
-import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, showToast, setTransactionStatus, openSettingsOverlay, closeSettingsOverlay, showTournamentTransition, shareTournamentVictory, showQuickCastMenu, movePowerTooltip, hidePowerTooltip } from './js/ui.js';
+import { hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, showToast, setTransactionStatus, openSettingsOverlay, closeSettingsOverlay, showTournamentTransition, shareTournamentVictory, showQuickCastMenu, movePowerTooltip, hidePowerTooltip, generateBracketHTML, updateTournamentPaginationUI } from './js/ui.js';
 import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress, connectWith, updatePayoutUI } from './js/wallet.js';
-import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket } from './js/leaderboard.js';
+import { fetchLeaderboard, switchHofTab, registerForTournament, openTournamentBracket, closeTournamentBracket, handleTournamentUI, renderTournamentBracket } from './js/leaderboard.js';
 import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, currentChallengerId, lastBoardState, lastLobbyPlayers, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderMatchHistory } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters } from './js/deck.js';
 import { adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, onAdminNetworkSelectChange, adminSetActiveNetwork, globalClubs } from './js/admin.js';
@@ -123,6 +123,8 @@ window.releaseHostage = releaseHostage;
 window.shareTournamentVictory = shareTournamentVictory;
 window.syncUI = syncUI;
 window.showQuickCastMenu = showQuickCastMenu;
+window.generateBracketHTML = generateBracketHTML;
+window.updateTournamentPaginationUI = updateTournamentPaginationUI;
 
 const UI_CACHE = new Map();
 const getEl = (id) => {
