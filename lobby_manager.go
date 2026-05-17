@@ -427,6 +427,14 @@ func (l *Lobby) handleGameProtocol(env *Envelope, rawMsg []byte) {
 		if !ok {
 			return
 		}
+
+		// SECURITY AUDIT: Verify that the sender is actually a player in this match.
+		// Spectators should never be able to inject moves or trigger AI delays for participants.
+		if env.FromID != match.P1ID && env.FromID != match.P2ID {
+			log.Printf("[SECURITY] Unauthorized move attempt from spectator: %s\n", env.FromID)
+			return
+		}
+
 		var move MoveData
 		if err := json.Unmarshal(env.Payload, &move); err != nil {
 			return
@@ -1509,6 +1517,7 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		P1RegionalBoost: p1Boost,
 		P2RegionalBoost: p2Boost,
 		ActiveItemBuffs: make(map[string]map[string]int),
+		Multiplayer:     true, // paired matches are authoritative multiplayer
 	}
 
 	if c1, ok := l.clients[id1]; ok {

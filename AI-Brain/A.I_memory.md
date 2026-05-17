@@ -182,6 +182,7 @@
 *   **295**: Hardened `processLoans` in `economy_processing.go`; implemented on-chain liquidation recording via `VBT_LOAN_LIQUIDATE:` note, capturing the territory ID and revenue split for forensic auditing.
 *   **293**: Finalized Spectator Portal infrastructure; synchronized `StartTime` telemetry across `common_types.go` and `lobby_manager.go`, and hardened discovery filtering in `handlers_public.go` to exclude unpaired queue entries.
 *   **298**: Engineered VBT Cyber-HUD for external Carrd portals; implemented neon-glass overlay with pulsing status badges and two-way control wiring to support remote match rotation and engine telemetry.
+*   **299**: Audited `handleSpectate` in `lobby_manager.go`; implemented Participant Guard in move handler to prevent spectators from triggering AI thinking delays and synchronized `multiplayer` flag across server and WASM layers.
 *   **283**: Audited `initiatePairedMatch` logic; resolved WASM engine desync where local P2 players incorrectly utilized P1 boosts; implemented card ownership re-synchronization in `StartMatch` and standardized boost handshake keys.
 *   **284**: Hardened `finalizeTournament` in `tournament_manager.go`; ensured `PayoutsHash` correctly includes the `groupID` of multi-asset reward transactions for immutable financial proof.
 *   **285**: Audited `processAuctions` in `auction_service.go`; verified `VBT_AUCTION_SETTLE:` note metadata and resolved an inflation leak where neutral district commissions were double-credited to the faucet pool.

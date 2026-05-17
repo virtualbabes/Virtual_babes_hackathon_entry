@@ -1086,6 +1086,7 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 		Game.TerritoryID = tid.String()
 	}
 
+	if mp := data.Get("multiplayer"); !mp.IsUndefined() { Game.Multiplayer = mp.Bool() }
 	if b1 := data.Get("p1_regional_boost"); !b1.IsUndefined() {
 		Game.P1RegionalBoost = b1.Bool()
 	}

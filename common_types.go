@@ -222,6 +222,7 @@ type MatchState struct {
 	Rules             map[string]bool `json:"rules"`
 	IsFinished        bool            `json:"is_finished"`
 	Spectators        []string        `json:"spectators"` // Client IDs spectating this match
+	Multiplayer       bool            `json:"multiplayer"` // Explicitly flag as multiplayer to prevent local AI loops
 	P1WantedLevel     int             `json:"p1_wanted_level"`
 	P2WantedLevel     int             `json:"p2_wanted_level"`
 	P1Cunning         int             `json:"p1_cunning"`
