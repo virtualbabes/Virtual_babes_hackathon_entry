@@ -27,6 +27,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		return
 	}
 
+	// PILLAR 3: Identity Hardening.
+	l.ensurePlayerStatsMapsInitialized(wallet)
+
 	playerStats := l.leaderboard[wallet]
 	targetClub, exists := l.clubs[data.TargetClubID]
 	if !exists {

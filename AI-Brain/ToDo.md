@@ -36,7 +36,7 @@
     - `Public/app.js`: Fix missing braces and malformed logic around line 586/2173.
     - `Public/js/admin.js`: Repair malformed `try-catch` blocks and missing statements (line 205-369).
     - `Public/js/wallet.js`: Fix missing closing brace at line 276.
-- [ ] **Compiler Compliance**: Resolve unused `pIdx` in `battle_service.go` and unused `p` in `main.go`. Fix `:=` shadowing in `achievement_service.go` and `club_service.go`.
+- [ ] **Compiler Compliance**: Resolve unused variables (`pIdx` in `battle_service.go`) and `:=` shadowing in `club_service.go`. (Shadowing fixed in achievement_service.go).
 - [ ] **Data Model Restoration**: Restore missing `Wallet` field to `PlayerStats` struct and fix `jsMap` references in `main.go`.
 
 ## Completed & Hardened (Reference)

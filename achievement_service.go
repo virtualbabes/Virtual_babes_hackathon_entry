@@ -55,6 +55,6 @@ func (l *Lobby) unlockAchievementLocked(wallet, id string) {
 	}
 
 	// Broadcast lobby update using the Locked snapshot pattern
-	msg := l.getLobbyUpdateMsgLocked()
+	msg = l.getLobbyUpdateMsgLocked()
 	go func() { l.broadcast <- msg }()
 }
