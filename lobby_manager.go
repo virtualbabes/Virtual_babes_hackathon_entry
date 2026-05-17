@@ -1021,6 +1021,15 @@ func (l *Lobby) handleSpectate(env *Envelope) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	// SECURITY: Prevent active players from abandoning their match to spectate.
+	// This ensures that participants in tourney matches cannot trigger a DNF by switching to a stream.
+	if existing, ok := l.matches[env.FromID]; ok {
+		if env.FromID == existing.P1ID || env.FromID == existing.P2ID {
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Error: Cannot spectate while your own match is active."}`)})
+			return
+		}
+	}
+
 	// Find the match associated with the target client
 	match, ok := l.matches[data.TargetID]
 	if !ok {
@@ -1050,6 +1059,20 @@ func (l *Lobby) handleSpectate(env *Envelope) {
 	})
 
 	log.Printf("[LOBBY] Client %s is now spectating match %s vs %s\n", env.FromID, match.P1ID, match.P2ID)
+}
+
+// countUniqueMatchesLocked counts actual active duels, excluding spectator sessions.
+// Assumptions: The lobby mutex is held by the caller.
+func (l *Lobby) countUniqueMatchesLocked() int {
+	seen := make(map[*MatchState]bool)
+	count := 0
+	for _, m := range l.matches {
+		if !seen[m] && !m.IsFinished {
+			seen[m] = true
+			count++
+		}
+	}
+	return count
 }
 
 func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
@@ -1154,7 +1177,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		FaucetBalance     float64                  `json:"faucet_balance"`
 		Clubs             map[string]*Club         `json:"clubs"`
 		RewardStack       map[string]uint64        `json:"reward_stack"`
-		ActiveMatchCount  int                      `json:"active_match_count"`
+		ActiveMatchCount  int                      `json:"active_match_count"` // Fixed: Uses unique match counting
 		Tournament        TournamentState          `json:"tournament"`
 		AvailableNetworks map[string]NetworkConfig `json:"available_networks"`
 		Rumors            map[string]*Rumor        `json:"rumors"` // Added for UI display
@@ -1166,7 +1189,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		MaintenanceTime: l.maintenanceTime,
 		Clubs:           l.clubs,
 		RewardStack:     l.rewardStack, FaucetBalance: l.faucetBalance,
-		ActiveMatchCount: len(l.matches) / 2, Tournament: l.tournament,
+		ActiveMatchCount: l.countUniqueMatchesLocked(), Tournament: l.tournament,
 		AvailableNetworks: l.availableNetworks, AdminFocusNetwork: l.adminFocusNetwork,
 		Rumors:        l.rumors,
 		BannedAvatars: l.bannedAvatars,

@@ -59,7 +59,7 @@ func (l *Lobby) handlePublicStatus(w http.ResponseWriter, r *http.Request) {
 	}{
 		FaucetBalance: l.faucetBalance,
 		Maintenance:   l.maintenanceMode,
-		ActiveMatches: len(l.matches) / 2,
+		ActiveMatches: l.countUniqueMatchesLocked(), // Fixed: Uses unique match counting
 		TotalPlayers:  len(l.clients),
 		Timestamp:     time.Now(),
 	}
@@ -165,6 +165,7 @@ func (l *Lobby) getVerifiedCard(wallet string, tokenID int, networkName string) 
 		return ServerCard{}, err
 	}
 	return cards[tokenID], nil
+}
 
 // handleActiveMatches returns a list of ongoing matches for the spectator portals.
 func (l *Lobby) handleActiveMatches(w http.ResponseWriter, r *http.Request) {

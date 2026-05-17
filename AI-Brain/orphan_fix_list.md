@@ -409,6 +409,9 @@
 - [FIXED] Hardened `CalculateReputation` (economy_service.go) to synergize Player Marketability with Club Mojo and added administrative standing bonuses for Regional Governors.
 - [FIXED] Resolved bug in `ensurePlayerStatsMapsInitialized` (lobby_manager.go) where `stats.Wallet` was not populated, preventing Governor Standing bonuses from being applied.
 - [VERIFIED] `handleHeist` (club_service.go) correctly accounts for Regional Governor security floors and hardware multipliers in success calculations.
+- [FIXED] Resolved security vulnerability in `lobby_manager.go` where spectators could inject moves into matches; added participant verification to the move handler.
+- [FIXED] Hardened `handleSpectate` in `lobby_manager.go` to prevent players in active matches from abandoning their session to join a stream.
+- [FIXED] Corrected server load calculation logic in `lobby_manager.go` and `handlers_public.go` to accurately count unique active matches and exclude spectator sessions from the load metric.
 - [FIXED] Hardened `handleJoinClub` (club_service.go) by implementing player Mojo requirements for elite clubs and ensuring standing reconciliation during the gate check.
 - [FIXED] Implemented a 5% "Regional Governor Protocol Fee" on territory purchases in `handlePurchaseTerritory` (club_service.go), distributed to existing Governors and synchronized with `faucetBalance`.
 - [FIXED] Hardened `processMojoDecay` (lobby_manager.go) to scale stagnation penalties based on club membership size, ensuring high-fidelity organizational maintenance requirements.
