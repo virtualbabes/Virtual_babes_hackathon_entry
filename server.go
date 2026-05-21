@@ -1,0 +1,438 @@
+//go:build !js && !wasm
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
+)
+
+// getDataPath constructs a full path for persistent files using the DataDir field.
+func (l *Lobby) getDataPath(filename string) string {
+	if l.DataDir == "" {
+		return filename
+	}
+	return filepath.Join(l.DataDir, filename)
+}
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		allowed := os.Getenv("ALLOWED_ORIGINS")
+		if allowed == "" || allowed == "*" {
+			return true // Permissive in dev or if explicitly wildcarded
+		}
+		origin := r.Header.Get("Origin")
+		for _, o := range strings.Split(allowed, ",") {
+			if strings.TrimSpace(o) == origin {
+				return true
+			}
+		}
+		log.Printf("[SECURITY] WebSocket connection rejected from unauthorized origin: %s", origin)
+		return false
+	},
+}
+
+// newLobby creates and returns a new Lobby instance, initializing all shared state.
+func newLobby() (*Lobby, error) {
+	seasonStart := time.Now()
+	seasonNum := 1
+
+	// PILLAR 5: Infrastructure Synergy.
+	wcID := os.Getenv("WC_PROJECT_ID")
+	if wcID == "" {
+		wcID = os.Getenv("AppID") // Prioritize the user-added AppID from Render
+	}
+
+	l := &Lobby{
+		clients:                 make(map[string]*Client),
+		matches:                 make(map[string]*MatchState),
+		inventory:               make(map[int]ServerCard),
+		persistentCardCache:     make(map[int]ServerCard),
+		wallets:                 make(map[string]string),
+		leaderboard:             make(map[string]PlayerStats),
+		matchHistory:            make(map[string]MatchHistory),
+		nonces:                  make(map[string]NonceData),
+		rateLimits:              make(map[string]time.Time),
+		httpRateLimits:          make(map[string]*RateBucket),
+		bannedAvatars:           make(map[string]time.Time),
+		registeredTxIDs:         make(map[string]time.Time),
+		processingRewards:       make(map[string]time.Time),
+		processingOnboarding:    make(map[string]time.Time),
+		processingRegistrations: make(map[string]time.Time),
+		activeKidnappings:       make(map[int]KidnapState),
+		availableNetworks:       make(map[string]NetworkConfig),
+		linkedWallets:           make(map[string]WalletLinkInfo),
+		loans:                   make(map[string]*Loan),
+		rumors:                  make(map[string]*Rumor),
+		auctions:                make(map[string]*Auction),
+		rewardStack:             make(map[string]uint64),
+		playerBalances:          make(map[string]uint64),
+		initialRewards:          make(map[string]uint64),
+		holdingBonuses:          make(map[string][]HoldingBonus),
+		register:                make(chan *Client),
+		unregister:              make(chan *Client),
+		broadcast:               make(chan []byte),
+		onboardedWallets:        make(map[string]bool),   // Initialize the new map
+		onboardingSemaphore:     make(chan struct{}, 5),  // Limit concurrent bridge operations
+		oracleSemaphore:         make(chan struct{}, 10), // Limit concurrent indexer queries
+		envoiCache:              make(map[string]string),
+		lastSeenDistricts:       make(map[string]string),
+		treasuryAverages:        make(map[string]float64),
+		treasuryCrashed:         make(map[string]bool),
+		vaultAddress:            os.Getenv("VAULT_ADDRESS"),
+		WCProjectID:             wcID,                  // Load WalletConnect Project ID (AppID)
+		DataDir:                 os.Getenv("DATA_DIR"), // Persistent volume path
+		maxFaucetCapacity:       10000.0,
+		adminFocusNetwork:       "Voi Mainnet",
+	}
+
+	// Initialize reward configuration
+	baseReward, _ := strconv.ParseUint(os.Getenv("BASE_REWARD"), 10, 64)
+	l.baseReward = baseReward * 1000000
+	l.initialBaseReward = l.baseReward
+	l.rewardAssetID = os.Getenv("REWARD_ASSET_ID")
+	l.avoiAssetID = os.Getenv("AVOI_ASSET_ID")
+	l.initialRewards[l.rewardAssetID] = l.initialBaseReward
+
+	l.seasonStart = seasonStart
+	l.seasonNumber = seasonNum
+
+	l.loadNetworkConfigs()
+	l.loadRegisteredTxIDs()
+	l.loadLinkedWallets()
+	l.loadLeaderboard()                    // Reconstruct Playstyles before sync
+	l.loadEconomyState()                   // Reconstruct Virtual Balances
+	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
+	go l.loadRegistrationsFromIndexer()    // Reconstruct tournament registration state
+
+	// PILLAR 6: Blockchain Persistence. Load persistent card cache from blockchain snapshots.
+	l.loadPersistentCardCache()
+
+	return l, nil
+}
+
+// loadNetworkConfigs loads network configurations from the local JSON store.
+func (l *Lobby) loadNetworkConfigs() {
+	data, err := os.ReadFile("networks.json")
+	if err != nil {
+		log.Println("[CONFIG] networks.json not found, using defaults.")
+		l.availableNetworks["Voi Mainnet"] = NetworkConfig{
+			NetworkName:    "Voi Mainnet",
+			IndexerURLs:    []string{"https://mainnet-idx.voi.nodly.io", "https://mainnet-idx.voi.network"},
+			NodeURLs:       []string{"https://mainnet-api.voi.nodly.io", "https://mainnet-api.voi.network"},
+			ExplorerURL:    "https://block.voi.network",
+			AppID:          l.rewardAssetID,
+			AssetID:        l.rewardAssetID,
+			ChainID:        "algorand:wGHE2Pwd1-YdV4EuJFy9u6C24-L-2B05",
+			PowerDivisor:   1000000,
+			PowerBase:      50,
+			IPFSGatewayURL: "https://ipfs.io/ipfs/", // Default public gateway
+		}
+		l.availableNetworks["Algorand Mainnet"] = NetworkConfig{
+			NetworkName:  "Algorand Mainnet",
+			IndexerURLs:  []string{"https://mainnet-idx.algonode.cloud", "https://mainnet-idx.algonodly.io"},
+			NodeURLs:     []string{"https://mainnet-api.algonode.cloud", "https://mainnet-api.algonodly.io"},
+			ExplorerURL:  "https://explorer.perawallet.app",
+			AppID:        "0",             // No game app on Algo, assets only
+			AssetID:      l.rewardAssetID, // Placeholder or specific mapping
+			ChainID:      "algorand:mainnet-v1.0",
+			PowerDivisor: 1000000,
+			PowerBase:    50,
+		}
+		// Other chains added as Metadata sources only - No transaction capability implied
+		l.availableNetworks["Ethereum"] = NetworkConfig{
+			NetworkName:  "Ethereum",
+			IndexerURLs:  []string{"https://api.etherscan.io"},
+			NodeURLs:     []string{"https://eth.llamarpc.com"},
+			ExplorerURL:  "https://etherscan.io",
+			ChainID:      "eip155:1",
+			PowerDivisor: 1e18, // standard ETH decimals
+			PowerBase:    100,
+		}
+		l.availableNetworks["Solana"] = NetworkConfig{
+			NetworkName:  "Solana",
+			IndexerURLs:  []string{"https://api.mainnet-beta.solana.com"},
+			NodeURLs:     []string{"https://api.mainnet-beta.solana.com"},
+			ExplorerURL:  "https://solscan.io",
+			ChainID:      "solana:5eykt4UsFvXYfy2khQbSsLurFBXY",
+			PowerDivisor: 1e9, // standard SOL decimals
+			PowerBase:    75,
+		}
+		l.availableNetworks["Polygon"] = NetworkConfig{
+			NetworkName:  "Polygon",
+			IndexerURLs:  []string{"https://api.polygonscan.com"},
+			NodeURLs:     []string{"https://polygon.llamarpc.com"},
+			ExplorerURL:  "https://polygonscan.com",
+			ChainID:      "eip155:137",
+			PowerDivisor: 1e18,
+			PowerBase:    40,
+		}
+		l.availableNetworks["Bitcoin"] = NetworkConfig{
+			NetworkName:  "Bitcoin",
+			IndexerURLs:  []string{"https://ordinals.com"},
+			NodeURLs:     []string{"https://ordinals.com"},
+			ExplorerURL:  "https://ordiscan.com",
+			ChainID:      "bip122:000000000019d6689c085ae165831e93",
+			PowerDivisor: 1, // Ordinals are individual inscriptions
+			PowerBase:    200,
+		}
+		l.availableNetworks["Flow"] = NetworkConfig{
+			NetworkName:  "Flow",
+			IndexerURLs:  []string{"https://rest-mainnet.onflow.org"},
+			NodeURLs:     []string{"https://access-mainnet-beta.onflow.org"},
+			ExplorerURL:  "https://flowscan.org",
+			ChainID:      "flow:mainnet",
+			PowerDivisor: 1e8,
+			PowerBase:    60,
+		}
+		l.availableNetworks["WAX"] = NetworkConfig{
+			NetworkName:  "WAX",
+			IndexerURLs:  []string{"https://wax.api.atomicassets.io"},
+			NodeURLs:     []string{"https://wax.greymass.com"},
+			ExplorerURL:  "https://wax.bloks.io",
+			ChainID:      "wax:1064487b3cd1a897ce03ae5b6a865651",
+			PowerDivisor: 1e8,
+			PowerBase:    30,
+		}
+		l.saveNetworkConfigs()
+		return
+	}
+	l.mutex.Lock()
+	json.Unmarshal(data, &l.availableNetworks)
+	l.mutex.Unlock()
+}
+
+// saveNetworkConfigs persists the current network configurations to disk.
+func (l *Lobby) saveNetworkConfigs() {
+	l.mutex.RLock()
+	data, _ := json.MarshalIndent(l.availableNetworks, "", "  ")
+	l.mutex.RUnlock()
+	os.WriteFile("networks.json", data, 0644)
+}
+
+// distributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
+// Ensures only players who were members at the time of tournament registration qualify.
+func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.distributeTournamentKickbackLocked(playerWallet, feeMicro, registrationTime, network)
+}
+
+// distributeTournamentKickbackLocked handles the kickback payout assuming the mutex is already held.
+func (l *Lobby) distributeTournamentKickbackLocked(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
+	// PILLAR 3: Dynamic Precision Recovery.
+	divisor := 1000000.0 // Default fallback
+	if cfg, ok := l.availableNetworks[network+" Mainnet"]; ok && cfg.PowerDivisor > 0 {
+		divisor = cfg.PowerDivisor
+	}
+
+	for _, club := range l.clubs {
+		joinedAt, isMember := club.Members[strings.ToLower(playerWallet)]
+
+		// Verify the player was a member at the time of tournament registration
+		if isMember && joinedAt.Before(registrationTime) {
+			// Base 1% kickback, scales with Club Mojo up to 5%
+			rate := 0.01 + (float64(club.Mojo)/1000.0)*0.04
+			if rate > 0.05 {
+				rate = 0.05
+			}
+
+			kickback := (float64(feeMicro) / divisor) * rate
+			club.Treasury += kickback
+			club.LastActivity = time.Now()
+
+			log.Printf("[REVENUE] Club %s received %.2f $VBV kickback from member %s registration (Rate: %.1f%%)\n",
+				club.Name, kickback, playerWallet, rate*100)
+
+			// A player can only benefit one club's treasury per registration
+			return
+		}
+	}
+}
+
+// serveWs upgrades HTTP connections to WebSockets and registers clients in the Lobby.
+func serveWs(lobby *Lobby, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("[WS ERROR] Upgrade failed: %v\n", err)
+		return
+	}
+
+	client := &Client{
+		conn:  conn,
+		send:  make(chan []byte, 256),
+		id:    fmt.Sprintf("Player-%d", time.Now().UnixNano()%10000),
+		lobby: lobby,
+	}
+
+	lobby.register <- client
+
+	// Initial connection handshake: provide the client with their ID and server config
+	// $Voi First: Identity always emphasizes Voi assets for payouts
+	identityMsg := Envelope{
+		Type:   "identity",
+		ToID:   client.id,
+		FromID: "SERVER",
+		Payload: json.RawMessage(fmt.Sprintf(`{"vault":"%s","vbv":"%s","avoi":"%s","wc_project_id":"%s","primary_network": "Voi Mainnet"}`,
+			lobby.vaultAddress,
+			lobby.rewardAssetID,
+			lobby.avoiAssetID,
+			lobby.WCProjectID, // Include the WalletConnect Project ID
+		)),
+	}
+	msg, _ := json.Marshal(identityMsg)
+	client.send <- msg
+
+	go client.writePump()
+	go client.readPump()
+}
+
+func main() {
+	// Load local .env file if it exists (primarily for development)
+	if err := godotenv.Load(); err != nil {
+		log.Println("[INFO] No .env file found; relying on platform-injected environment variables.")
+	}
+
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// Mainnet Security Audit: Pre-validate critical secrets at startup to ensure stability
+	// PILLAR 1: Production Hardening. Check for either legacy or user-defined AppID.
+	wcCheck := os.Getenv("WC_PROJECT_ID")
+	if wcCheck == "" {
+		wcCheck = os.Getenv("AppID")
+	}
+
+	secrets := []string{"FAUCET_MNEMONIC", "ADMIN_WALLETS", "VAULT_ADDRESS"}
+	for _, s := range secrets {
+		if os.Getenv(s) == "" {
+			log.Printf("[SECURITY WARNING] Environment variable %s is missing. System functionality may be impaired.\n", s)
+		}
+	}
+
+	if wcCheck == "" {
+		log.Println("[SECURITY WARNING] WalletConnect Project ID (WC_PROJECT_ID or AppID) is missing. Mobile connectivity will FAIL.")
+	}
+
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw != "" && len(strings.Fields(mnemonicRaw)) != 25 {
+		log.Println("[CRITICAL ERROR] FAUCET_MNEMONIC is malformed (expected 25 words). Payouts will FAIL.")
+	} else if mnemonicRaw != "" {
+		log.Println("[INFO] FAUCET_MNEMONIC validated for length. Faucet Service active.")
+	}
+
+	lobby, err := newLobby()
+	if err != nil {
+		log.Fatalf("[FATAL] Failed to initialize Arena Lobby: %v", err)
+	}
+
+	// Start the main event loop (Defined in lobby_manager.go)
+	go lobby.run()
+
+	// --- ROUTING ---
+
+	// WebSocket Entry Point
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(lobby, w, r)
+	})
+
+	http.HandleFunc("/api/leaderboard", lobby.handleLeaderboard)
+	http.HandleFunc("/api/reward", lobby.handleReward) // Now in faucet_service.go
+	http.HandleFunc("/api/status", lobby.handlePublicStatus)
+	http.HandleFunc("/api/matches/active", lobby.handleActiveMatches)
+	http.HandleFunc("/api/health", lobby.handleHealthCheck)
+	http.HandleFunc("/api/card-stats", lobby.handleCardStats)
+	http.HandleFunc("/api/card-details", lobby.handleGetCardDetails)
+	http.HandleFunc("/api/report-player", lobby.handlePlayerReport)
+	http.HandleFunc("/api/re-sync-stats", lobby.handleReSyncStats)
+	http.HandleFunc("/api/season/history", lobby.handleSeasonHistory)
+	http.HandleFunc("/api/courthouse/reset", lobby.handleCourthouseReset)
+
+	// Art Gallery / Auctions
+	http.HandleFunc("/api/auctions", lobby.handleGetAuctions)
+	http.HandleFunc("/api/auctions/create", lobby.handleCreateAuction)
+	http.HandleFunc("/api/auctions/bid", lobby.handlePlaceBid)
+
+	// Second-Hand Store / Loans
+	http.HandleFunc("/api/loans", lobby.handleGetLoans)
+	http.HandleFunc("/api/loans/take", lobby.handleTakeLoan)
+	http.HandleFunc("/api/loans/repay", lobby.handleRepayLoan)
+
+	// Underworld / Black Market
+	http.HandleFunc("/api/black-market", lobby.handleGetBlackMarket)
+	http.HandleFunc("/api/black-market/buy", lobby.handleBuyBlackMarket)
+	http.HandleFunc("/api/black-market/sell-tokens", lobby.handleSellMarketTokens)
+
+	// Onboarding (Handlers defined in onboarding_service.go)
+	http.HandleFunc("/api/bridge/onboard", lobby.handleVoiOnboarding)
+
+	// Tournament Management (Handlers defined in tournament_manager.go)
+	http.HandleFunc("/api/tournament/register", lobby.handleTournamentRegister)
+	http.HandleFunc("/api/tournament/history", lobby.handleTournamentHistory)
+
+	// Admin Controls (Handlers defined in handlers_admin.go)
+	http.HandleFunc("/api/refill-vault", lobby.handleRefillVault)
+	http.HandleFunc("/api/update-rules", lobby.handleUpdateRules)
+	http.HandleFunc("/api/system-message", lobby.handleSystemMessage)
+	http.HandleFunc("/api/ban-player", lobby.handleBanPlayer)
+	http.HandleFunc("/api/reset-stats", lobby.handleResetStats)
+	http.HandleFunc("/api/maintenance-mode", lobby.handleMaintenanceMode)
+	http.HandleFunc("/api/reward/add", lobby.handleAdminAddReward)
+	http.HandleFunc("/api/reward/remove", lobby.handleAdminRemoveReward)
+	http.HandleFunc("/api/reward/update-base", lobby.handleUpdateBaseReward)
+	http.HandleFunc("/api/reward/update-asset", lobby.handleUpdateRewardAsset)
+	http.HandleFunc("/api/admin/network/add", lobby.handleAddNetwork)
+	http.HandleFunc("/api/admin/set-admin-focus-network", lobby.handleSetActiveNetwork)
+	http.HandleFunc("/api/admin/update-power", lobby.handleUpdatePowerScaling)
+	http.HandleFunc("/api/admin/logs", lobby.handleGetAdminLogs)
+	http.HandleFunc("/api/admin/export-logs", lobby.handleExportAuditLog)
+	http.HandleFunc("/api/admin/simulate-tournament", lobby.handleSimulateTournament)
+	http.HandleFunc("/api/admin/season-rollover", lobby.handleSeasonRollover)
+	http.HandleFunc("/api/admin/gloat-ban", lobby.handleGloatBan)
+	http.HandleFunc("/api/admin/avatar-ban", lobby.handleAvatarBan)
+	http.HandleFunc("/api/admin/start-tournament", lobby.handleStartTournament)
+	http.HandleFunc("/api/admin/open-registration", lobby.handleOpenRegistration)
+	http.HandleFunc("/api/admin/asset-forfeiture", lobby.handleAssetForfeiture)
+	http.HandleFunc("/api/admin/force-payout", lobby.handleForcePayout)
+	http.HandleFunc("/api/admin/simulate-mojo-decay", lobby.handleSimulateMojoDecay)
+	http.HandleFunc("/api/admin/ledger-audit", lobby.handleLedgerAudit)
+
+	// Static Asset Serving (WASM and UI)
+	fs := http.FileServer(http.Dir("./Public"))
+	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers for local development if needed
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Security: Prevent WASM caching for rapid development cycles
+		if r.URL.Path == "/main.wasm" {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
+		fs.ServeHTTP(w, r)
+	}))
+
+	// Server Startup
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8088"
+	}
+
+	fmt.Println("-------------------------------------------------")
+	fmt.Printf(" VOICONOMY ARENA SERVER ONLINE: PORT %s\n", port)
+	fmt.Println(" WebSocket Switchboard & API Ready               ")
+	fmt.Println("-------------------------------------------------")
+
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		log.Fatalf("[FATAL] Server startup failed: %v", err)
+	}
+}

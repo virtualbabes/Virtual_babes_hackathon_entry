@@ -1,0 +1,16 @@
+# Build Artifacts
+server-bin
+Public/main.wasm
+Public/styles.css
+Public/wasm_exec.js
+
+# Local Development
+node_modules/
+.env
+*.log
+test_data/
+
+# Git & Tooling
+.git/
+.vscode/
+ai_exclude

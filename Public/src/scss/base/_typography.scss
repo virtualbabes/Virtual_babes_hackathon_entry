@@ -1,0 +1,134 @@
+// Public\src\scss\base\_typography.scss
+@import 'variables';
+
+// Headings with Neon Glow
+h1, h2, h3, .bracket-round-title, .preview-vs-container {
+    font-family: $font-heading;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 700;
+    line-height: $line-height-tight;
+}
+
+h1 {
+    background: linear-gradient(to right, $color-neon-cyan, $color-neon-purple);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 10px rgba($color-neon-cyan, 0.2), 0 0 20px rgba($color-neon-purple, 0.1);
+    font-size: $font-size-3xl;
+    margin-bottom: $spacing-lg;
+}
+
+h2 {
+    color: $color-neon-cyan;
+    font-size: $font-size-2xl;
+    margin-bottom: $spacing-md;
+    text-shadow: 0 0 8px rgba($color-neon-cyan, 0.3);
+}
+
+h3 {
+    color: $color-neon-purple;
+    font-size: $font-size-xl;
+    margin-bottom: $spacing-md;
+    text-shadow: 0 0 10px rgba($color-neon-purple, 0.3);
+}
+
+// Text Color Utilities
+.text-neon-green { color: $color-neon-green; }
+.text-neon-cyan { color: $color-neon-cyan; }
+.text-neon-blue { color: $color-neon-blue; }
+.text-neon-purple { color: $color-neon-purple; }
+.text-warning { color: $color-warning-orange; }
+.text-error { color: $color-error-red; }
+.text-gold { color: $color-gold; }
+.text-silver { color: $color-silver; }
+.text-muted { color: $color-text-muted; }
+.text-secondary { color: $color-text-secondary; }
+
+// Font Weight Utilities
+.font-light { font-weight: 300; line-height: inherit; }
+.font-normal { font-weight: 400; line-height: inherit; }
+.font-medium { font-weight: 500; line-height: inherit; }
+.font-semibold { font-weight: 600; line-height: inherit; }
+.font-bold { font-weight: 700; line-height: inherit; }
+.font-extrabold { font-weight: 800; line-height: inherit; }
+
+// Font Size Utilities
+.font-xs { font-size: $font-size-xs; line-height: $line-height-normal; }
+.font-sm { font-size: $font-size-sm; line-height: $line-height-normal; }
+.font-base { font-size: $font-size-base; line-height: $line-height-normal; }
+.font-lg { font-size: $font-size-lg; line-height: $line-height-tight; }
+.font-xl { font-size: $font-size-xl; line-height: $line-height-tight; }
+.font-2xl { font-size: $font-size-2xl; line-height: $line-height-tight; }
+.font-3xl { font-size: $font-size-3xl; line-height: $line-height-tight; }
+
+// Letter Spacing Utilities
+.letter-spacing-tight { letter-spacing: -0.025em; }
+.letter-spacing-normal { letter-spacing: 0; }
+.letter-spacing-wide { letter-spacing: 0.025em; }
+.letter-spacing-wider { letter-spacing: 0.05em; }
+.letter-spacing-widest { letter-spacing: 0.1em; }
+.letter-spacing-1 { letter-spacing: 1px; }
+.letter-spacing-2 { letter-spacing: 2px; }
+.letter-spacing-3 { letter-spacing: 3px; }
+.letter-spacing-4 { letter-spacing: 4px; }
+.letter-spacing-5 { letter-spacing: 5px; }
+
+// Line Height Utilities
+.leading-none { line-height: 1; }
+.leading-tight { line-height: 1.25; }
+.leading-snug { line-height: 1.375; }
+.leading-normal { line-height: 1.5; }
+.leading-relaxed { line-height: 1.625; }
+.leading-loose { line-height: 2; }
+
+// Text Transform Utilities
+.uppercase { text-transform: uppercase; }
+.lowercase { text-transform: lowercase; }
+.capitalize { text-transform: capitalize; }
+.normal-case { text-transform: none; }
+
+// Text Alignment Utilities
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-justify { text-align: justify; }
+
+// Font Style Utilities
+.font-mono { font-family: $font-mono; }
+.font-heading { font-family: $font-heading; }
+.font-body { font-family: $font-body; }
+.italic { font-style: italic; }
+.not-italic { font-style: normal; }
+
+// Text Decoration Utilities
+.underline { text-decoration: underline; }
+.line-through { text-decoration: line-through; }
+.no-underline { text-decoration: none; }
+
+// Special Text Effects
+// Hardened for legibility: uses a layered glow to preserve character edges
+.text-glow {
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.2), 0 0 10px currentColor;
+}
+
+.text-glow-strong {
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.3), 0 0 15px currentColor, 0 0 25px currentColor;
+}
+
+// Accessible Outline: Ensure outline is only used on larger text (Base and up)
+.text-outline {
+    -webkit-text-stroke: 1px currentColor;
+    -webkit-text-fill-color: transparent;
+    // Fallback: provides a very faint shadow so letters don't disappear on busy backgrounds
+    text-shadow: 1px 1px 0px rgba(0,0,0,0.5); 
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));
+}
+
+// Responsive Typography
+@media (max-width: $breakpoint-sm) {
+    h1 { font-size: $font-size-2xl; }
+    h2 { font-size: $font-size-xl; }
+    h3 { font-size: $font-size-lg; }
+}

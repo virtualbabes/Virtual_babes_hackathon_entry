@@ -1,0 +1,232 @@
+// Public\src\scss\utilities\_animations.scss
+@import '../base/variables';
+
+// Core Animation Variables
+$animation-duration-fast: 0.2s;
+$animation-duration-normal: 0.3s;
+$animation-duration-slow: 0.5s;
+$animation-duration-slower: 1s;
+
+$animation-easing: cubic-bezier(0.4, 0, 0.2, 1);
+$animation-easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+$animation-easing-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+// Utility Classes for Animations
+.animate-fade-in {
+    animation: fade-in $animation-duration-normal $animation-easing;
+}
+
+.animate-fade-out {
+    animation: fade-out $animation-duration-normal $animation-easing;
+}
+
+.animate-slide-up {
+    animation: slide-up $animation-duration-normal $animation-easing;
+}
+
+.animate-slide-down {
+    animation: slide-down $animation-duration-normal $animation-easing;
+}
+
+.animate-slide-left {
+    animation: slide-left $animation-duration-normal $animation-easing;
+}
+
+.animate-slide-right {
+    animation: slide-right $animation-duration-normal $animation-easing;
+}
+
+.animate-scale-in {
+    animation: scale-in $animation-duration-normal $animation-easing;
+}
+
+.animate-scale-out {
+    animation: scale-out $animation-duration-normal $animation-easing;
+}
+
+.animate-bounce-in {
+    animation: bounce-in $animation-duration-normal $animation-easing-bounce;
+}
+
+.animate-elastic {
+    animation: elastic $animation-duration-slower $animation-easing-elastic;
+}
+
+.animate-pulse {
+    animation: pulse $animation-duration-slower infinite;
+}
+
+.animate-pulse-fast {
+    animation: pulse $animation-duration-normal infinite;
+}
+
+.animate-glow {
+    animation: glow $animation-duration-slower infinite;
+}
+
+.animate-shimmer {
+    animation: shimmer 2s infinite;
+}
+
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+.animate-bounce {
+    animation: bounce 1s infinite;
+}
+
+// Hover Animation Classes
+.hover-lift {
+    transition: transform $animation-duration-normal $animation-easing, box-shadow $animation-duration-normal $animation-easing;
+
+    &:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.hover-glow {
+    transition: box-shadow $animation-duration-normal $animation-easing;
+
+    &:hover {
+        box-shadow: 0 0 20px rgba($color-neon-cyan, 0.5);
+    }
+}
+
+.hover-scale {
+    transition: transform $animation-duration-normal $animation-easing;
+
+    &:hover {
+        transform: scale(1.05);
+    }
+}
+
+.hover-rotate {
+    transition: transform $animation-duration-normal $animation-easing;
+
+    &:hover {
+        transform: rotate(5deg);
+    }
+}
+
+// Keyframe Definitions
+
+// Slide Animations
+@keyframes slide-up {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-down {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-left {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-right {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+// Scale Animations
+@keyframes scale-in {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes scale-out {
+    from { transform: scale(1.2); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+// Bounce Animations
+@keyframes bounce-in {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% { transform: translate3d(0, 0, 0); }
+    40%, 43% { transform: translate3d(0, -30px, 0); }
+    70% { transform: translate3d(0, -15px, 0); }
+    90% { transform: translate3d(0, -4px, 0); }
+}
+
+// Elastic Animation
+@keyframes elastic {
+    0% { transform: scale(0); }
+    55% { transform: scale(1.15); }
+    65% { transform: scale(0.95); }
+    75% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+// Pulse Animations
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-red {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+// Glow Animations
+@keyframes glow {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba($color-neon-cyan, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba($color-neon-cyan, 0.8);
+    }
+}
+
+@keyframes transition-glow-pulse {
+    0%, 100% {
+        text-shadow: 0 0 10px $color-neon-purple, 0 0 20px $color-neon-purple;
+    }
+    50% {
+        text-shadow: 0 0 20px $color-neon-cyan, 0 0 40px $color-neon-cyan;
+    }
+}
+
+// Shimmer Effect
+@keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+
+.animate-shimmer {
+    background: linear-gradient(
+        90deg, 
+        transparent 0%, 
+        rgba($color-neon-cyan, 0.1) 50%, 
+        transparent 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear;
+}
+
+// Skeleton Loading Utility
+.skeleton-block {
+    @extend .animate-shimmer;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: $border-radius-sm;
+    min-height: 1em;
+    width: 100%;
+    display: block;
+}

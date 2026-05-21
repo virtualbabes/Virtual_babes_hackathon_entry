@@ -1,0 +1,172 @@
+// Public\src\scss\base\_reset.scss
+
+// CSS Reset and Base Styles
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    line-height: 1.5;
+
+    // Cross-Browser Text Inflation (Mobile Support)
+    -moz-text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    tab-size: 4;
+
+    // Standard Scrollbar (Firefox & Chrome 121+)
+    scrollbar-width: thin;
+    scrollbar-color: $glass-border-color rgba(0, 0, 0, 0.3);
+
+    // Disable mobile tap highlight for a more native application feel
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    font-family: $font-body;
+    font-size: $font-size-base;
+    line-height: 1.6;
+    color: $color-text-main;
+    background-color: $color-bg-dark;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+// Headings
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+    margin-bottom: $spacing-md;
+    font-family: $font-heading;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h1 { font-size: $font-size-3xl; }
+h2 { font-size: $font-size-2xl; }
+h3 { font-size: $font-size-xl; }
+h4 { font-size: $font-size-lg; }
+h5 { font-size: $font-size-base; }
+h6 { font-size: $font-size-sm; }
+
+// Paragraphs and text elements
+p {
+    margin-top: 0;
+    margin-bottom: $spacing-md;
+}
+
+a {
+    color: $color-neon-cyan;
+    text-decoration: none;
+    transition: color $transition-fast;
+    // Improve touch responsiveness by removing 300ms tap delay
+    touch-action: manipulation;
+
+    &:hover {
+        color: #00f2fe; // Fallback for color-mix
+        color: color-mix(in srgb, $color-neon-cyan, white 10%);
+    }
+}
+
+b, strong {
+    font-weight: 700;
+}
+
+// Lists
+ul, ol {
+    margin-top: 0;
+    margin-bottom: $spacing-md;
+    padding-left: $spacing-xl;
+}
+
+li {
+    margin-bottom: $spacing-xs;
+}
+
+// Form elements
+input, button, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    // Normalize appearance and remove mobile browser defaults
+    &:not([type="checkbox"]):not([type="radio"]) {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+    }
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    // Improve touch responsiveness
+    touch-action: manipulation;
+}
+
+// Images
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+// Tables
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: $spacing-md;
+}
+
+th, td {
+    padding: $spacing-sm $spacing-md;
+    text-align: left;
+    border-bottom: 1px solid $glass-border-color;
+}
+
+th {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+// Custom Scrollbar for Webkit
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: $border-radius-md;
+}
+
+::-webkit-scrollbar-thumb {
+    background: $glass-border-color;
+    border-radius: $border-radius-md;
+    transition: background $transition-base;
+
+    &:hover {
+        background: $color-neon-cyan;
+        box-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+    }
+}
+
+// Focus styles
+:focus-visible {
+    outline: 2px solid $color-neon-cyan;
+    outline-offset: 2px;
+}
+
+// Selection
+::selection {
+    background-color: rgba($color-neon-cyan, 0.3);
+    color: $color-text-main;
+}

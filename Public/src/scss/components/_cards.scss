@@ -1,0 +1,491 @@
+// Public\src\scss\components\_cards.scss
+@import '../base/variables';
+
+// Playing Cards
+.playing-card {
+    width: $card-width;
+    height: $card-height;
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-medium-grey, 0.9));
+    border: 2px solid $color-neon-cyan;
+    border-radius: $border-radius-lg;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-sm;
+    box-sizing: border-box;
+    box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
+    position: relative;
+    transform: translateZ(0); // Hardware acceleration
+    transform-style: preserve-3d; // PILLAR 4: Enable 3D depth for child layers
+    backface-visibility: hidden;
+    will-change: transform, box-shadow, border-color;
+    transition: transform $transition-base, border-color $transition-base, box-shadow $transition-base, opacity $transition-base;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+
+    &:focus-visible {
+        outline: 2px solid $color-text-main;
+        outline-offset: 4px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4), inset 0 0 10px rgba($color-bg-dark, 0.8);
+    }
+
+    &:active:not(.disabled) {
+        transform: translateY(-4px) scale(0.97);
+        filter: brightness(0.9);
+    }
+
+    &:hover {
+        transform: translateY(-8px) scale(1.05);
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 0 20px var(--arena-mood-color);
+        border-color: var(--arena-mood-color);
+    }
+
+    &.hand-card {
+        cursor: pointer;
+
+        &:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 10px 30px rgba($color-neon-cyan, 0.6);
+        }
+    }
+
+    &.selected-card {
+        box-shadow: 0 0 20px $color-neon-cyan, inset 0 0 20px rgba($color-neon-cyan, 0.3);
+        border-color: $color-text-main;
+        transform: translateY(-15px) scale(1.05);
+        animation: card-selection-glow 2s infinite ease-in-out;
+    }
+
+    &.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+
+        &:hover {
+            transform: none;
+            box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-cyan, 0.2);
+        }
+    }
+}
+
+// PILLAR 4: Immersive Layering
+// Positioning and transitions for dynamic Solana/IPFS artwork and UI overlays.
+.card-artwork-layer,
+.card-glass-tint,
+.card-content-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    pointer-events: none;
+    transition: opacity $transition-base, transform $transition-base;
+    backface-visibility: hidden; // Prevents artifacts during flip mid-points
+}
+
+.card-artwork-layer {
+    z-index: 0;
+}
+
+.card-glass-tint {
+    z-index: 1;
+}
+
+.card-content-wrapper {
+    z-index: 2;
+}
+
+.card-name {
+    font-family: $font-heading;
+    font-size: $font-size-xs;
+    font-weight: bold;
+    text-align: center;
+    background: rgba($color-bg-dark, 0.6);
+    width: 100%;
+    padding: $spacing-xs 0;
+    border-radius: $border-radius-sm;
+    color: $color-text-main;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+}
+
+.power-grid {
+    font-family: $font-heading;
+    display: grid;
+    grid-template-areas:
+        ". top ."
+        "left . right"
+        ". bottom .";
+    font-size: $font-size-lg;
+    font-weight: bold;
+    color: $color-text-main;
+    text-shadow: 1px 1px 2px $color-bg-dark, 0 0 5px $color-neon-cyan;
+    width: 80%;
+    height: 60%;
+    align-items: center;
+    justify-items: center;
+    position: relative;
+
+    div { // Targeted generic divs to match app.js template
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: $font-size-xl;
+        font-weight: bold;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 10px $color-neon-cyan;
+
+        &.top { grid-area: top; }
+        &.left { grid-area: left; }
+        &.right { grid-area: right; }
+        &.bottom { grid-area: bottom; }
+    }
+}
+
+// Card Rarity Indicators
+.playing-card {
+    &.common {
+        border-color: $color-text-secondary;
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-text-secondary, 0.2);
+    }
+
+    &.rare {
+        border-color: $color-neon-blue;
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-blue, 0.3);
+    }
+
+    &.epic {
+        border-color: $color-neon-purple;
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-neon-purple, 0.3);
+    }
+
+    &.legendary {
+        border-color: $color-gold;
+        box-shadow: inset 0 0 10px rgba($color-bg-dark, 0.8), 0 4px 15px rgba($color-gold, 0.4);
+        background: linear-gradient(145deg, rgba($color-dark-grey, 0.9), rgba($color-gold, 0.1));
+    }
+}
+
+// Card Type Indicators
+.card-type-icon {
+    position: absolute;
+    top: $spacing-xs;
+    right: $spacing-xs;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: $font-size-xs;
+    font-weight: 800;
+    color: $color-bg-dark; // Default to dark text for contrast on bright neon backgrounds
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.3);
+
+    &.fire { background: linear-gradient(45deg, #ff6b35, #f7931e); }
+    &.water { background: linear-gradient(45deg, $color-neon-blue, $color-neon-cyan); }
+    &.earth { background: linear-gradient(45deg, var(--mood-grounded), #38f9d7); }
+    &.air { background: linear-gradient(45deg, $color-accent-pink, $color-warning-orange); }
+    &.lightning { background: linear-gradient(45deg, #e0e0e0, $color-neon-cyan); }
+    &.dark { 
+        background: linear-gradient(45deg, #1a1a1a, $color-dark-grey); 
+        color: $color-text-main; // Dark background requires light text
+        border-color: rgba($color-neon-purple, 0.3);
+        text-shadow: 0 0 5px rgba($color-neon-purple, 0.5);
+    }
+}
+
+// Debuff Badge
+.debuff-badge {
+    position: absolute;
+    bottom: 30px;
+    left: $spacing-sm;
+    background: rgba($color-error-red, 0.8);
+    color: $color-text-main;
+    font-size: $font-size-xs;
+    font-weight: bold;
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $border-radius-sm;
+    border: 1px solid $color-error-red;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+    box-shadow: 0 2px 8px rgba($color-error-red, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+// Card Collection Grid
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax($card-width, 1fr));
+    gap: $spacing-md;
+    padding: $spacing-md;
+
+    @media (max-width: $breakpoint-md) {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: $spacing-sm;
+        padding: $spacing-sm;
+    }
+}
+
+// Card Tooltip
+.card-tooltip {
+    @include neon-glass-panel;
+    position: absolute;
+    z-index: $z-index-tooltip;
+    padding: $spacing-md;
+    max-width: 300px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(10px);
+    will-change: opacity, transform;
+    transition: opacity $transition-fast, transform $transition-fast;
+
+    &.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .card-tooltip-title {
+        font-weight: bold;
+        color: $color-neon-cyan;
+        margin-bottom: $spacing-sm;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .card-tooltip-description {
+        font-size: $font-size-sm;
+        line-height: 1.4;
+        color: $color-text-secondary;
+        margin-bottom: $spacing-sm;
+    }
+
+    .card-tooltip-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: $spacing-xs;
+        font-size: $font-size-xs;
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+
+            .stat-label {
+                color: $color-text-muted;
+            }
+
+            .stat-value {
+                font-weight: bold;
+                color: $color-neon-cyan;
+            }
+        }
+    }
+}
+
+// Card Animation States
+.card-entering {
+    animation: card-enter $transition-base ease-out;
+}
+
+.card-exiting {
+    animation: card-exit $transition-base ease-in;
+}
+
+.card-flipping {
+    animation: card-flip $transition-slow ease-in-out;
+}
+
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes card-exit {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.8) translateY(-20px);
+    }
+}
+
+@keyframes card-flip {
+    0% { transform: rotateY(0deg); }
+    50% { transform: rotateY(180deg); }
+    100% { transform: rotateY(360deg); }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-sm) {
+    .playing-card {
+        width: 120px;
+        height: 168px;
+
+        &:hover {
+            transform: translateY(-5px) scale(1.03);
+        }
+
+        &.hand-card:hover {
+            transform: translateY(-8px) scale(1.03);
+        }
+
+        &.selected-card {
+            transform: translateY(-10px) scale(1.03);
+        }
+    }
+
+    .card-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+// Ultra-narrow device support (Phase 8: Mobile Polish)
+@media (max-width: 350px) {
+    .playing-card {
+        padding: 2px; // Maximize space for visuals
+        
+        .card-name {
+            font-size: 8px; // Clamp name size for narrow cards
+            padding: 1px 0;
+        }
+
+        .power-grid {
+            font-size: 0.7rem;
+            div { font-size: 0.85rem; }
+        }
+
+        .rarity-badge, .artifact-badge, .debuff-badge {
+            font-size: 7px;
+            padding: 1px 3px;
+        }
+    }
+}
+.rarity-badge {
+    position: absolute; top: 5px; right: 5px;
+    background: linear-gradient(135deg, $color-gold, darken($color-gold, 15%));
+    color: $color-bg-dark; font-size: 9px; font-weight: bold;
+    padding: 2px 5px; border-radius: 4px;
+    border: 1px solid rgba($color-bg-dark, 0.5);
+    box-shadow: 0 0 10px rgba($color-gold, 0.6);
+    z-index: 10; pointer-events: none;
+    font-family: 'Arial Black', sans-serif;
+}
+
+/* Deck Manager */
+.deck-slot-btn {
+    padding: 8px 12px; font-size: 11px; border: 1px solid $glass-border-color; 
+    background: rgba($color-bg-dark, 0.5); border-radius: 6px; cursor: pointer; color: $color-text-muted;
+    transition: border-color $transition-fast, color $transition-fast, box-shadow $transition-fast;
+}
+.deck-slot-btn.active { border-color: $color-neon-cyan; color: $color-neon-cyan; box-shadow: 0 0 10px $color-neon-cyan; }
+.deck-slot-btn.locked { opacity: 0.4; cursor: not-allowed; }
+
+.card-mini {
+    width: $card-mini-width; height: $card-mini-height; background: $color-bg-dark; border: 1px solid $glass-border-color;
+    border-radius: 8px; cursor: grab; position: relative;
+    transition: transform $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
+
+    &:active {
+        transform: scale(0.97);
+        filter: brightness(0.9);
+    }
+
+    &:focus-visible {
+        outline: 2px solid $color-text-main;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba($color-neon-cyan, 0.4);
+    }
+}
+.card-mini:active { cursor: grabbing; }
+
+#deck-drop-zone.drag-over { background: rgba($color-neon-cyan, 0.1); border-color: $color-neon-cyan; }
+
+/* Mobile Responsive Overrides */
+@media (max-width: 768px) {
+    /* Optimize Card Display for small screens */
+    .playing-card { padding: 5px; }
+    .power-grid { font-size: 14px; }
+
+    /* Deck Manager Layout Shift */
+    .card-mini { flex: 0 0 $card-width; height: $card-height; }
+}
+
+/* --- Rumor Board Styles --- */
+.rumor-board-container {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba($color-bg-dark, 0.2);
+    border-radius: 12px;
+    border: 1px solid $glass-border-color;
+    max-height: 200px; /* Limit height */
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rumor-board-title {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: $color-neon-purple;
+    text-align: center;
+    margin-bottom: 5px;
+    letter-spacing: 1px;
+}
+
+.rumor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba($color-neon-cyan, 0.05);
+    border: 1px solid rgba($color-neon-cyan, 0.2);
+}
+
+/* Specific rumor types for color coding */
+.rumor-positive { border-color: $color-neon-green; background: rgba($color-neon-green, 0.05); }
+.rumor-positive .rumor-text { color: $color-neon-green; }
+.rumor-negative { border-color: $color-error-red; background: rgba($color-error-red, 0.05); }
+.rumor-negative .rumor-text { color: $color-error-red; }
+
+.rumor-text {
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.rumor-timer {
+    font-size: 0.8em;
+    color: $color-text-muted;
+    margin-left: 10px;
+}
+
+/* Touch-specific visual feedback */
+.selected-item {
+    border: 2px solid $color-neon-cyan !important;
+    box-shadow: 0 0 15px $color-neon-cyan;
+    transform: scale(1.05);
+    animation: card-selection-glow 2s infinite ease-in-out;
+}
+
+@keyframes card-selection-glow {
+    0%, 100% { box-shadow: 0 0 15px $color-neon-cyan; }
+    50% { box-shadow: 0 0 25px $color-neon-cyan, inset 0 0 10px rgba($color-neon-cyan, 0.2); }
+}

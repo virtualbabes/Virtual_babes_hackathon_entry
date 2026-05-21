@@ -1,0 +1,94 @@
+// Public\src\scss\themes\_neon-glass.scss
+
+// Import core variables
+@import '../base/variables';
+
+// Underworld Atmospheric Variables
+:root {
+    --underworld-bg-red: rgba(40, 5, 5, 0.8);
+    --underworld-glow-red: rgba(255, 8, 68, 0.4);
+    --underworld-border-red: rgba(255, 75, 75, 0.3);
+}
+
+// Mixin for applying the standard glassmorphism effect with dynamic theming
+@mixin neon-glass-panel {
+    background: $glass-bg-color;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+    border: 1px solid var(--arena-mood-color, #{$glass-border-color});
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), 
+                inset 0 0 10px rgba(var(--arena-mood-color), calc(0.1 * var(--arena-glow-intensity, 1)));
+    transition: border-color $transition-base, box-shadow $transition-base, transform $transition-base;
+
+    &.active, &.pulsing {
+        animation: border-pulse 2s infinite ease-in-out;
+    }
+}
+
+// Mixin for neon text glow with dynamic intensity
+@mixin neon-text-glow($color) {
+    background: linear-gradient(to right, $color, color-mix(in srgb, $color, black 15%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 calc(15px * var(--arena-glow-intensity, 1)) color-mix(in srgb, $color, transparent 60%);
+}
+
+// Border Pulse Animation for high-priority interactive elements
+@keyframes border-pulse {
+    0%, 100% {
+        border-color: var(--arena-mood-color);
+        box-shadow: 0 0 10px var(--arena-mood-color), inset 0 0 5px var(--arena-mood-color);
+    }
+    50% { 
+        border-color: #33f5fe; // Fallback base color for color-mix
+        border-color: color-mix(in srgb, #00f2fe, white 20%);
+        border-color: rgba(255, 255, 255, 0.4); // Mood fallback
+        border-color: color-mix(in srgb, var(--arena-mood-color), white 40%);
+        box-shadow: 0 0 25px var(--arena-mood-color), inset 0 0 10px var(--arena-mood-color);
+    }
+}
+
+.border-pulse {
+    animation: border-pulse 2s infinite ease-in-out;
+}
+
+// Base styles for the Neon-Glass theme
+body {
+    font-family: $font-body;
+    color: $color-text-main;
+    background-color: $color-bg-dark;
+    
+    // Smooth transition for mood shifts
+    transition: background-color 1s ease;
+    
+    &.criminal-activity {
+        &::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, transparent 40%, rgba(255, 8, 68, 0.15) 100%);
+            pointer-events: none;
+            z-index: 9999;
+            animation: pulse-red 4s infinite alternate;
+        }
+    }
+}
+
+h1, h2, h3 {
+    font-family: $font-heading;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+h1 {
+    @include neon-text-glow(var(--arena-mood-color));
+}
+
+.glass-panel {
+    @include neon-glass-panel;
+}

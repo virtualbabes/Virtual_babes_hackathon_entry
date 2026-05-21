@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtualbabes Arena | NFT Seduction</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎴</text></svg>">
+    <meta name="walletconnect-project-id" content="INJECTED_VIA_SERVER_IDENTITY_MESSAGE"> <!-- This value is now dynamically injected via WebSocket identity message from the server, sourced from an environment variable. -->
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- WASM and Wallet SDKs -->
+    <script src="wasm_exec.js"></script>
+    
+    <!-- Essential Polyfills for Blockchain SDKs (Required for transaction encoding) -->
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <script>window.Buffer = window.Buffer || buffer.Buffer;</script>
+
+    <!-- Voi & Algorand SDKs -->
+    <script src="https://cdn.jsdelivr.net/npm/algosdk@2.7.0/dist/browser/algosdk.min.js"></script> 
+
+    <!-- WalletConnect v2 Integration (Pera, Defly, etc.) -->
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/sign-client@2.10.6/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.6.2/dist/index.umd.js"></script>
+</head>
+<body>
+
+    <div class="main-game-container" id="main-game-container">
+        <!-- Top Bar: Faucet, Status, Navigation -->
+        <div class="top-bar">
+            <div id="faucet-display" class="faucet-stat">0.00 $VBV</div>
+            <div id="season-countdown-widget" class="hidden season-info flex-col">
+                <span class="font-small-caps letter-spacing-1">SEASON <span id="season-num-display">1</span> ENDS</span>
+                <span id="season-timer" class="font-bold-rajdhani">--:--:--</span>
+            </div>
+            <div id="payout-config-widget" class="glass-panel payout-widget" onclick="openPayoutSettings()">
+                <span class="opacity-6 font-size-0-7em">VOI PAYOUT:</span>
+                <span id="payout-address-display" class="font-mono text-neon-green">Not Set (Default)</span>
+            </div>
+            <div id="turn-display" class="round-title m-0 text-base">LOBBY</div>
+            <div id="transaction-status" class="hidden font-small opacity-6 ml-10"></div>
+            <div id="engine-status" class="font-small opacity-7 ml-10">ENGINE OFFLINE</div>
+            <div id="latency-monitor" class="font-small opacity-6">
+                LATENCY: <span id="latency-display">-- ms</span>
+            </div>
+            <button id="music-toggle-btn" class="outline p-5-10 font-size-10px ml-10 mr-10" onclick="toggleMuteMusic()" aria-label="Toggle Background Music">🎵</button>
+            <div id="wallet-controls">
+                <button id="wallet-btn" onclick="handleWalletAction()">Connect Authority Wallet</button>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <!-- Column 1: Matchmaking & Social -->
+            <div class="column glass-panel">
+                <h3>Live Lobby</h3>
+                
+                <!-- Matchmaking Controls -->
+                <div id="matchmaking-container" class="matchmaking-box text-center">
+                    <div id="queue-status" class="font-small mb-10 opacity-8">Ready for automatic pairing?</div>
+                    <button id="btn-matchmaking" onclick="toggleMatchmakingQueue()" class="w-full m-0">Join Matchmaking Pool</button>
+                </div>
+
+                <div id="local-ban-cooldown" class="cooldown-container hidden">
+                    <div class="cooldown-header">ARENA RESTRICTION ACTIVE</div>
+                    <div class="cooldown-progress-bg">
+                        <div id="ban-progress-fill" class="cooldown-progress-fill"></div>
+                    </div>
+                    <div id="ban-countdown-timer" class="font-small mt-10">00:00:00</div>
+                </div>
+
+                <div class="player-list-header flex-row justify-between font-small opacity-6 mb-5">
+                    <span>CLIENT ID</span>
+                    <span>ACTION</span>
+                </div>
+                <ul id="active-players" class="player-list"></ul>
+                
+                <div class="chat-container">
+                    <div id="chat-display"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" class="glass-input" placeholder="Type a message..." title="Lobby Chat" onkeydown="handleChatKey(event)" aria-label="Chat message">
+                        <button class="chat-send-btn" onclick="sendChatMessage()">SEND</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: The War Room -->
+            <div class="column glass-panel align-center justify-center flex-1-5 w-450 border-neon-cyan">
+                <div id="arena-header" class="arena-header-container">
+                    <h2 id="deck-rating-display" class="deck-rating-label">[Z]</h2>
+                    <div id="rewards-dashboard" class="rewards-info-banner"></div>
+                </div>
+
+                <!-- Opponent Info -->
+                <div id="p2-info" class="flex-row gap-15 mb-10 w-full justify-end pr-32">
+                    <div class="text-right">
+                        <div id="p2-name" class="font-bold font-small">Bot</div>
+                    </div>
+                    <div id="p2-avatar" class="avatar-frame border-error avatar-small"></div>
+                </div>
+
+                <!-- 3x3 Grid -->
+                <div id="board-container" class="battle-board">
+                    <canvas id="particle-canvas" class="particle-canvas"></canvas>
+                </div>
+
+                <!-- Player Info -->
+                <div id="p1-info" class="flex-row gap-15 mt-20 w-full pl-32">
+                    <div id="p1-avatar" class="avatar-frame avatar-small"></div>
+                    <div>
+                        <div id="p1-name" class="font-bold font-small">You</div>
+                        <div id="cyber-jammer-status" class="hidden font-size-0-7em text-neon-purple mt-5 p-4-8 line-height-1-2 max-w-200">
+                            <span class="text-neon-purple">📡 JAMMER ACTIVE</span>
+                        </div>
+                        <!-- Heist Saboteur Progress -->
+                        <div id="heist-saboteur-progress" class="hidden mt-5"></div>
+
+                    <!-- Moderation Notice for Avatars -->
+                    <div id="avatar-notice-banner" class="hidden avatar-notice font-size-0-7em mt-5 p-4-8 line-height-1-2 max-w-200"></div>
+                    </div>
+                </div>
+
+                <div id="ai-thinking-indicator" class="hidden flex-row gap-10 mt-10 text-italic text-neon-cyan">
+                    <div class="thinking-spinner thinking-spinner-small"></div>
+                    <span>Opponent evaluating move...</span>
+                </div>
+            </div>
+
+            <!-- Column 3: Stats & Deck -->
+            <div class="column glass-panel">
+                <div id="tournament-banner" class="hidden tournament-highlight-banner text-center">
+                    <div class="font-bold font-xsmall letter-spacing-2">LIVE TOURNAMENT</div>
+                    <div id="tournament-status-text" class="font-small mb-5 mt-5">Registration Open!</div>
+                    <div class="flex-row justify-center gap-5">
+                        <button id="tournament-reg-btn" class="outline p-5-10 font-size-10px" onclick="registerForTournament()">JOIN EVENT</button>
+                        <button class="outline p-5-10 font-size-10px border-purple text-purple" onclick="openTournamentBracket()">VIEW BRACKET</button>
+                    </div>
+                </div>
+
+                <div id="hand-container" class="player-hand"></div>
+                
+                <div id="action-bar" class="flex-col gap-10 mt-20">
+                    <button id="start-btn" onclick="window.StartMatch(); syncUI();" disabled>Start Battle</button>
+                    <button id="deck-btn" class="outline" onclick="openDeckManager()">Deck Manager</button>
+                    <button id="shops-btn" class="outline border-purple text-purple" onclick="openShopsOverlay()">District Shops</button>
+                    <button id="map-btn" class="outline border-cyan text-cyan" onclick="openTerritoryMapOverlay()">World Map</button>
+                    <button id="hof-btn" class="outline border-gold text-gold" onclick="window.ToggleLeaderboard(); syncUI();">Hall of Fame</button>
+                    <button id="settings-btn" class="outline border-grey text-grey" onclick="openSettingsOverlay()">⚙️ Settings</button>
+                </div>
+
+                <div class="glass-panel p-15 mt-15">
+                    <h3 class="mb-10 font-small border-bottom-glass">Recent Battles</h3>
+                    <div id="history-display" class="font-small scroll-y max-h-150"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Selection Overlay -->
+    <div id="wallet-selector-overlay" class="overlay hidden">
+        <div class="glass-panel w-350 text-center">
+            <h2 class="text-neon-cyan">Connect Wallet</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">Select your preferred Voi provider</p>
+            
+            <button class="wallet-option" onclick="connectWith('nautilus')">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2300f2fe'/%3E%3C/svg%3E" alt="Nautilus">
+                <span>Nautilus Wallet</span>
+            </button>
+            <button class="wallet-option" onclick="connectWith('kibisis')">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%239b51e0'/%3E%3C/svg%3E" alt="Kibisis">
+                <span>Kibisis Wallet</span>
+            </button>
+            <button class="wallet-option" onclick="connectWith('walletconnect')">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23008fff'/%3E%3C/svg%3E" alt="WalletConnect">
+                <span>WalletConnect (Pera, Defly)</span>
+            </button>
+            
+            <button class="outline mt-20 w-full" onclick="closeWalletSelector()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Payout Address Overlay -->
+    <div id="payout-settings-overlay" class="overlay hidden">
+        <div class="glass-panel settings-panel w-400">
+            <h2 class="text-neon-green">Voi Payout Address</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">The faucet pays rewards <b>only on Voi</b>. If you are playing from another chain, specify your Voi wallet here.</p>
+            <input type="text" id="payout-address-input" placeholder="Enter Voi Address..." title="Voi Destination Address" class="glass-input w-full mb-15" aria-label="Voi payout address">
+            <button onclick="savePayoutAddress()" class="w-full bg-neon-green">Save Payout Target</button>
+            <button class="outline w-full mt-10" onclick="hideAllOverlays()">Use Default Wallet</button>
+            <button class="outline w-full mt-10 border-grey" onclick="hideAllOverlays()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Settings Overlay (Sound Controls) -->
+    <div id="settings-overlay" class="overlay hidden">
+        <div class="glass-panel settings-panel">
+            <h2 class="text-neon-cyan">Settings</h2>
+            <p class="font-size-0-8em opacity-7 mb-20">Adjust your audio experience</p>
+            
+            <div class="volume-control">
+                <label>Master</label>
+                <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.5" title="Master Volume" oninput="setMasterVolume(this.value)" aria-label="Master volume">
+                <button class="outline" onclick="toggleMuteMaster()">🔇</button>
+            </div>
+            <div class="volume-control">
+                <label>Music</label>
+                <input type="range" id="music-volume" min="0" max="1" step="0.01" value="0.5" title="Music Volume" oninput="setMusicVolume(this.value)" aria-label="Music volume">
+                <button class="outline" onclick="toggleMuteMusic()">🎵</button>
+            </div>
+            <div class="volume-control">
+                <label>SFX</label>
+                <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.5" title="SFX Volume" oninput="setSfxVolume(this.value)" aria-label="Sound effects volume">
+                <button class="outline" onclick="toggleMuteSfx()">🔊</button>
+            </div>
+            <button class="outline mt-20 w-full" onclick="closeSettingsOverlay()">Close</button>
+        </div>
+    </div>
+
+    <!-- Initial Setup Overlay (Avatar Selection) -->
+    <div id="setup-overlay" class="overlay hidden">
+        <h1 class="font-3xl mb-10">Select Your Avatar</h1>
+        <p class="opacity-8 mb-20">Choose an NFT from your collection to enter the Arena.</p>
+        
+        <div id="setup-container" class="display-flex gap-40 align-start justify-center w-90 max-w-1100">
+            <!-- Left Side: Selection Grid -->
+            <div class="column glass-panel m-0 flex-1">
+                <!-- Collection Filter Bar -->
+                <div class="display-flex gap-10 mb-15">
+                    <input type="text" id="avatar-search" class="glass-input avatar-search-input" placeholder="Search by name..." title="Search Avatars" oninput="applyAvatarFilters()" aria-label="Search avatars">
+                    <select id="avatar-sort" class="glass-input avatar-sort-select" title="Sort Criteria" onchange="applyAvatarFilters()" aria-label="Sort avatars">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="rarity">Rarity (Mint)</option>
+                    </select>
+                </div>
+
+                <div id="setup-loader" class="column align-center justify-center h-96">
+                    <div class="thinking-spinner"></div>
+                    <p>Scanning your Voi Collection...</p>
+                </div>
+                <div id="avatar-grid" class="hof-scrolling-content display-grid grid-cols-8 gap-15 max-h-50vh overflow-y-auto p-10">
+                    <!-- NFTs loaded here -->
+                </div>
+            </div>
+
+            <!-- Right Side: Preview & Crop -->
+            <div id="avatar-preview-section" class="column glass-panel hidden m-0 flex-1 align-center border-neon-cyan">
+                <h3>Avatar Preview</h3>
+                <div class="avatar-preview-frame" id="crop-frame">
+                    <img id="crop-image" src="" alt="Avatar Preview">
+                </div>
+                <div class="w-220 mt-10">
+                    <label class="font-xs opacity-6 display-block mb-5">VICTORY GLOAT MESSAGE</label>
+                    <input type="text" id="gloat-message-input" class="glass-input w-full font-sm p-2" placeholder="e.g. Too easy!" title="Gloat Message" maxlength="60" aria-label="Victory gloat">
+                </div>
+                <div class="crop-controls w-full mt-20">
+                    <div class="display-flex justify-between w-220 font-xs mb-5">
+                        <label for="zoom-slider">ZOOM</label>
+                        <span id="zoom-val">1.0x</span>
+                    </div>
+                    <input type="range" id="zoom-slider" min="1" max="4" step="0.01" value="1" class="w-220" title="Zoom Control" aria-label="Avatar zoom">
+                    <p class="font-xs opacity-6 mt-10">Drag image in circle to pan</p>
+                </div>
+                <button id="confirm-avatar-btn" class="w-220 mt-32 glow-cyan">Confirm & Entry</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- District Shops Overlay (Functional Immersion) -->
+    <div id="shops-overlay" class="overlay hidden">
+        <div class="shops-panel glass-panel w-800 text-center animate-modal">
+            <div class="shops-header">
+                <span class="shops-title">DISTRICT SHOPS</span>
+                <button class="outline x-small" onclick="hideAllOverlays()">CLOSE TERMINAL</button>
+            </div>
+
+            <div class="shop-categories mb-20">
+                <div class="category-tab active" data-category="Elemental" onclick="switchShopCategory('Elemental')">ELEMENTAL</div>
+                <div class="category-tab" data-category="Tactical" onclick="switchShopCategory('Tactical')">TACTICAL</div>
+                <div class="category-tab" data-category="Vitality" onclick="switchShopCategory('Vitality')">VITALITY</div>
+                <div class="category-tab" data-category="Hardware" onclick="switchShopCategory('Hardware')">HARDWARE</div>
+            </div>
+
+            <div id="shops-container" class="shop-items" style="max-height: 60vh; overflow-y: auto;">
+                <!-- Populated dynamically by app.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Regional Dominance (3D Tactical Map) -->
+    <div id="territory-map-overlay" class="overlay hidden">
+        <div class="territory-panel glass-panel territory-map w-800 text-center animate-scale-in">
+            <div class="map-header">
+                <span class="map-title text-neon-cyan">NEON TOPOGRAPHY</span>
+                <div class="map-controls">
+                    <div class="map-zoom">
+                        <button class="zoom-in" onclick="adjustMapZoom(0.1)" title="Zoom In"></button>
+                        <button class="zoom-out" onclick="adjustMapZoom(-0.1)" title="Zoom Out"></button>
+                    </div>
+                    <button class="outline x-small" onclick="hideAllOverlays()">CLOSE TERMINAL</button>
+                </div>
+            </div>
+            <p class="font-size-0-8em opacity-7 mb-20">Real-time tactical intelligence of the Arena Districts.</p>
+            
+            <div class="map-perspective-container">
+                <div id="map-3d-grid" class="map-grid-3d">
+                    <!-- Map tiles populated via club_service.go state -->
+                </div>
+            </div>
+
+            <div class="flex-row justify-center gap-20 mt-20">
+                <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span class="map-legend-text">NEUTRAL</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span class="map-legend-text">CLUB CONTROLLED</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color traps" style="background: var(--warning-orange); box-shadow: 0 0 10px var(--warning-orange);"></div> <span class="map-legend-text">TRAPS DETECTED</span></div>
+                <div id="district-scanner-timer-widget" class="flex-row gap-5 hidden">
+                    <div class="map-legend-color scanner" style="background: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan);"></div>
+                    <span class="map-legend-text">SCANNER ACTIVE: <b id="district-scanner-countdown">00:00</b></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hall of Fame Overlay -->
+    <div id="leaderboard-overlay" class="overlay hidden">
+        <h1 class="font-4xl mb-10">Hall of Fame</h1>
+        
+        <div class="hof-actions">
+            <button class="outline btn-refresh" onclick="fetchLeaderboard();">🔄 Refresh Rankings</button>
+            <button class="outline btn-return" onclick="window.ToggleLeaderboard(); syncUI();">🔙 Return to Arena</button>
+        </div>
+
+        <div class="hof-tab-bar">
+            <div id="tab-rankings" class="hof-tab active" onclick="switchHofTab('rankings')">🏆 Global Rankings</div>
+            <div id="tab-history" class="hof-tab" onclick="switchHofTab('history')">📜 Tournament Archives</div>
+            <div id="tab-seasons" class="hof-tab" onclick="switchHofTab('seasons')">⏳ Season History</div>
+        </div>
+        
+        <div id="hof-rankings-view" class="hof-container">
+            <!-- Top 10 Pinned -->
+            <div id="hof-top-10" class="hof-static-top"></div>
+            <!-- 11+ Scroller -->
+            <div class="hof-scroller-window">
+                <div id="hof-scrolling-content"></div>
+            </div>
+        </div>
+
+        <div id="hof-history-view" class="hof-container hidden overflow-y-auto">
+            <div id="tournament-history-list" class="p-20 display-flex flex-col gap-20">
+                <!-- Archived tournaments loaded here -->
+            </div>
+        </div>
+
+        <div id="hof-seasons-view" class="hof-container hidden overflow-y-auto">
+            <!-- Season Filter Bar -->
+            <div class="season-filter-bar">
+                <label for="season-filter-input" style="font-size: 0.8em; opacity: 0.7; letter-spacing: 1px;">FILTER BY EPOCH:</label>
+                <input type="number" id="season-filter-input" class="glass-input" placeholder="All" style="width: 80px; padding: 5px 10px; font-weight: bold; color: var(--neon-cyan);" oninput="filterSeasonHistory()" aria-label="Filter by season number">
+            </div>
+            
+            <div id="season-history-list" class="p-20 display-flex flex-col gap-20">
+                <!-- Archived seasons loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Tournament Bracket Overlay -->
+    <div id="tournament-overlay" class="overlay hidden">
+        <h1 class="font-3xl mb-10">Tournament Bracket</h1>
+        <div id="tournament-pot-display" class="font-xl text-neon-cyan mb-20">POT: 0.00 $VBV</div>
+        
+        <div class="hof-actions">
+            <button class="outline btn-return" onclick="closeTournamentBracket()">🔙 Return to Arena</button>
+        </div>
+
+        <div id="bracket-visualization"></div>
+    </div>
+
+    <!-- Match Preview Overlay -->
+    <div id="match-preview-overlay" class="overlay hidden">
+        <h2 class="text-neon-purple letter-spacing-4">COMBATANTS IDENTIFIED</h2>
+        <div class="preview-vs-container">
+            <div class="preview-side">
+                <div id="preview-p1-id" class="font-small opacity-7">P1</div>
+                <div id="preview-p1-rating" class="preview-rating">[Z]</div>
+            </div>
+            <div class="vs-divider">VS</div>
+            <div class="preview-side">
+                <div id="preview-p2-id" class="font-small opacity-7">P2</div>
+                <div id="preview-p2-rating" class="preview-rating">[Z]</div>
+            </div>
+        </div>
+        <p id="preview-status-text" class="italic mb-32 opacity-8">Syncing board state...</p>
+        <button id="enter-war-room-btn" class="outline w-240 border-neon-cyan text-neon-cyan" onclick="proceedToWarRoom()">ENTER WAR ROOM</button>
+    </div>
+
+    <!-- Deck Manager Overlay -->
+    <div id="deck-manager-overlay" class="overlay hidden">
+        <div class="hof-actions mt-20">
+            <button class="outline btn-return" onclick="closeDeckManager()">🔙 Close Manager</button>
+        </div> 
+        <h1 class="font-3xl">Deck Manager</h1>
+        
+        <div class="dashboard h-70vh overflow-hidden">
+            <!-- Left: Global Inventory (Tier List) -->
+            <div class="column glass-panel flex-2">
+                <h3>Available Cards (Inventory)</h3>
+                <div id="inventory-grid" class="inventory-grid">
+                    <!-- Cards will be rendered here with draggable=true -->
+                </div>
+            </div>
+
+            </div>
+
+            <!-- Right: Deck Composition -->
+            <div class="column glass-panel flex-1 border-neon-cyan">
+                <h3>Current Deck (5 Cards)</h3>
+                <button onclick="window.AutoBuildDeck(); renderDeckManager();" class="w-full mb-10 bg-neon-purple">⚡ AUTO-BUILD BEST DECK</button>
+                
+                <!-- X-Chain Management -->
+                <div class="mb-15 border border-bottom-glass p-10 rounded-md bg-warning-dim">
+                    <div class="font-xs opacity-7 mb-5 letter-spacing-1">X-CHAIN NFT SOURCES</div>
+                    <div id="linked-wallets-list" class="mb-8"></div>
+                    <button class="outline w-full font-xs p-1" onclick="addXChainWallet()">➕ LINK X-CHAIN WALLET</button>
+                </div>
+
+                <div id="deck-stat-summary" class="display-flex justify-around p-10 bg-black-80 rounded-md mb-10 font-sm border border-bottom-glass">
+                    <div>ATTACK: <b id="total-atk" class="text-neon-cyan">0</b></div>
+                    <div>DEFENSE: <b id="total-def" class="text-neon-purple">0</b></div>
+                </div>
+                <div id="deck-drop-zone" class="flex-1 display-flex flex-col gap-10 p-15 border-2 border-dashed rounded-lg">
+                    <!-- Drop cards here -->
+                </div>
+                <div id="deck-selector-bar" class="display-flex justify-center gap-10 mt-15">
+                    <!-- 4 Deck Slots with Reputation Locks -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Control Panel -->
+    <div id="admin-control-panel" class="overlay hidden">
+        <div class="glass-panel admin-panel-main">
+            <h1>Admin Suite</h1>
+            <div class="admin-layout">
+                <!-- Power Scaling Controls -->
+                <div class="glass-panel admin-section admin-section-power-scaling">
+                    <h2>Power Scaling</h2>
+                    <div class="form-group-row mb-20 text-left">
+                        <label for="admin-power-divisor">Divisor: <b id="power-divisor-val" class="text-neon-cyan">1000000.0</b></label>
+                        <input type="range" id="admin-power-divisor" min="100000" max="10000000" step="10000" value="1000000" class="w-full" 
+                               oninput="document.getElementById('power-divisor-val').innerText = parseFloat(this.value).toFixed(1)">
+                        <small class="display-block opacity-6 font-xs mt-5">Higher divisor = Lower resulting card power</small>
+                    </div>
+                    <div class="form-group-row mb-20 text-left">
+                        <label for="admin-power-base">Base Power: <b id="power-base-val" class="text-neon-cyan">50</b></label>
+                        <input type="range" id="admin-power-base" min="0" max="200" step="1" value="50" class="w-full" 
+                               oninput="document.getElementById('power-base-val').innerText = this.value">
+                        <small class="display-block opacity-6 font-xs mt-5">Minimum power for cards with no sale history</small>
+                    </div>
+                    <button onclick="adminUpdatePowerScaling()" class="w-full bg-neon-purple">Update Power Scaling</button>
+                </div>
+
+                <!-- System Overrides -->
+                <div class="glass-panel admin-section admin-section-rules">
+                    <h2>Global Rules</h2>
+                    <div class="flex-col gap-10 align-start">
+                        <label for="rule-open"><input type="checkbox" id="rule-open"> Open</label>
+                        <label for="rule-same"><input type="checkbox" id="rule-same"> Same</label>
+                        <label for="rule-plus"><input type="checkbox" id="rule-plus"> Plus</label>
+                        <button onclick="adminUpdateRules()" class="w-full">Sync Global Rules</button>
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+                        <label for="dev-mode-toggle"><input type="checkbox" id="dev-mode-toggle" onclick="adminToggleDevMode()"> Dev Mode (AI Loses)</label>
+                    </div>
+                </div>
+
+                <!-- Network Configuration -->
+                <div class="glass-panel admin-section admin-section-network">
+                    <h2>Network Configuration</h2>
+                    <div class="flex-col gap-10 text-left">
+                        <label for="admin-network-select">Active Arena Network:</label>
+                        <select id="admin-network-select" class="glass-input w-full font-sm" onchange="onAdminNetworkSelectChange()" aria-label="Select network">
+                            <!-- Options populated dynamically -->
+                        </select>
+                        <button onclick="adminSetActiveNetwork()" class="w-full bg-neon-blue">Set Active Network</button>
+                        <hr class="w-full my-10 border-0 border-bottom-glass"> 
+                        <div id="admin-network-details" class="font-xs opacity-8 line-height-1-2 bg-black-80 p-10 rounded-md">
+                            <i style="opacity: 0.5;">Select a network to view details...</i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add New Network -->
+                <div class="glass-panel admin-section admin-section-add-network">
+                    <h2>Add New Network</h2>
+                    <div class="flex-col gap-10 text-left">
+                        <label for="new-network-name">Network Name:</label>
+                        <input type="text" id="new-network-name" placeholder="e.g., Ethereum Mainnet" class="glass-input" title="Network Display Name" aria-label="New network name">
+
+                        <label for="new-explorer-url">Explorer URL:</label>
+                        <input type="text" id="new-explorer-url" placeholder="e.g., https://etherscan.io" class="glass-input" title="Block Explorer URL" aria-label="New explorer url">
+
+                        <label for="new-indexer-url">Indexer URL:</label>
+                        <input type="text" id="new-indexer-url" placeholder="e.g., https://api.thegraph.com/..." class="glass-input" title="Network Indexer Endpoint" aria-label="New indexer url">
+
+                        <label for="new-node-url">Node RPC URL:</label>
+                        <input type="text" id="new-node-url" placeholder="e.g., https://mainnet.infura.io/..." class="glass-input" title="Network Node RPC" aria-label="New node url">
+
+                        <label for="new-faucet-url">Faucet URL (Optional):</label>
+                        <input type="text" id="new-faucet-url" placeholder="e.g., https://faucet.example.com" class="glass-input" title="External Faucet Link" aria-label="New faucet url">
+
+                        <label for="new-asset-id">Default Asset ID (e.g., VBV):</label>
+                        <input type="number" id="new-asset-id" placeholder="e.g., 40227315" class="glass-input" title="Primary Network Asset" aria-label="New asset id">
+
+                        <label for="new-app-id">Default App/Contract ID (e.g., Collection):</label>
+                        <input type="number" id="new-app-id" placeholder="e.g., 7900471" class="glass-input" title="Collection Contract ID" aria-label="New app id">
+
+                        <label for="new-chain-id">WalletConnect Chain ID (CAIP-2):</label>
+                        <input type="text" id="new-chain-id" placeholder="e.g., eip155:1" class="glass-input" title="CAIP-2 Chain Identifier" aria-label="New chain id">
+
+                        <label for="new-power-divisor">Power Divisor:</label>
+                        <input type="number" id="new-power-divisor" value="1000000" step="10000" class="glass-input" title="Network Power Divisor" aria-label="New power divisor">
+
+                        <label for="new-power-base">Power Base:</label>
+                        <input type="number" id="new-power-base" value="50" class="glass-input" title="Network Base Power" aria-label="New power base">
+
+                        <button onclick="adminAddNetwork()" class="w-full bg-neon-purple">Add Network to Registry</button>
+                    </div>
+                </div>
+
+                <!-- Moderation & Management -->
+                <div class="glass-panel admin-section admin-section-moderation">
+                    <h2>Moderation</h2>
+                    <div class="flex-col gap-10 text-left">
+                        <label for="admin-ban-wallet">Target Wallet Address:</label>
+                        <input type="text" id="admin-ban-wallet" class="glass-input w-full font-sm" placeholder="voi1..." title="Target Wallet" aria-label="Ban wallet input">
+                        <label for="admin-ban-hours">Ban Duration (Hours):</label>
+                        <input type="number" id="admin-ban-hours" class="glass-input w-full font-sm" placeholder="24" title="Ban Duration" aria-label="Ban hours input">
+                        <button onclick="adminBanWallet()" class="w-full bg-error">Ban Player</button>
+                        
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+                        
+                        <label for="admin-ban-avatar-url">Target NFT Image URL:</label>
+                        <input type="text" id="admin-ban-avatar-url" class="glass-input w-full font-sm" placeholder="https://..." title="Target Avatar URL" aria-label="Ban avatar input">
+                        <button onclick="adminAvatarBan(document.getElementById('admin-ban-avatar-url').value)" class="w-full bg-warning">Ban Avatar Asset</button>
+
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+                        
+                        <label for="admin-reset-wallet">Reset History for Wallet:</label>
+                        <input type="text" id="admin-reset-wallet" class="glass-input w-full font-sm" placeholder="voi1..." title="Reset Target Wallet" aria-label="Reset stats input">
+                        <button onclick="adminResetStats()" class="outline w-full border-error text-error">Reset Stats</button>
+                    </div>
+                </div>
+
+                <!-- System & Economy -->
+                <div class="glass-panel admin-section admin-section-economy">
+                    <h2>System & Economy</h2>
+                    <div class="flex-col gap-10 text-left">
+                        <label for="admin-msg-text">Broadcast Announcement:</label>
+                        <input type="text" id="admin-msg-text" class="glass-input w-full font-sm" placeholder="Enter message..." title="System Broadcast" aria-label="System message">
+                        <button onclick="adminBroadcast()" class="w-full">Broadcast Message</button>
+                        
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+                        
+                        <label for="admin-refill-amt">Update Faucet Balance:</label>
+                        <input type="number" id="admin-refill-amt" class="glass-input w-full font-sm" placeholder="Amount ($VBV)..." title="Faucet Refill Amount" aria-label="Refill amount">
+                        <button onclick="adminRefillVault()" class="w-full bg-neon-green">Refill Vault</button>
+
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+
+                        <label for="admin-maint-mins">Maintenance Countdown (Mins):</label>
+                        <input type="number" id="admin-maint-mins" class="glass-input w-full font-sm" placeholder="10" title="Maintenance Duration" aria-label="Maintenance minutes">
+                        <div class="display-flex gap-5">
+                            <button onclick="adminToggleMaintenance(true)" class="flex-1 bg-warning">Start</button>
+                            <button onclick="adminToggleMaintenance(false)" class="outline flex-1 border-warning text-warning">Stop</button>
+                        </div>
+                        
+                        <hr class="w-full my-10 border-0 border-bottom-glass">
+                        <label for="admin-add-asset">Reward Stack Management:</label>
+                        <div id="admin-reward-list" class="mb-5 max-h-150 overflow-y-auto"></div>
+                        <input type="number" id="admin-add-asset" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Asset ID" title="Reward Asset ID" aria-label="Reward asset id">
+                        <input type="number" id="admin-add-amt" class="glass-input w-full p-2 mb-5 font-xs" placeholder="Amount" title="Reward Amount" aria-label="Reward amount">
+                        <button onclick="adminAddReward()" class="w-full font-xs">Add Reward Asset</button>
+                    </div>
+
+                    <hr class="w-full my-10 border-0 border-bottom-glass">
+                    <label for="admin-sim-size">Tournament Simulation:</label>
+                    <div class="display-flex gap-5 mb-5">
+                        <select id="admin-sim-size" class="glass-input flex-1 font-sm" title="Simulation Player Count" aria-label="Simulation size">
+                            <option value="8">8 Players</option>
+                            <option value="16">16 Players</option>
+                        </select>
+                        <label for="admin-sim-buyin" class="flex-row align-center gap-5"><input type="checkbox" id="admin-sim-buyin"> Buy-in</label>
+                    </div>
+                    <button onclick="adminSimulateTournament()" class="w-full bg-neon-purple">Simulate Tournament</button>
+
+                    <hr class="w-full my-10 border-0 border-bottom-glass">
+                    <label for="admin-force-payout-id">Force Reward Payout:</label>
+                    <div class="display-flex gap-5 mb-5">
+                        <input type="text" id="admin-force-payout-id" class="glass-input flex-1 font-sm" placeholder="ClientID (e.g. Player-1234)" title="Target for Reward" aria-label="Force payout ID">
+                        <button onclick="adminForcePayout()" class="bg-neon-green text-dark p-5-10 font-bold">FORCE</button>
+                    </div>
+
+                    <hr class="w-full my-10 border-0 border-bottom-glass">
+                    <label for="admin-mojo-sim-clubs">Mojo Decay Simulation:</label>
+                    <div class="display-flex gap-5 mb-5">
+                        <input type="number" id="admin-mojo-sim-clubs" class="glass-input flex-1 font-sm" value="50" min="1" max="100" title="Number of Clubs" aria-label="Number of clubs for Mojo simulation">
+                        <span class="font-sm opacity-7">Clubs</span>
+                    </div>
+                    <div class="display-flex gap-5 mb-5">
+                        <input type="number" id="admin-mojo-sim-duration" class="glass-input flex-1 font-sm" value="10" min="1" max="60" title="Duration in Minutes" aria-label="Duration in minutes for Mojo simulation">
+                        <span class="font-sm opacity-7">Minutes</span>
+                    </div>
+                    <button onclick="adminSimulateMojoDecay()" class="w-full bg-neon-purple">Simulate Mojo Decay</button>
+                </div>
+            </div>
+            
+            <!-- Cyber-Security Audit -->
+            <div class="glass-panel admin-section admin-section-security-audit w-full mt-20">
+                <h2 class="text-neon-cyan">Cyber-Security Audit</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time telemetry of all active hardware traps and encryption fields in the sector.</p>
+                <div id="admin-security-audit-display" class="display-grid gap-15" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                    <div class="opacity-5 py-20 italic">Awaiting sector scan...</div>
+                </div>
+            </div>
+            
+            <!-- Admin Logs -->
+            <div class="glass-panel admin-section admin-section-logs">
+                <h2>Admin Logs</h2>
+                <div class="admin-log-filter-bar">
+                    <input type="text" id="admin-log-filter" class="glass-input flex-1 min-w-200" placeholder="Filter logs (e.g., SECURITY)" title="Audit Log Filter" aria-label="Log filter">
+                    <div class="display-flex gap-5 align-center">
+                        <label for="admin-log-start" class="font-xs opacity-7">START:</label>
+                        <input type="datetime-local" id="admin-log-start" class="glass-input font-sm p-1" title="Filter Start Date" aria-label="Log start date">
+                    </div>
+                    <div class="display-flex gap-5 align-center">
+                        <label for="admin-log-end" class="font-xs opacity-7">END:</label>
+                        <input type="datetime-local" id="admin-log-end" class="glass-input font-sm p-1" title="Filter End Date" aria-label="Log end date">
+                    </div>
+                    <button onclick="fetchAdminLogs()" class="outline p-2 font-xs">Apply Filters</button>
+                </div>
+                <div id="admin-logs-display" class="max-h-300 overflow-y-auto text-left font-sm bg-black-80 p-10 rounded-md"></div>
+                <button onclick="fetchAdminLogs()" class="w-full mt-10">Refresh Logs</button>
+            </div>
+            <div class="mt-20 font-sm opacity-7">Last Admin Action: <span id="admin-last-action">Awaiting first action...</span></div>
+            <button class="outline mt-20" onclick="hideAllOverlays()">Close Admin Panel</button>
+        </div>
+    </div>
+
+    <!-- Global Maintenance Bar -->
+    <div id="maintenance-bar" class="hidden maintenance-bar">
+        ⚠️ ARENA MAINTENANCE IN: <span id="maintenance-timer">00:00</span>
+    </div>
+
+    <!-- Tournament Transition Overlay -->
+    <div id="tournament-transition-overlay" class="overlay hidden tournament-transition-overlay">
+        <div class="text-center">
+            <h1 class="font-3xl mb-0 animate-pulse">BRACKET ADVANCEMENT</h1>
+            <div class="round-number-display text-glow-strong">ROUND 1</div>
+            <p class="letter-spacing-5 opacity-7 text-neon-purple font-bold">PREPARE FOR COMBAT</p>
+        </div>
+    </div>
+
+    <!-- Kidnap Gambit Overlay -->
+    <div id="kidnap-overlay" class="overlay hidden kidnap-overlay">
+        <h2 style="color: var(--error-red);">Kidnap Gambit</h2>
+        <div id="kidnap-content">
+            <!-- Dynamic content filled by JS -->
+        </div>
+        <button class="outline" onclick="hideAllOverlays()">Close</button>
+    </div>
+
+    <!-- Main Application Logic -->
+    <script src="app.js" type="module"></script>
+</body>
+</html>

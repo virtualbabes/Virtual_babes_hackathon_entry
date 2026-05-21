@@ -1,0 +1,559 @@
+// Public\src\scss\layouts\_dashboard.scss
+@import '../base/variables';
+
+// Dashboard Container
+.dashboard {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    flex-grow: 1;
+    width: 100%;
+    max-width: 1400px;
+    gap: $spacing-lg;
+    margin: $spacing-lg 0;
+
+    @media (max-width: $breakpoint-lg) {
+        gap: $spacing-md;
+        margin: $spacing-md 0;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        flex-direction: column;
+        gap: $spacing-sm;
+    }
+}
+
+// Column Layout
+.column {
+    flex: 1;
+    min-width: 320px;
+    max-width: 450px;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    @media (max-width: $breakpoint-md) {
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+// Glass Panel Base
+.glass-panel {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-radius: $border-radius-xl;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    @media (max-width: $breakpoint-md) {
+        padding: $spacing-md;
+    }
+}
+
+// Live Lobby Player List
+.player-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+}
+
+.player-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-md;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: $border-radius-md;
+    border: 1px solid $glass-border-color;
+    transition: transform $transition-fast, border-color $transition-fast, background-color $transition-fast;
+
+    &:hover {
+        background: rgba(0, 0, 0, 0.5);
+        border-color: rgba($color-neon-cyan, 0.3);
+        transform: translateY(-2px);
+    }
+
+    .player-name {
+        font-weight: 600;
+        color: $color-text-main;
+    }
+
+    .player-rating {
+        font-size: $font-size-sm;
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+
+    .player-status {
+        font-size: $font-size-xs;
+        color: $color-text-secondary;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+}
+
+.player-list-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: $font-size-sm;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: $color-text-secondary;
+    margin-bottom: $spacing-sm;
+}
+
+// Lobby Chat Styles
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: $border-radius-lg;
+    border: 1px solid $glass-border-color;
+    overflow: hidden;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+
+    @media (max-width: $breakpoint-md) {
+        height: 250px;
+    }
+}
+
+#chat-display {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-md;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    font-size: $font-size-sm;
+    scroll-behavior: smooth;
+}
+
+.chat-msg {
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $border-radius-sm;
+    background: rgba(255, 255, 255, 0.05);
+    word-wrap: break-word;
+    line-height: 1.4;
+
+    b {
+        color: $color-neon-cyan;
+        font-weight: bold;
+    }
+
+    &.system {
+        color: $color-text-secondary;
+        font-style: italic;
+        background: transparent;
+        padding: $spacing-xs 0;
+    }
+
+    &.admin {
+        background: rgba($color-warning-orange, 0.1);
+        border-left: 3px solid $color-warning-orange;
+        color: $color-warning-orange;
+    }
+
+    &.error {
+        background: rgba($color-error-red, 0.1);
+        border-left: 3px solid $color-error-red;
+        color: $color-error-red;
+    }
+}
+
+.chat-input-area {
+    display: flex;
+    border-top: 1px solid $glass-border-color;
+    padding: $spacing-sm;
+    background: rgba(0, 0, 0, 0.3);
+    gap: $spacing-sm;
+
+    .chat-send-btn {
+        background: $color-neon-cyan;
+        color: $color-bg-dark;
+        border: none;
+        padding: $spacing-sm $spacing-md;
+        border-radius: $border-radius-md;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition: background-color $transition-fast, box-shadow $transition-fast;
+
+        &:hover {
+            background: color-mix(in srgb, $color-neon-cyan, white 10%);
+            box-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+        }
+
+        &:disabled {
+            background: $color-medium-grey;
+            color: $color-text-muted;
+            cursor: not-allowed;
+        }
+    }
+}
+
+// Shared Glass Input Styles
+.glass-input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $glass-border-color;
+    color: $color-text-main;
+    border-radius: $border-radius-md;
+    padding: $spacing-sm $spacing-md;
+    font-size: $font-size-sm;
+    transition: border-color $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
+    -webkit-backdrop-filter: blur($glass-blur);
+    backdrop-filter: blur($glass-blur);
+
+    &:focus {
+        outline: none;
+        border-color: $color-neon-cyan;
+        box-shadow: 0 0 10px rgba($color-neon-cyan, 0.3);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    &::placeholder {
+        color: $color-text-muted;
+        opacity: 0.7;
+    }
+
+    &.w-full {
+        width: 100%;
+    }
+}
+
+// Matchmaking Container
+.matchmaking-box {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    text-align: center;
+    border-color: rgba($color-neon-cyan, 0.3);
+
+    .queue-status {
+        color: $color-text-secondary;
+        font-size: $font-size-sm;
+        margin-bottom: $spacing-md;
+    }
+}
+
+// Cooldown Container
+.cooldown-container {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    text-align: center;
+    border-color: rgba($color-error-red, 0.3);
+    background: rgba($color-error-red, 0.05);
+
+    .cooldown-header {
+        color: $color-error-red;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: $spacing-md;
+    }
+
+    .cooldown-progress-bg {
+        width: 100%;
+        height: 8px;
+        background: rgba($color-text-main, 0.1);
+        border-radius: $border-radius-sm;
+        overflow: hidden;
+        margin-bottom: $spacing-sm;
+    }
+
+    .cooldown-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, $color-error-red, $color-warning-orange);
+        border-radius: $border-radius-sm;
+        transition: width $transition-base;
+        box-shadow: 0 0 10px rgba($color-error-red, 0.5);
+    }
+
+    .cooldown-timer {
+        font-size: $font-size-lg;
+        font-weight: bold;
+        color: $color-error-red;
+        font-family: $font-mono;
+    }
+}
+
+// Tournament Banner
+.tournament-highlight-banner {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    border-color: rgba($color-gold, 0.3);
+    background: linear-gradient(45deg, rgba($color-gold, 0.05), rgba($color-neon-cyan, 0.05));
+
+    .tournament-status-text {
+        color: $color-neon-cyan;
+        font-size: $font-size-base;
+        margin: $spacing-sm 0;
+    }
+}
+
+// Action Bar
+.action-bar {
+    @include neon-glass-panel;
+    padding: $spacing-lg;
+    gap: $spacing-md;
+
+    button {
+        flex: 1;
+        min-height: 48px;
+    }
+}
+
+// History Display
+.history-display {
+    @include neon-glass-panel;
+    padding: $spacing-md;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: $font-size-sm;
+    background: rgba(0, 0, 0, 0.2);
+
+    .history-item {
+        padding: $spacing-xs 0;
+        border-bottom: 1px solid rgba($color-text-main, 0.1);
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        .history-timestamp {
+            color: $color-text-secondary;
+            font-size: $font-size-xs;
+        }
+
+        .history-result {
+            font-weight: bold;
+
+            &.win { color: $color-neon-green; }
+            &.loss { color: $color-error-red; }
+            &.draw { color: $color-warning-orange; }
+        }
+    }
+}
+
+/* --- Resolved Unfinished Layout Logic --- */
+
+/* Custom arrow for glass selects */
+select.glass-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: calc(100% - 12px) center;
+    padding-right: 35px;
+}
+
+.glass-input-options { 
+    background: #141824; 
+    color: white; 
+}
+
+/* 3x3 Battle Grid */
+.battle-board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(80px, 110px));
+    grid-template-rows: repeat(3, 1fr); 
+    aspect-ratio: 1 / 1; 
+    gap: clamp(8px, 2vw, 15px);
+    justify-content: center;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.grid-slot {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px dashed rgba(0, 242, 254, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+    transition: border-color 0.3s, background-color 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+    position: relative;
+
+    &:hover { 
+        border-color: #00f2fe; 
+        background: rgba(0, 242, 254, 0.1); 
+        box-shadow: inset 0 0 15px rgba(0, 242, 254, 0.2); 
+    }
+}
+
+// Responsive Design
+@media (max-width: $breakpoint-md) {
+    .dashboard {
+        padding: 0 $spacing-sm;
+    }
+
+    .column {
+        gap: $spacing-sm;
+    }
+
+    .glass-panel {
+        padding: $spacing-md;
+    }
+
+    .player-item {
+        padding: $spacing-sm;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: $spacing-xs;
+    }
+
+    .chat-input-area {
+        flex-direction: column;
+
+        .chat-send-btn {
+            align-self: stretch;
+        }
+    }
+}
+select.glass-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: calc(100% - 12px) center;
+    padding-right: 35px;
+}
+
+.glass-input option { background: #141824; color: white; }
+
+.glass-input:focus {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: $color-neon-cyan;
+    box-shadow: 0 0 10px rgba($color-neon-cyan, 0.2);
+}
+
+#chat-input {
+    flex: 1;
+    border-color: transparent;
+    font-size: 0.9em;
+}
+
+.chat-send-btn { margin-left: 8px; border-radius: 6px; background: $color-neon-purple; padding: 5px 15px; cursor: pointer; border: none; color: white; }
+
+/* 3x3 Battle Grid */
+.battle-board {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(80px, 110px));
+    grid-template-rows: repeat(3, 1fr); /* Ensure rows take equal space */
+    aspect-ratio: 1 / 1; /* Force a square aspect ratio for the entire board */
+    gap: clamp(8px, 2vw, 15px);
+    justify-content: center;
+    margin-top: 20px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.grid-slot {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px dashed rgba($color-neon-cyan, 0.3);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+    transition: border-color 0.3s, background-color 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+    position: relative;
+}
+
+.grid-slot:hover { border-color: $color-neon-cyan; background: rgba($color-neon-cyan, 0.1); box-shadow: inset 0 0 15px rgba($color-neon-cyan, 0.2); }
+.status-active { color: $color-neon-green; text-shadow: 0 0 10px $color-neon-green; font-weight: bold; }
+
+/* Mood-Specific Tile Styles */
+.mood-volatile { border-color: #ff0844 !important; background: rgba(255, 8, 68, 0.05); }
+.mood-volatile::before { content: '🔥'; }
+
+.mood-serene { border-color: $color-neon-blue !important; background: rgba(79, 172, 254, 0.05); }
+.mood-serene::before { content: '💧'; }
+
+.mood-spirited { border-color: $color-warning-orange !important; background: rgba(255, 166, 87, 0.05); }
+.mood-spirited::before { content: '⚡'; }
+
+.mood-grounded { border-color: $color-neon-green !important; background: rgba(63, 185, 80, 0.05); }
+.mood-grounded::before { content: '🌿'; }
+
+.grid-slot::before {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    font-size: 1.2em;
+    opacity: 0.4;
+    z-index: 1;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.grid-slot:hover::before { opacity: 0.8; }
+
+/* Player Hand Area */
+.player-hand { display: flex; justify-content: center; gap: 10px; margin-top: 20px; height: 150px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------
+   MOBILE RESPONSIVE OVERRIDES (Phase 8)
+   --------------------------------------------------------- */
+@media (max-width: 768px) {
+    /* 1. Force the 3x3 grid to maintain shape and fill width */
+    .battle-board, #board-container {
+        grid-template-columns: repeat(3, minmax(0, 1fr)); // Allow slots to shrink below 100px
+        grid-template-rows: repeat(3, minmax(0, 1fr));
+        gap: clamp(4px, 2vw, 10px); // Tighten gaps on small screens
+        width: 95vw;
+        height: 95vw; /* Maintain 1:1 Aspect Ratio */
+        max-width: 400px;
+        max-height: 400px;
+        margin: 0 auto;
+    }
+
+    /* 3. Deck Manager Layout Shift */
+    #deck-manager-overlay .glass-panel {
+        flex-direction: column;
+        width: 98vw;
+        height: 90vh;
+        overflow-y: auto;
+        padding: 15px;
+    }
+
+    #inventory-grid {
+        display: flex;
+        overflow-x: auto; /* Horizontal scroll for cards on mobile */
+        padding-bottom: 15px;
+        height: 180px;
+        gap: 10px;
+    }
+
+    /* 4. Tap Target Improvements */
+    button, .deck-slot-btn, .outline { min-height: 44px; margin-bottom: 10px; }
+
+    /* Season History & Hall of Fame Mobile (< 480px) */
+    .hof-tab-bar { gap: 5px; overflow-x: auto; padding-bottom: 5px; }
+    .hof-tab { font-size: 0.75em; padding: 5px 10px; white-space: nowrap; }
+    
+    .season-filter-bar { padding: 10px; gap: 5px; }
+    #season-filter-input { width: 60px; font-size: 0.8em; }
+
+    .season-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    .season-card-header span:last-child { font-size: 0.7em; }
+    
+    .season-winner-row { padding: 6px 10px; }
+    .season-winner-row .player-name { font-size: 0.85em; }
+    .season-winner-row .player-stats { font-size: 0.75em; }
+}
