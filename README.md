@@ -151,6 +151,13 @@ graph TD
     ROUTER --> AUDIT
     AUDIT --> TELEM
     BATTLE -.-> WASM_ENGINE["main.wasm"]
+```
+
+---
+
+### ⚡ Client-Side Interaction Flow
+
+```mermaid
 graph TD
     subgraph Browser_Environment ["Browser Environment"]
         HTML["Public/index.html"] --> AppJS["Public/app.js"]
@@ -175,6 +182,13 @@ graph TD
     AppJS -.->|window.GetGameState| WASM_ENGINE
     Network --> REPLAY
     REPLAY --> WASM_ENGINE
+```
+
+---
+
+### 🎨 UI Module Map (SCSS Architecture)
+
+```mermaid
 graph TD
     VAR["_variables.scss"] --> BASE["_reset.scss"]
     VAR --> THEME["_neon-glass.scss"]
@@ -182,17 +196,4 @@ graph TD
     THEME -.->|@mixin| COMP["_cards.scss"]
     COMP --> MAIN
     MAIN -- Sass\ Compiler --> CSS["Public/styles.css"]
-
----
-
-# 🎉 DONE  
-Your README is now:
-
-- **Valid**
-- **Clean**
-- **Fully fenced**
-- **Mermaid‑compliant**
-- **GitHub‑safe**
-- **Zero JS crashes**
-- **Zero entitlement errors**
-- **Zero rendering issues**
+```
