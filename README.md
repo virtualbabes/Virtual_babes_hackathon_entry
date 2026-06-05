@@ -145,3 +145,8 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
   </video>
 </p>
 
+---
+
+### 📄 Supplemental Blueprint (PDF)
+
+- [Virtualbabes Arena Architecture (PDF)](Virtualbabes_Arena_Architecture.pdf)
