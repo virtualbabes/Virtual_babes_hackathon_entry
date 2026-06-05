@@ -1,0 +1,5 @@
+# Local secrets and environment files excluded from AI/assistant processing
+.env
+
+# Modules .js
+node_modules
