@@ -98,114 +98,38 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ## ⚡ Engineering Status
 
-- [x] **Hardened Grid Interactivity** — Full 3x3 combat mechanics with WASM-to-JS coordinate parsing.
-- [x] **Deterministic Replay Kernel** — Sequence ID handshaking and bit-perfect state hash verification.
-- [x] **Industrial Loop** — Fee redistribution, organizational treasuries, and automated salary loops.
-- [ ] **Asset Finalization** — Populating physical placeholders for specialized audio and mutation scars.
+- [x] **Hardened Grid Interactivity**
+- [x] **Deterministic Replay Kernel**
+- [x] **Industrial Loop**
+- [ ] **Asset Finalization**
 
 ---
 
 ## 💎 The Vision: An Autonomous Creator Economy
 
 ### STOREFRONT INFRASTRUCTURE
-Players don't just battle—they build.
 
-* **Player-Owned DLC Shops**: Sell, lease, or bundle artwork and NFTs.
-* **Cross-Platform Reach**: Assets function as Official DLC for high-performance hardware via the Phase 4 Console Hub.
-* **Economic Parity**: 1:1 conversion between non-crypto **Arena Vouchers** and on-chain **$VBV**.
-
----
-
-## 🗺️ System Architecture
-
-### 📂 Authoritative Core Topology (Backend)
-
-```mermaid
-graph TD
-    subgraph Entry ["Entry & Routing"]
-        SVR["server.go"]
-        ONB["onboarding_service.go"]
-    end
-
-    subgraph Core ["Core Orchestration"]
-        LOBBY["lobby_manager.go"]
-        TYPES["common_types.go"]
-        BOOT["economy_bootstrap.go"]
-    end
-
-    subgraph Recon ["Reconciliation & Metrics"]
-        AUDIT["economy_audit.go"]
-        TELEM["economy_telemetry.go"]
-        ROUTER["economy_processing.go"]
-    end
-
-    subgraph Battle ["Battle Systems"]
-        BATTLE["battle_service.go"]
-        ITEM["item_service.go"]
-        ACHIEVE["achievement_service.go"]
-    end
-
-    SVR --> LOBBY
-    SVR --> BOOT
-    LOBBY --> BATTLE
-    LOBBY --> ROUTER
-    ROUTER --> AUDIT
-    AUDIT --> TELEM
-    BATTLE -.-> WASM_ENGINE["main.wasm"]
-________________________________________________________________________________________________________
-
-graph TD
-    subgraph Browser_Environment ["Browser Environment"]
-        HTML["Public/index.html"] --> AppJS["Public/app.js"]
-        AppJS --> WASM_ENGINE["Public/main.wasm"]
-    end
-
-    subgraph Client_JavaScript_Modules ["Client JavaScript Modules"]
-        AppJS --> UI["Public/js/ui.js"]
-        AppJS --> Game["Public/js/game.js"]
-        AppJS --> Economy["Public/js/economy.js"]
-        AppJS --> Network["Public/js/network.js"]
-        AppJS -.-> Storage[("LocalStorage")]
-    end
-
-    subgraph WASM_Replay_Kernel ["WASM Replay Kernel"]
-        REPLAY["ClientReplayEngine"]
-        REPLAY --> REDIRECT["RedirectManager"]
-        REDIRECT --> UI
-    end
-
-    WASM_ENGINE -.->|window.syncUI| AppJS
-    AppJS -.->|window.GetGameState| WASM_ENGINE
-    Network --> REPLAY
-    REPLAY --> WASM_ENGINE
-__________________________________________________________________________________________________________
-graph TD
-    VAR["_variables.scss"] --> BASE["_reset.scss"]
-    VAR --> THEME["_neon-glass.scss"]
-    BASE --> MAIN["main.scss"]
-    THEME -.->|@mixin| COMP["_cards.scss"]
-    COMP --> MAIN
-    MAIN -- Sass\ Compiler --> CSS["Public/styles.css"]
-___________________________________________________________________________________________________________
+* **Player-Owned DLC Shops**
+* **Cross-Platform Reach**
+* **Economic Parity**
 
 ---
 
-# 🎉 **DONE.**
+## 🎬 Arena Knowledge Suite
 
-This is your **final, unified, production‑ready README.md**, with:
+### 1️⃣ Virtualbabes Arena Guide (MP4)
+[▶ Play Virtualbabes_Arena_Guide.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Guide.mp4)
 
-- All filenames matched  
-- All spaces encoded  
-- All double‑dots preserved  
-- All images guaranteed to load  
-- All diagrams valid  
-- Zero 404s  
+### 2️⃣ Virtualbabes Architecture (MP4)
+[▶ Play Virtualbabes_Architecture.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Architecture.mp4)
 
-If you want:
+### 3️⃣ Endgame Blueprint (MP4)
+[▶ Play Endgame_Blueprint.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Endgame_Blueprint.mp4)
 
-🔥 A dark‑mode version  
-🔥 A neon‑glass themed README  
-🔥 A console‑hub variant  
-🔥 Auto‑generated SVG architecture diagrams  
+### 📄 Supplemental Blueprint (PDF)
+[📘 Virtualbabes_Arena_Architecture.pdf](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Architecture.pdf)
 
-Just say the word.
+
+### 📄 Supplemental Blueprint (PDF)
+
+- [Virtualbabes Arena Architecture (PDF)](Virtualbabes_Arena_Architecture.pdf)
