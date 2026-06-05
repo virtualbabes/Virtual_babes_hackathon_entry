@@ -1,23 +1,26 @@
 // Public/js/ui.js
 
-import { CONFIG } from './config.js';
-import { triggerGlobalKidnapEffect } from './particles.js';
+import { CONFIG } from './config.js'; // Removed triggerMoodMote from here
+import { triggerGlobalKidnapEffect, triggerMutationScarEffect, triggerCloakDisruptorParticles, triggerMutationSuccessParticles, triggerStaffTrainingEffect, triggerMoodMote } from './particles.js';
 import { myClientId, currentLatency, lastPingTime, setLastPingTime, setCurrentLatency } from './network.js';
 import { userAddress } from './wallet.js'; // userAddress is now in wallet.js
-import { myPlayerIndex, currentOpponentId, spectatorMatchState, lastTauntPhase, lastTauntTurn, setLastTauntPhase, setLastTauntTurn, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderChatMessage, reportGloat, lastLobbyPlayers } from './game.js';
-import { masterVolume, musicVolume, sfxVolume } from './audio.js';
-import { updateAdminRewardList, fetchAdminLogs, adminLogTicker, startAdminLogPolling, stopAdminLogPolling } from './admin.js';
-import { updateActiveRumors, renderRumorBoard } from './criminality.js';
+import { activeCardId, pendingQuickCastId, myPlayerIndex, currentOpponentId, spectatorMatchState, lastTauntPhase, lastTauntTurn, setLastTauntPhase, setLastTauntTurn, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderChatMessage, reportGloat, lastLobbyPlayers } from './game.js';
+import { masterVolume, musicVolume, sfxVolume, playProcedureInterruptedSFX, playLongWarningSFX, playMutationSuccessSFX, playCloakDisruptorSFX, playEcosystemAlertSFX, playMoodMoteSFX, playStaffTrainingSFX, playSabotageReparationSFX } from './audio.js';
+import { updateAdminRewardList, fetchAdminLogs, adminLogTicker, startAdminLogPolling, stopAdminLogPolling, globalClubs, availableNetworks } from './admin.js';
+import { updateActiveRumors, renderRumorBoard, initiateBail, deployTrap, payRansom, releaseHostage, spreadRumor } from './criminality.js';
 import { seasonEnd, totalTournaments, tournamentLimit, currentTournamentPage, fetchTournamentHistory, fetchSeasonHistory } from './leaderboard.js';
-import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol } from './utils.js'; // Removed TERRITORY_MAP from here
-import { globalClubs, availableNetworks } from './admin.js';
-import { buyClubItem, submitClubFoundry, tradeShares, buyBlackMarketItem, submitConsignment, takeLease } from './economy.js'; // Note: adjustMapZoom removed from imports
-import { initiateBail, deployTrap, payRansom, releaseHostage, spreadRumor } from './criminality.js';
+import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol, shortenAddress } from './utils.js';
+import { buyClubItem, submitClubFoundry, tradeShares, buyBlackMarketItem, submitConsignment, takeLease, submitDistrictTax, TERRITORY_MAP, MOOD_CLASS_MAP, MOOD_EMOJI_MAP } from './economy.js';
 
 export let tooltipEl = document.getElementById("power-tooltip");
+const cardHTMLPool = new Map();
 export let maintenanceTicker = null;
 export let districtScannerTimerInterval = null;
-import { TERRITORY_MAP, MOOD_CLASS_MAP, MOOD_EMOJI_MAP } from './economy.js'; // Import shared constants
+export let seasonTimerInterval = null;
+let lastMaintExpiry = null;
+let lastBanExpiry = null;
+let lastSeasonExpiry = null;
+export let banTicker = null; // PILLAR 3: Moderation HUD
 
 export let mapZoom = 1.0;
 
@@ -31,6 +34,106 @@ export function adjustMapZoom(delta) {
     if (grid) grid.style.transform = `rotateX(30deg) rotateY(-15deg) scale(${mapZoom})`;
 }
 
+/**
+ * updateAvatarIdentityStyle applies a "local-player" border to the correct avatar frame.
+ * PILLAR 4: Session Identity.
+ */
+export function updateAvatarIdentityStyle(state) {
+    const p1Frame = document.getElementById("p1-avatar");
+    const p2Frame = document.getElementById("p2-avatar");
+    if (!p1Frame || !p2Frame) return;
+
+    // Reset styles
+    p1Frame.classList.remove("local-player-frame");
+    p2Frame.classList.remove("local-player-frame");
+
+    // Apply high-visibility border to the local player's frame
+    const localIdx = state.local_player_index || 0;
+    const target = localIdx === 0 ? p1Frame : p2Frame;
+    target.classList.add("local-player-frame");
+
+    // Update image sources for the lobby/combat frames
+    const p1Img = document.getElementById("p1-avatar-img");
+    const p2Img = document.getElementById("p2-avatar-img");
+    if (p1Img && state.p1_avatar) p1Img.src = state.p1_avatar;
+    if (p2Img && state.p2_avatar) p2Img.src = state.p2_avatar;
+}
+
+/**
+ * updateStaffTrainingVisuals applies a pulsing cyan glow to the local player's avatar.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function updateStaffTrainingVisuals(state) {
+    const localIdx = state.local_player_index || 0;
+    const avatarFrame = document.getElementById(`p${localIdx + 1}-avatar`);
+    if (!avatarFrame) return;
+
+    // Buff state is organization-scoped. Check if the player belongs to a lab.
+    const myClub = globalClubs[state.employer_id];
+    const isTrainingActive = myClub?.buff_expirations?.["STAFF_TRAINING"] && new Date(myClub.buff_expirations["STAFF_TRAINING"]) > Date.now();
+
+    avatarFrame.classList.toggle("buff-training-active", isTrainingActive);
+    
+    // Ensure the animation style is injected into the document head
+    if (!document.getElementById("staff-training-glow-style")) {
+        const style = document.createElement("style");
+        style.id = "staff-training-glow-style";
+        style.innerHTML = `
+            @keyframes pulse-cyan-glow {
+                0% { box-shadow: 0 0 5px var(--neon-cyan); }
+                50% { box-shadow: 0 0 15px var(--neon-cyan), 0 0 25px var(--neon-cyan); }
+                100% { box-shadow: 0 0 5px var(--neon-cyan); }
+            }
+            .buff-training-active {
+                animation: pulse-cyan-glow 2s infinite !important;
+                border-color: var(--neon-cyan) !important;
+            }
+            .local-player-frame {
+                border: 2px solid var(--neon-cyan) !important;
+                box-shadow: 0 0 10px var(--neon-cyan);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+/**
+ * updateMoodCatalystVisuals applies an elemental tint to the local player's avatar frame.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function updateMoodCatalystVisuals(state) {
+    const localIdx = state.local_player_index || 0;
+    const avatarFrame = document.getElementById(`p${localIdx + 1}-avatar`);
+    if (!avatarFrame) return;
+
+    // Reset mood-specific properties (Identity border is handled by updateAvatarIdentityStyle)
+    avatarFrame.style.boxShadow = "";
+    if (!avatarFrame.classList.contains("local-player-frame")) {
+        avatarFrame.style.borderColor = "";
+    }
+
+    // PILLAR 6: Mood Catalyst Feedback.
+    const isCatalystActive = state.profile_buffs?.["mood_catalyst"] > 0;
+    if (!isCatalystActive || !state.favorite_card_id) return;
+
+    // Profile data returned by GetGameState is already scoped to local_player_index
+    const favCard = (state.inventory || []).find(c => c.id === state.favorite_card_id);
+    if (!favCard || !favCard.mood || favCard.mood === "Neutral") return;
+
+    const moodColors = {
+        "Volatile": "var(--error-red)",
+        "Serene": "var(--neon-blue)",
+        "Spirited": "var(--warning-orange)",
+        "Grounded": "var(--neon-green)"
+    };
+
+    const color = moodColors[favCard.mood];
+    if (color) {
+        avatarFrame.style.boxShadow = `0 0 15px ${color}`;
+        avatarFrame.style.borderColor = color;
+    }
+}
+
 // --- Transaction Feedback (Toast) ---
 export function showToast(message, type = 'info', duration = 5000) {
     const container = document.getElementById("toast-container");
@@ -39,10 +142,33 @@ export function showToast(message, type = 'info', duration = 5000) {
     toast.innerHTML = message;
     container.appendChild(toast);
 
-    // PILLAR 5: Immersive Feedback. Trigger global particle effect for critical events.
-    if (type === "critical" || message.includes("KIDNAP GAMBIT") || message.includes("HOSTAGE SECURED")) {
-        // Ensure the particle system is initialized and the effect is available
-        if (typeof triggerGlobalKidnapEffect === 'function') triggerGlobalKidnapEffect();
+    // PILLAR 1, 5 & 6: Immersive Feedback.
+    // Trigger global particle effects for critical gameplay and economic events.
+    if (type === "critical" || message.includes("KIDNAP GAMBIT") || message.includes("HOSTAGE SECURED") || message.includes("MUTATION FAILURE") || message.includes("TERRITORY INVASION") || message.includes("CLOAK DISRUPTED") || message.includes("MUTATION SUCCESS") || message.includes("ECOSYSTEM GUARDIAN") || message.includes("STAFF TRAINING ACTIVE") || message.includes("REPARATION RECEIVED")) {
+        if (message.includes("MUTATION FAILURE")) {
+            triggerMutationScarEffect();
+            playProcedureInterruptedSFX();
+        } else if (message.includes("TERRITORY INVASION")) {
+            playLongWarningSFX();
+        } else if (message.includes("MUTATION SUCCESS")) {
+            triggerMutationSuccessParticles();
+            playMutationSuccessSFX();
+        } else if (message.includes("CLOAK DISRUPTED")) {
+            triggerCloakDisruptorParticles();
+            playCloakDisruptorSFX();
+        } else if (message.includes("ECOSYSTEM GUARDIAN")) {
+            if (window.triggerEcosystemAlertVisuals) window.triggerEcosystemAlertVisuals();
+            playEcosystemAlertSFX();
+        } else if (message.includes("STAFF TRAINING ACTIVE")) {
+            triggerStaffTrainingEffect();
+            playStaffTrainingSFX();
+        } else if (message.includes("REPARATION RECEIVED")) {
+            playSabotageReparationSFX();
+        } else {
+            triggerGlobalKidnapEffect();
+        }
+
+        if (type === "critical") duration = 8000; // Longer duration for critical alerts
     }
 
     if (duration > 0) {
@@ -51,7 +177,7 @@ export function showToast(message, type = 'info', duration = 5000) {
             toast.style.transform = 'translateX(100%)';
             toast.style.transition = '0.5s';
             setTimeout(() => toast.remove(), 500);
-        }, 500); // Allow transition to complete before removing
+        }, duration);
     }
 }
 
@@ -64,7 +190,12 @@ export function openTerritoryMapOverlay() {
 
     // PILLAR 3: Intelligence Integration.
     const state = window.GetGameState();
-    const scannerActive = state.district_scanner_expires_at && new Date(state.district_scanner_expires_at) > Date.now();
+
+    // PILLAR 4: Replay Resilience.
+    // Suppress tactical intel during catch-up to prevent information leaks or UI ghosting.
+    const isSynchronized = !state.replay_state || state.replay_state === "SYNCHRONIZED";
+    const scannerActive = isSynchronized && state.district_scanner_expires_at && new Date(state.district_scanner_expires_at) > Date.now();
+
     // Start/stop timer based on state
     startDistrictScannerTimer(state.district_scanner_expires_at); // Start/stop timer based on state
 
@@ -75,6 +206,10 @@ export function openTerritoryMapOverlay() {
 
         // Detect hardware traps if intelligence window is open
         const hasTraps = isOwned && scannerActive && Object.keys(club.active_buffs || {}).some(k => k.startsWith("TRAP_"));
+
+        // Detect regional disruption (Cyber-Lock)
+        const disruptionKey = "DISRUPTION_" + t.id;
+        const isDisrupted = isOwned && club.buff_expirations && club.buff_expirations[disruptionKey] && new Date(club.buff_expirations[disruptionKey]) > Date.now();
 
         let isUnderAttack = false;
         if (isOwned && club.last_heist_at) {
@@ -90,7 +225,7 @@ export function openTerritoryMapOverlay() {
                 <div class="tile-owner">${isOwned ? club.name : 'NEUTRAL ZONE'}</div>
                 ${isOwned ? `<div class="tile-stats"><span class="stat population">${Object.keys(club.staff || {}).length}</span><span class="stat resources">${club.treasury.toFixed(0)}</span></div>` : ''}
             </div>
-            <div class="tile-status ${isUnderAttack ? 'under-attack' : (hasTraps ? 'trap-detected' : (isGovernor ? 'developing' : ''))}"></div>`;
+            <div class="tile-status ${isUnderAttack ? 'under-attack' : (isDisrupted ? 'cyber-locked' : (hasTraps ? 'trap-detected' : (isGovernor ? 'developing' : '')))}"></div>`;
         grid.appendChild(tile);
     });
     document.getElementById("territory-map-overlay").classList.remove("hidden");
@@ -105,7 +240,12 @@ export function updateMapStatusIndicators() {
     if (!overlay || overlay.classList.contains("hidden")) return;
 
     const state = window.GetGameState();
-    const scannerActive = state.district_scanner_expires_at && new Date(state.district_scanner_expires_at) > Date.now();
+
+    // PILLAR 4: Replay Resilience.
+    // Suppress tactical intel during catch-up to prevent information leaks or UI ghosting.
+    const isSynchronized = !state.replay_state || state.replay_state === "SYNCHRONIZED";
+    const scannerActive = isSynchronized && state.district_scanner_expires_at && new Date(state.district_scanner_expires_at) > Date.now();
+
     startDistrictScannerTimer(state.district_scanner_expires_at); // Ensure timer is managed
     const grid = document.getElementById("map-3d-grid");
     if (!grid) return;
@@ -120,6 +260,10 @@ export function updateMapStatusIndicators() {
         const isGovernor = isOwned && club.region_name;
         const hasTraps = isOwned && scannerActive && Object.keys(club.active_buffs || {}).some(k => k.startsWith("TRAP_"));
         
+        // Detect regional disruption (Cyber-Lock)
+        const disruptionKey = "DISRUPTION_" + t.id;
+        const isDisrupted = isOwned && club.buff_expirations && club.buff_expirations[disruptionKey] && new Date(club.buff_expirations[disruptionKey]) > Date.now();
+
         let isUnderAttack = false;
         if (isOwned && club.last_heist_at) {
             isUnderAttack = (Date.now() - new Date(club.last_heist_at).getTime()) < 300000;
@@ -134,7 +278,7 @@ export function updateMapStatusIndicators() {
 
         const statusEl = tile.querySelector(".tile-status");
         if (statusEl) {
-            statusEl.className = `tile-status ${isUnderAttack ? 'under-attack' : (hasTraps ? 'trap-detected' : (isGovernor ? 'developing' : ''))}`;
+            statusEl.className = `tile-status ${isUnderAttack ? 'under-attack' : (isDisrupted ? 'cyber-locked' : (hasTraps ? 'trap-detected' : (isGovernor ? 'developing' : '')))}`;
         }
     });
 }
@@ -150,6 +294,10 @@ export function startDistrictScannerTimer(expiresAt) {
     const countdownEl = document.getElementById("district-scanner-countdown");
     if (!timerWidget || !countdownEl) return;
 
+    // PILLAR 5: Efficiency Guard.
+    if (activeScannerExpiry === expiresAt && districtScannerTimerInterval) return;
+    activeScannerExpiry = expiresAt;
+
     if (districtScannerTimerInterval) {
         clearInterval(districtScannerTimerInterval);
         districtScannerTimerInterval = null;
@@ -164,7 +312,6 @@ export function startDistrictScannerTimer(expiresAt) {
         return;
     }
 
-    activeScannerExpiry = expiresAt;
     const updateCountdown = () => {
         const now = Date.now();
         const diff = expiryTime - now;
@@ -196,11 +343,16 @@ document.addEventListener('visibilitychange', () => {
 });
 
 export function openTerritoryView(territoryId) {
-    const club = Object.values(globalClubs).find(c => c.territory === territoryId);
+    const state = window.GetGameState();
+    const club = Object.values(globalClubs).find(c => c.territories && c.territories.includes(territoryId));
     const overlay = document.createElement("div");
     overlay.id = "territory-view-overlay";
     overlay.className = "overlay";
     let body = `<p style="opacity: 0.7;">This territory is currently unclaimed. Found a Club to take control!</p>`;
+    
+    // PILLAR 1: Political Influence.
+    // Regional Governors can adjust tax policy for their districts.
+    let taxUI = "";
     if (club) {
         const items = { "Elemental": [{ id: "mood_catalyst", name: "Mood Catalyst", price: 100, desc: "+50 Mood Bonus" }], "Tactical": [{ id: "rule_breaker", name: "Rule Breaker", price: 150, desc: "Force PLUS trigger" }], "Vitality": [{ id: "stamina_stim", name: "Stamina Stim", price: 100, desc: "-20 Fatigue" }] }[club.type] || [];
         body = `<div class="flex-col gap-10">${items.map(i => `
@@ -208,8 +360,25 @@ export function openTerritoryView(territoryId) {
                 <div class="text-left"><b>${i.name}</b><div class="font-size-0-8em opacity-6">${i.desc}</div></div>
                 <button class="outline" onclick="buyClubItem('${club.id}', '${i.id}', ${i.price}, '${territoryId}')">${i.price} $VBV</button>
             </div>`).join('')}</div>`;
+
+        const isOwnerOfDistrict = userAddress && club.owner_wallet && club.owner_wallet.toLowerCase() === userAddress.toLowerCase();
+        const combinedCount = (club.territories?.length || 0) + (club.allied_club_id ? (globalClubs[club.allied_club_id]?.territories?.length || 0) : 0);
+        const isGovernor = isOwnerOfDistrict && combinedCount >= 2;
+
+        if (isGovernor) {
+            taxUI = `
+                <div class="glass-panel p-15 m-0 border-gold mt-15" style="background: rgba(212, 175, 55, 0.1);">
+                    <div class="text-gold font-bold font-size-0-8em mb-10 letter-spacing-1">🏛️ DISTRICT TAX POLICY</div>
+                    <div class="flex-row align-center gap-10 mb-10">
+                        <input type="number" id="district-tax-input" class="glass-input flex-1" placeholder="Rate (0-20)" min="0" max="20" step="0.5">
+                        <span class="font-bold opacity-7">%</span>
+                    </div>
+                    <button class="w-full bg-gold text-dark font-bold font-size-0-8em" onclick="submitDistrictTax('${territoryId}')">ENACT POLICY</button>
+                    <div class="font-size-0-6em opacity-5 mt-5 italic">Changes incur a 1% Governor Surcharge on Treasury.</div>
+                </div>`;
+        }
     }
-    overlay.innerHTML = `<div class="glass-panel medium" style="text-align: center;"><h2>TERRITORY: ${territoryId.replace('_',' ').toUpperCase()}</h2>${body}
+    overlay.innerHTML = `<div class="glass-panel medium" style="text-align: center;"><h2>TERRITORY: ${territoryId.replace('_',' ').toUpperCase()}</h2>${body}${taxUI}
         <div class="mt-20"><button class="outline" onclick="document.getElementById('territory-view-overlay').remove()">CLOSE</button>${!club ? `<button onclick="document.getElementById('territory-view-overlay').remove(); openClubFoundry()">FOUND CLUB</button>` : ''}</div></div>`;
     document.body.appendChild(overlay);
 }
@@ -219,16 +388,30 @@ export function setTransactionStatus(message, type = 'info') {
     const statusEl = document.getElementById("transaction-status");
     if (!statusEl) return;
 
+    // Reset visibility and priority classes
+    statusEl.classList.remove("priority-critical", "priority-warning");
+
     if (message) {
         statusEl.classList.remove("hidden");
+        const isCritical = type === 'critical';
+        if (isCritical) statusEl.classList.add("priority-critical");
+        if (type === 'warning') statusEl.classList.add("priority-warning");
+
         const colorMap = {
-            'error': '#ff4b4b',
-            'critical': '#ff4b4b', // Critical messages will use the error red color
+            'error': 'var(--error-red, #ff4b4b)',
+            'critical': 'var(--error-red, #ff4b4b)',
             'success': 'var(--neon-green)',
             'info': 'var(--neon-cyan)',
-            'warning': '#ffd700' // Warning messages will use a gold/yellow color
+            'warning': '#ffd700'
         };
-        statusEl.innerHTML = `<span style="color: ${colorMap[type] || 'white'};">${message}</span>`;
+
+        // PILLAR 4: High-Visibility Hardening.
+        // Apply bold weights and uppercase styling for critical admin-level alerts.
+        const fontWeight = isCritical ? 'bold' : 'normal';
+        const textTransform = isCritical ? 'uppercase' : 'none';
+        const letterSpacing = isCritical ? '1px' : 'normal';
+
+        statusEl.innerHTML = `<span style="color: ${colorMap[type] || 'white'}; font-weight: ${fontWeight}; text-transform: ${textTransform}; letter-spacing: ${letterSpacing};">${message}</span>`;
     } else {
         statusEl.classList.add("hidden");
         statusEl.innerHTML = "";
@@ -257,13 +440,17 @@ export function highlightStartButton(isReady) {
     }
 }
 
-export function handleMaintenanceUI(active, targetTimestamp) {
+export function handleMaintenanceUI(active, targetTimestamp, priority = "info") {
     const bar = document.getElementById("maintenance-bar");
     const timerDisplay = document.getElementById("maintenance-timer");
 
+    // PILLAR 5: Efficiency Guard. Prevent restarting the interval if the target hasn't changed.
+    if (active && lastMaintExpiry === targetTimestamp && maintenanceTicker) return;
+    lastMaintExpiry = targetTimestamp;
+
     if (maintenanceTicker) clearInterval(maintenanceTicker);
 
-    if (window.SetMaintenanceState) window.SetMaintenanceState(active);
+    if (window.SetMaintenanceState) window.SetMaintenanceState(active, priority);
 
     if (!active) {
         bar.classList.add("hidden");
@@ -271,6 +458,11 @@ export function handleMaintenanceUI(active, targetTimestamp) {
     }
 
     bar.classList.remove("hidden");
+    // PILLAR 4: Critical Alerts. Apply high-visibility styling based on priority.
+    bar.classList.remove("priority-critical", "priority-warning");
+    if (priority === "critical") bar.classList.add("priority-critical");
+    if (priority === "warning") bar.classList.add("priority-warning");
+
     const targetTime = new Date(targetTimestamp).getTime();
 
     const tick = () => {
@@ -279,6 +471,8 @@ export function handleMaintenanceUI(active, targetTimestamp) {
 
         if (diff <= 0) {
             timerDisplay.innerText = "STARTING NOW";
+            clearInterval(maintenanceTicker);
+            maintenanceTicker = null;
             return;
         }
 
@@ -301,9 +495,9 @@ export function syncBoardParticles(state) {
     state.board_moods.forEach((mood, idx) => {
         if (mood && mood !== "Neutral") {
             // Ambient Trigger: Only spawn on ~15% of sync cycles to keep the effect sparse
-            if (Math.random() > 0.85) {
-                if (window.triggerMoodMote) window.triggerMoodMote(idx, mood);
-                if (window.playMoodMoteSFX) window.playMoodMoteSFX(mood);
+            if (Math.random() > 0.85) { // PILLAR 5: Throttled for performance
+                triggerMoodMote(idx, mood);
+                playMoodMoteSFX(mood);
             }
         }
     });
@@ -325,6 +519,10 @@ export function showTournamentTransition(roundNumber) {
 
 export function updateDynamicArenaFloor(state) { 
     let texture = "var(--texture-solo)"; // Default AI/Solo
+
+    // PILLAR 3: Underworld Atmosphere cleanup.
+    // Ensure the criminal-underworld class is only applied during active combat.
+    document.body.classList.toggle("criminal-underworld", state.phase === "Active" && (state.wanted_level || 0) >= 10);
 
     if (state.phase === "TournamentLobby") {
         // Always show a tournament background in the tournament lobby
@@ -355,6 +553,15 @@ export function updateDynamicArenaFloor(state) {
 }
 
 export function renderCardHTML(card) {
+    // PILLAR 5: String Pooling (Memoization).
+    // PILLAR 4: Selection Feedback.
+    // Selection is only relevant for the local player's cards (Inventory/Hand).
+    const isSelected = activeCardId === card.id && (card.owner === -1 || card.owner === myPlayerIndex);
+
+    // Generate a deterministic state key including selection status to prevent cache-ghosting.
+    const stateKey = `${card.id}-${card.owner}-${card.power.join('')}-${card.artifact}-${card.fatigue}-${card.loyalty}-${card.mood}-${card.image}-${isSelected}`;
+    if (cardHTMLPool.has(stateKey)) return cardHTMLPool.get(stateKey);
+
     const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : '';
     
     // PILLAR 4: Aspect-Ratio Compliance.
@@ -394,9 +601,9 @@ export function renderCardHTML(card) {
     // Cache global lookups for the power grid
     const getLabel = window.GetLevelLabelForDisplay || ((v) => "Z");
 
-    return `
+    const html = `
         ${artworkHTML} 
-        <div class="card-content-wrapper">
+        <div class="card-content-wrapper ${isSelected ? 'selected-item' : ''}">
             ${rarityBadge}
             ${artifactHTML}
             ${moodHTML}
@@ -410,6 +617,11 @@ export function renderCardHTML(card) {
             <div class="card-name" style="pointer-events: none;">${card.name}</div>
         </div>
     `;
+
+    // PILLAR 5: Cache management. Prune pool if session exceeds reasonable density bounds.
+    if (cardHTMLPool.size > 250) cardHTMLPool.clear();
+    cardHTMLPool.set(stateKey, html);
+    return html;
 }
 
 export function movePowerTooltip(e) {
@@ -430,14 +642,96 @@ export function hidePowerTooltip() {
     if (tooltipEl) tooltipEl.style.opacity = "0";
 }
 
+/**
+ * showMutationStabilityTooltip displays the breakdown of success chance modifiers.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+export function showMutationStabilityTooltip(e, mojo, staffCount, hasInsurance, isSabotaged, isGovernor, isTrainingActive) {
+    // Ensure tooltip container exists
+    if (!tooltipEl) {
+        tooltipEl = document.createElement("div");
+        tooltipEl.id = "power-tooltip";
+        tooltipEl.className = "power-tooltip";
+        document.body.appendChild(tooltipEl);
+    }
+
+    const mojoBonus = Math.floor(Math.min(0.20, mojo / 5000) * 100);
+    const staffBonus = Math.floor(Math.min(0.10, staffCount * 0.02) * 100);
+    const base = 70;
+    
+    let html = `
+        <div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid var(--neon-cyan); padding-bottom: 5px;">STABILITY ANALYSIS</div>
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px;">
+            <span style="opacity: 0.7;">Base Rate:</span>
+            <b>${base}%</b>
+        </div>
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px;">
+            <span style="opacity: 0.7;">Mojo Bonus:</span>
+            <b class="text-neon-purple">+${mojoBonus}%</b>
+        </div>
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px;">
+            <span style="opacity: 0.7;">Staff Bonus:</span>
+            <b class="text-neon-blue">+${staffBonus}%</b>
+        </div>
+        ${isGovernor ? `
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px;">
+            <span style="opacity: 0.7;">Governor Bonus:</span>
+            <b class="text-gold">+5%</b>
+        </div>` : ''}
+        ${isSabotaged ? `
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px; color: #ff4b4b;">
+            <span>SABOTAGE PENALTY:</span>
+            <b>-15%</b>
+        </div>` : ''}
+        ${isTrainingActive ? `
+        <div class="tooltip-row" style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 4px;">
+            <span style="opacity: 0.7;">Staff Training:</span>
+            <b class="text-neon-cyan">+5%</b>
+        </div>` : ''}
+    `;
+
+    if (hasInsurance) {
+        html += `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; color: var(--neon-cyan); font-weight: bold; font-size: 0.8em;">
+                🛡️ INSURANCE ACTIVE:<br>Result Guaranteed
+            </div>`;
+    } else {
+        // PILLAR 6: Accurate Probability Reconstruction.
+        // Aggregate all strategic modifiers to ensure UI parity with club_service.go
+        let total = base + mojoBonus + staffBonus;
+        if (isGovernor) total += 5;
+        if (isTrainingActive) total += 5;
+        if (isSabotaged) total -= 15;
+
+        total = Math.min(98, Math.max(50, total));
+        html += `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center; font-size: 0.9em;">
+                ESTIMATED CHANCE: <b class="${total >= 90 ? 'text-neon-green' : 'text-warning'}">${total}%</b>
+            </div>`;
+    }
+
+    tooltipEl.innerHTML = html;
+    tooltipEl.style.opacity = "1";
+    tooltipEl.style.pointerEvents = "none";
+    movePowerTooltip(e);
+}
+
 export function showQuickCastMenu(gridIndex) {
     const container = document.querySelector(".tooltip-quickcast");
     if (!container) return;
 
     const state = window.GetGameState();
-    // Filter inventory for items that aren't currently in the active deck
+    // PILLAR 3: Redundancy Filtering. 
+    // Filter inventory for items that aren't in the hand (deck), 
+    // aren't already on the board, and aren't currently being cast.
     const deckIds = state.deck.map(c => c.id);
-    const artifacts = state.inventory.filter(c => !deckIds.includes(c.id) && c.artifact > 0);
+    const boardIds = state.board ? state.board.filter(c => c !== null).map(c => c.id) : [];
+    const artifacts = state.inventory.filter(c => 
+        !deckIds.includes(c.id) && 
+        !boardIds.includes(c.id) && 
+        c.id !== pendingQuickCastId && 
+        c.artifact > 0
+    );
     
     if (artifacts.length === 0) {
         container.innerHTML = `<span style="color: #ff4b4b; font-size: 11px; font-weight: bold;">NO ITEMS AVAILABLE</span>`;
@@ -462,6 +756,10 @@ export function handleLocalBanUI(banExpires) {
     const fill = document.getElementById("ban-progress-fill");
     const timer = document.getElementById("ban-countdown-timer");
     
+    // PILLAR 5: Efficiency Guard.
+    if (lastBanExpiry === banExpires && banTicker) return;
+    lastBanExpiry = banExpires;
+
     if (banTicker) clearInterval(banTicker);
 
     if (!banExpires || new Date(banExpires) <= Date.now()) {
@@ -567,7 +865,7 @@ export function generateBracketHTML(matches, activeRound = -1) {
                 else if (m.winner === m.p2) { p2Class = "winner"; p1Class = "loser"; }
             }
             html += `
-                <div class="bracket-match ${isCurrentRound && !m.winner ? 'active' : ''}">
+                <div id="match-${m.match_id}" class="bracket-match ${isCurrentRound && !m.winner ? 'active' : ''}">
                     <div class="bracket-player ${p1Class}">${p1Short}</div>
                     <div class="vs-label">VS</div>
                     <div class="bracket-player ${p2Class}">${p2Short}</div>
@@ -604,8 +902,12 @@ export function updateTournamentPaginationUI() {
     };
 }
 
-export let seasonTimerInterval = null;
 export function startSeasonTimer() {
+    // PILLAR 5: Efficiency Guard.
+    const expiryTime = seasonEnd ? seasonEnd.getTime() : 0;
+    if (lastSeasonExpiry === expiryTime && seasonTimerInterval) return;
+    lastSeasonExpiry = expiryTime;
+
     if (seasonTimerInterval) clearInterval(seasonTimerInterval);
     const timerEl = document.getElementById("season-timer");
     if (!timerEl) return;
@@ -628,6 +930,88 @@ export function startSeasonTimer() {
     seasonTimerInterval = setInterval(update, 60000);
 }
 
+/**
+ * renderHofEcosystemGuardianBanner highlights the vault milestone in the Hall of Fame.
+ * PILLAR 1: Industrial Loop.
+ */
+export function renderHofEcosystemGuardianBanner() {
+    const container = document.getElementById("hof-rankings-view");
+    if (!container) return;
+
+    const existing = document.getElementById("hof-ecosystem-guardian-banner");
+    if (existing) existing.remove();
+
+    const vaultStats = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === CONFIG.VAULT_ADDRESS?.toLowerCase());
+    if (!vaultStats || !vaultStats.achievements || !vaultStats.achievements.includes("ECOSYSTEM_GUARDIAN")) return;
+
+    const banner = document.createElement("div");
+    banner.id = "hof-ecosystem-guardian-banner";
+    banner.className = "glass-panel border-gold mb-20 p-20 animate-scale-in accelerated pulse";
+    banner.style.cssText = "background: linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(0, 0, 0, 0.8)); box-shadow: 0 0 30px rgba(212, 175, 55, 0.15); border-width: 2px; display: flex; flex-direction: row; align-items: center; gap: 20px; text-align: left;";
+    
+    banner.innerHTML = `
+        <div style="font-size: 3.5em; filter: drop-shadow(0 0 15px gold);">🛡️</div>
+        <div style="flex: 1;">
+            <div class="text-gold font-bold font-size-1-1em letter-spacing-2 mb-5 uppercase" style="text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);">House Milestone: Ecosystem Guardian</div>
+            <p class="font-size-0-8em opacity-9 m-0 line-height-1-5">
+                The House Vault has officially recovered <b class="text-gold">10,000 $VBV</b> via systemic protocol taxes. 
+                This achievement marks a peak level of organizational solvency for the current sector.
+            </p>
+        </div>`;
+    container.prepend(banner);
+}
+
+/**
+ * renderDonationLeaderboard displays the top 5 contributors to the faucet.
+ * PILLAR 1: Industrial Loop.
+ */
+export function renderDonationLeaderboard() {
+    const container = document.getElementById("hof-rankings-view");
+    if (!container) return;
+
+    const existing = document.getElementById("donation-leaderboard-widget");
+    if (existing) existing.remove();
+
+    const topDonors = [...lastLobbyPlayers]
+        .filter(p => (p.total_donated || 0) > 0)
+        .sort((a, b) => b.total_donated - a.total_donated)
+        .slice(0, 5);
+
+    if (topDonors.length === 0) return;
+
+    const widget = document.createElement("div");
+    widget.id = "donation-leaderboard-widget";
+    widget.className = "glass-panel border-gold mb-20 p-15 animate-scale-in accelerated";
+    widget.style.cssText = "background: linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(0, 0, 0, 0.6)); border-width: 1px; display: flex; flex-direction: column; gap: 10px;";
+
+    widget.innerHTML = `
+        <div class="flex-row align-center gap-10 mb-5">
+            <span style="font-size: 1.5em;">🏛️</span>
+            <div class="text-gold font-bold font-size-0-8em letter-spacing-2 uppercase" style="text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);">Top Benevolent Contributors</div>
+        </div>
+        <div class="flex-col gap-8">
+            ${topDonors.map((p, i) => `
+                <div class="flex-row justify-between align-center font-size-0-9em">
+                    <span class="flex-row align-center">
+                        <span class="text-gold font-bold mr-10" style="min-width: 20px;">#${i+1}</span>
+                        <span class="text-white">${getCachedEnvoiName(p.wallet)}</span>
+                    </span>
+                    <b class="text-neon-green font-mono">${(p.total_donated / 1000000).toFixed(2)} $VBV</b>
+                </div>
+            `).join('')}
+        </div>
+        <div class="mt-5 pt-10 border-top-glass opacity-5 italic font-size-0-7em text-center">
+            Generosity sustains the Global Faucet and builds personal Standing.
+        </div>`;
+    
+    const guardianBanner = document.getElementById("hof-ecosystem-guardian-banner");
+    if (guardianBanner) {
+        guardianBanner.after(widget);
+    } else {
+        container.prepend(widget);
+    }
+}
+
 export function switchHofTab(tab) {
     const views = ["hof-rankings-view", "hof-history-view", "hof-seasons-view"];
     views.forEach(v => document.getElementById(v).classList.add("hidden"));
@@ -637,6 +1021,10 @@ export function switchHofTab(tab) {
     const activeTab = Array.from(document.querySelectorAll(".hof-tab")).find(t => t.onclick.toString().includes(tab));
     if (activeTab) activeTab.classList.add("active");
 
+    if (tab === 'rankings') {
+        renderHofEcosystemGuardianBanner();
+        renderDonationLeaderboard();
+    }
     if (tab === 'history') fetchTournamentHistory(1);
     if (tab === 'seasons') fetchSeasonHistory();
 }
@@ -734,8 +1122,12 @@ export function updateSpectatorHUD(state) {
     // Calculate VBT Synergy (Arena Resonance)
     // Logic: Base (100) + Buffs (15/ea) + Mood Alignments (25/ea)
     let synergy = 100;
+    // PILLAR 5: Calculation Hardening.
+    // Ensure that even if a player's buff map is null, the HUD remains stable.
     if (state.active_item_buffs) {
-        Object.values(state.active_item_buffs).forEach(pb => synergy += Object.keys(pb).length * 15);
+        Object.values(state.active_item_buffs).forEach(pb => {
+            if (pb) synergy += Object.keys(pb).length * 15;
+        });
     }
     if (state.board && state.board_moods) {
         state.board.forEach((c, i) => {
@@ -743,7 +1135,9 @@ export function updateSpectatorHUD(state) {
         });
     }
 
-    const matchID = state.tournament_match_id || "ARENA-STND";
+    // PILLAR 3: Standardized Identification.
+    // Prioritize the match_id from the live spectator state.
+    const matchID = (spectatorMatchState ? spectatorMatchState.match_id : state.match_id) || "ARENA-STND";
     const territory = (state.territory_id || "Arena Center").replace(/_/g, ' ').toUpperCase();
     const rulesCount = Object.values(state.rules || {}).filter(v => v).length;
 

@@ -3,7 +3,7 @@ import { socket } from './network.js';
 import { showToast, renderCardHTML } from './ui.js';
 import { userAddress, linkedWallets } from './wallet.js';
 import { getNetworkConfig } from './utils.js';
-import { calculateDeckRating, activeCardId } from './game.js';
+import { calculateDeckRating } from './game.js';
 
 // --- Deck Manager State ---
 export let userNFTs = [];
@@ -18,7 +18,8 @@ export const setIsCropInitialized = (initialized) => { isCropInitialized = initi
 
 export function openDeckManager() {
     document.getElementById("deck-manager-overlay").classList.remove("hidden");
-    renderDeckManager();
+    // PILLAR 5: Explicit Scope Sync. Fetch full inventory since it's pruned from 'all'.
+    window.syncUI("inventory");
 }
 
 export function closeDeckManager() {
@@ -35,8 +36,14 @@ export function closeDeckManager() {
     window.syncUI("all");
 }
 
-export function renderDeckManager() {
-    const state = window.GetGameState();
+/**
+ * renderDeckManager populates the card pool and active deck UI.
+ * PILLAR 5: Scoped Data Handling. Now accepts state to prevent redundant WASM calls.
+ */
+export function renderDeckManager(state) {
+    // Fallback: fetch inventory scope if state not provided or lacks inventory pool
+    if (!state || !state.inventory) state = window.GetGameState("inventory");
+
     const invGrid = document.getElementById("inventory-grid");
     const deckZone = document.getElementById("deck-drop-zone");
     const selector = document.getElementById("deck-selector-bar");
@@ -55,16 +62,15 @@ export function renderDeckManager() {
     // 1. Render Inventory
     state.inventory.forEach(card => {
         const cardEl = document.createElement("div");
-        // Use live binding for activeCardId from game.js
-        const isSelected = activeCardId === card.id;
-        cardEl.className = `card-mini ${isSelected ? 'selected-item' : ''}`;
+        // PILLAR 5: Visual Authority. 
+        // The 'selected-item' class is now handled internally by renderCardHTML.
+        cardEl.className = "card-mini";
         cardEl.draggable = true;
         cardEl.innerHTML = renderCardHTML(card);
         cardEl.ondragstart = (e) => e.dataTransfer.setData("cardID", card.id);
         
         cardEl.onclick = () => {
             window.selectCard(card.id);
-            renderDeckManager();
         };
 
         invGrid.appendChild(cardEl);
@@ -76,7 +82,7 @@ export function renderDeckManager() {
         cardEl.className = "card-mini";
         cardEl.style.width = "100%";
         cardEl.style.height = "60px";
-        cardEl.innerHTML = `<span style="font-size: 10px;">${card.name}</span><button onclick="window.RemoveFromDeck(${idx}); renderDeckManager();" style="float: right; padding: 2px 5px; font-size: 9px;">X</button>`;
+        cardEl.innerHTML = `<span style="font-size: 10px;">${card.name}</span><button onclick="window.RemoveFromDeck(${idx}); window.syncUI('inventory');" style="float: right; padding: 2px 5px; font-size: 9px;">X</button>`;
         
         // Calculate Stats: Attack (Top + Right), Defense (Bottom + Left)
         totalAtk += (card.power[0] + card.power[1]);
@@ -95,7 +101,8 @@ export function renderDeckManager() {
         const isLocked = state.reputation < thresholds[i];
         btn.className = `deck-slot-btn ${i === state.active_deck ? 'active' : ''} ${isLocked ? 'locked' : ''}`;
         btn.innerText = isLocked ? `🔒 ${thresholds[i]} REP` : `Deck ${i+1}`;
-        btn.onclick = () => { if(!isLocked) { window.SelectDeck(i); renderDeckManager(); } };
+        // PILLAR 5: Scoped Update. Refresh view after selection.
+        btn.onclick = () => { if(!isLocked) { window.SelectDeck(i); window.syncUI("inventory"); } };
         selector.appendChild(btn);
     }
 }

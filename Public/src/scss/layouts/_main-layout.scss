@@ -101,6 +101,34 @@
     color: $color-text-secondary;
     font-size: $font-size-xs;
     margin-left: $spacing-md;
+    display: inline-block;
+    transition: all $transition-base;
+
+    &.priority-critical {
+        animation: critical-text-pulse 1.5s infinite ease-in-out;
+        text-shadow: 0 0 10px rgba($color-error-red, 0.5);
+    }
+
+    &.priority-warning {
+        animation: warning-text-pulse 2.5s infinite ease-in-out;
+        text-shadow: 0 0 5px rgba($color-warning-orange, 0.3);
+    }
+}
+
+@keyframes critical-text-pulse {
+    0%, 100% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% { 
+        transform: scale(1.03);
+        opacity: 0.8;
+    }
+}
+
+@keyframes warning-text-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 .latency-monitor {

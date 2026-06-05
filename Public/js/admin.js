@@ -17,7 +17,176 @@ export const setGlobalClubs = (clubs) => { globalClubs = clubs; };
 export const setAdminFocusNetwork = (network) => { adminFocusNetwork = network; };
 export const setIgnoredReporters = (reporters) => { ignoredReporters = reporters; };
 
-let cachedAdminHeaders = null;
+export let cachedAdminHeaders = null;
+
+/**
+ * fetchMutationAudit retrieves aggregated mutation performance stats by club.
+ * PILLAR 6: Forensic Auditing.
+ */
+export async function fetchMutationAudit() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/mutation-audit`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderMutationAuditDashboard(data);
+        } else {
+            showToast(`❌ Failed to fetch mutation audit: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("Mutation audit fetch failed", err);
+        showToast("❌ Network error fetching mutation audit.", "error");
+    }
+}
+
+/**
+ * renderMutationAuditDashboard displays mutation success/failure rates in the admin panel.
+ * PILLAR 6: Forensic Auditing.
+ */
+export function renderMutationAuditDashboard(stats) {
+    const container = document.getElementById("admin-mutation-audit-display");
+    if (!container) return;
+
+    if (!stats || stats.length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No mutation data logged in sector.</div>`;
+        return;
+    }
+
+    container.innerHTML = stats.map(s => {
+        const rateClass = s.success_rate >= 80 ? 'text-neon-green' : s.success_rate >= 60 ? 'text-warning' : 'text-error';
+        return `
+            <div class="glass-panel p-10 m-0 border-neon-purple accelerated" style="background: rgba(0,0,0,0.4);">
+                <div class="font-bold text-neon-purple mb-5 border-bottom-glass pb-5">${s.club_name.toUpperCase()}</div>
+                <div class="font-xs opacity-6 mb-5">
+                    Successes: <b class="text-neon-green">${s.success_count}</b> | 
+                    Botches: <b class="text-error">${s.failure_count}</b>
+                </div>
+                <div class="display-flex align-center gap-10">
+                    <div class="progress-bar flex-1" style="height: 4px; background: rgba(255,255,255,0.05);">
+                        <div class="progress-fill" style="width: ${s.success_rate}%; background: ${s.success_rate >= 80 ? 'var(--neon-green)' : s.success_rate >= 60 ? 'var(--warning-orange)' : 'var(--error-red)'}"></div>
+                    </div>
+                    <b class="${rateClass} font-mono font-xs">${s.success_rate.toFixed(1)}%</b>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * fetchLedgerAudit retrieves the solvency status comparing vault vs liabilities.
+ * PILLAR 2: Ledger Integrity.
+ */
+export async function fetchLedgerAudit() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/ledger-audit`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderSolvencyDashboard(data);
+            // PILLAR 5: Orchestration. Push the forensic report to the top bar HUD.
+            if (window.syncUI) window.syncUI("solvency_override", data);
+        } else {
+            showToast(`❌ Failed to fetch ledger audit: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("Ledger audit fetch failed", err);
+        showToast("❌ Network error fetching ledger audit.", "error");
+    }
+}
+
+/**
+ * renderSolvencyDashboard displays the solvency metrics in the admin panel.
+ * PILLAR 2: Ledger Integrity.
+ */
+export function renderSolvencyDashboard(data) {
+    const container = document.getElementById("admin-solvency-display");
+    if (!container) return;
+
+    const coverageClass = data.coverage_ratio >= 1.0 ? 'text-neon-green' : 'text-error';
+    const surplusClass = data.net_surplus >= 0 ? 'text-neon-cyan' : 'text-error';
+
+    container.innerHTML = `
+        <div class="glass-panel p-10 m-0 border-neon-green accelerated" style="background: rgba(0,0,0,0.4); grid-column: 1 / -1;">
+            <div class="display-flex justify-between align-center border-bottom-glass pb-10 mb-10">
+                <span class="font-bold text-neon-green uppercase letter-spacing-1">System Solvency: <b class="${data.status === 'HEALTHY' ? 'text-neon-green' : 'text-error'}">${data.status}</b></span>
+                <span class="font-mono font-size-0-8em opacity-5">${new Date(data.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="display-grid gap-15 text-center border-bottom-glass pb-15 mb-10" style="grid-template-columns: repeat(4, 1fr);">
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Physical Vault</div>
+                    <b class="text-neon-cyan">${(data.physical_vault / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Liabilities</div>
+                    <b class="text-warning">${(data.virtual_liabilities / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Coverage</div>
+                    <b class="${coverageClass}">${(data.coverage_ratio * 100).toFixed(1)}%</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Net Surplus</div>
+                    <b class="${surplusClass}">${(data.net_surplus / 1000000).toFixed(2)} $VBV</b>
+                </div>
+            </div>
+            <div class="font-size-0-75em opacity-7 italic text-center p-10 bg-black-80 rounded">
+                ${data.audit_report}
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * fetchNodeHealth retrieves the real-time status of the RPC node cluster.
+ * PILLAR 4: Network Resiliency.
+ */
+export async function fetchNodeHealth() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/node-health`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderNodeHealthDashboard(data);
+        } else {
+            showToast(`❌ Failed to fetch node health: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("Node health fetch failed", err);
+        showToast("❌ Network error fetching node health.", "error");
+    }
+}
+
+/**
+ * renderNodeHealthDashboard displays the fetched node health data in the admin panel.
+ * PILLAR 4: Network Resiliency.
+ */
+export function renderNodeHealthDashboard(nodeStatuses) {
+    const container = document.getElementById("admin-node-health-display");
+    if (!container) return;
+
+    if (!nodeStatuses || nodeStatuses.length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No node health data available.</div>`;
+        return;
+    }
+
+    container.innerHTML = nodeStatuses.map(node => `
+        <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
+            <div class="font-bold text-neon-purple mb-5 border-bottom-glass pb-5">${node.url}</div>
+            <div class="font-xs opacity-6 mb-10">
+                Latency: <b class="${node.latency_ms > 300 ? 'text-error' : node.latency_ms > 100 ? 'text-warning' : 'text-neon-green'}">${node.latency_ms}ms</b> |
+                Last Block: <b class="text-neon-cyan">${node.last_block}</b> |
+                Status: <b class="${node.is_blacklisted ? 'text-error' : 'text-neon-green'}">${node.is_blacklisted ? 'BLACKLISTED' : 'OPERATIONAL'}</b>
+                ${node.is_blacklisted ? `<br><small class="text-error">Last Error: ${new Date(node.last_error).toLocaleString()}</small>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
 
 /**
  * getAdminHeaders constructs the authentication headers required for administrative APIs.
@@ -71,13 +240,13 @@ export async function getAdminHeaders() {
         }
 
         cachedAdminHeaders = { "X-Admin-Wallet": userAddress, "X-Admin-Nonce": nonce, "X-Admin-Signature": signature };
+        setTransactionStatus(null);
         return cachedAdminHeaders;
     } catch (err) {
         console.error("[ADMIN AUTH ERROR]", err);
+        setTransactionStatus(`❌ Auth Failed: ${err.message}`, "critical");
         showToast(`❌ Authentication Failed: ${err.message}`, "error");
         return null;
-    } finally {
-        setTransactionStatus(null);
     }
 }
 
@@ -108,16 +277,15 @@ export async function adminSeasonRollover() {
 
         if (response.ok) {
             showToast("✅ Season rollover initiated. Check logs for archival status.", "success", 10000);
-            // Optionally trigger a full lobby update to reflect new season number, etc.
-            // window.syncUI("all"); // Assuming syncUI is globally available
+            setTransactionStatus(null);
         } else {
             const err = await response.text();
+            setTransactionStatus(`❌ Rollover Failed: ${err}`, "critical");
             showToast(`❌ Season rollover failed: ${err}`, "error");
         }
     } catch (err) {
+        setTransactionStatus("❌ Server Connection Error", "critical");
         showToast("❌ Server connection error during season rollover.", "error");
-    } finally {
-        setTransactionStatus(null);
     }
 }
 
@@ -149,14 +317,15 @@ export async function adminExportAuditLog() {
             window.URL.revokeObjectURL(url);
             a.remove();
             showToast("✅ Audit logs exported successfully.", "success");
+            setTransactionStatus(null);
         } else {
             const err = await response.text();
+            setTransactionStatus(`❌ Export Failed: ${err}`, "critical");
             showToast(`❌ Audit log export failed: ${err}`, "error");
         }
     } catch (err) {
+        setTransactionStatus("❌ Connection error", "critical");
         showToast("❌ Server connection error during audit log export.", "error");
-    } finally {
-        setTransactionStatus(null);
     }
 }
 
@@ -189,16 +358,91 @@ export async function adminForcePayout() {
         if (response.ok) {
             const result = await response.json();
             showToast(`🏆 FORCE PAYOUT SUCCESS: ${result.txid}`, "success");
+            setTransactionStatus(null);
             if (typeof fetchAdminLogs === 'function') fetchAdminLogs(); // Refresh logs to see the audit entry
         } else {
             const err = await response.text();
+            setTransactionStatus(`❌ Payout Failed: ${err}`, "critical");
             showToast(`❌ Force Payout Failed: ${err}`, "error");
         }
     } catch (err) {
         console.error("[ADMIN ERROR]", err);
+        setTransactionStatus("❌ Network error", "critical");
         showToast("❌ Network error during force payout request.", "error");
-    } finally {
-        setTransactionStatus(null);
+    }
+}
+
+/**
+ * adminSimulateMutationSuccess triggers the high-fidelity success payoff (particles + synth) for testing.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+export async function adminSimulateMutationSuccess() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Triggering mutation success simulation...", "info");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-mutation-success`, {
+            method: "POST",
+            headers: headers
+        });
+
+        if (response.ok) {
+            showToast("🧬 Simulation triggered: payoff FX arriving via WebSocket.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Simulation Failed: ${err}`, "critical");
+            showToast(`❌ Simulation trigger failed: ${err}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Network error", "critical");
+        showToast("❌ Network error during simulation request.", "error");
+    }
+}
+
+/**
+ * adminSimulateMutationFailure triggers the high-intensity failure payoff (particles + warning sfx) for testing.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+export async function adminSimulateMutationFailure() {
+    const cardIdInput = document.getElementById("admin-sim-fail-card-id");
+    const reductionInput = document.getElementById("admin-sim-fail-reduction");
+    
+    if (!cardIdInput || !reductionInput) return;
+    
+    const card_id = parseInt(cardIdInput.value);
+    const reduction = parseInt(reductionInput.value);
+
+    if (isNaN(card_id) || isNaN(reduction)) {
+        showToast("❌ Please enter both Card ID and Reduction amount.", "error");
+        return;
+    }
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Triggering mutation failure simulation...", "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-mutation-failure`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_id, reduction })
+        });
+
+        if (response.ok) {
+            showToast("🚨 Simulation triggered: failure FX arriving via WebSocket.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Simulation Failed: ${err}`, "critical");
+            showToast(`❌ Simulation trigger failed: ${err}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Network error", "critical");
+        showToast("❌ Network error during simulation request.", "error");
     }
 }
 
@@ -230,9 +474,18 @@ export async function adminSimulateMojoDecay() {
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ num_clubs: numClubs, duration_minutes: durationMinutes })
         });
-        if (response.ok) showToast("🧪 Mojo Decay Simulation Started. Check server logs for progress.", "success");
-        else showToast(`❌ Simulation Failed: ${await response.text()}`, "error");
-    } catch (err) { showToast("❌ Network error during simulation request.", "error"); } finally { setTransactionStatus(null); }
+        if (response.ok) {
+            showToast("🧪 Mojo Decay Simulation Started. Check server logs for progress.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Simulation Failed: ${err}`, "critical");
+            showToast(`❌ Simulation Failed: ${err}`, "error");
+        }
+    } catch (err) { 
+        setTransactionStatus("❌ Network error", "critical");
+        showToast("❌ Network error during simulation request.", "error"); 
+    }
 }
 
 /**
@@ -274,16 +527,17 @@ export async function adminAssetForfeiture() {
 
         if (response.ok) {
             showToast("✅ Asset forfeiture successful. Card returned to owner.", "success");
+            setTransactionStatus(null);
             cardIdInput.value = "";
             clubIdInput.value = "";
         } else {
             const err = await response.text();
+            setTransactionStatus(`❌ Forfeiture Failed: ${err}`, "critical");
             showToast(`❌ Forfeiture failed: ${err}`, "error");
         }
     } catch (err) {
+        setTransactionStatus("❌ Connection error", "critical");
         showToast("❌ Server connection error during asset forfeiture.", "error");
-    } finally {
-        setTransactionStatus(null);
     }
 }
 
@@ -304,6 +558,17 @@ export function renderAdminAutomationButtons() {
         <div class="section-actions mb-20">
             <button class="danger" onclick="adminSeasonRollover()">SEASON ROLLOVER</button>
             <button class="outline" onclick="adminExportAuditLog()">EXPORT AUDIT LOGS</button>
+        </div>
+
+        <h3 class="section-title mt-20">Procedure FX Testing</h3>
+        <div class="glass-panel p-15 border-neon-cyan">
+            <button class="w-full outline border-neon-green text-neon-green mb-15" onclick="adminSimulateMutationSuccess()">SIMULATE SUCCESS PAYOFF</button>
+            <div class="flex-row gap-10 mb-10">
+                <input type="number" id="admin-sim-fail-card-id" class="glass-input flex-1" placeholder="Card ID">
+                <input type="number" id="admin-sim-fail-reduction" class="glass-input flex-1" placeholder="Reduction" value="50">
+            </div>
+            <button class="w-full outline border-error text-error" onclick="adminSimulateMutationFailure()">SIMULATE FAILURE PAYOFF</button>
+            <small class="opacity-5 italic block mt-10">Triggers the blood-red glitch particles and warning audio. Applies permanent Artifact reduction.</small>
         </div>
         
         <h3 class="section-title mt-20">Asset Recovery (Forfeiture)</h3>
@@ -338,10 +603,135 @@ export async function fetchAdminLogs() { // Exported for use in app.js
             updateDashboardStats(data);
             renderAdminLogs(data.logs);
             adminCyberSecurityAudit(); // Refresh the security audit view
+            fetchNodeHealth(); // Refresh node health dashboard
+            fetchLedgerAudit(); // Refresh solvency dashboard
+            fetchMutationAudit(); // New: Refresh mutation audit dashboard
+            adminCommissionAudit(); // PILLAR 1: Refresh alliance dividends
+            adminTaxAudit(); // PILLAR 1: Refresh systemic taxes
+            adminDistrictTaxAudit(); // PILLAR 1: Refresh localized policies
         }
     } catch (err) { 
         console.error("Log fetch failed", err); 
     }
+}
+
+/**
+ * adminDistrictTaxAudit fetches the aggregated localized tax policies.
+ * PILLAR 1: Political Influence Telemetry.
+ */
+export async function adminDistrictTaxAudit() {
+    const container = document.getElementById("admin-district-tax-display");
+    if (!container) return;
+
+    try {
+        const headers = await getAdminHeaders();
+        if (!headers) return;
+        
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/district-tax-audit`, { headers });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        renderDistrictTaxDashboard(data);
+    } catch (err) {
+        console.error("[ADMIN ERROR] District Tax Audit Failed:", err);
+    }
+}
+
+/**
+ * renderDistrictTaxDashboard generates the policy table.
+ */
+export function renderDistrictTaxDashboard(data) {
+    const container = document.getElementById("admin-district-tax-display");
+    if (!container) return;
+
+    if (!data || data.length === 0) {
+        container.innerHTML = `<div class="opacity-5 py-20 italic">No custom district taxes enacted in sector.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">DISTRICT</th>
+                    <th class="p-10">GOVERNOR</th>
+                    <th class="p-10 text-right">TAX RATE</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${data.map(d => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10"><b class="text-neon-cyan">${d.territory_id.replace(/_/g, ' ').toUpperCase()}</b></td>
+                        <td class="p-10">
+                            <span class="text-white">${d.governor_name}</span><br/>
+                            <small class="opacity-5 font-mono">${d.governor_address}</small>
+                        </td>
+                        <td class="p-10 text-right"><b class="text-neon-green">${d.tax_rate.toFixed(1)}%</b></td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * adminTaxAudit fetches the aggregated session tax revenue.
+ * PILLAR 1: Industrial Loop Tracking.
+ */
+export async function adminTaxAudit() {
+    const container = document.getElementById("admin-tax-revenue-display");
+    if (!container) return;
+
+    try {
+        const headers = await getAdminHeaders();
+        if (!headers) return;
+        
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/tax-audit`, { headers });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        renderTaxDashboard(data);
+    } catch (err) {
+        console.error("[ADMIN ERROR] Tax Audit Failed:", err);
+    }
+}
+
+/**
+ * renderTaxDashboard generates the tax revenue metrics.
+ */
+export function renderTaxDashboard(data) {
+    const container = document.getElementById("admin-tax-revenue-display");
+    if (!container) return;
+    const corp = (data.corporate_tax_total / 1000000).toFixed(2);
+    const lux = (data.luxury_tax_total / 1000000).toFixed(2);
+    const sabo = (data.sabotage_surcharge_total / 1000000).toFixed(2);
+    const govS = (data.governor_surcharge_total / 1000000).toFixed(2);
+    const total = (parseFloat(corp) + parseFloat(lux) + parseFloat(sabo) + parseFloat(govS)).toFixed(2);
+    
+    container.innerHTML = `
+        <div class="glass-panel p-10 m-0 border-neon-green accelerated" style="background: rgba(0,0,0,0.4); grid-column: 1 / -1;">
+            <div class="display-grid gap-15 text-center" style="grid-template-columns: repeat(5, 1fr);">
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Corporate Recovery</div>
+                    <b class="text-neon-cyan">${corp} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(${data.corporate_tax_count || 0} contracts)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Luxury Recovery</div>
+                    <b class="text-neon-purple">${lux} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(${data.luxury_tax_count || 0} items)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Sabotage Fees</div>
+                    <b class="text-gold">${sabo} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(Alliance Dividends)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Gov Surcharge</div>
+                    <b class="text-gold">${govS} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(Capital Revenue)</div>
+                </div>
+                <div><div class="font-xs opacity-6 uppercase mb-5">Session Total</div><b class="text-neon-green">${total} $VBV</b></div>
+            </div>
+        </div>`;
 }
 
 export async function adminResetStats(wallet) {
@@ -359,10 +749,78 @@ export async function adminResetStats(wallet) {
     }
 }
 
+/**
+ * adminCommissionAudit fetches the aggregated alliance dividend history.
+ * PILLAR 1: Industrial Loop Tracking.
+ */
+export async function adminCommissionAudit() {
+    const container = document.getElementById("admin-commission-audit-display");
+    if (!container) return;
+
+    try {
+        const headers = await getAdminHeaders();
+        if (!headers) return;
+        
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/commission-audit`, { headers });
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+        renderCommissionAuditDashboard(data);
+    } catch (err) {
+        console.error("[ADMIN ERROR] Commission Audit Failed:", err);
+    }
+}
+
+/**
+ * renderCommissionAuditDashboard generates the history table.
+ */
+export function renderCommissionAuditDashboard(events) {
+    const container = document.getElementById("admin-commission-audit-display");
+    if (!container) return;
+
+    if (!events || events.length === 0) {
+        container.innerHTML = `<div class="opacity-5 py-20 italic">No alliance dividend events found in this sector.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">TIMESTAMP</th>
+                    <th class="p-10">RECIPIENT CLUB</th>
+                    <th class="p-10">SOURCE PARTNER</th>
+                    <th class="p-10">PROCEDURE</th>
+                    <th class="p-10 text-right">DIVIDEND</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${events.map(e => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10 font-mono opacity-7">${new Date(e.timestamp * 1000).toLocaleTimeString()}</td>
+                        <td class="p-10"><b class="text-neon-cyan">${e.recipient_name}</b></td>
+                        <td class="p-10">${e.source_club}</td>
+                        <td class="p-10"><span class="tag-purple font-xs">${e.type} SYNTHESIS</span></td>
+                        <td class="p-10 text-right text-neon-green font-bold">+${e.amount.toFixed(2)} $VBV</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
 export function updateAdminRewardList(rewards) { // Exported for use in app.js
     const container = document.getElementById("admin-reward-list");
+    if (!container) return;
     container.innerHTML = "";
     Object.entries(rewards || {}).forEach(([id, amt]) => {
+        const div = document.createElement("div");
+        div.className = "flex-row justify-between align-center p-5 border-bottom-glass font-xs";
+        div.innerHTML = `
+            <span>ID: <b class="text-neon-cyan">${id}</b></span>
+            <span>Amt: <b class="text-neon-green">${(amt / 1000000).toFixed(2)}</b></span>
+            <button class="outline x-small border-error text-error" onclick="adminRemoveReward('${id}')">X</button>
+        `;
+        container.appendChild(div);
     });
 }
 
@@ -375,14 +833,23 @@ export async function adminAddReward() { // Exported for use in app.js
         const headers = await getAdminHeaders();
         if (!headers) return;
 
+        setTransactionStatus(`Adding reward asset ${assetID}...`, "info");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/reward/add`, {
             method: 'POST',
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ asset_id: assetID, amount: amount })
         });
 
-        if (response.ok) showToast("✅ Reward asset added.", "success");
+        if (response.ok) {
+            showToast("✅ Reward asset added.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Action Failed: ${err}`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus(`❌ Action Failed: ${err.message}`, "critical");
         showToast("❌ Action failed", "error"); 
     }
 }
@@ -391,13 +858,23 @@ export async function adminRemoveReward(assetId) { // Exported for use in app.js
     try {
         const headers = await getAdminHeaders();
         if (!headers) return;
+
+        setTransactionStatus(`Removing reward asset ${assetId}...`, "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/reward/remove`, {
             method: 'POST',
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify({ asset_id: assetId })
         });
-        if (response.ok) showToast("✅ Asset removed.", "success");
+        if (response.ok) {
+            showToast("✅ Asset removed.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Removal Failed: ${err}`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus("❌ Update failed", "critical");
         showToast("❌ Update failed", "error"); 
     }
 }
@@ -417,6 +894,9 @@ export async function adminUpdateRules() {
     try {
         const headers = await getAdminHeaders();
         if (!headers) return;
+
+        setTransactionStatus("Updating arena rules...", "warning");
+
         const req = {
             Open: document.getElementById("rule-open").checked,
             Power_copy: document.getElementById("rule-same").checked,
@@ -427,8 +907,15 @@ export async function adminUpdateRules() {
             headers: { ...headers, 'Content-Type': 'application/json' },
             body: JSON.stringify(req)
         });
-        if (response.ok) showToast("✅ Rules updated.", "success");
+        if (response.ok) {
+            showToast("✅ Rules updated.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Rules Update Failed: ${err}`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus("❌ Action failed", "critical");
         showToast("❌ Rules update failed", "error"); 
     }
 }
@@ -439,13 +926,24 @@ export async function adminBanWallet(walletToBan = null, hoursToBan = null) {
         const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
         if (!wallet) return;
         const headers = await getAdminHeaders();
+        if (!headers) return;
+
+        setTransactionStatus(`Banning wallet ${shortenAddress(wallet)}...`, "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/ban-player`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ wallet, hours })
         });
-        if (response.ok) showToast(`Banned ${wallet}`, "success");
+        if (response.ok) {
+            showToast(`Banned ${wallet}`, "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Ban Failed: ${err}`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus(`❌ Ban Failed: ${err.message}`, "critical");
         showToast("❌ Server connection error", "error"); 
     }
 }
@@ -455,13 +953,22 @@ export async function adminAvatarBan(url = null, hours = null) {
         const targetUrl = url || document.getElementById("admin-ban-avatar-url").value.trim();
         const headers = await getAdminHeaders();
         if (!targetUrl || !headers) return;
+
+        setTransactionStatus(`Restricting avatar access...`, "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/admin/avatar-ban`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ url: targetUrl, hours })
         });
-        if (response.ok) showToast("Avatar restricted.", "success");
+        if (response.ok) {
+            showToast("Avatar restricted.", "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Ban Failed`, "critical");
+        }
     } catch (err) {
+        setTransactionStatus("❌ Ban failed", "critical");
         showToast("Ban failed.", "error");
     }
 }
@@ -475,13 +982,24 @@ export async function adminUpdatePowerScaling() {
         const divisor = parseFloat(document.getElementById("admin-power-divisor").value);
         const base = parseInt(document.getElementById("admin-power-base").value);
         const headers = await getAdminHeaders();
+        if (!headers) return;
+
+        setTransactionStatus("Updating power scaling...", "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/admin/update-power`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ divisor, base })
         });
-        if (response.ok) showToast("Scaling updated.", "success");
+        if (response.ok) {
+            showToast("Scaling updated.", "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Update Failed: ${err}`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus("❌ Update failed", "critical");
         showToast("❌ Power update failed", "error"); 
     }
 }
@@ -491,13 +1009,23 @@ export async function adminToggleMaintenance(active) {
         const minsInput = document.getElementById("admin-maint-mins");
         const minutes = parseInt(minsInput.value) || 0;
         const headers = await getAdminHeaders();
+        if (!headers) return;
+
+        setTransactionStatus(`${active ? 'Enabling' : 'Disabling'} maintenance mode...`, "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/maintenance-mode`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ active, minutes })
         });
-        if (response.ok) showToast(`Maintenance ${active ? 'ON' : 'OFF'}`, "info");
+        if (response.ok) {
+            showToast(`Maintenance ${active ? 'ON' : 'OFF'}`, "info");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Action Failed`, "critical");
+        }
     } catch (err) { 
+        setTransactionStatus("❌ Server error", "critical");
         showToast("❌ Server connection error", "error"); 
     }
 }
@@ -516,13 +1044,23 @@ export async function adminSimulateTournament() {
         const size = parseInt(document.getElementById("admin-sim-size").value);
         const isBuyIn = document.getElementById("admin-sim-buyin").checked;
         const headers = await getAdminHeaders();
+        if (!headers) return;
+
+        setTransactionStatus(`Simulating ${size}-player tournament...`, "warning");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-tournament`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ size, is_buy_in: isBuyIn })
         });
-        if (response.ok) showToast("Simulation started.", "success");
+        if (response.ok) {
+            showToast("Simulation started.", "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Simulation Failed`, "critical");
+        }
     } catch (err) {
+        setTransactionStatus("❌ Simulation failed", "critical");
         showToast("Simulation failed.", "error");
     }
 }
@@ -592,13 +1130,23 @@ export async function adminSetActiveNetwork() { // Exported for use in app.js
         const networkName = document.getElementById("admin-network-select").value;
         const headers = await getAdminHeaders();
         if (!headers) return;
+
+        setTransactionStatus(`Switching focus to ${networkName}...`, "info");
+
         const response = await fetch(`${CONFIG.API_BASE}/api/admin/set-admin-focus-network`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ network_name: networkName })
         });
-        if (response.ok) showToast(`Focus set to ${networkName}`, "success");
+        if (response.ok) {
+            showToast(`Focus set to ${networkName}`, "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Focus Switch Failed: ${err}`, "critical");
+        }
     } catch (err) {
+        setTransactionStatus("❌ Focus switch failed", "critical");
         showToast("Focus switch failed.", "error");
     }
 }
@@ -627,14 +1175,15 @@ export async function adminBroadcast() {
         if (response.ok) {
             showToast("📢 Message broadcasted successfully.", "success");
             document.getElementById("admin-msg-text").value = "";
+            setTransactionStatus(null);
         } else {
             const err = await response.text();
+            setTransactionStatus(`❌ Broadcast Failed: ${err}`, "critical");
             showToast(`❌ Broadcast failed: ${err}`, "error");
         }
     } catch (err) {
+        setTransactionStatus("❌ Broadcast failed", "critical");
         showToast("❌ Broadcast failed", "error");
-    } finally {
-        setTransactionStatus(null);
     }
 }
 

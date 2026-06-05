@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { socket, myClientId } from './network.js';
 import { showToast, hideAllOverlays, renderCardHTML } from './ui.js';
-import { collectiveIntelligence } from '../collective-intelligence.js'; // This is a global object, not a module export
+import { collectiveIntelligence } from '../collective-intelligence.js'; 
 import { userAddress, walletProvider, signClient } from './wallet.js';
 import { getCachedEnvoiName, getNetworkConfig, resolveEnvoiName, assetCache, resolveAssetSymbol } from './utils.js';
 import { globalClubs, availableNetworks, fetchAdminLogs } from './admin.js';
@@ -45,6 +45,427 @@ export const GlobalShopRegistry = {
     "tripwire": { name: "Laser Tripwire", desc: "+10% Heist Failure", price: 500, ClubType: "Hardware", requiredRole: "Security" },
     "sentry_turret": { name: "Sentry Turret", desc: "+25% Heist Failure", price: 1200, ClubType: "Hardware", requiredRole: "Security", requiredMojo: 300 },
     "guard_dog": { name: "Bio-Guard Dog", desc: "Forces Jail on Failure", price: 2000, ClubType: "Hardware", requiredRole: "Security", requiredMojo: 500 }
+};
+
+/**
+ * openVaultInteraction provides a UI for players to donate VBV back to the House.
+ * PILLAR 1: Industrial Loop.
+ */
+export function openVaultInteraction() {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "vault-interaction-overlay";
+    overlay.className = "overlay";
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-450 border-gold">
+            <div class="market-header">
+                <span class="market-title text-gold">🏛️ HOUSE DONATION</span>
+                <div class="access-level">ECOSYSTEM GUARDIAN PROTOCOL</div>
+            </div>
+            <div class="p-20 text-center">
+                <p class="opacity-7 mb-20 font-size-0-85em">
+                    Donate your earned rewards back to the Global Faucet to sustain the Arena. 
+                    Generosity increases your <b>Nurturing</b> attribute and <b>Reputation</b>.
+                </p>
+                <div class="display-flex justify-center gap-10 mb-20">
+                    <button class="outline btn-small" onclick="document.getElementById('donation-input').value = 100">100</button>
+                    <button class="outline btn-small" onclick="document.getElementById('donation-input').value = 500">500</button>
+                    <button class="outline btn-small border-gold text-gold" onclick="document.getElementById('donation-input').value = 1000">1000</button>
+                </div>
+                <input type="number" id="donation-input" class="glass-input w-full text-center font-size-1-5em mb-20" placeholder="0.00" step="10">
+                <div class="flex-row gap-10">
+                    <button class="outline w-full" onclick="document.getElementById('vault-interaction-overlay').remove()">ABORT</button>
+                    <button class="w-full bg-neon-green text-dark font-bold" onclick="window.submitVaultDonation()">CONFIRM DONATION</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+window.submitVaultDonation = () => {
+    const input = document.getElementById("donation-input");
+    if (!input || !userAddress) return;
+    const amount = parseFloat(input.value);
+    if (isNaN(amount) || amount <= 0) return showToast("❌ Invalid donation amount.", "error");
+    
+    const state = window.GetGameState();
+    if (state.virtual_balance < amount) return showToast("❌ Insufficient reward balance.", "error");
+
+    showToast(`🏛️ Processing donation of ${amount.toFixed(2)} $VBV...`, "info");
+    socket.send(JSON.stringify({ type: "vault_donation", payload: { amount_micro: Math.round(amount * 1000000) } }));
+    document.getElementById("vault-interaction-overlay")?.remove();
+};
+
+/**
+ * openMutationHistoryOverlay allows players to review the gene-editing history of their cards.
+ * PILLAR 6: Forensic Auditing.
+ */
+export function openMutationHistoryOverlay(cardID = null) {
+    const state = window.GetGameState();
+    const history = state.mutation_history || [];
+
+    // PILLAR 6: Mutation Analytics.
+    // Aggregate success vs. scar counts from the profile's forensic log.
+    const stats = history.reduce((acc, event) => {
+        const id = event.card_id;
+        if (!acc[id]) acc[id] = { success: 0, scars: 0, name: `BABE #${id}` };
+        if (event.type === 'SCAR') {
+            acc[id].scars++;
+        } else {
+            acc[id].success++;
+        }
+        return acc;
+    }, {});
+
+    // Resolve names from current inventory for the summary
+    Object.keys(stats).forEach(id => {
+        const card = state.inventory.find(c => c.id === parseInt(id));
+        if (card) stats[id].name = card.name;
+    });
+
+    const getMutationGrade = (s, b) => {
+        const total = s + b;
+        if (total === 0) return { label: "N/A", color: "inherit" };
+        if (b === 0) return { label: "S", color: "var(--neon-cyan)" };
+        const ratio = s / total;
+        if (ratio >= 0.8) return { label: "A", color: "var(--neon-green)" };
+        if (ratio >= 0.6) return { label: "B", color: "var(--neon-blue)" };
+        if (ratio >= 0.4) return { label: "C", color: "var(--warning-orange)" };
+        return { label: "F", color: "var(--error-red)" };
+    };
+
+    let summaryHTML = "";
+    if (cardID) {
+        const s = stats[cardID] || { success: 0, scars: 0 };
+        const grade = getMutationGrade(s.success, s.scars);
+        summaryHTML = `
+            <div class="glass-panel m-0 mb-20 p-15 border-neon-cyan" style="background: rgba(0,242,254,0.05);">
+                <div class="flex-row justify-between align-center px-10">
+                    <div class="text-center">
+                        <div class="font-xs opacity-5 uppercase mb-5">STABILITY GRADE</div>
+                        <b class="font-size-2em" style="color: ${grade.color}; text-shadow: 0 0 10px ${grade.color};">${grade.label}</b>
+                    </div>
+                    <div style="width: 1px; height: 40px; background: rgba(255,255,255,0.1);"></div>
+                    <div><div class="font-xs opacity-5 uppercase letter-spacing-1">SUCCESSES</div><b class="text-neon-green font-size-1-2em">${s.success}</b></div>
+                    <div><div class="font-xs opacity-5 uppercase letter-spacing-1">BOTCHES</div><b class="text-error font-size-1-2em">${s.scars}</b></div>
+                </div>
+            </div>`;
+    } else if (Object.keys(stats).length > 0) {
+        summaryHTML = `
+            <div class="glass-panel m-0 mb-20 p-15 border-neon-purple" style="background: rgba(155, 81, 224, 0.05);">
+                <small class="section-label opacity-5 mb-10 block letter-spacing-1">GENETIC STABILITY SUMMARY</small>
+                <div class="flex-col gap-10 max-h-150 overflow-y-auto pr-5">
+                    ${Object.entries(stats).sort((a,b) => b[1].success - a[1].success).map(([id, s]) => {
+                        const grade = getMutationGrade(s.success, s.scars);
+                        return `
+                        <div class="flex-row justify-between align-center font-size-0-85em">
+                            <span class="text-white flex-1">${s.name.toUpperCase()}</span>
+                            <span class="font-mono flex-row align-center gap-10">
+                                <b style="color: ${grade.color}; font-size: 1.1em;">[${grade.label}]</b>
+                                <span class="opacity-5">${s.success}S / ${s.scars}B</span>
+                            </span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+    }
+
+    const filteredHistory = cardID ? history.filter(e => e.card_id === cardID) : history;
+    const overlay = document.createElement("div");
+    overlay.id = "mutation-history-overlay";
+    overlay.className = "overlay";
+
+    const typeIcons = { "VECTOR": "🧬", "MOOD": "✨", "LOYALTY": "❤️", "SCAR": "🩸" };
+    const sortedHistory = [...filteredHistory].sort((a, b) => b.timestamp - a.timestamp);
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-500">
+            <div class="market-header">
+                <span class="market-title">📜 GENE-EDITING LOG</span>
+                <div class="access-level">${cardID ? `BABE #${cardID}` : 'GLOBAL'} FORENSICS</div>
+            </div>
+            
+            <div class="p-20 max-h-400 overflow-y-auto">
+                ${summaryHTML}
+                ${sortedHistory.length === 0 ? 
+                    '<div class="opacity-3 italic text-center py-40">No mutation events recorded in the profile.</div>' : 
+                    sortedHistory.map(event => {
+                        const date = new Date(event.timestamp * 1000).toLocaleString();
+                        const card = state.inventory.find(c => c.id === event.card_id);
+                        return `
+                            <div class="history-item glass-panel m-0 mb-10 p-10 flex-row align-center gap-15" 
+                                 style="border-left: 4px solid ${event.type === 'SCAR' ? '#ff4b4b' : 'var(--neon-purple)'}; background: rgba(0,0,0,0.2);">
+                                <div class="font-size-1-5em">${typeIcons[event.type] || '📑'}</div>
+                                <div class="flex-1 text-left">
+                                    <div class="flex-row justify-between mb-5">
+                                        <b class="${event.type === 'SCAR' ? 'text-error' : 'text-neon-purple'} font-size-0-8em letter-spacing-1">${event.type}</b>
+                                        <small class="opacity-5 font-mono" style="font-size: 0.7em;">${date}</small>
+                                    </div>
+                                    <div class="font-size-0-85em text-white mb-5">${event.details}</div>
+                                    ${!cardID ? `<div class="text-neon-cyan font-bold font-xs">Asset: ${card ? card.name : 'Unknown Babe'}</div>` : ''}
+                                </div>
+                            </div>`;
+                    }).join('')}
+            </div>
+
+            <button class="outline w-full mt-10" onclick="document.getElementById('mutation-history-overlay').remove()">CLOSE LOG</button>
+        </div>`;
+
+    document.body.appendChild(overlay);
+}
+
+/**
+ * openMutationFoundryOverlay opens the gene-editing terminal for a specific card.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+export function openMutationFoundryOverlay(cardID) {
+    const state = window.GetGameState();
+    const card = state.inventory.find(c => c.id === cardID);
+    const myClub = globalClubs[state.employer_id];
+
+    if (!card) return showToast("❌ Error: Asset metadata not found.", "error");
+    if (!myClub || (myClub.type !== "Vitality" && myClub.type !== "Elemental")) {
+        return showToast("❌ Access Denied: Mutation Foundry requires a Vitality Lab or Elemental Forge.", "error");
+    }
+
+    const overlay = document.createElement("div");
+    window.playMutationSoundscape(); // Start soundscape when overlay opens
+    overlay.id = "mutation-foundry-overlay";
+    overlay.className = "overlay";
+
+    const originalSum = card.power.reduce((a, b) => a + b, 0);
+    let pendingPower = [...card.power];
+    const catalystCount = state.inventory["mood_catalyst"] || 0;
+    const hasInsurance = state.has_mutation_insurance;
+    const mojo = myClub.club_mojo || 0;
+    const staffCount = Object.keys(myClub.staff || {}).length;
+    
+    // PILLAR 1 & 3: Environment Assessment.
+    const isGovernor = (myClub.territories?.length || 0) + (myClub.allied_club_id ? (globalClubs[myClub.allied_club_id]?.territories?.length || 0) : 0) >= 2;
+    const isSabotaged = myClub.buff_expirations?.["SABOTAGE"] && new Date(myClub.buff_expirations["SABOTAGE"]) > Date.now();
+    const isTrainingActive = myClub.buff_expirations?.["STAFF_TRAINING"] && new Date(myClub.buff_expirations["STAFF_TRAINING"]) > Date.now();
+
+    const calculateMutationOdds = () => {
+        if (hasInsurance) return 100;
+        let chance = 0.70;
+        let mojoBonus = mojo / 5000.0;
+        if (mojoBonus > 0.20) mojoBonus = 0.20;
+        chance += mojoBonus;
+        let staffBonus = staffCount * 0.02;
+        if (staffBonus > 0.10) staffBonus = 0.10;
+        chance += staffBonus;
+        if (isSabotaged) chance -= 0.15;
+        if (isGovernor) chance += 0.05;
+        if (isTrainingActive) chance += 0.05;
+        if (chance > 0.98) chance = 0.98;
+        if (chance < 0.50) chance = 0.50;
+        return Math.floor(chance * 100);
+    };
+
+    const successChance = calculateMutationOdds();
+    const stabilityClass = successChance < 60 ? 'stability-warning' : '';
+
+    // Trigger visual shield if insurance is active
+    if (window.triggerMutationInsuranceEffect) window.triggerMutationInsuranceEffect(hasInsurance);
+    
+    // PILLAR 6: Auditory Feedback for Insurance.
+    if (hasInsurance && window.playMutationInsuranceHum) window.playMutationInsuranceHum();
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel large animate-modal w-600">
+            <div class="market-header">
+                <span class="market-title">🧬 MUTATION FOUNDRY</span>
+                <div class="access-level">${myClub.name.toUpperCase()} TERMINAL</div>
+            </div>
+            
+            <div class="display-flex ab-mutation" class="tab-btn active" onclick="window.switchFoundryTab('mutation')">🛠️ MUTATION</button>
+                <button id="foundry-tab-commission" class="tab-btn" onclick="window.switchFoundryTab('commission')">💰 COMMISSION</button>
+            </div>
+
+            <div id="foundry-mutation-content" class="display-flex gap-20 p-20">
+                <!-- Left: Card Preview -->
+                <div class="flex-1">
+                    <div id="mutat-->
+                        ${renderCardHTML(card)}
+                    </div>
+                </div>
+
+                <!-- Right: Controls -->
+                <div class="flex-1 flex-col gap-15">
+                    <div class="glass-panel p-10 m-0 border-gold ${stabilityClass}" 
+                         style="background: rgba(212, 175, 55, 0.1); cursor: help;"
+                         onmouseenter="window.showMutationStabilityTooltip(event, ${mojo}, ${staffCount}, ${hasInsurance}, ${isSabotaged}, ${isGovernor}, ${isTrainingActive})"
+                         onmouseleave="window.hidePowerTooltip()">
+                        <div class="flex-row justify-between align-center">
+                            <small class="text-gold font-bold">PROCEDURE STABILITY</small>
+                            <b class="${successChance >= 90 ? 'text-neon-green' : 'text-warning'}" style="font-size: 1.2em;">${successChance}%</b>
+                        </div>
+                        <div class="font-size-0-7em opacity-7 mt-5">
+                            ${hasInsurance ? '<span class="text-neon-cyan">🛡️ INSURANCE ACTIVE: Guaranteed Success</span>' : 
+                            `Base: 70% | Mojo: +${Math.floor(Math.min(0.20, mojo/5000.0)*100)}% | Staff: +${Math.min(10, staffCount * 2)}%${isTrainingActive ? ' | Training: +5%' : ''}`}
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-10 m-0">
+                        <small class="text-neon-cyan font-bold block mb-10">VECTOR REALIGNMENT (500 $VBV)</small>
+                        <div class="flex-col gap-10">
+                            ${['TOP', 'RIGHT', 'BOTTOM', 'LEFT'].map((dir, i) => `
+                                <div class="flex-row align-center gap-10">
+                                    <span class="font-xs opacity-5 w-50">${dir}</span>
+                                    <input type="range" class="vector-slider" data-index="${i}" min="5" max="2500" value="${card.power[i]}" 
+                                           oninput="window.adjustMutationVector(${i}, this.value)">
+                                    <b class="vector-val-${i} text-white font-mono">${card.power[i]}</b>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div id="vector-delta-display" class="mt-15 p-5 text-center font-size-0-8em rounded-sm" style="background: rgba(0,0,0,0.3);">
+                            DRIFT: <b id="vector-sum-delta" class="text-neon-green">0</b> Pts
+                        </div>
+                        <button id="commit-realignment-btn" class="w-full mt-10 outline border-neon-cyan text-neon-cyan" onclick="window.submitVectorRealignment(${cardID})">COMMIT REALIGNMENT</button>
+                    </div>
+
+                    <div class="glass-panel p-10 m-0">
+                        <small class="text-neon-purple font-bold block mb-10">MOOD RECALIBRATION (250 $VBV + 1x Catalyst)</small>
+                        <div class="flex-row gap-5 mb-10">
+                            ${Object.keys(MOOD_EMOJI_MAP).map(m => `
+                                <button class="outline x-small flex-1 ${card.mood === m ? 'active' : ''}" 
+                                        onclick="window.submitMoodRecalibration(${cardID}, '${m}')"
+                                        ${catalystCount === 0 ? 'disabled' : ''}>
+                                    ${MOOD_EMOJI_MAP[m]}<br><small>${m.substring(0,3)}</small>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="text-center font-size-0-7em opacity-5">Catalysts Available: <span class="${catalystCount > 0 ? 'text-neon-green' : 'text-error'}">${catalystCount}</span></div>
+                    </div>
+
+                    <button class="outline x-small border-neon-purple text-neon-purple w-full" onclick="window.openMutationHistoryOverlay(${cardID})">📜 VIEW GENE-EDITING LOGS</button>
+                </div>
+            </div>
+
+            <div id="foundry-commission-content" class="hidden p-20 flex-col gap-10 max-h-400 overflow-y-auto">
+                <small class="section-label opacity-5">ALLIANCE DIVIDEND LOG</small>
+                ${(myClub.commission_history || []).length === 0 ? 
+                    '<div class="opacity-3 italic text-center py-40">No dividends received from alliance partners yet.</div>' : 
+                    myClub.commission_history.map(event => `
+                        <div class="history-item glass-panel m-0 p-10 flex-row justify-between align-center" style="background: rgba(0,242,254,0.05); border-left: 3px solid var(--neon-green);">
+                            <div class="text-left">
+                                <small class="opacity-5 block mb-2 letter-spacing-1">${event.type} SYNTHESIS</small>
+                                <b class="text-white">Partner: ${event.source_club}</b>
+                            </div>
+                            <div class="text-right">
+                                <b class="text-neon-green">+${event.amount.toFixed(2)} $VBV</b><br>
+                                <small class="opacity-5 font-mono" style="font-size: 0.75em;">${new Date(event.timestamp * 1000).toLocaleTimeString()}</small>
+                            </div>
+                        </div>
+                    `).reverse().join('')}
+                <div class="mt-10 p-10 border-top-glass opacity-5 italic font-size-0-75em text-center">
+                    Regional Governors earn a 5% split from all mutation procedures performed by allied organizations.
+                </div>
+            </div>
+
+            <button class="outline w-full mt-10" onclick="window.triggerMutationInsuranceEffect(false); window.stopMutationInsuranceHum(); window.stopMutationSoundscape(); document.getElementById('mutation-foundry-overlay').remove()">CLOSE FOUNDRY</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // --- Tab Orchestration ---
+    window.switchFoundryTab = (tab) => {
+        const mutationContent = document.getElementById("foundry-mutation-content");
+        const commissionContent = document.getElementById("foundry-commission-content");
+        const mutationTab = document.getElementById("foundry-tab-mutation");
+        const commissionTab = document.getElementById("foundry-tab-commission");
+
+        mutationContent.classList.toggle("hidden", tab !== 'mutation');
+        commissionContent.classList.toggle("hidden", tab !== 'commission');
+        mutationTab.classList.toggle("active", tab === 'mutation');
+        commissionTab.classList.toggle("active", tab === 'commission');
+
+        // Hide card preview if in commission view
+        if (window.triggerMutationInsuranceEffect) window.triggerMutationInsuranceEffect(tab === 'mutation' && hasInsurance);
+    };
+
+    // --- Internal Logic ---
+    window.adjustMutationVector = (idx, val) => {
+        const newVal = parseInt(val);
+        // PILLAR 5: Input Validation. Ensure numeric input and minimum power floor.
+        if (isNaN(newVal) || newVal < 5) {
+            showToast("❌ Power value must be a number and at least 5.", "error");
+            return;
+        }
+        pendingPower[idx] = newVal;
+        document.querySelector(`.vector-val-${idx}`).innerText = newVal;
+        
+        const currentSum = pendingPower.reduce((a, b) => a + b, 0);
+        const delta = originalSum - currentSum;
+        
+        const deltaEl = document.getElementById("vector-sum-delta");
+        deltaEl.innerText = delta > 0 ? `+${delta}` : delta;
+        deltaEl.className = delta === 0 ? "text-neon-green" : "text-error";
+        
+        document.getElementById("commit-realignment-btn").disabled = delta !== 0;
+        
+        // Update preview dynamically
+        const previewCard = {...card, power: pendingPower};
+        document.getElementById("mutation-card-preview").innerHTML = renderCardHTML(previewCard);
+    };
+
+    window.submitVectorRealignment = async (id) => {
+        const state = window.GetGameState();
+        if (state.virtual_balance < 500) return showToast("❌ Insufficient $VBV rewards.", "error");
+        
+        const currentSum = pendingPower.reduce((a, b) => a + b, 0);
+        if (currentSum !== originalSum) return showToast("❌ Power budget mismatch.", "error");
+
+        showToast("🧬 Initiating vector realignment...", "info");
+        socket.send(JSON.stringify({
+            type: "vector_realignment",
+            payload: {
+                card_id: id,
+                club_id: state.employer_id,
+                new_power: pendingPower
+            }
+        }));
+        window.stopMutationSoundscape(); // Stop soundscape on commit
+        document.getElementById("mutation-foundry-overlay").remove();
+    };
+
+    window.submitMoodRecalibration = async (id, mood) => {
+        const state = window.GetGameState();
+        if (state.virtual_balance < 250) return showToast("❌ Insufficient $VBV rewards.", "error");
+        if (!state.inventory["mood_catalyst"]) return showToast("❌ Mood Catalyst required.", "error");
+
+        if (!confirm(`Permanently align this babe with the ${mood} element for 250 $VBV + 1x Catalyst?`)) return;
+
+        showToast("🧬 Recalibrating elemental alignment...", "info");
+        socket.send(JSON.stringify({
+            type: "mood_recalibration",
+            payload: {
+                card_id: id,
+                club_id: state.employer_id,
+                new_mood: mood
+            }
+        }));
+        window.stopMutationSoundscape(); // Stop soundscape on commit
+        document.getElementById("mutation-foundry-overlay").remove();
+    };
+}
+
+/**
+ * window.submitMutationLoyaltySynthesis initiates the soul-bonding protocol.
+ */
+window.submitMutationLoyaltySynthesis = (cardID) => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 1000) return showToast("❌ Insufficient $VBV rewards.", "error");
+    
+    socket.send(JSON.stringify({
+        type: "loyalty_synthesis",
+        payload: {
+            card_id: cardID,
+            club_id: state.employer_id
+        }
+    }));
 };
 
 /**
@@ -247,6 +668,26 @@ export function switchShopCategory(category) {
     } else {
         container.innerHTML = itemsHTML;
     }
+}
+
+/**
+ * submitDistrictTax dispatches a policy shift request to the backend.
+ * PILLAR 1: Political Influence.
+ */
+export async function submitDistrictTax(territoryId) {
+    const input = document.getElementById("district-tax-input");
+    if (!input || !socket) return;
+    const rate = parseFloat(input.value);
+    if (isNaN(rate) || rate < 0 || rate > 20) {
+        showToast("❌ Invalid rate. Policy window is 0% to 20%.", "error");
+        return;
+    }
+
+    if (!confirm(`Enact ${rate}% District Tax on ${territoryId.replace(/_/g, ' ').toUpperCase()}?\n\nThis will incur a 1% Governor Surcharge on your club treasury.`)) return;
+
+    showToast("🏛️ Dispatching policy shift to sector network...", "info");
+    socket.send(JSON.stringify({ type: "set_district_tax", payload: { territory_id: territoryId, new_rate: rate / 100 } }));
+    document.getElementById("territory-view-overlay")?.remove();
 }
 
 export async function buyClubItem(clubId, itemId, price, territoryId) {
@@ -525,38 +966,6 @@ export async function submitConsignment() {
     }
 }
 
-// --- Market Ticker Logic ---
-let tickerItems = [];
-let tickerOffset = 0;
-let tickerAnimId = null;
-    const spacing = 60;
-    let tickerContainer = document.getElementById("market-ticker");
-    if (!tickerContainer) {
-        tickerContainer = document.createElement("div");
-        tickerContainer.id = "market-ticker";
-        tickerContainer.className = "market-ticker-container";
-        tickerContainer.innerHTML = `
-            <div class="ticker-label">LIVE MARKET:</div>
-            <canvas id="market-ticker-canvas" style="flex: 1; height: 30px; cursor: default;"></canvas>
-        `;
-        document.body.prepend(tickerContainer);
-
-        const canvas = document.getElementById("market-ticker-canvas");
-        const resize = () => {
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = 30 * dpr;
-            const ctx = canvas.getContext('2d');
-            ctx.scale(dpr, dpr);
-        };
-        window.addEventListener('resize', resize);
-        resize();
-    }
-
-    const topPerformers = [...players]
-        .sort((a, b) => (b.wins - a.wins) || (b.reputation - a.reputation))
-        .slice(0, 5);
 
     const newItems = [];
     newItems.push({ symbol: "MKT TOKEN", val: "0.80 $VBV", trend: "▲", color: "#3fb950" });
@@ -882,12 +1291,15 @@ export function renderRegionalAllianceWidget(myClubID) {
     } else if (isOwner && myClub.alliance_invite_id) {
         const requester = globalClubs[myClub.alliance_invite_id];
         allianceHtml = `
-            <div class="alliance-status glass-panel border-warning mb-10 p-15 accelerated">
+            <div id="alliance-invite-hud" class="alliance-status glass-panel border-warning mb-10 p-15 accelerated">
                 <div class="text-warning font-bold mb-5" style="letter-spacing: 1px;">✉️ ALLIANCE PROPOSAL</div>
                 <div class="flex-row justify-between align-center">
                     <div class="text-left">
                         <b>${requester ? requester.name : 'Unknown Club'}</b><br>
                         <small>Owner: ${getCachedEnvoiName(requester ? requester.owner_wallet : '')}</small>
+                    </div>
+                    <div id="alliance-invite-timer" class="font-mono font-xs text-warning">
+                        --:--
                     </div>
                     <div class="flex-row gap-5">
                         <button class="outline success btn-small" onclick="window.acceptAlliance('${myClub.id}')">ACCEPT</button>
@@ -931,10 +1343,120 @@ export function renderRegionalAllianceWidget(myClubID) {
     return allianceHtml;
 }
 
-export function tradeShares(entityId, action, amount) {
+/**
+ * tradeShares acts as the UI launcher for entity market transactions.
+ * Renamed internal logic to executeTradeShares to support the confirmation step.
+ */
+export function tradeShares(entityId, action, amount = 1) {
+    openTradeSharesOverlay(entityId, action, amount);
+}
+
+/**
+ * openTradeSharesOverlay provides a confirmation UI with real-time slippage calculations.
+ * PILLAR 2: AMM Transparency.
+ */
+export function openTradeSharesOverlay(entityId, action, initialAmount) {
+    const state = window.GetGameState("combat");
+    const target = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === entityId.toLowerCase() || p.id === entityId);
+    const displayName = target ? getCachedEnvoiName(target.wallet) : entityId;
+
+    const overlay = document.createElement("div");
+    overlay.id = "trade-confirmation-overlay";
+    overlay.className = "overlay";
+    
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-450 border-neon-cyan">
+            <div class="market-header">
+                <span class="market-title">${action.toUpperCase()} SHARES</span>
+                <div class="access-level">AMM BONDING CURVE PROTOCOL</div>
+            </div>
+            <div class="p-20 text-center">
+                <b class="text-white font-size-1-2em mb-10 block">${displayName.toUpperCase()}</b>
+                
+                <div class="glass-panel p-15 border-cyan mb-20" style="background: rgba(0,0,0,0.3);">
+                    <label class="font-size-0-7em text-neon-cyan font-bold block mb-10 letter-spacing-1">ORDER QUANTITY (SHARES)</label>
+                    <input type="number" id="trade-amount-input" class="glass-input w-full text-center font-size-1-5em" value="${initialAmount}" step="0.1" min="0.01" oninput="window.updateTradeImpact('${action}')">
+                </div>
+
+                <div class="flex-col gap-10 mb-20 text-left px-10">
+                    <div class="flex-row justify-between"><span class="opacity-5">Est. Total:</span> <b id="trade-est-total" class="text-neon-green">0.00 $VBV</b></div>
+                    <div class="flex-row justify-between"><span class="opacity-5">Price Impact:</span> <b id="trade-slippage" class="text-white">0.00%</b></div>
+                </div>
+
+                <div class="flex-row gap-10">
+                    <button class="outline w-full" onclick="document.getElementById('trade-confirmation-overlay').remove()">ABORT</button>
+                    <button class="w-full bg-neon-green text-dark font-bold" onclick="window.confirmTrade('${entityId}', '${action}')">CONFIRM ORDER</button>
+                </div>
+            </div>
+        </div>`;
+
+    document.body.appendChild(overlay);
+    window.updateTradeImpact(action);
+}
+
+/**
+ * updateTradeImpact replicates backend AMM math to estimate cost and slippage.
+ * PILLAR 2: Quadratic Whale Penalty Verification.
+ */
+window.updateTradeImpact = (action) => {
+    const amount = parseFloat(document.getElementById("trade-amount-input")?.value);
+    if (isNaN(amount) || amount <= 0) return;
+
+    // PILLAR 2: Bancor parameters synced with market_service.go
+    const UNITS_PER_SHARE = 100;
+    const units = amount * UNITS_PER_SHARE;
+    const baseSupply = 10000;
+    const baseReserve = 50000 * 1000000;
+    const reserveRatio = 0.33;
+
+    const spotPriceBefore = baseReserve / (baseSupply * reserveRatio);
+    let finalValueMicro = 0;
+    let slippage = 0;
+
+    if (action === "buy") {
+        const supplyRatio = units / (baseSupply + 1);
+        const baseCost = baseReserve * (Math.pow(1 + supplyRatio, 1 / reserveRatio) - 1);
+        const slippageFactor = 1 + Math.pow(supplyRatio, 2) * 5.0; // Quadratic Penalty
+        finalValueMicro = baseCost * slippageFactor;
+        slippage = (((finalValueMicro / units) - spotPriceBefore) / spotPriceBefore) * 100;
+    } else {
+        const supplyRatio = units / baseSupply;
+        const baseReturn = baseReserve * (1 - Math.pow(1 - supplyRatio, 1 / reserveRatio));
+        const slippageFactor = Math.max(0.1, 1 - Math.pow(supplyRatio, 2) * 2.0);
+        finalValueMicro = baseReturn * slippageFactor;
+        slippage = ((spotPriceBefore - (finalValueMicro / units)) / spotPriceBefore) * 100;
+    }
+
+    const totalEl = document.getElementById("trade-est-total");
+    const slipEl = document.getElementById("trade-slippage");
+    
+    if (totalEl) totalEl.innerText = `${(finalValueMicro / 1000000).toFixed(2)} $VBV`;
+    if (slipEl) {
+        slipEl.innerText = `${slippage.toFixed(2)}%`;
+        slipEl.style.color = slippage > 5 ? '#ff4b4b' : slippage > 1 ? 'var(--warning-orange)' : 'var(--neon-green)';
+    }
+};
+
+/**
+ * confirmTrade executes the final WebSocket dispatch after user approval.
+ */
+window.confirmTrade = (entityId, action) => {
+    const amount = parseFloat(document.getElementById("trade-amount-input").value);
+    executeTradeShares(entityId, action, amount);
+    document.getElementById("trade-confirmation-overlay")?.remove();
+};
+
+/**
+ * executeTradeShares performs the authoritative backend dispatch.
+ * This remains internal to the module.
+ */
+function executeTradeShares(entityId, action, amount) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "trade_shares", payload: { entity_id: entityId, action, amount } }));
-    showToast(`🛰️ Processing ${action} order for ${amount} shares...`, "info");
+    socket.send(JSON.stringify({
+        type: "trade_shares",
+        payload: { entity_id: entityId, action, amount }
+    }));
+    showToast(`🛰️ Order dispatched: ${action.toUpperCase()} ${amount} shares...`, "info");
 }
 export async function openBlackMarket() {
 	const state = window.GetGameState();

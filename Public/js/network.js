@@ -4,7 +4,7 @@ import { CONFIG } from './config.js'; // Ensure CONFIG is imported
 import { showToast, setTransactionStatus, handleMaintenanceUI, handleTournamentUI, startSeasonTimer } from './ui.js';
 import { updateWalletUI, disconnectUserWallet, initWalletConnect } from './wallet.js';
 import { setSeasonEnd } from './leaderboard.js'; // Removed handleTournamentUI and startSeasonTimer from here
-import { updatePlayerList } from './game.js';
+import { updatePlayerList, handleMatchmakingUpdate } from './game.js';
 import { updateMarketTicker, updateBountyTicker, buyBlackMarketItem } from './economy.js';
 import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs } from './admin.js';
 import { updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer } from './criminality.js';
@@ -90,6 +90,20 @@ export function sendPing() {
     socket.send(JSON.stringify({ type: "ping" }));
 }
 
+/**
+ * requestMatchSync dispatches a catch-up request to the backend.
+ * PILLAR 4: Replay Resilience. 
+ * Invoked by the WASM engine when sequence gaps are detected.
+ */
+export function requestMatchSync() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    
+    const state = window.GetGameState("meta");
+    const lastSeq = state ? (state.last_sequence_id || 0) : 0;
+    
+    socket.send(JSON.stringify({ type: "sync_request", payload: { last_sequence_id: lastSeq } }));
+}
+
 let syncScheduled = false;
 let currentSyncScope = null;
 
@@ -148,6 +162,7 @@ export function handleServerMessage(msg) {
             updateMarketTicker(msg.payload.players);
             updateBountyTicker(msg.payload.players);
 
+            const state = window.GetGameState("combat"); // Check phase with minimal overhead
             // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
             const me = msg.payload.players.find(p => p.id === myClientId);
             if (me) {
@@ -157,12 +172,15 @@ export function handleServerMessage(msg) {
                 }
             }
             
-            handleMaintenanceUI(msg.payload.maintenance_active, msg.payload.maintenance_time);
+            handleMaintenanceUI(msg.payload.maintenance_active, msg.payload.maintenance_time, msg.payload.maintenance_priority);
 
             if (window.SyncTournament) window.SyncTournament(msg.payload.tournament);
             handleTournamentUI(msg.payload.tournament);
 
             if (msg.payload.faucet_balance !== undefined) window.SyncVaultBalance(msg.payload.faucet_balance);
+            if (msg.payload.total_virtual_liability !== undefined && window.SyncSolvency) {
+                window.SyncSolvency(msg.payload.faucet_balance_micro || 0, msg.payload.total_virtual_liability);
+            }
             if (msg.payload.reward_stack !== undefined) window.SyncRewards(msg.payload.reward_stack);
             if (window.SyncClubs) window.SyncClubs(msg.payload.clubs);
             
@@ -180,6 +198,16 @@ export function handleServerMessage(msg) {
                 document.getElementById("season-countdown-widget").classList.remove("hidden");
                 startSeasonTimer();
             } // Assuming syncUI is still in app.js
+            
+            // PILLAR 5: Performance Guard. If in a match, background lobby updates should stay lean.
+            if (state && state.phase === "Active") {
+                requestBatchedSync("meta");
+            } else {
+                requestBatchedSync("all");
+            }
+            break;
+        case "matchmaking_status":
+            handleMatchmakingUpdate(msg.payload);
             requestBatchedSync("all");
             break;
         case "portfolio_update":
@@ -204,8 +232,12 @@ export function handleServerMessage(msg) {
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(1, msg.payload.deck);
                 if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
+
+                // PILLAR 4: Race Condition Hardening.
+                // Transition local engine to 'Active' phase BEFORE dispatching the sync response.
+                if (window.StartMatch) window.StartMatch(true);
                 sendMatchSync(msg.from_id);
-                window.StartMatch(true);
+
                 if (window.triggerConnectionPulse) window.triggerConnectionPulse();
                 if (window.playConnectionSFX) window.playConnectionSFX();
                 if (window.playBattleStartSFX) window.playBattleStartSFX();
@@ -242,13 +274,13 @@ export function handleServerMessage(msg) {
             console.log("⚔️ SUDDEN DEATH INITIALIZED");
             if (msg.payload.text) renderChatMessage("SERVER", msg.payload.text);
 
+            if (msg.payload.card_metadata && window.SyncCardMetadata) {
+                window.SyncCardMetadata(msg.payload.card_metadata);
+            }
+
             if (window.SyncOpponentDeck) {
                 window.SyncOpponentDeck(0, msg.payload.p1_deck);
                 window.SyncOpponentDeck(1, msg.payload.p2_deck);
-            }
-
-            if (msg.payload.card_metadata && window.SyncCardMetadata) {
-                window.SyncCardMetadata(msg.payload.card_metadata);
             }
 
             if (window.initiateSuddenDeath) window.initiateSuddenDeath();
@@ -262,16 +294,34 @@ export function handleServerMessage(msg) {
             
             if (msg.from_id !== myClientId) {
                 let success = false;
-                if (spectatorMatchState) { // Use window.spectatorMatchState from game.js
-                    // We are a spectator: Determine player index from match state
-                    const pIdx = (msg.from_id === spectatorMatchState.p1_id) ? 0 : 1;
-                    success = window.SyncMove(msg.payload.grid_index, msg.payload.card_id, pIdx);
-                } else {
-                    // We are a player: Standard turn-based placement
-                    success = window.PlaceCard(msg.payload.grid_index, msg.payload.card_id);
-                }
+
+                // PILLAR 4: Authoritative Frame Sync.
+                // Pass the entire AuthoritativeFrame payload to SyncMove for deterministic processing.
+                // msg.payload is already the AuthoritativeFrame object.
+                success = window.SyncMove(msg.payload);
                 if (!success) console.warn("[WS] Move sync failed.");
-                requestBatchedSync("combat");
+                // Manual requestBatchedSync removed. 
+                // window.SyncMove (Go) now triggers window.syncUI("combat") immediately upon success.
+            }
+            break;
+        case "sync_response":
+            if (msg.payload.frames && window.PushReplayFrame) {
+                if (msg.payload.frames.length > 0) {
+                    msg.payload.frames.forEach(frame => {
+                        window.PushReplayFrame(JSON.stringify(frame));
+                    });
+                } else {
+                    // PILLAR 4: Recovery Finalization. 
+                    // If no frames are needed for catch-up, explicitly release the engine state.
+                    if (window.CompleteRecovery) window.CompleteRecovery();
+                }
+            }
+            break;
+        case "turn_change":
+            // PILLAR 5: Reactive Atmosphere.
+            // Trigger specialized audio if the move resulted in a combo chain reaction.
+            if (msg.payload && msg.payload.combo) {
+                if (window.playComboSFX) window.playComboSFX();
             }
             break;
         case "chat":
@@ -297,7 +347,8 @@ export function handleServerMessage(msg) {
             break;
         case "maintenance_update":
             console.log("[WS] Maintenance update received:", msg.payload);
-            handleMaintenanceUI(msg.payload.active, msg.payload.timestamp);
+            handleMaintenanceUI(msg.payload.active, msg.payload.timestamp, msg.payload.priority);
+            requestBatchedSync("meta"); // Force re-render and beacon snapshot
             break;
         case "tournament_update":
             // PILLAR 3: Bracket Sync. Ensure real-time tournament and OpenTime updates are processed.
@@ -307,7 +358,7 @@ export function handleServerMessage(msg) {
             requestBatchedSync("meta");
             break;
         case "admin_notification":
-            showToast(msg.payload.text, "warning", 8000);
+            showToast(msg.payload.text, msg.payload.priority || "info", 8000); // Use payload's priority
             const adminPanel = document.getElementById("admin-control-panel");
             if (adminPanel && !adminPanel.classList.contains("hidden")) {
                 fetchAdminLogs();

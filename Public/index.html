@@ -25,6 +25,79 @@
     <!-- WalletConnect v2 Integration (Pera, Defly, etc.) -->
     <script src="https://cdn.jsdelivr.net/npm/@walletconnect/sign-client@2.10.6/dist/index.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@walletconnect/modal@2.6.2/dist/index.umd.js"></script>
+
+    <!-- WASM Wallet Bridge (Roadmap 5.3) -->
+    <script>
+        window.WasmWalletBridge = {
+            // Requests a signature from an Algorand/Voi standard wallet provider
+            signMarketAction: async (jsonPayloadString) => {
+                try {
+                    const payload = JSON.parse(jsonPayloadString);
+                    
+                    // 1. Verify the provider is active in the user's browser context
+                    // We look for the standard window.voi provider (Kibisis/Lute)
+                    if (!window.voi || !window.voi.signBytes) {
+                        throw new Error("Compatible Voi Wallet Extension not detected.");
+                    }
+
+                    // 2. Convert the incoming JSON into a Uint8Array for signing
+                    const encoder = new TextEncoder();
+                    const dataBuffer = encoder.encode(JSON.stringify(payload));
+
+                    console.log(`[JS Bridge] Dispatching signature request for Nonce: ${payload.nonce}`);
+                    
+                    // 3. Request cryptographic signature via the extension
+                    const userAddress = payload.buyer_address; 
+                    const signatureResult = await window.voi.signBytes(dataBuffer, userAddress);
+
+                    // Return the raw signature back to the awaiting WASM runtime context
+                    return {
+                        success: true,
+                        signature: btoa(String.fromCharCode(...signatureResult)), // Base64 packed
+                        error: ""
+                    };
+                } catch (err) {
+                    console.error("[JS Bridge] Signing failed:", err.message);
+                    return {
+                        success: false,
+                        signature: "",
+                        error: err.message
+                    };
+                }
+            }
+        };
+
+        // Unified Alert System (Roadmap 5.4)
+        window.UnifiedAlertSystem = {
+            showAlert: (title, message, visualType) => {
+                // Check for an existing alert container to prevent layout stacking
+                let alertBox = document.getElementById("game-alert-overlay");
+                if (!alertBox) {
+                    alertBox = document.createElement("div");
+                    alertBox.id = "game-alert-overlay";
+                    document.body.appendChild(alertBox);
+                }
+
+                // Apply visual type styling (e.g., security warning or resource notice)
+                const themeColor = visualType === "SECURITY" ? "#ff4d4d" : "#ffae42";
+                
+                alertBox.innerHTML = `
+                    <div style="position: fixed; top: 20px; right: 20px; background: #1a1a2e; color: #fff; 
+                                border-left: 5px solid ${themeColor}; padding: 16px; border-radius: 4px; 
+                                box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-family: sans-serif; z-index: 9999; 
+                                max-width: 350px; transition: all 0.3s ease;">
+                        <b style="color: ${themeColor}; display: block; margin-bottom: 4px;">${title}</b>
+                        <span style="font-size: 13px; line-height: 1.4;">${message}</span>
+                    </div>
+                `;
+
+                // Automatically fade out the notification after 5 seconds
+                setTimeout(() => {
+                    if (alertBox) alertBox.innerHTML = "";
+                }, 5000);
+            }
+        };
+    </script>
 </head>
 <body>
 
@@ -36,6 +109,10 @@
                 <span class="font-small-caps letter-spacing-1">SEASON <span id="season-num-display">1</span> ENDS</span>
                 <span id="season-timer" class="font-bold-rajdhani">--:--:--</span>
             </div>
+            
+            <!-- Solvency Dashboard: Real-time Coverage Ratio (Task 1101) -->
+            <div id="solvency-hud-container" class="hidden ml-10"></div>
+
             <div id="payout-config-widget" class="glass-panel payout-widget" onclick="openPayoutSettings()">
                 <span class="opacity-6 font-size-0-7em">VOI PAYOUT:</span>
                 <span id="payout-address-display" class="font-mono text-neon-green">Not Set (Default)</span>
@@ -46,6 +123,31 @@
             <div id="latency-monitor" class="font-small opacity-6">
                 LATENCY: <span id="latency-display">-- ms</span>
             </div>
+            
+            <!-- Sabotage HUD: Visible to Owners during Blackouts (Task 793) -->
+            <div id="sabotage-hud-container" class="hidden ml-10"></div>
+
+            <!-- Mutation Stability HUD: Visible to Lab Personnel (Task 848) -->
+            <div id="mutation-stability-hud" class="hidden ml-10"></div>
+
+            <!-- Active Bounty Warning: Visible to Outlaws (Task 854) -->
+            <div id="active-bounty-warning" class="hidden ml-10"></div>
+
+            <!-- Bounty Hunter HUD: Visible to clean players (Task 855) -->
+            <div id="bounty-hunter-hud" class="hidden ml-10"></div>
+
+            <!-- Commission Summary HUD: Visible to Regional Governors (Task 885) -->
+            <div id="commission-summary-hud" class="hidden ml-10"></div>
+
+            <!-- District Stabilizer HUD: Displays remaining time for mojo field (Task 936) -->
+            <div id="district-stabilizer-hud" class="hidden ml-10"></div>
+
+            <!-- Mojo Decay Status HUD: Displays current decay rate (Task 937) -->
+            <div id="mojo-decay-status-hud" class="hidden ml-10"></div>
+
+            <!-- Bounty Tally HUD: Sector prize pool (Task 859) -->
+            <div id="bounty-tally-hud" class="hidden ml-10"></div>
+
             <button id="music-toggle-btn" class="outline p-5-10 font-size-10px ml-10 mr-10" onclick="toggleMuteMusic()" aria-label="Toggle Background Music">🎵</button>
             <div id="wallet-controls">
                 <button id="wallet-btn" onclick="handleWalletAction()">Connect Authority Wallet</button>
@@ -313,6 +415,7 @@
             <div class="flex-row justify-center gap-20 mt-20">
                 <div class="flex-row gap-5"><div class="map-legend-color neutral"></div> <span class="map-legend-text">NEUTRAL</span></div>
                 <div class="flex-row gap-5"><div class="map-legend-color controlled"></div> <span class="map-legend-text">CLUB CONTROLLED</span></div>
+                <div class="flex-row gap-5"><div class="map-legend-color disrupted" style="background: #ff00ff; box-shadow: 0 0 10px #ff00ff;"></div> <span class="map-legend-text">CYBER-LOCK DISRUPTION</span></div>
                 <div class="flex-row gap-5"><div class="map-legend-color traps" style="background: var(--warning-orange); box-shadow: 0 0 10px var(--warning-orange);"></div> <span class="map-legend-text">TRAPS DETECTED</span></div>
                 <div id="district-scanner-timer-widget" class="flex-row gap-5 hidden">
                     <div class="map-legend-color scanner" style="background: var(--neon-cyan); box-shadow: 0 0 10px var(--neon-cyan);"></div>
@@ -625,6 +728,60 @@
                 </div>
             </div>
             
+            <!-- Tax Revenue Audit (Task 898) -->
+            <div class="glass-panel admin-section admin-section-tax-revenue w-full mt-20">
+                <h2 class="text-neon-green">Systemic Tax Revenue</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time aggregation of VBV recovered from Corporate, Luxury, and Sabotage protocols.</p>
+                <div id="admin-tax-revenue-display" class="display-grid gap-15">
+                    <div class="opacity-5 py-20 italic">Scanning systemic ledgers...</div>
+                </div>
+            </div>
+            
+            <!-- District Tax Policy Audit (Task 920) -->
+            <div class="glass-panel admin-section admin-section-district-tax w-full mt-20">
+                <h2 class="text-gold">District Tax Policy Audit</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time telemetry of localized sales tax rates and presiding Governors.</p>
+                <div id="admin-district-tax-display" class="overflow-x-auto">
+                    <div class="opacity-5 py-20 italic">Awaiting policy datastream...</div>
+                </div>
+            </div>
+            
+            <!-- Alliance Commission History (Task 894) -->
+            <div class="glass-panel admin-section admin-section-commission-audit w-full mt-20">
+                <h2 class="text-gold">Alliance Commission History</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Global record of 5% alliance dividends across all organizations.</p>
+                <div id="admin-commission-audit-display" class="overflow-x-auto">
+                    <div class="opacity-5 py-20 italic">Scanning regional ledgers...</div>
+                </div>
+            </div>
+            
+            <!-- Mutation Performance Dashboard (Pillar 6: Forensic Auditing) -->
+            <div class="glass-panel admin-section admin-section-mutation-audit w-full mt-20">
+                <h2 class="text-neon-purple">Mutation Performance</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Aggregated procedure success/failure rates by facility.</p>
+                <div id="admin-mutation-audit-display" class="display-grid gap-15" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                    <div class="opacity-5 py-20 italic">Scanning genetic logs...</div>
+                </div>
+            </div>
+
+            <!-- Solvency Health Dashboard (Pillar 2: Ledger Integrity) -->
+            <div class="glass-panel admin-section admin-section-solvency-health w-full mt-20">
+                <h2 class="text-neon-green">Solvency Health</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time reconciliation of physical vault vs. virtual liabilities.</p>
+                <div id="admin-solvency-display" class="display-grid gap-15" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                    <div class="opacity-5 py-20 italic">Calculating coverage ratio...</div>
+                </div>
+            </div>
+
+            <!-- Node Health Dashboard (Pillar 4: Resiliency) -->
+            <div class="glass-panel admin-section admin-section-node-health w-full mt-20">
+                <h2 class="text-neon-cyan">Node Health Dashboard</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time telemetry of the high-availability RPC node cluster.</p>
+                <div id="admin-node-health-display" class="display-grid gap-15" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                    <div class="opacity-5 py-20 italic">Scanning network latency...</div>
+                </div>
+            </div>
+
             <!-- Admin Logs -->
             <div class="glass-panel admin-section admin-section-logs">
                 <h2>Admin Logs</h2>

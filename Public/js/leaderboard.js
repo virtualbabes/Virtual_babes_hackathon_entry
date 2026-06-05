@@ -33,13 +33,40 @@ export async function fetchLeaderboard() {
         // Resolve names for top 10
         await Promise.all(players.slice(0, 10).map(p => resolveEnvoiName(p.wallet)));
 
-        leaderboardList.innerHTML = players.map((p, i) => `
-            <div class="leaderboard-row ${p.id === myClientId ? 'me' : ''}">
-                <span class="rank-badge">#${i + 1}</span>
-                <span class="player-name">${getCachedEnvoiName(p.wallet)}</span>
-                <span class="player-stats">${p.wins}W | ${p.reputation} REP</span>
-            </div>
-        `).join('');
+        leaderboardList.innerHTML = players.map((p, i) => {
+            const isVault = p.wallet?.toLowerCase() === CONFIG.VAULT_ADDRESS?.toLowerCase();
+            const rowClass = isVault ? 'vault-highlight' : (p.id === myClientId ? 'me' : '');
+            
+            // PILLAR 1: House Highlighting.
+            const houseTag = isVault ? `<span class="tag-gold font-xs px-5 py-2 mr-5" style="border: 1px solid; border-radius: 4px; vertical-align: middle; background: rgba(212, 175, 55, 0.1);">HOUSE</span>` : '';
+            const vaultStyle = isVault ? `style="border: 1px solid #ffd700; box-shadow: 0 0 15px rgba(212, 175, 55, 0.4); background: linear-gradient(90deg, rgba(212, 175, 55, 0.15), transparent);"` : '';
+
+            // PILLAR 1: Donation Tier Badges.
+            const donated = p.total_donated || 0;
+            const donatedVBV = donated / 1000000;
+            let donationTag = "";
+            if (donatedVBV >= 500) {
+                let color = "#cd7f32"; // Bronze
+                let label = "BENEFACTOR";
+                if (donatedVBV >= 5000) { color = "#b9f2ff"; label = "PATRON"; }
+                else if (donatedVBV >= 2500) { color = "#ffd700"; label = "GUARDIAN"; }
+                else if (donatedVBV >= 1000) { color = "#c0c0c0"; label = "SUPPORTER"; }
+                
+                donationTag = `<span class="font-xs px-5 py-2 mr-5" style="border: 1px solid ${color}; color: ${color}; border-radius: 4px; vertical-align: middle; background: ${color}1A;" title="Total Donated: ${donatedVBV.toFixed(0)} VBV">${label}</span>`;
+            }
+
+            // PILLAR 1: Hardened Status Badge.
+            const reparations = p.reparations_received_count || 0;
+            const hardenedTag = reparations >= 5 ? `<span class="font-xs px-5 py-2 mr-5" style="border: 1px solid var(--neon-cyan); color: var(--neon-cyan); border-radius: 4px; vertical-align: middle; background: rgba(0, 242, 254, 0.1);" title="Hardened: Secured ${reparations} reparations this session.">🛡️ HARDENED</span>` : '';
+
+            return `
+                <div class="leaderboard-row ${rowClass} accelerated" ${vaultStyle}>
+                    <span class="rank-badge">#${i + 1}</span>
+                    <span class="player-name">${houseTag}${donationTag}${hardenedTag}${getCachedEnvoiName(p.wallet)}</span>
+                    <span class="player-stats">${p.wins}W | ${p.reputation} REP</span>
+                </div>
+            `;
+        }).join('');
     } catch (err) {
         leaderboardList.innerHTML = `<div class="chat-msg system error">Leaderboard uplink offline.</div>`;
     }
@@ -60,6 +87,21 @@ export async function fetchTournamentHistory(page = 1) {
         if (data.history.length === 0) {
             container.innerHTML = `<div class="opacity-3 py-40 italic">No tournament data found in this sector.</div>`;
         } else {
+            // PILLAR 4: Historical Immersion.
+            // Batch resolve Envoi names for all winners and participants in the history
+            // to ensure high-fidelity handles are displayed in the archived brackets.
+            const wallets = new Set();
+            data.history.forEach(t => {
+                if (t.winner) wallets.add(t.winner);
+                if (t.matches) {
+                    t.matches.forEach(m => {
+                        if (m.p1) wallets.add(m.p1);
+                        if (m.p2) wallets.add(m.p2);
+                    });
+                }
+            });
+            await Promise.all(Array.from(wallets).filter(w => w && w.length > 50).map(w => resolveEnvoiName(w)));
+
             container.innerHTML = data.history.map(t => `
                 <div class="tournament-item glass-panel">
                     <div class="flex-row justify-between align-center mb-10">

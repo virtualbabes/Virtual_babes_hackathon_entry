@@ -10,7 +10,12 @@ export let lastSfxVolume = parseFloat(localStorage.getItem('lastSfxVolume') || (
 let audioCtx = null;
 let sfxGainNode = null;
 let musicGainNode = null;
-const bufferCache = new Map();
+let currentMutationSoundscapeSource = null;
+let currentMutationInsuranceHumSource = null;
+let currentDistrictStabilizerThrumSource = null;
+const bufferCache = new Map(); // url -> Promise<AudioBuffer>
+const sfxCooldowns = new Map(); // path -> timestamp
+const MIN_SFX_INTERVAL = 50; // ms
 
 /**
  * Initializes the high-performance SFX engine.
@@ -26,8 +31,18 @@ export function initAudioContext() {
         sfxGainNode = audioCtx.createGain();
         musicGainNode = audioCtx.createGain();
 
-        sfxGainNode.connect(audioCtx.destination);
-        musicGainNode.connect(audioCtx.destination);
+        // PILLAR 5: Audio Hardening.
+        // Implement a master compressor to prevent digital clipping during high-frequency combat events.
+        const compressor = audioCtx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, audioCtx.currentTime);
+        compressor.knee.setValueAtTime(40, audioCtx.currentTime);
+        compressor.ratio.setValueAtTime(12, audioCtx.currentTime);
+        compressor.attack.setValueAtTime(0, audioCtx.currentTime);
+        compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+        sfxGainNode.connect(compressor);
+        musicGainNode.connect(compressor);
+        compressor.connect(audioCtx.destination);
         
         syncSFXGain();
         syncMusicGain();
@@ -133,16 +148,21 @@ async function getSFXBuffer(path) {
     const url = path.startsWith('http') ? path : `${CONFIG.ASSET_URL}Assets/Audio/${path}`;
     if (bufferCache.has(url)) return bufferCache.get(url);
 
-    try {
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = await audioCtx.decodeAudioData(arrayBuffer);
-        bufferCache.set(url, buffer);
-        return buffer;
-    } catch (err) {
-        console.warn(`[AUDIO] Buffer load failed: ${url}`);
-        return null;
-    }
+    const promise = (async () => {
+        try {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            // PILLAR 5: Deterministic Audio Decoding. 
+            return await audioCtx.decodeAudioData(arrayBuffer);
+        } catch (err) {
+            console.warn(`[AUDIO] Buffer load failed: ${url}`);
+            bufferCache.delete(url); // Clear failed load from cache
+            return null;
+        }
+    })();
+
+    bufferCache.set(url, promise);
+    return promise;
 }
 
 /**
@@ -154,9 +174,9 @@ export function playMoodMoteSFX(mood) {
     
     // Throttling: Mood motes are very frequent. Audio triggers on only ~5% of visual events
     // to maintain a subtle, immersive "hum" rather than a cacophony.
-    if (Math.random() > 0.05) return;
+    if (Math.random() > 0.05) return; // PILLAR 5: Throttled for performance
 
-    playSFX('Game_Feedback/Toggle_bip.mp3');
+    playSFX('Toggle_bip.mp3');
 }
 
 /**
@@ -168,11 +188,186 @@ export function playConnectionSFX() {
 }
 
 /**
+ * Plays the glitchy 'Cyber-Pulse' sound for regional blackouts.
+ * PILLAR 1: Regional Warfare Feedback.
+ */
+export function playBlackoutSFX() {
+    playSFX('Cyber-Pulse.mp3');
+}
+
+/**
+ * Plays the intense 'Chain_reaction' sound for combo flips.
+ * PILLAR 5: Atmospheric Immersion.
+ */
+export function playComboSFX() {
+    playSFX('Chain_reaction.mp3');
+}
+
+/**
+ * Plays the 'Cyber-Pulse' sound for Bounty Board de-cloaking.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+export function playCloakFailureSFX() {
+    playSFX('Cyber-Pulse.mp3');
+}
+
+/**
+ * Plays a constant low-frequency electronic thrum for the District Stabilizer.
+ * PILLAR 1: Infrastructure Prestige.
+ */
+export async function playDistrictStabilizerThrum() {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+    if (currentDistrictStabilizerThrumSource) return;
+
+    if (!audioCtx) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buffer = await getSFXBuffer('Industrial_Hum.mp3');
+    if (!buffer || !audioCtx) return;
+
+    currentDistrictStabilizerThrumSource = audioCtx.createBufferSource();
+    currentDistrictStabilizerThrumSource.buffer = buffer;
+    currentDistrictStabilizerThrumSource.loop = true;
+    
+    // PILLAR 6: Differentiate via pitch shifting. 
+    // 0.45 rate creates a constant low-frequency thrum.
+    currentDistrictStabilizerThrumSource.playbackRate.value = 0.45;
+    
+    const thrumGain = audioCtx.createGain();
+    thrumGain.gain.value = 0.4; // Subtle ambient thrum
+    currentDistrictStabilizerThrumSource.connect(thrumGain);
+    thrumGain.connect(sfxGainNode);
+    currentDistrictStabilizerThrumSource.start(0);
+}
+
+/**
+ * Stops the District Stabilizer thrum.
+ */
+export function stopDistrictStabilizerThrum() {
+    if (currentDistrictStabilizerThrumSource) {
+        try {
+            currentDistrictStabilizerThrumSource.stop();
+        } catch (e) {}
+        currentDistrictStabilizerThrumSource = null;
+    }
+}
+
+/**
+ * Plays a rhythmic data-processing sound effect for Staff Training activation.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function playStaffTrainingSFX() {
+    playSFX('Cyber-Pulse.mp3');
+}
+
+/**
+ * Plays a specialized 'ka-ching' variant for Sabotage Reparations.
+ * PILLAR 1: Trust Layer Feedback.
+ */
+export async function playSabotageReparationSFX() {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+
+    if (!audioCtx) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buffer = await getSFXBuffer('Pay_out-in-2.mp3');
+    if (!buffer || !audioCtx) return;
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    // PILLAR 6: Audio Variation. 
+    // 1.2 rate creates a higher, more satisfying "metallic" ring.
+    source.playbackRate.value = 1.2;
+
+    const sfxGain = audioCtx.createGain();
+    sfxGain.gain.value = 1.0; 
+    source.connect(sfxGain);
+    sfxGain.connect(sfxGainNode);
+    
+    source.start(0);
+}
+
+/**
+ * Plays a high-priority system alarm for ecosystem milestones.
+ * PILLAR 1: Industrial Loop Feedback.
+ */
+export function playEcosystemAlertSFX() {
+    playSFX('Warning_long.mp3');
+}
+
+/**
+ * Plays the quick 'interupt_warning' sound for botched procedures.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function playProcedureInterruptedSFX() {
+    playSFX('interupt_warning.mp3');
+}
+
+/**
+ * Plays the 'Warning_long' sound for critical systemic alerts.
+ * PILLAR 1: Infrastructure Security.
+ */
+export function playLongWarningSFX() {
+    playSFX('Warning_long.mp3');
+}
+
+/**
  * Plays a high-intensity battle start audio cue.
  * Accompanies the transition to the active combat phase.
  */
 export function playBattleStartSFX() {
     playSFX('Start_intense.mp3');
+}
+
+/**
+ * Plays the low-frequency industrial background for the Mutation Foundry.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export async function playMutationSoundscape() {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+    if (currentMutationSoundscapeSource) return;
+
+    if (!audioCtx) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buffer = await getSFXBuffer('Industrial_Hum.mp3');
+    if (!buffer || !audioCtx) return;
+
+    currentMutationSoundscapeSource = audioCtx.createBufferSource();
+    currentMutationSoundscapeSource.buffer = buffer;
+    currentMutationSoundscapeSource.loop = true;
+    currentMutationSoundscapeSource.connect(sfxGainNode);
+    currentMutationSoundscapeSource.start(0);
+}
+
+/**
+ * Plays a deep, low-frequency power hum for insured procedures.
+ * Layers over the soundscape to provide tactical confirmation.
+ */
+export async function playMutationInsuranceHum() {
+    if (sfxVolume <= 0 || masterVolume <= 0) return;
+    if (currentMutationInsuranceHumSource) return;
+
+    if (!audioCtx) initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+    const buffer = await getSFXBuffer('Industrial_Hum.mp3');
+    if (!buffer || !audioCtx) return;
+
+    currentMutationInsuranceHumSource = audioCtx.createBufferSource();
+    currentMutationInsuranceHumSource.buffer = buffer;
+    currentMutationInsuranceHumSource.loop = true;
+    
+    // PILLAR 6: Differentiate via pitch shifting. 
+    // 0.55 rate creates a deep "Power Grid" resonance.
+    currentMutationInsuranceHumSource.playbackRate.value = 0.55;
+    
+    const humGain = audioCtx.createGain();
+    humGain.gain.value = 0.7; // Subtle layering
+    currentMutationInsuranceHumSource.connect(humGain);
+    humGain.connect(sfxGainNode);
+    currentMutationInsuranceHumSource.start(0);
 }
 
 /**
@@ -218,6 +413,15 @@ export function playCharacterVoiceLine(characterType, isPlayerVictory, isMultipl
  */
 export async function playSFX(path) {
     if (sfxVolume <= 0 || masterVolume <= 0) return;
+
+    // PILLAR 5: Audio Hardening.
+    // Prevent buffer exhaustion and UX cacophony by enforcing a minimum interval per sound type.
+    // This is critical for high-frequency item usage and chain reactions.
+    const now = Date.now();
+    if (sfxCooldowns.has(path) && (now - sfxCooldowns.get(path)) < MIN_SFX_INTERVAL) {
+        return;
+    }
+    sfxCooldowns.set(path, now);
 
     // Lazy-init if not already called by a UI gesture, or resume if suspended
     if (!audioCtx) initAudioContext();
@@ -279,6 +483,18 @@ export function stopChallengeWaitSFX() {
 }
 
 /**
+ * Stops the Mutation Insurance power hum.
+ */
+export function stopMutationInsuranceHum() {
+    if (currentMutationInsuranceHumSource) {
+        try {
+            currentMutationInsuranceHumSource.stop();
+        } catch (e) {}
+        currentMutationInsuranceHumSource = null;
+    }
+}
+
+/**
  * Plays the challenge accepted sound.
  */
 export function playChallengeAcceptedSFX() {
@@ -326,14 +542,39 @@ export async function playMusic(path) {
     console.log(`[AUDIO] Track Active: ${path}`);
 }
 
+/**
+ * Stops the Mutation Foundry soundscape.
+ */
+export function stopMutationSoundscape() {
+    if (currentMutationSoundscapeSource) {
+        currentMutationSoundscapeSource.stop();
+        currentMutationSoundscapeSource = null;
+    }
+}
+
 window.PlaySound = playSFX;
 window.initAudioContext = initAudioContext;
 window.playMoodMoteSFX = playMoodMoteSFX;
 window.playCharacterVoiceLine = playCharacterVoiceLine;
 window.playConnectionSFX = playConnectionSFX;
+window.playBlackoutSFX = playBlackoutSFX;
+window.playCloakFailureSFX = playCloakFailureSFX;
+window.playDistrictStabilizerThrum = playDistrictStabilizerThrum;
+window.stopDistrictStabilizerThrum = stopDistrictStabilizerThrum;
+window.playComboSFX = playComboSFX;
+window.playSabotageReparationSFX = playSabotageReparationSFX;
+window.playStaffTrainingSFX = playStaffTrainingSFX;
+window.playEcosystemAlertSFX = playEcosystemAlertSFX;
+window.playMutationSuccessSFX = playMutationSuccessSFX;
 window.playBattleStartSFX = playBattleStartSFX;
 window.playChallengeWaitSFX = playChallengeWaitSFX;
 window.stopChallengeWaitSFX = stopChallengeWaitSFX;
 window.playChallengeAcceptedSFX = playChallengeAcceptedSFX;
 window.playChallengeDeclinedSFX = playChallengeDeclinedSFX;
 window.playMusic = playMusic;
+window.playMutationSoundscape = playMutationSoundscape;
+window.playMutationInsuranceHum = playMutationInsuranceHum;
+window.stopMutationInsuranceHum = stopMutationInsuranceHum;
+window.stopMutationSoundscape = stopMutationSoundscape;
+window.playProcedureInterruptedSFX = playProcedureInterruptedSFX;
+window.playLongWarningSFX = playLongWarningSFX;

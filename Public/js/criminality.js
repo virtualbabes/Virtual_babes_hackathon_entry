@@ -8,6 +8,7 @@ import { lastLobbyPlayers } from './game.js';
 
 export let rumorTimers = {};
 export let activeRumors = {};
+let sabotageIntervals = {};
 
 const algosdk = window.algosdk;
 
@@ -309,10 +310,21 @@ export function deployTrap(trapId) {
     document.getElementById("security-sentry-overlay")?.remove();
 }
 
+let bountyBoardTicker = null;
+
 export async function openBountyBoard() {
     const state = window.GetGameState();
     const myWanted = state.wanted_level || 0;
     const isHunter = myWanted <= 2;
+    const hasDisruptor = (state.inventory && state.inventory["cloak_disruptor"] > 0);
+    
+    // PILLAR 3: Cooldown Tracking
+    const cooldownAt = state.disruptor_cooldown_at ? new Date(state.disruptor_cooldown_at).getTime() : 0;
+    const isOnCooldown = cooldownAt > Date.now();
+
+    // Clean up previous interval
+    if (bountyBoardTicker) clearInterval(bountyBoardTicker);
+
     const outlaws = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
     
     const overlay = document.createElement("div");
@@ -341,13 +353,17 @@ export async function openBountyBoard() {
 
             return `
                 <div class="player-item border-gold">
-                    <div class="text-left"><b class="text-gold">${name}</b><br><small>Wanted: ${p.wanted_level} | Mojo: ${mojo}<br>Affiliation: ${employer}</small></div>
+                    <div class="text-left">
+                        <b class="text-gold">${name}</b><br>
+                        <small>Wanted: ${p.wanted_level} | Mojo: ${p.mojo}<br>Affiliation: ${employer}</small>
+                    </div>
                     <div class="text-right">
                         <b class="text-neon-green">${p.wanted_level * 50} $VBV</b>
                         ${isHunter && !isMe && !isGhost ? `<button class="outline btn-small border-gold mt-5" onclick="window.sendChallenge('${p.id}'); hideAllOverlays();">HUNT</button>` : ''}
                         ${isMe ? `<span class="text-error" style="font-size: 10px;">TARGET: YOU</span>` : ''}
                     </div>
                 </div>`;
+
         }).join('');
     }
 
@@ -355,10 +371,35 @@ export async function openBountyBoard() {
         <div class="glass-panel w-500 border-gold" style="text-align: center;">
             <h2 class="text-gold">🎯 BOUNTY BOARD</h2>
             <p class="font-size-0-8em opacity-7 mb-20">Hunters (Wanted ≤ 2) earn 50 $VBV per Wanted point on victory.</p>
+            ${isHunter && hasDisruptor ? `
+                <div class="flex-row justify-center gap-10 mb-15">
+                    <button id="btn-disrupt-signal" class="outline btn-small border-neon-cyan text-neon-cyan ${isOnCooldown ? 'disabled' : ''}" 
+                            ${isOnCooldown ? 'disabled' : ''}
+                            onclick="initiateCloakDisruption()">
+                        ${isOnCooldown ? `RECALIBRATING (${Math.ceil((cooldownAt - Date.now())/1000)}s)` : 'DISRUPT SIGNAL'}
+                    </button>
+                    <small class="opacity-5 font-size-0-7em">Requires Cloak Disruptor. Reveals Ghosted targets for 5 min.</small>
+                </div>
+            ` : ''}
             <div class="flex-col gap-10 max-h-400 overflow-y-auto">${targetsHtml}</div>
-            <button class="outline w-full mt-20" onclick="document.getElementById('bounty-board-overlay').remove()">CLOSE</button>
+            <button class="outline w-full mt-20" onclick="clearInterval(bountyBoardTicker); document.getElementById('bounty-board-overlay').remove()">CLOSE</button>
         </div>`;
     document.body.appendChild(overlay);
+
+    if (isOnCooldown) {
+        bountyBoardTicker = setInterval(() => {
+            const btn = document.getElementById("btn-disrupt-signal");
+            const now = Date.now();
+            if (btn && cooldownAt > now) {
+                btn.innerText = `RECALIBRATING (${Math.ceil((cooldownAt - now)/1000)}s)`;
+            } else if (btn) {
+                btn.innerText = "DISRUPT SIGNAL";
+                btn.classList.remove("disabled");
+                btn.disabled = false;
+                clearInterval(bountyBoardTicker);
+            }
+        }, 1000);
+    }
 }
 
 export async function openRumorMill() {
@@ -425,9 +466,24 @@ export function openTrophyView() {
 
 export async function openSocialPanelOverlay(initialTab = 'alliances') {
     const state = window.GetGameState();
+
+    // PILLAR 1: Cyber-Pulse SFX Trigger.
+    // Check for active regional disruption before opening.
+    const myClub = globalClubs[state.employer_id];
+    if (myClub && myClub.buff_expirations) {
+        const hasBlackout = Object.entries(myClub.buff_expirations).some(([key, expiry]) => 
+            key.startsWith("DISRUPTION_") && new Date(expiry) > Date.now());
+        if (hasBlackout && window.playBlackoutSFX) window.playBlackoutSFX();
+    }
+
     const overlay = document.createElement("div");
     overlay.id = "social-hub-overlay";
     overlay.className = "overlay";
+
+    if (bountyBoardTicker) {
+        clearInterval(bountyBoardTicker);
+        bountyBoardTicker = null;
+    }
 
     overlay.innerHTML = `
         <div class="social-panel glass-panel w-550">
@@ -444,10 +500,166 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
                 <button id="social-tab-achievements" class="tab-btn" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
             </div>
             <div id="social-content-hub" class="flex-col gap-15 max-h-400 overflow-y-auto"></div>
-            <button class="outline mt-20 w-full" onclick="document.getElementById('social-hub-overlay').remove()">CLOSE</button>
+            <button class="outline mt-20 w-full" onclick="window.cleanupSocialHub(); document.getElementById('social-hub-overlay').remove()">CLOSE</button>
         </div>`;
     document.body.appendChild(overlay);
     switchSocialTab(initialTab);
+}
+
+/**
+ * renderRegionalSabotageReport generates a situational awareness block for club members
+ * notifying them of active disruptions in their sectors.
+ * PILLAR 1: Regional Warfare.
+ */
+function renderRegionalSabotageReport(myClub) {
+    if (!myClub || !myClub.buff_expirations) return "";
+
+    const disruptions = Object.entries(myClub.buff_expirations)
+        .filter(([key, expiry]) => key.startsWith("DISRUPTION_") && new Date(expiry) > Date.now());
+
+    if (disruptions.length === 0) return "";
+
+    return `
+        <div class="sabotage-report glass-panel border-error mb-20 p-15 animate-pulse" style="background: rgba(255, 0, 255, 0.1);">
+            <div class="text-error font-bold mb-10" style="letter-spacing: 1px; font-size: 0.8em;">📡 SECTOR ALERT: NETWORK BLACKOUT</div>
+            <div class="flex-col gap-10">
+                ${disruptions.map(([key, expiry]) => {
+                    const district = key.replace("DISRUPTION_", "").replace(/_/g, ' ').toUpperCase();
+                    const remaining = Math.max(0, new Date(expiry) - Date.now());
+                    const mins = Math.ceil(remaining / 60000);
+                    return `
+                        <div class="flex-row justify-between align-center font-size-0-85em">
+                            <span class="text-white">District: <b class="text-neon-purple">${district}</b></span>
+                            <span class="text-warning font-mono">${mins}m remaining</span>
+                        </div>`;
+                }).join('')}
+            </div>
+            <div class="mt-10 pt-10 border-top-glass font-size-0-7em italic opacity-7">
+                Coalition and Regional defensive coordination is OFFLINE in these sectors.
+            </div>
+        </div>`;
+}
+
+/**
+ * renderStaffTrainingStatus generates a notification block for active mutation buffs.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+function renderStaffTrainingStatus(myClub) {
+    if (!myClub || !myClub.buff_expirations) return "";
+
+    const expiry = myClub.buff_expirations["STAFF_TRAINING"];
+    if (!expiry || new Date(expiry) <= Date.now()) return "";
+
+    return `
+        <div id="staff-training-hud" class="staff-training-status glass-panel m-0 mb-15 p-10 flex-row justify-between align-center" style="background: rgba(0, 242, 254, 0.08); border-left: 3px solid var(--neon-cyan);">
+            <div class="text-left">
+                <small class="opacity-5 block mb-2 letter-spacing-1">VITALITY LAB UPGRADE</small>
+                <b class="text-neon-cyan" style="font-size: 0.9em;">🧬 STAFF TRAINING ACTIVE (+5% SUCCESS)</b>
+            </div>
+            <div id="staff-training-timer" class="text-right font-mono font-xs text-neon-cyan">
+                --:--
+            </div>
+        </div>`;
+}
+
+let allianceInviteInterval = null;
+
+/**
+ * startAllianceInviteTimer manages the real-time countdown for partnership proposals.
+ * PILLAR 1: Alliance Integration.
+ */
+function startAllianceInviteTimer(expiresAt) {
+    if (allianceInviteInterval) clearInterval(allianceInviteInterval);
+    const timerEl = document.getElementById("alliance-invite-timer");
+    if (!timerEl) return;
+
+    const expiryTime = new Date(expiresAt).getTime();
+    const update = () => {
+        const now = Date.now();
+        const diff = expiryTime - now;
+        if (diff <= 0) {
+            document.getElementById("alliance-invite-hud")?.remove();
+            clearInterval(allianceInviteInterval);
+            return;
+        }
+        const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
+        timerEl.innerText = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    };
+    update();
+    allianceInviteInterval = setInterval(update, 1000);
+}
+
+/**
+ * renderGhostProtocolStatus generates a notification block for active signal scrambling.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+function renderGhostProtocolStatus(state) {
+    const expiry = state.ghost_protocol_expires_at;
+    if (!expiry || new Date(expiry) <= Date.now()) return "";
+
+    return `
+        <div id="ghost-protocol-hud" class="staff-training-status glass-panel m-0 mb-15 p-10 flex-row justify-between align-center" style="background: rgba(155, 81, 224, 0.08); border-left: 3px solid var(--neon-purple);">
+            <div class="text-left">
+                <small class="opacity-5 block mb-2 letter-spacing-1">GHOST PROTOCOL ACTIVE</small>
+                <b class="text-neon-purple" style="font-size: 0.9em;">👻 SIGNAL SCRAMBLED (BOUNTY IMMUNITY)</b>
+            </div>
+            <div id="ghost-protocol-timer" class="text-right font-mono font-xs text-neon-purple">
+                --:--
+            </div>
+        </div>`;
+}
+
+let ghostProtocolInterval = null;
+
+/**
+ * startGhostProtocolTimer manages the real-time countdown for signal scrambling.
+ */
+function startGhostProtocolTimer(expiresAt) {
+    if (ghostProtocolInterval) clearInterval(ghostProtocolInterval);
+    const timerEl = document.getElementById("ghost-protocol-timer");
+    if (!timerEl) return;
+
+    const expiryTime = new Date(expiresAt).getTime();
+    const update = () => {
+        const now = Date.now();
+        const diff = expiryTime - now;
+        if (diff <= 0) {
+            document.getElementById("ghost-protocol-hud")?.remove();
+            clearInterval(ghostProtocolInterval);
+            return;
+        }
+        const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
+        timerEl.innerText = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    };
+    update();
+    ghostProtocolInterval = setInterval(update, 1000);
+}
+
+let staffTrainingInterval = null;
+
+/**
+ * startStaffTrainingTimer manages the real-time countdown for active mutation buffs.
+ * PILLAR 6: Specialized Gene-Editing.
+ */
+function startStaffTrainingTimer(expiresAt) {
+    if (staffTrainingInterval) clearInterval(staffTrainingInterval);
+    const timerEl = document.getElementById("staff-training-timer");
+    if (!timerEl) return;
+
+    const expiryTime = new Date(expiresAt).getTime();
+    const update = () => {
+        const now = Date.now();
+        const diff = expiryTime - now;
+        if (diff <= 0) {
+            document.getElementById("staff-training-hud")?.remove();
+            clearInterval(staffTrainingInterval);
+            return;
+        }
+        const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
+        timerEl.innerText = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    };
+    update();
+    staffTrainingInterval = setInterval(update, 1000);
 }
 
 export async function switchSocialTab(tab) {
@@ -458,10 +670,52 @@ export async function switchSocialTab(tab) {
     const state = window.GetGameState();
     container.innerHTML = `<div class="loading-text">Decrypting datastreams...</div>`;
 
+    if (staffTrainingInterval) {
+        clearInterval(staffTrainingInterval);
+        staffTrainingInterval = null;
+    }
+
+    if (ghostProtocolInterval) {
+        clearInterval(ghostProtocolInterval);
+        ghostProtocolInterval = null;
+    }
+
+    if (allianceInviteInterval) {
+        clearInterval(allianceInviteInterval);
+        allianceInviteInterval = null;
+    }
+
+    // PILLAR 1: Clear Sabotage Intervals
+    Object.keys(sabotageIntervals).forEach(k => clearInterval(sabotageIntervals[k]));
+    sabotageIntervals = {};
+
     if (tab === 'alliances') {
         const myClubID = state.employer_id;
         const myClub = globalClubs[myClubID];
         const isOwner = myClub && myClub.owner_wallet && userAddress && myClub.owner_wallet.toLowerCase() === userAddress.toLowerCase();
+
+        const sabotageReport = renderRegionalSabotageReport(myClub);
+        const ghostHtml = renderGhostProtocolStatus(state);
+        const staffTrainingHtml = renderStaffTrainingStatus(myClub);
+
+        // PILLAR 6: Mutation Performance Metrics for Owners.
+        let performanceHtml = "";
+        if (myClub && isOwner) {
+            const successes = myClub.mutation_successes || 0;
+            const failures = myClub.mutation_failures || 0;
+            const total = successes + failures;
+            const rate = total > 0 ? ((successes / total) * 100).toFixed(1) : "0.0";
+            performanceHtml = `
+                <div class="facility-stats glass-panel m-0 mb-15 p-10 flex-row justify-between align-center" style="background: rgba(0,242,254,0.05); border-left: 3px solid var(--neon-cyan);">
+                    <div class="text-left">
+                        <small class="opacity-5 block mb-2 letter-spacing-1">FACILITY PERFORMANCE</small>
+                        <b class="text-neon-cyan" style="font-size: 1.1em;">${rate}% MUTATION SUCCESS</b>
+                    </div>
+                    <div class="text-right font-mono font-xs opacity-7">
+                        S: ${successes} / F: ${failures}
+                    </div>
+                </div>`;
+        }
 
         let allianceHtml = "";
 
@@ -533,7 +787,7 @@ export async function switchSocialTab(tab) {
         }
 
         const others = lastLobbyPlayers.filter(p => p.id !== myClientId);
-        container.innerHTML = allianceHtml + `
+        container.innerHTML = sabotageReport + staffTrainingHtml + ghostHtml + performanceHtml + allianceHtml + `
             <small class="section-label opacity-5">PEER NETWORK</small>
             <div class="flex-col gap-5 mt-5">
                 ${others.map(p => `
@@ -559,13 +813,28 @@ export async function switchSocialTab(tab) {
         const unlocked = new Set(state.achievements || []);
         const catalog = [
             { id: "FIRST_VICTORY", name: "First Victory" }, { id: "FIRST_HEIST", name: "First Heist" },
-            { id: "OUTLAW_SLAYER", name: "Outlaw Slayer" }, { id: "ARENA_LEGEND", name: "Arena Legend" }
+            { id: "OUTLAW_SLAYER", name: "Outlaw Slayer" }, { id: "ARENA_LEGEND", name: "Arena Legend" },
+            { id: "BOUNTY_HUNTER", name: "Bounty Hunter" },
+            { id: "PATRON_OF_THE_ARTS", name: "Patron of the Arts" }
         ];
-        container.innerHTML = `<div class="achievements-grid">${catalog.map(t => `
-            <div class="trophy-badge ${unlocked.has(t.id) ? 'unlocked' : 'locked'}">
-                <div class="badge-icon">${unlocked.has(t.id) ? '🏆' : '🔒'}</div>
+        container.innerHTML = `<div class="achievements-grid">${catalog.map(t => {
+            const isUnlocked = unlocked.has(t.id);
+            let progressHtml = "";
+            if (t.id === "BOUNTY_HUNTER" && !isUnlocked) {
+                const count = state.captured_outlaws ? Object.keys(state.captured_outlaws).length : 0;
+                progressHtml = `<div class="badge-progress" style="font-size: 0.7em; opacity: 0.6; margin-top: 4px; color: var(--neon-cyan);">${count}/3 unique captures</div>`;
+            } else if (t.id === "PATRON_OF_THE_ARTS" && !isUnlocked) {
+                const donated = state.total_donated || 0;
+                const percent = Math.min(100, (donated / (5000 * 1000000)) * 100);
+                progressHtml = `<div class="badge-progress" style="font-size: 0.7em; opacity: 0.6; margin-top: 4px; color: var(--gold);">${percent.toFixed(0)}% of 5,000 VBV</div>`;
+            }
+            return `
+            <div class="trophy-badge ${isUnlocked ? 'unlocked' : 'locked'}">
+                <div class="badge-icon">${isUnlocked ? '🏆' : '🔒'}</div>
                 <div class="badge-name">${t.name}</div>
-            </div>`).join('')}</div>`;
+                ${progressHtml}
+            </div>`;
+        }).join('')}</div>`;
     }
 }
 
@@ -724,6 +993,105 @@ export function dissolveAlliance(myClubId) {
     switchSocialTab('alliances');
 }
 
+// initiateRegionalSabotage allows a player to trigger a regional network blackout.
+export function initiateRegionalSabotage(targetClubId, targetTerritoryId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return showToast("❌ Not connected to server.", "error");
+    if (!userAddress) return showToast("❌ Connect wallet first.", "error");
+
+    if (!confirm(`⚠️ Initiate Regional Sabotage on ${targetTerritoryId} (Club: ${globalClubs[targetClubId]?.name})? This is a high-cost, high-impact action.`)) return;
+
+    showToast(`📡 Initiating regional blackout in ${targetTerritoryId}...`, "warning");
+    socket.send(JSON.stringify({
+        type: "regional_sabotage",
+        payload: {
+            target_club_id: targetClubId,
+            target_territory_id: targetTerritoryId
+        }
+    }));
+    hideAllOverlays(); // Close any open overlays after action
+}
+
+/**
+ * initiateCloakDisruption allows a Bounty Hunter to use a Cloak Disruptor item
+ * to temporarily reveal a Ghosted target's location.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+export function initiateCloakDisruption() {
+    const state = window.GetGameState();
+    const myWanted = state.wanted_level || 0;
+    const hasDisruptor = (state.inventory && state.inventory["cloak_disruptor"] > 0);
+
+    // PILLAR 3: Cooldown enforcement
+    const cooldownAt = state.disruptor_cooldown_at ? new Date(state.disruptor_cooldown_at).getTime() : 0;
+    if (cooldownAt > Date.now()) {
+        const remaining = Math.ceil((cooldownAt - Date.now()) / 1000);
+        showToast(`❌ Disruptor Recalibrating: Ready in ${remaining}s.`, "error");
+        return;
+    }
+
+    if (myWanted > 2 || !hasDisruptor) {
+        showToast("❌ Access Denied: Requires Bounty Hunter status (Wanted ≤ 2) and a Cloak Disruptor.", "error");
+        return;
+    }
+
+    const targetWallet = prompt("Enter the wallet address of the Ghosted target to disrupt:");
+    if (!targetWallet) return;
+
+    showToast(`📡 Attempting to disrupt signal for ${shortenAddress(targetWallet)}...`, "info");
+    socket.send(JSON.stringify({
+        type: "use_item",
+        payload: { item_id: "cloak_disruptor", target_wallet: targetWallet }
+    }));
+    document.getElementById('bounty-board-overlay')?.remove();
+}
+
+/**
+ * reportPlayer triggers the automated reporting protocol for a specific target.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+export async function reportPlayer(targetWallet) {
+    const reason = prompt("Enter reason for report (e.g. Harassment, Exploiting, Cheating):");
+    if (!reason) return;
+    const details = prompt("Enter additional details (Match ID, specific behavior):") || "";
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/report-player`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reporter_wallet: userAddress,
+                target_wallet: targetWallet,
+                reason: reason,
+                details: details
+            })
+        });
+
+        if (response.ok) {
+            showToast("🚩 Report submitted to Arena Security.", "success");
+        } else {
+            const err = await response.text();
+            showToast(`❌ Failed to submit report: ${err}`, "error");
+        }
+    } catch (err) {
+        console.error("[MODERATION ERROR]", err);
+        showToast("❌ Connection error during report submission.", "error");
+    }
+}
+
+/**
+ * window.cleanupSocialHub purges all active intervals to prevent memory leaks.
+ * PILLAR 5: Separation of Concerns.
+ */
+window.cleanupSocialHub = () => {
+    if (staffTrainingInterval) clearInterval(staffTrainingInterval);
+    if (ghostProtocolInterval) clearInterval(ghostProtocolInterval);
+    if (allianceInviteInterval) clearInterval(allianceInviteInterval);
+    Object.keys(sabotageIntervals).forEach(k => clearInterval(sabotageIntervals[k]));
+    sabotageIntervals = {};
+};
+
 window.sendAllianceInvite = sendAllianceInvite;
 window.acceptAlliance = acceptAlliance;
 window.dissolveAlliance = dissolveAlliance;
@@ -745,4 +1113,6 @@ window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
 window.executeKidnap = executeKidnap;
 window.showKidnapOverlay = showKidnapOverlay;
 window.payRansom = payRansom;
+window.initiateCloakDisruption = initiateCloakDisruption;
+window.reportPlayer = reportPlayer;
 window.releaseHostage = releaseHostage;

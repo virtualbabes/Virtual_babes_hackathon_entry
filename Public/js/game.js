@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { socket, myClientId } from './network.js';
-import { showToast, hideAllOverlays, showMatchPreview, renderCardHTML, movePowerTooltip, hidePowerTooltip, showQuickCastMenu, handleLocalBanUI } from './ui.js';
+import { showToast, hideAllOverlays, showMatchPreview, renderCardHTML, movePowerTooltip, hidePowerTooltip, showQuickCastMenu, handleLocalBanUI, tooltipEl } from './ui.js';
 import { userAddress, walletProvider, signClient } from './wallet.js';
 import { collectiveIntelligence } from '../collective-intelligence.js';
 import { getCachedEnvoiName, resolveEnvoiName } from './utils.js';
@@ -9,6 +9,7 @@ import { initAudioContext } from './audio.js';
 // --- Game State Variables ---
 export let activeCardId = null; // Tracks the card you clicked in your hand
 export let aiThinking = false; // To track if AI is currently performing a move
+export let pendingQuickCastId = null; // PILLAR 3: Prevent redundant interaction
 export let lastBoardState = Array(9).fill(null); // Track state to detect captures
 export let currentChallengerId = null; // Stores the ID of the player who sent the current challenge
 export let currentOpponentId = null;   // The player we are currently battling
@@ -27,6 +28,7 @@ export const setMatchHistorySaved = (saved) => { matchHistorySaved = saved; };
 export const setLastLobbyPlayers = (players) => { lastLobbyPlayers = players; };
 export const setLastTauntPhase = (phase) => { lastTauntPhase = phase; };
 export const setLastTauntTurn = (turn) => { lastTauntTurn = turn; };
+export const setPendingQuickCastId = (id) => { pendingQuickCastId = id; };
 
 // --- Game Logic Functions ---
 
@@ -45,8 +47,15 @@ export function toggleMatchmakingQueue() {
     if (!userAddress) { showToast("Connect wallet first", "error"); return; }
     initAudioContext();
 
-    const state = window.GetGameState();
+    // PILLAR 5: Deterministic Decision Logic. 
+    // Use the authoritative WASM state to determine which action to dispatch.
+    const state = window.GetGameState("all");
+    if (!state) return;
+
     if (state.deck.length < 5) { showToast("Deck must have 5 cards", "error"); return; }
+
+    const btn = document.getElementById("btn-matchmaking");
+    if (btn) btn.disabled = true; // Throttle UI during transition
 
     if (!state.in_matchmaking_queue) {
         socket.send(JSON.stringify({
@@ -56,42 +65,25 @@ export function toggleMatchmakingQueue() {
                 deck_rating: state.deck_rating
             }
         }));
-        const btn = document.getElementById("btn-matchmaking");
-        btn.disabled = true; // This will be re-enabled by handleMatchmakingUpdate
-        btn.innerText = "Joining Queue...";
+        if (btn) btn.innerText = "Joining Queue...";
     } else {
         socket.send(JSON.stringify({ type: "leave_queue" }));
-        const btn = document.getElementById("btn-matchmaking");
-        btn.disabled = true;
-        btn.innerText = "Leaving Queue...";
+        if (btn) btn.innerText = "Leaving Queue...";
     }
 }
 
 export function handleMatchmakingUpdate(data) {
-    const btn = document.getElementById("btn-matchmaking");
-    const status = document.getElementById("queue-status");
-
     if (data.status === "queued") {
         window.SetInMatchmakingQueue(true); // Update WASM state
-        btn.innerText = "Leave Queue";
-        btn.style.background = "var(--neon-purple)";
-        status.innerHTML = `<span class="status-active">SEARCHING FOR OPPONENT...</span>`;
         showToast("🛰️ Entered global matchmaking pool.", "info");
-        btn.disabled = false; // Re-enable after status update
     } else if (data.status === "idle") {
         window.SetInMatchmakingQueue(false); // Update WASM state
-        btn.innerText = "Join Matchmaking Pool";
-        btn.style.background = "";
-        status.innerText = "Ready for automatic pairing?";
-        btn.disabled = false; // Re-enable after status update
         showToast("🛰️ Left matchmaking pool.", "info");
     } else if (data.status === "match_found") {
         window.SetInMatchmakingQueue(false); // Update WASM state
-        btn.innerText = "Join Matchmaking Pool";
-        status.innerText = "Ready for automatic pairing?";
-        showToast(`⚔️ MATCH FOUND! Battle vs ${data.opponent.substring(0,8)}...`, "success");
+        const opp = data.opponent ? data.opponent.substring(0, 8) : "Human";
+        showToast(`⚔️ MATCH FOUND! Battle vs ${opp}...`, "success");
         window.SetPhase("Active"); // Optional: logic to transition visual state
-        btn.disabled = false; // Re-enable after status update
     }
 }
 
@@ -190,10 +182,14 @@ export async function saveMatchResult(state) {
     await renderMatchHistory();
 }
 
+let isRenderingHistory = false;
 export async function renderMatchHistory() {
+    if (isRenderingHistory) return;
     const display = document.getElementById("history-display");
     if (!display) return;
 
+    isRenderingHistory = true;
+    try {
     let history = [];
     
     // PILLAR 4: Historical Immersion. Prioritize server-authoritative history reconstructed from blockchain.
@@ -245,6 +241,9 @@ export async function renderMatchHistory() {
                          <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;
         display.appendChild(div);
     });
+    } finally {
+        isRenderingHistory = false;
+    }
 }
 
 export function showChallengeNotification(challengerId) {
@@ -259,6 +258,12 @@ export function showChallengeNotification(challengerId) {
 
 export function acceptChallenge() {
     if (!socket || !currentChallengerId) return;
+
+    // PILLAR 5: Pre-emptive Engine Initialization.
+    // Initialize the WASM 'StartMatch' bridge before notifying the server.
+    // This ensures the local game state is in 'Active' phase before the challenger sends moves.
+    if (window.StartMatch) window.StartMatch(true);
+
     const state = window.GetGameState();
     const envelope = {
         type: "challenge",
@@ -268,13 +273,17 @@ export function acceptChallenge() {
             action: "accept",
             to_id: currentChallengerId,
             deck: state.deck.map(c => c.id),
-            avatar: state.p1_avatar,
-            gloat: state.p1_gloat,
+            avatar: state.avatar_url,
+            gloat: state.gloat_message,
             rules: state.rules
         }
     };
 
     socket.send(JSON.stringify(envelope));
+    // PILLAR 5: Visual Confirmation.
+    // Provide explicit UI feedback that the challenge has been rejected.
+    showToast(`❌ Challenge from ${currentChallengerId} declined.`, "info");
+
     document.getElementById("challenge-overlay").classList.add("hidden");
     currentChallengerId = null;
 }
@@ -288,8 +297,8 @@ export function sendMatchSync(targetId) {
         payload: { 
             action: "sync_back", 
             deck: state.deck.map(c => c.id),
-            avatar: state.p1_avatar,
-            gloat: state.p1_gloat
+            avatar: state.avatar_url,
+            gloat: state.gloat_message
         }
     };
     socket.send(JSON.stringify(envelope));
@@ -320,6 +329,11 @@ export function sendSpectate(targetId) {
     };
     spectatorMatchState = null; // Reset for new spectate session
 
+    // PILLAR 4: Interaction Hardening.
+    // Reset local selection states to prevent interaction leaks into the spectator view.
+    activeCardId = null;
+    pendingQuickCastId = null;
+
     socket.send(JSON.stringify(envelope));
     showToast(`👁️ Requesting access to stream...`, "info");
 }
@@ -346,8 +360,8 @@ export function sendChallenge(targetId) {
         to_id: targetId,
         payload: { 
             action: "invite",
-            avatar: state.p1_avatar || "",
-            gloat: state.p1_gloat || "",
+            avatar: state.avatar_url || "",
+            gloat: state.gloat_message || "",
             deck: state.deck.map(c => c.id)
         }
     };
@@ -363,47 +377,108 @@ export function triggerToggleNetwork() {
 }
 
 export function selectCard(id) {
-    activeCardId = id;
+    // PILLAR 2: Integer Supremacy. Ensure the ID is numeric to prevent 
+    // type-mismatch errors during grid placement validation.
+    activeCardId = id !== null ? parseInt(id) : null;
+    
     if (window.PlaySelectSound) window.PlaySelectSound();
-    window.syncUI("inventory"); // Re-render to show the selected card glowing
+    
+    // PILLAR 5: Reactive Authority. 
+    // Trigger a full UI sync to ensure selection glows are updated across all views.
+    window.syncUI("all"); 
 }
 
 export function clickGrid(index) {
-    const state = window.GetGameState();
-    
-    // Multiplayer Guard: Only allow move if it's actually our turn
-    if (state.phase === "Active" && state.turn !== state.local_player_index) {
-        console.warn("It is not your turn!");
+    // PILLAR 5: Optimized Tactical Sync. 
+    // CRITICAL: Ensure the WASM engine is ready before attempting IPC.
+    if (typeof window.GetGameState !== "function" || typeof window.PlaceCard !== "function") {
+        console.error("[BATTLE] WASM Interaction Bridge not initialized.");
         return;
     }
 
+    const state = window.GetGameState("combat");
+    if (!state) return;
+    
+    // PILLAR 4: Replay Resilience.
+    // Prevent moves if the engine is catching up or desynced.
+    if (state.replay_state && state.replay_state !== "SYNCHRONIZED") {
+        showToast("⚠️ Reality Reconstruction in progress. Please wait...", "warning");
+        return;
+    }
+
+    // Multiplayer Guard: Only allow move if it's actually our turn
+    if (state.phase === "Active" && state.turn !== state.local_player_index) {
+        showToast("It is not your turn!", "warning");
+        return;
+    }
+
+    // UX Hardening: Inform player if no card is selected.
     if (activeCardId === null) {
+        showToast("Select a card from your hand first", "info");
         return;
     }
     
     const selectedCardId = activeCardId;
 
     // Execute locally
-    const success = window.PlaceCard(index, activeCardId);
+    // PILLAR 2: Integer Supremacy. Ensure card ID is a valid integer for the WASM engine.
+    const success = window.PlaceCard(index, parseInt(selectedCardId));
     if (success) {
+        // PILLAR 4: State Resilience.
+        // Clear the selection immediately to prevent double-spending the card.
+        activeCardId = null; 
+
         // If in multiplayer, broadcast the move to the opponent
         if (state.phase === "Active" && currentOpponentId) {
             // Find card power for server verification
-            const card = state.deck.find(c => c.id === selectedCardId);
+            const card = (state.deck || []).find(c => c.id === parseInt(selectedCardId));
             const envelope = {
                 type: "move",
                 to_id: currentOpponentId, // This should be the opponent's client ID
                 payload: {
                     grid_index: index,
-                    card_id: selectedCardId,
+                    card_id: parseInt(selectedCardId),
                     power: card ? card.power : [0,0,0,0]
                 }
             };
             socket.send(JSON.stringify(envelope));
         }
+
+        // PILLAR 4: State Resilience.
+        // Clear the selection immediately to prevent double-spending the card.
         activeCardId = null; 
         window.syncUI("combat"); // Assuming syncUI is still global or imported
+    } else {
+        // PILLAR 3: UX Hardening.
+        // If local placement failed (e.g. slot occupied), provide tactical feedback.
+        showToast("Slot already occupied. Choose an empty coordinate.", "warning");
     }
+}
+
+/**
+ * rejoinActiveMatch handles match restoration during a warm boot.
+ * PILLAR 4: Replay Resilience.
+ */
+export function rejoinActiveMatch() {
+    // PILLAR 5: Authoritative Decision.
+    const state = window.GetGameState("all");
+    if (!state || state.phase !== "Active") return;
+
+    console.log(`[MATCH] Rejoining active engagement: ${state.match_id || 'PvP'}`);
+
+    // PILLAR 4: Replay Resilience.
+    if (state.replay_state === "SYNCHRONIZED") {
+        // Already synchronized via beacon hydration. Signal completion to thaw UI.
+        console.log("[MATCH] Engine reporting SYNCHRONIZED. Finalizing recovery.");
+        if (window.CompleteRecovery) window.CompleteRecovery();
+    } else {
+        // Trigger the catch-up request to the backend for missing frames
+        import('./network.js').then(m => m.requestMatchSync());
+    }
+
+    // PILLAR 4: UI Continuity.
+    // Force a full UI sync to transition to the combat arena immediately.
+    window.syncUI("all");
 }
 
 export function calculateDeckRating(deck) {
@@ -467,14 +542,29 @@ export function calculateDeckRating(deck) {
 }
 
 export async function executeQuickCast(itemId, gridIndex) {
-    const state = window.GetGameState();
+    // PILLAR 5: Bridge Integrity.
+    if (typeof window.ApplyArtifactToBoard !== "function") return;
+    if (pendingQuickCastId === itemId) return;
+
+    const state = window.GetGameState("all");
+    if (!state) return;
+
+    // PILLAR 4: Replay Resilience.
+    if (state.replay_state && state.replay_state !== "SYNCHRONIZED") {
+        showToast("⚠️ Reality Reconstruction in progress. Please wait...", "warning");
+        return;
+    }
+
+    pendingQuickCastId = itemId;
+
     const item = state.inventory.find(c => c.id === itemId);
     if (!item) return;
 
     const success = window.ApplyArtifactToBoard(gridIndex, item.artifact);
 
     if (success) {
-        showToast(`⚡ Used ${item.name} on ${state.board[gridIndex].name}!`, "success");
+        const targetName = state.board[gridIndex] ? state.board[gridIndex].name : "Asset";
+        showToast(`⚡ Used ${item.name} on ${targetName}!`, "success");
         if (state.multiplayer && currentOpponentId) {
             socket.send(JSON.stringify({
                 type: "use_item",
@@ -483,15 +573,25 @@ export async function executeQuickCast(itemId, gridIndex) {
             }));
         }
         hidePowerTooltip();
-        window.syncUI(); // Assuming syncUI is still global or imported
+        window.syncUI("combat"); // PILLAR 5: Minimize serialization overhead during match turns
+    } else {
+        // PILLAR 3: Interaction Hardening.
+        // If the application fails (e.g. card removed or grid desync), close the menu 
+        // immediately to prevent repetitive error clicks (toast-spam).
+        pendingQuickCastId = null;
+        showToast("❌ Quick-Cast failed: Invalid sector or target missing.", "warning");
+        hidePowerTooltip();
     }
 }
 
 export function showPowerTooltip(e, card, index, state) {
-    if (!window.tooltipEl) { // Using window.tooltipEl as it's defined in ui.js
-        window.tooltipEl = document.createElement("div");
-        window.tooltipEl.className = "power-tooltip";
-        document.body.appendChild(window.tooltipEl);
+    // PILLAR 5: UI Consistency. 
+    // Use the exported tooltip element from ui.js rather than checking a window property.
+    let targetTooltip = tooltipEl; 
+    if (!targetTooltip) {
+        targetTooltip = document.createElement("div");
+        targetTooltip.className = "power-tooltip";
+        document.body.appendChild(targetTooltip);
     }
 
     const tileMood = state.board_moods ? state.board_moods[index] : "Neutral";
@@ -604,10 +704,10 @@ export function showPowerTooltip(e, card, index, state) {
         html += `<div style="margin-top: 8px; font-size: 10px; opacity: 0.6; text-align: center;">MOOD: ${card.mood.toUpperCase()} vs TILE: ${tileMood.toUpperCase()}</div>`;
     }
 
-    window.tooltipEl.innerHTML = html;
-    window.tooltipEl.style.opacity = "1";
-    window.tooltipEl.style.pointerEvents = (state.rules?.Artifact_bonus && card.owner === myPlayerIndex) ? "auto" : "none";
-    window.tooltipEl.onmouseleave = () => hidePowerTooltip();
+    targetTooltip.innerHTML = html;
+    targetTooltip.style.opacity = "1";
+    targetTooltip.style.pointerEvents = (state.rules?.Artifact_bonus && card.owner === myPlayerIndex) ? "auto" : "none";
+    targetTooltip.onmouseleave = hidePowerTooltip; // PILLAR 5: GC Optimization. Assign function directly.
     movePowerTooltip(e);
 }
 
@@ -631,3 +731,4 @@ window.clickGrid = clickGrid;
 window.executeQuickCast = executeQuickCast;
 window.showPowerTooltip = showPowerTooltip;
 window.buildEmptyBoard = buildEmptyBoard;
+window.rejoinActiveMatch = rejoinActiveMatch;
