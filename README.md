@@ -115,8 +115,33 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ---
 
-## 🧠 NotebookLM Mind Map
+## 🎬 Arena Knowledge Suite
 
+### 1️⃣ Virtualbabes Arena Guide (MP4)
 <p align="center">
-  <img src="Public/Assets/Images/Mindmap1.png" width="800" alt="Mindmap">
+  <video width="800" controls>
+    <source src="Virtualbabes_Arena_Guide.mp4" type="video/mp4">
+    Your browser does not support embedded videos.
+  </video>
 </p>
+
+---
+
+### 2️⃣ Virtualbabes Architecture (MP4)
+<p align="center">
+  <video width="800" controls>
+    <source src="Virtualbabes_Architecture.mp4" type="video/mp4">
+    Your browser does not support embedded videos.
+  </video>
+</p>
+
+---
+
+### 3️⃣ Endgame Blueprint (MP4)
+<p align="center">
+  <video width="800" controls>
+    <source src="Endgame_Blueprint.mp4" type="video/mp4">
+    Your browser does not support embedded videos.
+  </video>
+</p>
+
