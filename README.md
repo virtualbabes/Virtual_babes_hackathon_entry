@@ -128,8 +128,3 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ### 📄 Supplemental Blueprint (PDF)
 [📘 Virtualbabes_Arena_Architecture.pdf](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Architecture.pdf)
-
-
-### 📄 Supplemental Blueprint (PDF)
-
-- [Virtualbabes Arena Architecture (PDF)](Virtualbabes_Arena_Architecture.pdf)
