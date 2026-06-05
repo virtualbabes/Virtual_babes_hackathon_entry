@@ -115,16 +115,5 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ---
 
-## 🎬 Arena Knowledge Suite
-
-### 1️⃣ Virtualbabes Arena Guide (MP4)
-[▶ Play Virtualbabes_Arena_Guide.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Guide.mp4)
-
-### 2️⃣ Virtualbabes Architecture (MP4)
-[▶ Play Virtualbabes_Architecture.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Architecture.mp4)
-
-### 3️⃣ Endgame Blueprint (MP4)
-[▶ Play Endgame_Blueprint.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Endgame_Blueprint.mp4)
-
 ### 📄 Supplemental Blueprint (PDF)
 [📘 Virtualbabes_Arena_Architecture.pdf](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Architecture.pdf)
