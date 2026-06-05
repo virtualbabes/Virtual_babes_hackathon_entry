@@ -118,5 +118,5 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 ## 🧠 NotebookLM Mind Map
 
 <p align="center">
-  <img src="Public/Assets/Images/NotebookLMMindMap1.png" width="800" alt="NotebookLMMindMap">
+  <img src="Public/Assets/Images/Mindmap1.png" width="800" alt="Mindmap">
 </p>
