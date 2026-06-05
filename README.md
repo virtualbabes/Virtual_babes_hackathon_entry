@@ -117,35 +117,18 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ## 🎬 Arena Knowledge Suite
 
-### 1️⃣ Virtualbabes Arena Guide (MP4)
-<p align="center">
-  <video width="800" controls>
-    <source src="Virtualbabes_Arena_Guide.mp4" type="video/mp4">
-    Your browser does not support embedded videos.
-  </video>
-</p>
+### 1️⃣ Virtualbabes Arena Guide (MP4)
+[▶ Play Virtualbabes_Arena_Guide.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Guide.mp4)
 
----
+### 2️⃣ Virtualbabes Architecture (MP4)
+[▶ Play Virtualbabes_Architecture.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Architecture.mp4)
 
-### 2️⃣ Virtualbabes Architecture (MP4)
-<p align="center">
-  <video width="800" controls>
-    <source src="Virtualbabes_Architecture.mp4" type="video/mp4">
-    Your browser does not support embedded videos.
-  </video>
-</p>
+### 3️⃣ Endgame Blueprint (MP4)
+[▶ Play Endgame_Blueprint.mp4](https://github.com/<your‑user>/<your‑repo>/blob/main/Endgame_Blueprint.mp4)
 
----
+### 📄 Supplemental Blueprint (PDF)
+[📘 Virtualbabes_Arena_Architecture.pdf](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Architecture.pdf)
 
-### 3️⃣ Endgame Blueprint (MP4)
-<p align="center">
-  <video width="800" controls>
-    <source src="Endgame_Blueprint.mp4" type="video/mp4">
-    Your browser does not support embedded videos.
-  </video>
-</p>
-
----
 
 ### 📄 Supplemental Blueprint (PDF)
 
