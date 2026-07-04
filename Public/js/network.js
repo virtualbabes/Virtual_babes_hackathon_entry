@@ -6,7 +6,7 @@ import { updateWalletUI, disconnectUserWallet, initWalletConnect } from './walle
 import { setSeasonEnd } from './leaderboard.js'; // Removed handleTournamentUI and startSeasonTimer from here
 import { updatePlayerList, handleMatchmakingUpdate } from './game.js';
 import { updateMarketTicker, updateBountyTicker, buyBlackMarketItem } from './economy.js';
-import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs } from './admin.js';
+import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs, globalClubs } from './admin.js';
 import { updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer } from './criminality.js';
 
 export let socket = null;
@@ -190,6 +190,9 @@ export function handleServerMessage(msg) {
                 setAdminFocusNetwork(msg.payload.admin_focus_network);
                 updateAdminNetworkUI();
             }
+            if (msg.payload.RewardRatio !== undefined) {
+                currentRewardRatio = msg.payload.RewardRatio; // PILLAR 2: Update global for scaled payouts
+            }
             updateActiveRumors(msg.payload.rumors);
 
             if (msg.payload.season_end) {
@@ -228,7 +231,7 @@ export function handleServerMessage(msg) {
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(0);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
-                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "", msg.payload.faceplate || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(1, msg.payload.deck);
                 if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
@@ -252,7 +255,7 @@ export function handleServerMessage(msg) {
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(1);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);
-                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "", msg.payload.faceplate || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(0, msg.payload.deck);
                 if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
@@ -382,5 +385,26 @@ export function handleServerMessage(msg) {
                 updateActiveRumors(msg.payload.rumor);
             }
             break;
+        case "achievement_unlock":
+            handleAchievementUnlock(msg.payload);
+            break;
     }
+}
+
+/**
+ * handleAchievementUnlock processes server-pushed achievement notifications.
+ * Displays a styled toast and pushes to the global achievement log.
+ */
+let lastAchievementId = ""; // Dedup guard
+function handleAchievementUnlock(payload) {
+    if (!payload || !payload.achievement_id) return;
+    
+    // Deduplicate rapid-fire unlocks of the same achievement
+    if (payload.achievement_id === lastAchievementId) return;
+    lastAchievementId = payload.achievement_id;
+    setTimeout(() => { lastAchievementId = ""; }, 2000);
+
+    const toastMessage = `🏆 <b>ACHIEVEMENT UNLOCKED:</b><br>${payload.title || "Unknown Achievement"}${payload.progress_text ? "<br>" + payload.progress_text : ""}`;
+    
+    showToast(toastMessage, "success", 6000);
 }

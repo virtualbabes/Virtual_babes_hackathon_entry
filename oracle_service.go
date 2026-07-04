@@ -5,12 +5,17 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/base32"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net/http"
+	"sync"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,19 +25,125 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
-const cardCacheName = "card_cache.json"
+type OracleService struct{}
 
-// indexerRequest executes an HTTP GET request across multiple indexer endpoints with retries.
+var (
+	ErrInvalidSignature = errors.New("security exception: cryptographic verification failed")
+	ErrExpiredNonce     = errors.New("security exception: payload nonce lifetime exceeded")
+	ErrReplayedNonce    = errors.New("security exception: nonce vector has already been consumed")
+)
+
+const (
+	cardCacheName = "card_cache.json"
+
+	// SecureCommandType enums for signed payloads
+	CommandMarketBuy  uint8 = 1
+	CommandMarketSell uint8 = 2
+)
+
+// MarketActionPayload represents the structured data signed by the user's wallet.
+type MarketActionPayload struct {
+	CommandType uint8  `json:"command_type"`
+	EntityID    uint64 `json:"entity_id"`
+	ShareCount  uint64 `json:"share_count"`
+	MaxCost     uint64 `json:"max_cost"`
+	Nonce       uint64 `json:"nonce"`
+	Timestamp   int64  `json:"timestamp"`
+}
+
+// NewVerificationHook initializes the security challenge registry.
+func NewVerificationHook() *VerificationHook {
+	return &VerificationHook{
+		ActiveNonces:   make(map[uint64]time.Time),
+		ConsumedNonces: make(map[uint64]bool),
+	}
+}
+
+// GenerateNextNonce reserves a valid transactional entry block with a 2-minute TTL.
+func (vh *VerificationHook) GenerateNextNonce(nonceID uint64) {
+	vh.Mu.Lock()
+	defer vh.Mu.Unlock()
+	vh.ActiveNonces[nonceID] = time.Now().Add(2 * time.Minute)
+}
+
+// CompilePayloadDigest hashes the structural payload into a deterministic 32-byte array.
+// PILLAR 3: Deterministic Data Integrity.
+func CompilePayloadDigest(payload MarketActionPayload) []byte {
+	hasher := sha256.New()
+
+	// Write raw continuous binary fields to prevent padding manipulation
+	hasher.Write([]byte{payload.CommandType})
+
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, payload.EntityID)
+	hasher.Write(buf)
+
+	binary.BigEndian.PutUint64(buf, payload.ShareCount)
+	hasher.Write(buf)
+
+	binary.BigEndian.PutUint64(buf, payload.MaxCost)
+	hasher.Write(buf)
+
+	binary.BigEndian.PutUint64(buf, payload.Nonce)
+	hasher.Write(buf)
+
+	binary.BigEndian.PutUint64(buf, uint64(payload.Timestamp))
+	hasher.Write(buf)
+
+	return hasher.Sum(nil)
+}
+
+// VerifyIncomingCommand validates wallet authenticity before exposing engine mutations.
+func (s *OracleService) VerifyIncomingCommand(l *Lobby, publicKey ed25519.PublicKey, payload MarketActionPayload, signature []byte) error {
+	l.verificationHook.Mu.Lock()
+	defer l.verificationHook.Mu.Unlock()
+
+	// 1. Replay Protection Guardrail
+	if l.verificationHook.ConsumedNonces[payload.Nonce] {
+		return ErrReplayedNonce
+	}
+
+	// 2. Nonce Validity & Expiration Checks
+	expiration, exists := l.verificationHook.ActiveNonces[payload.Nonce]
+	if !exists {
+		return ErrExpiredNonce
+	}
+	if time.Now().After(expiration) {
+		delete(l.verificationHook.ActiveNonces, payload.Nonce)
+		return ErrExpiredNonce
+	}
+
+	// 3. Compile and Evaluate Cryptographic Verification Vector
+	digest := CompilePayloadDigest(payload)
+	if !ed25519.Verify(publicKey, digest, signature) {
+		return ErrInvalidSignature
+	}
+
+	// 4. Commit state changes to eliminate reuse vectors
+	l.verificationHook.ConsumedNonces[payload.Nonce] = true
+	delete(l.verificationHook.ActiveNonces, payload.Nonce)
+
+	return nil
+}
+
+// IndexerRequest executes an HTTP GET request across multiple indexer endpoints with retries.
 // PILLAR 4: RPC Failover. Automatically cycles configured endpoints on 429 or 5xx errors.
-func (l *Lobby) indexerRequest(cfg NetworkConfig, path string) (*http.Response, error) {
+func (s *OracleService) IndexerRequest(l *Lobby, cfg NetworkConfig, path string) (*http.Response, error) {
+	// PILLAR 4: Multi-failover timeout hardening.
+	// Implement an outer context to bound the total duration of the entire failover/retry sequence.
+	outerCtx, outerCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer outerCancel()
+
 	var lastErr error
 	for _, baseURL := range cfg.IndexerURLs {
 		url := baseURL + path
 		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+			// Derive attempt context from outer context to respect total deadline
+			attemptCtx, attemptCancel := context.WithTimeout(outerCtx, indexerTimeout)
+			req, _ := http.NewRequestWithContext(attemptCtx, "GET", url, nil)
 			resp, err := http.DefaultClient.Do(req)
-			cancel()
+			attemptCancel()
+
 			if err != nil {
 				lastErr = err
 				time.Sleep(500 * time.Millisecond)
@@ -55,7 +166,7 @@ func (l *Lobby) indexerRequest(cfg NetworkConfig, path string) (*http.Response, 
 	return nil, fmt.Errorf("indexer request failed after cycling endpoints: %w", lastErr)
 }
 
-func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName string) (map[int]ServerCard, error) {
+func (s *OracleService) GetVerifiedCards(l *Lobby, wallet string, tokenIDs []int, networkName string) (map[int]ServerCard, error) {
 	results := make(map[int]ServerCard)
 	var toFetch []int
 
@@ -100,7 +211,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 			if strings.Contains(cfg.ChainID, "algorand") {
 				// PATH 1: Standard ASA Scan (ARC-19/ARC-69)
 				// Query account info to find all held assets, regardless of contract status.
-				accResp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/accounts/%s", t.addr))
+				accResp, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/v2/accounts/%s", t.addr))
 				if err == nil && accResp.StatusCode == http.StatusOK {
 					var accRes struct {
 						Account struct {
@@ -125,7 +236,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 							}
 
 							// Use the Dispatcher to resolve ARC-19 or ARC-69 metadata
-							meta, std, err := l.MetadataDispatcher(t.network, int(as.AssetID))
+							meta, std, err := s.MetadataDispatcher(l, t.network, int(as.AssetID))
 							if err == nil && meta != nil {
 								newCard := ServerCard{
 									ID:            int(as.AssetID),
@@ -149,7 +260,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 				// PATH 2: ARC-72 Collection Scan
 				// Keep existing logic to find tokens within a specific smart contract collection.
 				log.Printf("[ORACLE] Syncing tokens for %s on %s...\n", t.addr, t.network)
-				resp, err := l.indexerRequest(cfg, fmt.Sprintf("/tokens?owner=%s", t.addr))
+				resp, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/tokens?owner=%s", t.addr))
 				if err == nil && resp.StatusCode == http.StatusOK {
 					var res struct {
 						Tokens []struct {
@@ -173,7 +284,7 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 
 							// If bulk metadata is missing, use the Dispatcher for deep discovery (ARC-19/69)
 							if meta == nil {
-								m, s, err := l.MetadataDispatcher(t.network, tok.TokenID)
+								m, s, err := s.MetadataDispatcher(l, t.network, tok.TokenID)
 								if err == nil {
 									meta = m
 									std = s
@@ -280,14 +391,14 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 
 	// Cross-Chain Safety Guard: Ensure we only hit Algorand indexers for Algorand-based chains
 	if !strings.Contains(netConfig.ChainID, "algorand") {
-		return l.getVerifiedCardsCrossChain(tokenIDs, netConfig)
+		return s.GetVerifiedCardsCrossChain(l, tokenIDs, netConfig)
 	}
 
 	// PILLAR 3: Multi-Standard Discovery.
 	// We iterate through missing tokens and utilize the MetadataDispatcher to identify
 	// and fetch standard-compliant metadata (ARC-72, ARC-19, or ARC-69).
 	for _, id := range toFetch {
-		meta, standard, err := l.MetadataDispatcher(networkName, id)
+		meta, standard, err := s.MetadataDispatcher(l, networkName, id)
 		if err != nil {
 			log.Printf("[ORACLE] Metadata resolution failed for %s #%d: %v\n", networkName, id, err)
 			// Cache a placeholder to prevent repeated hits for invalid assets
@@ -314,8 +425,8 @@ func (l *Lobby) getVerifiedCards(wallet string, tokenIDs []int, networkName stri
 	return results, nil
 }
 
-// getVerifiedCardsCrossChain handles metadata retrieval for non-Algorand networks (EVM, Solana, etc).
-func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (map[int]ServerCard, error) {
+// GetVerifiedCardsCrossChain handles metadata retrieval for non-Algorand networks (EVM, Solana, etc).
+func (s *OracleService) GetVerifiedCardsCrossChain(l *Lobby, tokenIDs []int, cfg NetworkConfig) (map[int]ServerCard, error) {
 	results := make(map[int]ServerCard)
 
 	// Identify Network Type
@@ -333,7 +444,7 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 			path := fmt.Sprintf("/api?module=token&action=tokenid_metadata&contractaddress=%s&tokenid=%d",
 				cfg.AssetID, id)
 
-			resp, err := l.indexerRequest(cfg, path)
+			resp, err := s.IndexerRequest(l, cfg, path)
 
 			if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 				var evmRes struct {
@@ -494,7 +605,7 @@ func (l *Lobby) getVerifiedCardsCrossChain(tokenIDs []int, cfg NetworkConfig) (m
 	return results, nil
 }
 
-func (l *Lobby) syncStatsFromBlockchain(_, wallet string) {
+func (s *OracleService) SyncStatsFromBlockchain(l *Lobby, _, wallet string) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	vaultAddr := l.vaultAddress
@@ -513,7 +624,7 @@ func (l *Lobby) syncStatsFromBlockchain(_, wallet string) {
 	}
 
 	// PASS 1: Wins/DNFs (Vault -> Wallet)
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+	resp, err := s.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.AssetID, vaultAddr, wallet))
 
 	if err != nil {
@@ -586,7 +697,7 @@ func (l *Lobby) syncStatsFromBlockchain(_, wallet string) {
 	// PILLAR 4: Mirrored Immersion.
 	// Pass 3: Global Result Recovery. Scan the Vault's output to find matches where I was the Loser.
 	// This allows reconstructing persistent "Loss" records without extra blockchain fees.
-	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=200",
+	resp, err = s.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=200",
 		voiConfig.AssetID, vaultAddr))
 
 	if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
@@ -664,7 +775,7 @@ func (l *Lobby) syncStatsFromBlockchain(_, wallet string) {
 
 	// PASS 2: Buy-ins/Registrations (Wallet -> Vault)
 	// This allows the server to discover used TxIDs for the specific player joining.
-	resp, err = l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
+	resp, err = s.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=500",
 		voiConfig.AssetID, wallet, vaultAddr))
 
 	if err == nil {
@@ -709,7 +820,7 @@ func (l *Lobby) syncStatsFromBlockchain(_, wallet string) {
 	}
 }
 
-func (l *Lobby) refreshGlobalLeaderboard() {
+func (s *OracleService) RefreshGlobalLeaderboard(l *Lobby) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
@@ -717,7 +828,7 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 		return
 	}
 
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
+	resp, err := s.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
 		voiConfig.AssetID, l.vaultAddress))
 
 	if err != nil {
@@ -772,7 +883,18 @@ func (l *Lobby) refreshGlobalLeaderboard() {
 
 // loadOnboardedWalletsFromIndexer reconstructs the historical Sybil protection state from blockchain snapshots.
 // PILLAR 6: Blockchain Persistence.
-func (l *Lobby) loadOnboardedWalletsFromIndexer() {
+func (s *OracleService) LoadOnboardedWalletsFromIndexer(l *Lobby) {
+	// PILLAR 6: Bootstrap Optimization.
+	// If the state was already hydrated from a blockchain snapshot (VBT_ECONOMY_SNAPSHOT),
+	// we bypass the expensive paged indexer scan to minimize startup latency.
+	l.mutex.RLock()
+	if len(l.onboardedWallets) > 0 {
+		log.Printf("[ORACLE] Onboarding state hydrated from snapshot (%d records). Bypassing scan.\n", len(l.onboardedWallets))
+		l.mutex.RUnlock()
+		return
+	}
+	l.mutex.RUnlock()
+
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	l.onboardedWallets = make(map[string]bool)
@@ -786,21 +908,43 @@ func (l *Lobby) loadOnboardedWalletsFromIndexer() {
 
 // saveOnboardedWallets persists the Sybil protection map to the blockchain.
 // PILLAR 6: Blockchain Persistence.
-func (l *Lobby) saveOnboardedWallets() {
+func (s *OracleService) SaveOnboardedWallets(l *Lobby) {
 	l.mutex.RLock()
-	state := l.onboardedWallets
+	// Create a point-in-time snapshot of the map
+	snapshot := make(map[string]bool, len(l.onboardedWallets))
+	for k, v := range l.onboardedWallets {
+		snapshot[k] = v
+	}
 	l.mutex.RUnlock()
-	l.saveBlockchainStateSnapshotLocked("VBT_ONBOARD_SNAPSHOT:", state)
+
+	// Marshal the snapshot outside the lock
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		log.Printf("[CACHE ERROR] Failed to marshal onboarded wallets snapshot: %v\n", err)
+		return
+	}
+	l.dispatchBlockchainSnapshot("VBT_ONBOARD_SNAPSHOT:", data)
 }
 
 // loadRegistrationsFromIndexer reconstructs the tournament registration state from the blockchain.
 // It identifies paid participants by scanning the indexer for transactions with the buy-in prefix.
-func (l *Lobby) loadRegistrationsFromIndexer() {
+func (s *OracleService) LoadRegistrationsFromIndexer(l *Lobby) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	vaultAddr := l.vaultAddress
 	rewardAsset := l.rewardAssetID
 	activeTournID := l.tournament.ID
+
+	// PILLAR 6: Bootstrap Optimization.
+	// If the participant list was already hydrated from a blockchain snapshot,
+	// we bypass the full sweep to minimize startup latency and RPC overhead.
+	if len(l.paidParticipants) > 0 {
+		log.Printf("[ORACLE] Tournament state hydrated from snapshot (%d entries). Bypassing indexer scan for event %s.\n", 
+			len(l.paidParticipants), activeTournID)
+		l.mutex.RUnlock()
+		return
+	}
+
 	// PILLAR 3: State Reconstruction.
 	// Fetch the buy-in amount to reconstruct the prize pool commitment.
 	buyInAmt := l.tournament.BuyInAmount
@@ -814,7 +958,7 @@ func (l *Lobby) loadRegistrationsFromIndexer() {
 
 	// Query all transfers received by the vault for the current primary reward asset
 	url := fmt.Sprintf("/arc200/transfers?contractId=%s&to=%s&limit=500", rewardAsset, vaultAddr)
-	resp, err := l.indexerRequest(voiConfig, url)
+	resp, err := s.IndexerRequest(l, voiConfig, url)
 	if err != nil {
 		log.Printf("[ORACLE ERROR] Failed to fetch registrations from indexer: %v\n", err)
 		return
@@ -830,42 +974,63 @@ func (l *Lobby) loadRegistrationsFromIndexer() {
 		} `json:"transfers"`
 	}
 
-	if json.NewDecoder(resp.Body).Decode(&res) == nil {
-		l.mutex.Lock()
-			// Reset bonus before reconstruction to prevent double-counting 
-			// if the scan is re-triggered.
-			l.tournamentPotBonus = 0
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return
+	}
 
-		for _, tx := range res.Transfers {
-			// PILLAR 3: Bound Verification. Use trailing colon for absolute ID isolation.
-			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:"+activeTournID+":") {
-				l.registeredTxIDs[tx.TransactionID] = time.Unix(tx.Timestamp, 0)
+	// PILLAR 4: Mutex Contention Minimization.
+	// Process indexer results into local buffers outside the write lock.
+	// This ensures the lobby loop remains responsive during heavy state reconstruction.
+	newParticipants := []string{}
+	newTxIDs := make(map[string]time.Time)
+	var reconstructedBonus float64 = 0
+	seen := make(map[string]bool)
 
-				// Add to participants list if not already present
-				found := false
-				for _, p := range l.paidParticipants {
-					if strings.EqualFold(p, tx.From) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					l.paidParticipants = append(l.paidParticipants, tx.From)
-						// PILLAR 2: Prize Pool Commitment.
-						// Reconstruct the prize pool bonus from recovered registrations.
-						l.tournamentPotBonus += (buyInAmt / 2.0)
-					log.Printf("[ORACLE] Reconstructed participant entry: %s (Tx: %s)\n", tx.From, tx.TransactionID)
-				}
+	for _, tx := range res.Transfers {
+		// PILLAR 3: Bound Verification. Use trailing colon for absolute ID isolation.
+		if strings.HasPrefix(tx.Metadata, "VBT_TOURN_BUYIN:"+activeTournID+":") {
+			newTxIDs[tx.TransactionID] = time.Unix(tx.Timestamp, 0)
+
+			lowerFrom := strings.ToLower(tx.From)
+			if !seen[lowerFrom] {
+				seen[lowerFrom] = true
+				newParticipants = append(newParticipants, tx.From)
+				reconstructedBonus += (buyInAmt / 2.0)
 			}
 		}
-		l.mutex.Unlock()
 	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Reset bonus before reconstruction to prevent double-counting if the scan is re-triggered.
+	l.tournamentPotBonus = reconstructedBonus
+
+	for txid, ts := range newTxIDs {
+		l.registeredTxIDs[txid] = ts
+	}
+
+	// Optimization: Use a map for O(1) lookups to minimize lock duration
+	existing := make(map[string]bool)
+	for _, p := range l.paidParticipants {
+		existing[strings.ToLower(p)] = true
+	}
+
+	for _, p := range newParticipants {
+		// PILLAR 5: Scalability.
+		// Deduplicate against existing memory state in O(M) time.
+		if !existing[strings.ToLower(p)] {
+			l.paidParticipants = append(l.paidParticipants, p)
+			log.Printf("[ORACLE] Reconstructed participant entry: %s\n", p)
+		}
+	}
+
 	log.Println("[ORACLE] Tournament registration reconstruction complete.")
 }
 
 // ResolveEnvoiName attempts to find a .voi or .algo name for a wallet address.
 // It utilizes a dedicated lock and local cache to minimize indexer traffic and avoid deadlocks.
-func (l *Lobby) ResolveEnvoiName(address string) string {
+func (s *OracleService) ResolveEnvoiName(l *Lobby, address string) string {
 	if address == "" || address == "TBD" || address == "BYE" {
 		return address
 	}
@@ -890,7 +1055,7 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 
 	// PILLAR 4: RPC Failover.
 	// Use the resilient dispatcher to resolve .voi names.
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/tokens?owner=%s", address))
+	resp, err := s.IndexerRequest(l, voiConfig, fmt.Sprintf("/tokens?owner=%s", address))
 	if err == nil && resp.StatusCode == http.StatusOK {
 		defer resp.Body.Close()
 		var res struct {
@@ -921,9 +1086,9 @@ func (l *Lobby) ResolveEnvoiName(address string) string {
 	return truncated
 }
 
-func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64, expectedAsset, sender, vaultAddr, expectedNotePrefix string) (bool, int64, error) {
+func (s *OracleService) VerifyBuyInTransaction(l *Lobby, network, txid string, expectedAmt uint64, expectedAsset, sender, vaultAddr, expectedNotePrefix string) (bool, int64, error) {
 	// 1. Authoritative Network Key Resolution (Deterministic Case Sync)
-	netKey := l.mapChainToNetworkName(network)
+	netKey := s.MapChainToNetworkName(network)
 	if netKey == "" {
 		netKey = network // Fallback for direct usage
 	}
@@ -949,7 +1114,7 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 
 	// 2. Branch logic based on Network Type
 	if strings.Contains(strings.ToLower(netKey), "voi") {
-		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/arc200/transfers?transactionId=%s", txid))
+		resp, err := s.IndexerRequest(l, netConfig, fmt.Sprintf("/arc200/transfers?transactionId=%s", txid))
 		if err != nil {
 			return false, 0, err
 		}
@@ -976,7 +1141,7 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 		}
 	} else {
 		// ALGORAND Logic: Standard Indexer Transaction Endpoint
-		resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/v2/transactions/%s", txid))
+		resp, err := s.IndexerRequest(l, netConfig, fmt.Sprintf("/v2/transactions/%s", txid))
 		if err != nil {
 			return false, 0, err
 		}
@@ -1020,9 +1185,55 @@ func (l *Lobby) verifyBuyInTransaction(network, txid string, expectedAmt uint64,
 	return false, 0, nil
 }
 
+// CheckAssetApproval verifies if an owner has approved a spender (e.g. the Vault) 
+// for a specific amount of an ARC-200 token.
+// PILLAR 2: High-Finance. Enables non-custodial bidding and automated settlement.
+func (s *OracleService) CheckAssetApproval(l *Lobby, network, owner, spender, assetIDStr string) (uint64, error) {
+	netKey := s.MapChainToNetworkName(network)
+	if netKey == "" { netKey = network }
+
+	l.mutex.RLock()
+	netConfig, ok := l.availableNetworks[netKey]
+	l.mutex.RUnlock()
+
+	if !ok {
+		return 0, fmt.Errorf("network config not found: %s", netKey)
+	}
+
+	// Approvals are currently specific to ARC-200 on Voi
+	if !strings.Contains(strings.ToLower(netKey), "voi") {
+		return 0, fmt.Errorf("approval verification only supported on Voi ARC-200 assets")
+	}
+
+	url := fmt.Sprintf("/arc200/approvals?contractId=%s&owner=%s&spender=%s", assetIDStr, owner, spender)
+	resp, err := s.IndexerRequest(l, netConfig, url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("indexer returned status: %d", resp.StatusCode)
+	}
+
+	var res struct {
+		Approvals []struct {
+			Amount string `json:"amount"`
+		} `json:"approvals"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err == nil && len(res.Approvals) > 0 {
+		// PILLAR 2: Integer Supremacy.
+		amt, _ := strconv.ParseUint(res.Approvals[0].Amount, 10, 64)
+		return amt, nil
+	}
+
+	return 0, nil
+}
+
 // fetchARC69Metadata retrieves metadata from the latest configuration transaction note.
-func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
-	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
+func (s *OracleService) FetchARC69Metadata(l *Lobby, cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
+	resp, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/v2/assets/%d/transactions?tx-type=acfg&limit=1", assetID))
 	if err != nil {
 		return nil, err
 	}
@@ -1055,9 +1266,9 @@ func (l *Lobby) fetchARC69Metadata(cfg NetworkConfig, assetID int) (*ARC72Metada
 }
 
 // fetchARC19Metadata resolves a dynamic IPFS CID from the asset's reserve address.
-func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
+func (s *OracleService) FetchARC19Metadata(l *Lobby, cfg NetworkConfig, assetID int) (*ARC72Metadata, error) {
 	// 1. Fetch Asset Information from Indexer to retrieve the Reserve Address
-	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d", assetID))
+	resp, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/v2/assets/%d", assetID))
 	if err != nil {
 		return nil, err
 	}
@@ -1141,7 +1352,7 @@ func (l *Lobby) fetchARC19Metadata(cfg NetworkConfig, assetID int) (*ARC72Metada
 
 // MetadataDispatcher identifies the NFT standard (ARC-72, ARC-69, or ARC-19)
 // and routes the metadata retrieval request to the appropriate service.
-func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metadata, string, error) {
+func (s *OracleService) MetadataDispatcher(l *Lobby, networkName string, assetID int) (*ARC72Metadata, string, error) {
 	l.mutex.RLock()
 	cfg, ok := l.availableNetworks[networkName]
 	l.mutex.RUnlock()
@@ -1151,7 +1362,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 
 	// 1. ARC-19 Detection: Fetch Asset parameters from Indexer to check for template URL.
 	// This is the most efficient first check for dynamic ASAs.
-	resp, err := l.indexerRequest(cfg, fmt.Sprintf("/v2/assets/%d", assetID))
+	resp, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/v2/assets/%d", assetID))
 
 	if err == nil && resp.StatusCode == http.StatusOK {
 		defer resp.Body.Close()
@@ -1163,7 +1374,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 			} `json:"asset"`
 		}
 		if json.NewDecoder(resp.Body).Decode(&res) == nil && strings.Contains(res.Asset.Params.URL, "template-ipfs") {
-			meta, err := l.fetchARC19Metadata(cfg, assetID)
+			meta, err := s.FetchARC19Metadata(l, cfg, assetID)
 			return meta, "ARC-19", err
 		}
 	} else if resp != nil {
@@ -1172,7 +1383,7 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 
 	// 2. ARC-72 Check: If network has a configured AppID, check if this ID exists as a token.
 	if cfg.AppID != "" && cfg.AppID != "0" {
-		resp72, err := l.indexerRequest(cfg, fmt.Sprintf("/tokens?contractId=%s&tokenId=%d", cfg.AppID, assetID))
+		resp72, err := s.IndexerRequest(l, cfg, fmt.Sprintf("/tokens?contractId=%s&tokenId=%d", cfg.AppID, assetID))
 		if err == nil && resp72.StatusCode == http.StatusOK {
 			defer resp72.Body.Close()
 			var res72 struct {
@@ -1189,19 +1400,18 @@ func (l *Lobby) MetadataDispatcher(networkName string, assetID int) (*ARC72Metad
 	}
 
 	// 3. Fallback to ARC-69: Scan configuration history for JSON notes.
-	meta, err := l.fetchARC69Metadata(cfg, assetID)
+	meta, err := s.FetchARC69Metadata(l, cfg, assetID)
 	return meta, "ARC-69", err
 }
 
 // checkVaultBalanceOnChain synchronizes the internal faucetBalance with the on-chain $VBV pool.
-func (l *Lobby) checkVaultBalanceOnChain() {
+func (s *OracleService) CheckVaultBalanceOnChain(l *Lobby) {
 	l.mutex.RLock()
-	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	rewardAppIDStr := l.rewardAssetID
 	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
 
-	if !ok || rewardAppIDStr == "" || vaultAddr == "" {
+	if rewardAppIDStr == "" || vaultAddr == "" {
 		return
 	}
 
@@ -1212,80 +1422,97 @@ func (l *Lobby) checkVaultBalanceOnChain() {
 
 	addrObj, _ := types.DecodeAddress(vaultAddr)
 
-	// PILLAR 4: RPC Failover. Cycle through available NodeURLs until balance is retrieved.
-	for _, nodeURL := range voiConfig.NodeURLs {
-		client, _ := algod.MakeClient(nodeURL, "")
-		var boxValue []byte
-		found := false
+	// PILLAR 4: Node Redundancy integration.
+	if l.ledgerClient == nil {
+		return
+	}
 
-		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
-			boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
-			cancel()
+	// PILLAR 4: Resilient Failover. 
+	// Cycle through the pool to ensure the baseline sync succeeds even if 
+	// the primary RPC endpoint is degraded.
+	var boxValue []byte
+	l.ledgerClient.Mu.RLock()
+	nodeCount := len(l.ledgerClient.Nodes)
+	l.ledgerClient.Mu.RUnlock()
 
-			if err != nil {
-				// If not found, vault is empty/not initialized on this node.
-				if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-					log.Printf("[ORACLE] Authoritative Sync: Vault box not found at %s (Asset: %s).\n", nodeURL, rewardAppIDStr)
-					break // Try next node if this one doesn't have the box yet
-				}
-				// Handle Node rate-limiting (429) or transient errors
-				time.Sleep(time.Duration(i+1) * 1 * time.Second)
-				continue
-			}
-			boxValue = boxResp.Value
-			found = true
+	for i := 0; i < nodeCount; i++ {
+		client, url, err := l.ledgerClient.GetBestClient()
+		if err != nil {
 			break
 		}
 
-		// ARC-200 balances are conventionally 32-byte uint256 values.
-		// PILLAR 3: Robust Parsing. We allow box values shorter than 32 bytes (unpadded)
-		// to ensure authoritative sync even if a contract utilizes minimized storage.
-		if found && len(boxValue) > 0 {
-			parseLen := len(boxValue)
-			if parseLen > 32 {
-				parseLen = 32
-			}
-			bal := new(big.Int).SetBytes(boxValue[:parseLen]).Uint64()
-			l.mutex.Lock()
-			l.faucetBalance = float64(bal) / 1000000.0
-			l.applyDynamicScalingLocked() // Adjust rewards based on new liquidity
-			l.mutex.Unlock()
-			log.Printf("[ORACLE] Vault $VBV Pool Synced via %s: %.2f units.\n", nodeURL, l.faucetBalance)
-			return // Success: exit function
-		}
-	}
-}
-
-func (l *Lobby) checkNativeVaultBalanceOnChain() {
-	l.mutex.RLock()
-	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
-	l.mutex.RUnlock()
-
-	// PILLAR 4: Multi-Node Failover.
-	// Cycle through all configured nodes to perform the gas check, utilizing
-	// the streamlined pattern from the public health check.
-	for _, nodeURL := range voiConfig.NodeURLs {
-		client, _ := algod.MakeClient(nodeURL, "")
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		info, err := client.AccountInformation(l.vaultAddress).Do(ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), indexerTimeout)
+		boxResp, err := client.GetApplicationBoxByName(rewardAppID, addrObj[:]).Do(ctx)
 		cancel()
 
-		if err == nil {
-			amount := info.Amount
-			l.mutex.Lock()
-			if amount < 1000000 { // 1.0 VOI threshold for gas alerts
-				log.Printf("[CRITICAL] Vault gas low at %s! Balance: %d\n", nodeURL, amount)
-				go l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted.")
-			}
-			l.mutex.Unlock()
-			return // Success
+		if err != nil {
+			log.Printf("[ORACLE WARNING] Node %s failed vault balance check: %v. Blacklisting.\n", url, err)
+			l.ledgerClient.MarkNodeFailure(url)
+			continue
 		}
+
+		boxValue = boxResp.Value
+		break
+	}
+
+	if len(boxValue) == 0 {
+		return
+	}
+
+	// PILLAR 3: Robust Parsing & Integer Supremacy.
+	bal := new(big.Int).SetBytes(boxValue).Uint64()
+	l.mutex.Lock()
+	l.faucetBalanceMicro = bal
+	l.faucetBalance = float64(bal) / 1000000.0
+	l.applyDynamicScalingLocked()
+	l.mutex.Unlock()
+	log.Printf("[ORACLE] Vault $VBV Pool Synced via resilient client: %.2f units.\n", l.faucetBalance)
+}
+
+func (s *OracleService) CheckNativeVaultBalanceOnChain(l *Lobby) {
+	l.mutex.RLock()
+	vaultAddr := l.vaultAddress
+	lb := l.ledgerClient
+	l.mutex.RUnlock()
+
+	// PILLAR 4: Multi-Node Cluster Failover.
+	if lb == nil { return }
+
+	lb.Mu.RLock()
+	nodeCount := len(lb.Nodes)
+	lb.Mu.RUnlock()
+
+	success := false
+	for i := 0; i < nodeCount; i++ {
+		client, url, err := lb.GetBestClient()
+		if err != nil { break }
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		info, err := client.AccountInformation(vaultAddr).Do(ctx)
+		cancel()
+
+		if err != nil {
+			log.Printf("[ORACLE WARNING] Node %s failed gas check: %v. Blacklisting.\n", url, err)
+			lb.MarkNodeFailure(url)
+			continue
+		}
+
+		// Evaluate liquidity threshold for automated gas alerts
+		if info.Amount < 1000000 { // 1.0 VOI Threshold
+			log.Printf("[CRITICAL] Vault gas low! Balance: %d\n", info.Amount)
+			l.broadcastToAdmins("⚠️ <b>CRITICAL:</b> Vault gas is nearly depleted.")
+		}
+		success = true
+		break
+	}
+
+	if !success {
+		log.Printf("[ORACLE ERROR] Gas check failed: all cluster nodes degraded.\n")
 	}
 }
 
 // handleSeasonHistory fetches archived seasonal standings from the blockchain.
-func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
+func (s *OracleService) HandleSeasonHistory(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	// Ensure Voi Mainnet config is available for transactional operations
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
@@ -1313,7 +1540,7 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 
 	// PILLAR 4: RPC Failover.
 	// Utilizing the dispatcher to fetch season history receipts.
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=100",
+	resp, err := s.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&to=%s&limit=100",
 		rewardAssetID, faucetAddr, faucetAddr))
 
 	if err != nil {
@@ -1324,7 +1551,8 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 
 	var res struct {
 		Transfers []struct {
-			Metadata string `json:"metadata"`
+			TransactionID string `json:"transactionId"`
+			Metadata      string `json:"metadata"`
 		} `json:"transfers"`
 	}
 
@@ -1352,11 +1580,14 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(tx.Metadata, "VBT_SEASON_ARCHIVE:") {
 				jsonStr := strings.TrimPrefix(tx.Metadata, "VBT_SEASON_ARCHIVE:")
 				var archive SeasonArchive
-				if err := json.Unmarshal([]byte(jsonStr), &archive); err != nil {
-					// Only include if no specific season was requested, or if it matches the target
+				if err := json.Unmarshal([]byte(jsonStr), &archive); err == nil && archive.Season > 0 {
+					// PILLAR 4: Replay Resilience. Ensure record is valid before deduplication.
+					// A Season ID of 0 indicates a malformed or empty unmarshal result.
 					if targetSeason == -1 || archive.Season == targetSeason {
 						uniqueSeasons[archive.Season] = archive
 					}
+				} else {
+					log.Printf("[SEASON HISTORY] Skipping malformed record in TxID %s: %v\n", tx.TransactionID, err)
 				}
 			}
 		}
@@ -1377,7 +1608,7 @@ func (l *Lobby) handleSeasonHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleReSyncStats triggers a manual sync for a specific wallet address.
-func (l *Lobby) handleReSyncStats(w http.ResponseWriter, r *http.Request) {
+func (s *OracleService) HandleReSyncStats(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Wallet string `json:"wallet"`
 	}
@@ -1385,12 +1616,12 @@ func (l *Lobby) handleReSyncStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid wallet", http.StatusBadRequest)
 		return
 	}
-	go l.syncStatsFromBlockchain("UI_TRIGGER", req.Wallet)
+	go s.SyncStatsFromBlockchain(l, "UI_TRIGGER", req.Wallet)
 	json.NewEncoder(w).Encode(map[string]string{"status": "sync_initiated"})
 }
 
 // mapChainToNetworkName translates frontend chain codes to internal NetworkConfig keys.
-func (l *Lobby) mapChainToNetworkName(chain string) string {
+func (s *OracleService) MapChainToNetworkName(chain string) string {
 	switch strings.ToUpper(chain) {
 	case "ETH":
 		return "Ethereum"
@@ -1408,13 +1639,13 @@ func (l *Lobby) mapChainToNetworkName(chain string) string {
 }
 
 // checkAssetOptIn verifies if a wallet is opted into a specific asset (ASA or ARC-200 balance box).
-func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool, int64, error) {
+func (s *OracleService) CheckAssetOptIn(l *Lobby, network, wallet string, assetIDStr string) (bool, int64, error) {
 	if assetIDStr == "" || assetIDStr == "0" {
 		return true, 0, nil
 	}
 
 	// 1. Authoritative Network Key Resolution (Deterministic Case Sync)
-	netKey := l.mapChainToNetworkName(network)
+	netKey := s.MapChainToNetworkName(network)
 	if netKey == "" {
 		netKey = network // Fallback for direct full-name usage
 	}
@@ -1431,30 +1662,31 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 	if strings.Contains(strings.ToLower(netKey), "voi") {
 		assetID, _ := strconv.ParseUint(assetIDStr, 10, 64)
 		addr, _ := types.DecodeAddress(wallet)
-		var lastErr error
 
-		for _, nodeURL := range netConfig.NodeURLs {
-			client, _ := algod.MakeClient(nodeURL, "")
-			for i := 0; i < 3; i++ {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
-				cancel()
-				if err != nil {
-					if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
-						return false, 0, nil // Definitively not opted in
+		// PILLAR 4: Cluster integration for Opt-In verification.
+		if l.ledgerClient != nil {
+			client, url, err := l.ledgerClient.GetBestClient()
+			if err == nil {
+				for i := 0; i < 3; i++ {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					_, err := client.GetApplicationBoxByName(assetID, addr[:]).Do(ctx)
+					cancel()
+					if err == nil {
+						return true, 0, nil
 					}
-					lastErr = err
+					if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+						return false, 0, nil
+					}
 					time.Sleep(500 * time.Millisecond)
-					continue
 				}
-				return true, 0, nil
+				l.ledgerClient.MarkNodeFailure(url)
 			}
 		}
-		return false, 0, fmt.Errorf("voi node failover failed: %w", lastErr)
+		return false, 0, fmt.Errorf("voi cluster failover: all healthy nodes exhausted during opt-in check")
 	}
 
 	// 3. ALGORAND / ASA Pattern: Indexer Account Asset Scan
-	resp, err := l.indexerRequest(netConfig, fmt.Sprintf("/v2/accounts/%s", wallet))
+	resp, err := s.IndexerRequest(l, netConfig, fmt.Sprintf("/v2/accounts/%s", wallet))
 	if err != nil {
 		return false, 0, err
 	}
@@ -1481,4 +1713,26 @@ func (l *Lobby) checkAssetOptIn(network, wallet string, assetIDStr string) (bool
 		}
 	}
 	return false, 0, nil
+}
+
+// SavePersistentCardCache persists the current card inventory to a blockchain snapshot.
+// PILLAR 6: Blockchain Persistence.
+func (s *OracleService) SavePersistentCardCache(l *Lobby) {
+	l.mutex.RLock()
+	state := l.persistentCardCache
+	l.mutex.RUnlock()
+	l.saveBlockchainStateSnapshotLocked("VBT_CARD_CACHE_SNAPSHOT:", state)
+}
+
+// LoadPersistentCardCache reconstructs the card cache from blockchain snapshots.
+// PILLAR 6: Blockchain Persistence.
+func (s *OracleService) LoadPersistentCardCache(l *Lobby) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.persistentCardCache = make(map[int]ServerCard)
+	if l.loadBlockchainStateSnapshotLocked("VBT_CARD_CACHE_SNAPSHOT:", &l.persistentCardCache) {
+		for k, v := range l.persistentCardCache {
+			l.inventory[k] = v
+		}
+	}
 }

@@ -2,12 +2,15 @@ import { CONFIG } from './config.js';
 import { socket, setNonceResolver } from './network.js';
 import { showToast, setTransactionStatus } from './ui.js';
 import { userAddress, walletProvider, signClient, linkedWallets } from './wallet.js';
-import { getAssetSymbol, getNetworkConfig } from './utils.js';
+import { getAssetSymbol, getNetworkConfig, shortenAddress } from './utils.js';
+import { lastLobbyPlayers } from './game.js';
 import { fetchLeaderboard } from './leaderboard.js';
 
 export let availableNetworks = {};
 export let globalClubs = {};
 export let adminFocusNetwork = "";
+let lastPlatformAlertTotal = 0; // PILLAR 5: Internal state for alert throttling
+let lastGhostAlertTotal = 0; // PILLAR 5: Internal state for alert throttling
 export let ignoredReporters = new Set(JSON.parse(localStorage.getItem("vbabes_ignored_reporters") || "[]"));
 
 // Setters for external modules
@@ -115,7 +118,7 @@ export function renderSolvencyDashboard(data) {
                 <span class="font-bold text-neon-green uppercase letter-spacing-1">System Solvency: <b class="${data.status === 'HEALTHY' ? 'text-neon-green' : 'text-error'}">${data.status}</b></span>
                 <span class="font-mono font-size-0-8em opacity-5">${new Date(data.timestamp).toLocaleString()}</span>
             </div>
-            <div class="display-grid gap-15 text-center border-bottom-glass pb-15 mb-10" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="display-grid gap-15 text-center border-bottom-glass pb-15 mb-10" style="grid-template-columns: repeat(7, 1fr);">
                 <div>
                     <div class="font-xs opacity-6 uppercase mb-5">Physical Vault</div>
                     <b class="text-neon-cyan">${(data.physical_vault / 1000000).toFixed(2)} $VBV</b>
@@ -132,8 +135,20 @@ export function renderSolvencyDashboard(data) {
                     <div class="font-xs opacity-6 uppercase mb-5">Net Surplus</div>
                     <b class="${surplusClass}">${(data.net_surplus / 1000000).toFixed(2)} $VBV</b>
                 </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Ghost Rec.</div>
+                    <b class="text-error">${((data.ghost_reclaimed || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Stag. Fees</div>
+                    <b class="text-warning">${((data.stagnation_fees || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Plat. Fees</div>
+                    <b class="text-neon-purple">${((data.platform_fees || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
             </div>
-            <div class="font-size-0-75em opacity-7 italic text-center p-10 bg-black-80 rounded">
+            <div class="font-size-0-75em ${data.kernel_healthy ? 'opacity-7' : 'text-error'} italic text-center p-10 bg-black-80 rounded">
                 ${data.audit_report}
             </div>
         </div>
@@ -606,6 +621,7 @@ export async function fetchAdminLogs() { // Exported for use in app.js
             fetchNodeHealth(); // Refresh node health dashboard
             fetchLedgerAudit(); // Refresh solvency dashboard
             fetchMutationAudit(); // New: Refresh mutation audit dashboard
+            fetchDLCRegistry(); // New: Refresh DLC registry dashboard
             adminCommissionAudit(); // PILLAR 1: Refresh alliance dividends
             adminTaxAudit(); // PILLAR 1: Refresh systemic taxes
             adminDistrictTaxAudit(); // PILLAR 1: Refresh localized policies
@@ -654,6 +670,7 @@ export function renderDistrictTaxDashboard(data) {
                 <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
                     <th class="p-10">DISTRICT</th>
                     <th class="p-10">GOVERNOR</th>
+                    <th class="p-10 text-right">DIVIDEND POOL</th>
                     <th class="p-10 text-right">TAX RATE</th>
                 </tr>
             </thead>
@@ -665,6 +682,7 @@ export function renderDistrictTaxDashboard(data) {
                             <span class="text-white">${d.governor_name}</span><br/>
                             <small class="opacity-5 font-mono">${d.governor_address}</small>
                         </td>
+                        <td class="p-10 text-right"><b class="text-neon-green">${((d.dividend_pool || 0) / 1000000).toFixed(2)} $VBV</b></td>
                         <td class="p-10 text-right"><b class="text-neon-green">${d.tax_rate.toFixed(1)}%</b></td>
                     </tr>
                 `).join('')}
@@ -673,6 +691,133 @@ export function renderDistrictTaxDashboard(data) {
     `;
 }
 
+/**
+ * fetchDLCRegistry retrieves the current state of the DLC registry.
+ * PILLAR 4: Console Expansion Management.
+ */
+export async function fetchDLCRegistry() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderDLCRegistryDashboard(data);
+        } else {
+            showToast(`❌ Failed to fetch DLC registry: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC registry fetch failed", err);
+        showToast("❌ Network error fetching DLC registry.", "error");
+    }
+}
+
+/**
+ * renderDLCRegistryDashboard displays the DLC products in the admin panel.
+ * PILLAR 4: Console Expansion Management.
+ */
+export function renderDLCRegistryDashboard(registry) {
+    const container = document.getElementById("admin-dlc-registry-display");
+    if (!container) return;
+
+    if (!registry || Object.keys(registry).length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No DLC products registered.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">ID</th>
+                    <th class="p-10">NAME</th>
+                    <th class="p-10">COST ($VBV)</th>
+                    <th class="p-10">CREATOR</th>
+                    <th class="p-10 text-right">ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.values(registry).map(p => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10"><b class="text-neon-cyan">${p.arena_voucher_id}</b></td>
+                        <td class="p-10">${p.name}</td>
+                        <td class="p-10">${(p.cost_micro / 1000000).toFixed(2)}</td>
+                        <td class="p-10 font-mono font-xs opacity-7">${shortenAddress(p.creator_wallet)}</td>
+                        <td class="p-10 text-right">
+                            <button class="outline x-small border-neon-cyan" onclick="adminUpdateDLCProduct('${p.arena_voucher_id}', '${p.name}', '${p.description}', ${p.cost_micro}, '${p.creator_wallet}')">EDIT</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * adminUpdateDLCProduct allows administrators to add or modify DLC products.
+ * PILLAR 4: Console Expansion Management.
+ */
+export async function adminUpdateDLCProduct(id, name, description, costMicro, creatorWallet) {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    // For simplicity, this example assumes direct input or pre-filled form.
+    // In a real UI, you'd have a modal with input fields.
+    const product = {
+        arena_voucher_id: id || prompt("Enter DLC Product ID:", "NEW_DLC_ITEM"),
+        name: name || prompt("Enter DLC Name:", "New DLC Item"),
+        description: description || prompt("Enter DLC Description:", "A new item for console players."),
+        cost_micro: costMicro || parseInt(prompt("Enter Cost in micro-VBV:", "100000000")), // Default 100 VBV
+        creator_wallet: creatorWallet || prompt("Enter Creator Wallet:", userAddress),
+    };
+
+    if (!product.arena_voucher_id || !product.name || !product.cost_micro || !product.creator_wallet) {
+        showToast("❌ Missing required DLC product fields.", "error");
+        return;
+    }
+
+    // PILLAR 2: Integer Supremacy.
+    // Ensure cost is a valid positive integer to prevent backend arithmetic drift.
+    const cost = parseInt(product.cost_micro);
+    if (isNaN(cost) || cost <= 0) {
+        showToast("❌ Invalid cost amount. Must be a positive integer (micro-units).", "error");
+        return;
+    }
+    product.cost_micro = cost;
+
+    // PILLAR 3: Identity Validation & Normalization.
+    // Verify the creator wallet conforms to supported network standards.
+    const wallet = product.creator_wallet.trim();
+    const isEVM = wallet.startsWith("0x") && wallet.length === 42;
+    const isAVM = wallet.length === 58;
+    const isSOL = wallet.length >= 32 && wallet.length <= 44; // Solana Base58 length range
+
+    if (!isEVM && !isAVM && !isSOL) {
+        showToast("❌ Invalid Creator Wallet address format.", "error");
+        return;
+    }
+    // Normalize AVM and EVM to lowercase; Solana remains case-sensitive.
+    if (!isSOL) product.creator_wallet = wallet.toLowerCase();
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry/update`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+        if (response.ok) {
+            showToast(`✅ DLC product '${product.name}' updated.`, "success");
+            fetchDLCRegistry(); // Refresh the dashboard
+        } else {
+            const err = await response.text();
+            showToast(`❌ DLC Update Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC update failed", err);
+        showToast("❌ Network error updating DLC registry.", "error");
+    }
+}
 /**
  * adminTaxAudit fetches the aggregated session tax revenue.
  * PILLAR 1: Industrial Loop Tracking.
@@ -700,15 +845,34 @@ export async function adminTaxAudit() {
 export function renderTaxDashboard(data) {
     const container = document.getElementById("admin-tax-revenue-display");
     if (!container) return;
-    const corp = (data.corporate_tax_total / 1000000).toFixed(2);
-    const lux = (data.luxury_tax_total / 1000000).toFixed(2);
-    const sabo = (data.sabotage_surcharge_total / 1000000).toFixed(2);
-    const govS = (data.governor_surcharge_total / 1000000).toFixed(2);
-    const total = (parseFloat(corp) + parseFloat(lux) + parseFloat(sabo) + parseFloat(govS)).toFixed(2);
+
+    // PILLAR 2: Solvency Guard.
+    // Trigger a high-priority alert if session ghost reclamation exceeds the critical threshold (5,000 $VBV).
+    // Guarded to only fire when the total increments while above the limit to prevent polling spam.
+    if ((data.ghost_tax_total || 0) > 5000000000 && (data.ghost_tax_total || 0) > lastGhostAlertTotal) {
+        showToast("👻 <b>GHOST ALERT:</b> Session reclamation total exceeds 5,000 $VBV. Verify Creator Hub initialization status.", "critical");
+        lastGhostAlertTotal = data.ghost_tax_total;
+    }
+
+    // PILLAR 2: Solvency Guard.
+    // Trigger a high-priority alert if session platform fees exceed the critical threshold (2,000 $VBV).
+    // Guarded to only fire when the total increments while above the limit to prevent polling spam.
+    if ((data.platform_tax_total || 0) > 2000000000 && (data.platform_tax_total || 0) > lastPlatformAlertTotal) {
+        showToast("💸 <b>SURCHARGE ALERT:</b> Session Platform Fees total exceeds 2,000 $VBV. High volume of self-redemptions detected.", "critical");
+        lastPlatformAlertTotal = data.platform_tax_total;
+    }
+    const corp = ((data.corporate_tax_total || 0) / 1000000).toFixed(2);
+    const lux = ((data.luxury_tax_total || 0) / 1000000).toFixed(2);
+    const sabo = ((data.sabotage_surcharge_total || 0) / 1000000).toFixed(2);
+    const govS = ((data.governor_surcharge_total || 0) / 1000000).toFixed(2);
+    const ghost = ((data.ghost_tax_total || 0) / 1000000).toFixed(2);
+    const plat = ((data.platform_tax_total || 0) / 1000000).toFixed(2);
+    const stag = ((data.stagnation_tax_total || 0) / 1000000).toFixed(2);
+    const total = (parseFloat(corp) + parseFloat(lux) + parseFloat(sabo) + parseFloat(govS) + parseFloat(ghost) + parseFloat(plat) + parseFloat(stag)).toFixed(2);
     
     container.innerHTML = `
         <div class="glass-panel p-10 m-0 border-neon-green accelerated" style="background: rgba(0,0,0,0.4); grid-column: 1 / -1;">
-            <div class="display-grid gap-15 text-center" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="display-grid gap-15 text-center" style="grid-template-columns: repeat(8, 1fr);">
                 <div>
                     <div class="font-xs opacity-6 uppercase mb-5">Corporate Recovery</div>
                     <b class="text-neon-cyan">${corp} $VBV</b>
@@ -728,6 +892,21 @@ export function renderTaxDashboard(data) {
                     <div class="font-xs opacity-6 uppercase mb-5">Gov Surcharge</div>
                     <b class="text-gold">${govS} $VBV</b>
                     <div class="font-xs opacity-4 mt-2">(Capital Revenue)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Platform Fees</div>
+                    <b class="text-neon-purple">${plat} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(Self-Redeem)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Ghost Reclamation</div>
+                    <b class="text-error">${ghost} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(100% Recycle)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Stagnation Fees</div>
+                    <b class="text-warning">${stag} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(25% Siphon)</div>
                 </div>
                 <div><div class="font-xs opacity-6 uppercase mb-5">Session Total</div><b class="text-neon-green">${total} $VBV</b></div>
             </div>
@@ -1227,4 +1406,359 @@ export function adminCyberSecurityAudit() {
                 </div>
             </div>`;
     }).join('')
+}
+
+/**
+ * fetchDLCRegistry retrieves the current state of the DLC registry.
+ * PILLAR 4: Console Expansion Management.
+ */
+export async function fetchDLCRegistry() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderDLCRegistryDashboard(data);
+        } else {
+            showToast(`❌ Failed to fetch DLC registry: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC registry fetch failed", err);
+        showToast("❌ Network error fetching DLC registry.", "error");
+    }
+}
+
+/**
+ * renderDLCRegistryDashboard displays the DLC products in the admin panel.
+ * PILLAR 4: Console Expansion Management.
+ */
+export function renderDLCRegistryDashboard(registry) {
+    const container = document.getElementById("admin-dlc-registry-display");
+    if (!container) return;
+
+    // PILLAR 4: Consistent Styling. 
+    // Apply the specific border class to the parent section glass panel defined in index.html.
+    const section = container.closest('.admin-section-dlc-registry');
+    if (section) section.classList.add('border-neon-cyan');
+
+    const products = Object.values(registry);
+    if (products.length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No DLC products registered.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">ID</th>
+                    <th class="p-10">NAME</th>
+                    <th class="p-10">COST ($VBV)</th>
+                    <th class="p-10">STOCK</th>
+                    <th class="p-10">CREATOR</th>
+                    <th class="p-10 text-right">ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${products.map(p => {
+                    // PILLAR 2: Cross-referencing Creator Stock.
+                    const creator = lastLobbyPlayers.find(pl => pl.wallet?.toLowerCase() === p.creator_wallet?.toLowerCase());
+                    const stock = (creator && creator.inventory) ? (creator.inventory[p.arena_voucher_id] || 0) : 0;
+                    const stockClass = stock === 0 ? 'text-error font-bold' : 'text-neon-green';
+                    return `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10"><b class="text-neon-cyan">${p.arena_voucher_id}</b></td>
+                        <td class="p-10">${p.name}</td>
+                        <td class="p-10">${(p.cost_micro / 1000000).toFixed(2)}</td>
+                        <td class="p-10"><span class="${stockClass}">${stock}</span></td>
+                        <td class="p-10 font-mono font-xs opacity-7">${shortenAddress(p.creator_wallet)}</td>
+                        <td class="p-10 text-right">
+                            <button class="outline x-small border-neon-cyan" onclick="adminUpdateDLCProduct('${p.arena_voucher_id}', '${p.name}', '${p.description}', ${p.cost_micro}, '${p.creator_wallet}')">EDIT</button>
+                            <button class="outline x-small border-neon-green text-neon-green" onclick="adminRestockDLC('${p.arena_voucher_id}')">RESTOCK</button>
+                        </td>
+                    </tr>
+                `; }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+export async function adminUpdateDLCProduct(id, name, description, costMicro, creatorWallet) {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    const product = {
+        arena_voucher_id: id || prompt("Enter DLC Product ID:", "NEW_DLC_ITEM"),
+        name: name || prompt("Enter DLC Name:", "New DLC Item"),
+        description: description || prompt("Enter DLC Description:", "A new item for console players."),
+        cost_micro: costMicro || parseInt(prompt("Enter Cost in micro-VBV:", "100000000")),
+        creator_wallet: creatorWallet || prompt("Enter Creator Wallet:", userAddress),
+    };
+
+    if (!product.arena_voucher_id || !product.name || !product.cost_micro || !product.creator_wallet) {
+        showToast("❌ Missing required DLC product fields.", "error");
+        return;
+    }
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry/update`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+        if (response.ok) {
+            showToast(`✅ DLC product '${product.name}' updated.`, "success");
+            fetchDLCRegistry();
+        } else {
+            const err = await response.text();
+            showToast(`❌ DLC Update Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC update failed", err);
+        showToast("❌ Network error updating DLC registry.", "error");
+    }
+}
+
+/**
+ * adminRestockDLC triggers a manual restock for a specific DLC item.
+ * PILLAR 2: Integer Supremacy.
+ */
+export async function adminRestockDLC(id) {
+    const qty = parseInt(prompt(`Enter restock quantity for ${id}:`, "10"));
+    if (isNaN(qty) || qty <= 0) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry/restock`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ arena_voucher_id: id, quantity: qty })
+        });
+        if (response.ok) {
+            showToast(`✅ Successfully restocked ${qty} units of ${id}.`, "success");
+            fetchDLCRegistry();
+        } else {
+            const err = await response.text();
+            showToast(`❌ Restock Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Network error restocking DLC.", "error");
+    }
+}
+
+/**
+ * adminNodeHealthAudit renders the RPC node cluster health report.
+ * PILLAR 4: Network Resiliency — covers /api/admin/node-health-audit.
+ */
+export async function adminNodeHealthAudit() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/node-health-audit`, { headers });
+        if (response.ok) {
+            const data = await response.json();
+            renderNodeHealthAudit(data);
+        } else {
+            showToast(`❌ Node audit failed: ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Network error fetching node health.", "error");
+    }
+}
+
+/**
+ * renderNodeHealthAudit displays RPC node cluster status.
+ */
+export function renderNodeHealthAudit(data) {
+    const container = document.getElementById("admin-node-health-display");
+    if (!container) return;
+
+    const nodes = data.nodes || [];
+    if (nodes.length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No nodes registered.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">NETWORK</th>
+                    <th class="p-10">NODE URL</th>
+                    <th class="p-10">STATUS</th>
+                    <th class="p-10">LATENCY (ms)</th>
+                    <th class="p-10">LAST CHECK</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${nodes.map(n => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10">${n.network || 'Unknown'}</td>
+                        <td class="p-10 font-mono font-xs opacity-7">${n.url || '?'}</td>
+                        <td class="p-10 ${n.healthy ? 'text-neon-green' : 'text-error'}">${n.healthy ? 'HEALTHY' : 'UNHEALTHY'}</td>
+                        <td class="p-10">${n.latency_ms ?? '?'}</td>
+                        <td class="p-10">${n.last_check || 'Never'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * adminSystemSanityCheck performs a comprehensive ledger and node audit.
+ * PILLAR 4: Live Deployment & Monitoring — covers /api/admin/system-sanity-check.
+ */
+export async function adminSystemSanityCheck() {
+    if (!confirm("⚠️ This will run a full ledger invariant audit. Continue?")) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Running comprehensive system sanity check...", "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/system-sanity-check`, { method: 'POST', headers });
+        if (response.ok) {
+            const data = await response.json();
+            renderSystemSanityCheck(data);
+            showToast("✅ System sanity check complete.", "success");
+        } else {
+            setTransactionStatus(`❌ Sanity check failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Sanity check network error", "critical");
+        showToast("❌ Network error during sanity check.", "error");
+    }
+}
+
+/**
+ * renderSystemSanityCheck displays ledger invariants and node connectivity results.
+ */
+export function renderSystemSanityCheck(data) {
+    const container = document.getElementById("admin-sanity-check-display");
+    if (!container) return;
+
+    const checks = data.checks || [];
+    container.innerHTML = checks.length > 0 ? checks.map(c => `
+        <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
+            <div class="${c.passed ? 'text-neon-green' : 'text-error'} font-bold mb-5">
+                ${c.passed ? '✅' : '❌'} ${c.name}
+            </div>
+            <div class="font-xs opacity-7">${c.message || 'No details'}</div>
+        </div>
+    `).join('') : '<div class="opacity-5 italic py-20">No results available.</div>';
+}
+
+/**
+ * adminEmergencyShutdown executes a scorched-earth protocol to preserve state and terminate sessions.
+ * PILLAR 3: Administrative Security — covers /api/admin/emergency-shutdown.
+ */
+export async function adminEmergencyShutdown() {
+    if (!confirm("⚠️ CRITICAL: This will shut down all active sessions and preserve state. Confirm?")) return;
+    if (!confirm("⚠️ SECOND CONFIRMATION: This action is irreversible without external recovery.")) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("🔴 EMERGENCY SHUTDOWN INITIATED...", "critical");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/emergency-shutdown`, { method: 'POST', headers });
+        if (response.ok) {
+            showToast("✅ Emergency shutdown executed successfully.", "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Shutdown failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Shutdown network error", "critical");
+        showToast("❌ Network error during shutdown.", "error");
+    }
+}
+
+/**
+ * adminSimulateLoad stress-tests the telemetry throughput.
+ * PILLAR 4: Performance Monitoring & Stress Testing — covers /api/admin/simulate-load.
+ */
+export async function adminSimulateLoad() {
+    const count = parseInt(prompt("Enter number of concurrent load events:", "50")) || 50;
+    if (count <= 0) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus(`Stress-testing with ${count} concurrent transactions...`, "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-load`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ count })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            showToast(`✅ Load test complete: ${data.transactions || count} transactions processed.`, "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Load test failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Load test network error", "critical");
+        showToast("❌ Network error during load test.", "error");
+    }
+}
+
+/**
+ * adminDistrictTaxAudit audits district-level tax collection and revenue distribution.
+ * PILLAR 1: Economic Integrity — covers /api/admin/district-tax-audit.
+ */
+export async function adminDistrictTaxAudit() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/district-tax-audit`, { headers });
+        if (response.ok) {
+            const data = await response.json();
+            renderDistrictTaxAudit(data);
+        } else {
+            showToast(`❌ Tax audit failed: ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Network error fetching tax audit.", "error");
+    }
+}
+
+/**
+ * renderDistrictTaxAudit displays district-level tax collection data.
+ */
+export function renderDistrictTaxAudit(data) {
+    const container = document.getElementById("admin-district-tax-display");
+    if (!container) return;
+
+    const districts = data.districts || [];
+    const totalRevenue = data.total_revenue_micro || 0;
+
+    container.innerHTML = `
+        <div class="mb-10 font-bold text-neon-cyan">Total District Revenue: ${(totalRevenue / 1000000).toFixed(2)} $VBV</div>
+        ${districts.length > 0 ? districts.map(d => `
+            <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
+                <div class="font-bold text-neon-purple mb-5">${d.name || 'Unknown District'}</div>
+                <div class="font-xs opacity-7">
+                    Collected: ${(d.collected_micro || 0) / 1000000} $VBV | 
+                    Distributed: ${(d.distributed_micro || 0) / 1000000} $VBV | 
+                    Retained: ${(d.retained_micro || 0) / 1000000} $VBV
+                </div>
+            </div>
+        `).join('') : '<div class="opacity-5 italic py-20">No district data available.</div>'}
+    `;
 }

@@ -46,6 +46,13 @@ export function triggerMoodMote(gridIndex, mood) {
             life: 0.8, decay: Math.random() * 0.05 + 0.02,
         });
     }
+
+    // PILLAR 5: Visual Hardening.
+    // Ensure particle count stays within bounds during high-frequency catch-up events.
+    if (particles.length > MAX_PARTICLES) {
+        particles = particles.slice(-MAX_PARTICLES);
+    }
+
     startAnimationLoop();
 }
 
@@ -403,6 +410,40 @@ export function triggerGlobalKidnapEffect() {
     startAnimationLoop();
 }
 
+/**
+ * triggerContractCompleteEffect generates a high-intensity emerald and gold flourish.
+ * PILLAR 3: Underworld mission success feedback.
+ */
+export function triggerContractCompleteEffect() {
+    const canvas = document.getElementById("particle-canvas");
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    // Generate 100 high-velocity emerald and gold geometric particles
+    for (let i = 0; i < 100; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 15 + 5;
+        particles.push({
+            x: rect.width / 2,
+            y: rect.height / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: Math.random() * 5 + 2,
+            color: Math.random() > 0.4 ? "#50c878" : "#ffd700", // Emerald or Gold
+            life: 1.2,
+            decay: Math.random() * 0.02 + 0.01,
+            isGeometric: true,
+            sides: Math.random() > 0.5 ? 4 : 6, // Diamonds and Hexagons
+            rotation: Math.random() * Math.PI * 2,
+            spin: (Math.random() - 0.5) * 0.3,
+            glitch: Math.random() > 0.8
+        });
+    }
+
+    if (particles.length > MAX_PARTICLES) particles = particles.slice(-MAX_PARTICLES);
+    startAnimationLoop();
+}
+
 export function triggerMutationScarEffect() {
     const canvas = document.getElementById("particle-canvas");
     if (!canvas) return;
@@ -450,6 +491,7 @@ export function triggerMutationScarEffect() {
 window.triggerCloakFailureParticles = triggerCloakFailureParticles;
 window.triggerCloakDisruptorParticles = triggerCloakDisruptorParticles;
 window.triggerDistrictStabilizerEffect = triggerDistrictStabilizerEffect;
+window.triggerContractCompleteEffect = triggerContractCompleteEffect;
 window.triggerStaffTrainingEffect = triggerStaffTrainingEffect;
 window.triggerMutationInsuranceEffect = triggerMutationInsuranceEffect;
 window.triggerMutationSuccessParticles = triggerMutationSuccessParticles;

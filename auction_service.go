@@ -1,19 +1,33 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math/big"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
+	"github.com/algorand/go-algorand-sdk/v2/crypto"
 	"github.com/algorand/go-algorand-sdk/v2/encoding/msgpack"
+	"github.com/algorand/go-algorand-sdk/v2/mnemonic"
+	"github.com/algorand/go-algorand-sdk/v2/transaction"
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
-// handleGetAuctions returns all active listings in the Art Gallery.
-func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
+// AuctionService encapsulates logic for high-fidelity asset sales and Art Gallery operations.
+// PILLAR 5: Stateless Service Design.
+type AuctionService struct{}
+
+// HandleGetAuctions returns all active listings in the Art Gallery.
+func (s *AuctionService) HandleGetAuctions(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
 	var list []*Auction
 	for _, a := range l.auctions {
@@ -26,10 +40,10 @@ func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
 	// master record for all future requests.
 	for _, a := range list {
 		if a.SellerName == "" {
-			a.SellerName = l.ResolveEnvoiName(a.SellerWallet)
+			a.SellerName = l.oracleService.ResolveEnvoiName(l, a.SellerWallet)
 		}
 		if a.HighestBidder != "" && (a.HighestBidderName == "" || a.HighestBidderName == a.HighestBidder) {
-			a.HighestBidderName = l.ResolveEnvoiName(a.HighestBidder)
+			a.HighestBidderName = l.oracleService.ResolveEnvoiName(l, a.HighestBidder)
 		}
 	}
 
@@ -37,8 +51,8 @@ func (l *Lobby) handleGetAuctions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(list)
 }
 
-// handleCreateAuction allows a player to list a bundle for $VBV.
-func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
+// HandleCreateAuction allows a player to list a bundle for $VBV.
+func (s *AuctionService) HandleCreateAuction(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Wallet     string     `json:"wallet"`
 		Bundle     CardBundle `json:"bundle"`
@@ -63,7 +77,9 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sellerName := l.ResolveEnvoiName(req.Wallet)
+	// PILLAR 3: Identity Normalization.
+	targetWallet := strings.ToLower(req.Wallet)
+	sellerName := l.oracleService.ResolveEnvoiName(l, targetWallet)
 
 	l.mutex.RLock()
 	nonceData, nonceExists := l.nonces[req.ClientID]
@@ -74,7 +90,7 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var stx types.SignedTxn
-	if err := msgpack.Decode(req.SignedTx, &stx); err != nil || stx.Txn.Sender.String() != req.Wallet || string(stx.Txn.Note) != nonceData.Value {
+	if err := msgpack.Decode(req.SignedTx, &stx); err != nil || !strings.EqualFold(stx.Txn.Sender.String(), targetWallet) || string(stx.Txn.Note) != nonceData.Value {
 		http.Error(w, "Unauthorized: Signature mismatch", http.StatusUnauthorized)
 		return
 	}
@@ -83,7 +99,7 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 	defer l.mutex.Unlock()
 
 	// PILLAR 2: Inventory Integrity. Ensure stats are ready for verification.
-	stats := l.leaderboard[req.Wallet]
+	stats := l.leaderboard[targetWallet]
 	if req.Bundle.CardID != 0 {
 		cardKey := fmt.Sprintf("CARD-%d", req.Bundle.CardID)
 		if stats.Inventory == nil || stats.Inventory[cardKey] <= 0 {
@@ -94,26 +110,28 @@ func (l *Lobby) handleCreateAuction(w http.ResponseWriter, r *http.Request) {
 
 	// PILLAR 5: Modular Orchestration.
 	// Utilize authoritative helper for escrow removal to ensure consistent key pruning.
-	l.transferBundleItems(req.Wallet, req.Bundle, false)
+	s.TransferBundleItems(l, targetWallet, req.Bundle, false)
 
 	auctionID := fmt.Sprintf("AUC-%d", time.Now().UnixNano())
+	startPriceMicro := uint64(req.StartPrice*1000000 + 0.5)
 	l.auctions[auctionID] = &Auction{
 		ID:           auctionID,
-		SellerWallet: req.Wallet,
+		SellerWallet: targetWallet,
 		SellerName:   sellerName,
 		Bundle:       req.Bundle,
-		CurrentBid:   uint64(req.StartPrice * 1000000),
+		CurrentBid:   startPriceMicro,
 		EndsAt:       time.Now().Add(time.Duration(req.Duration) * time.Hour),
 		TerritoryID:  "the_archive", // Fixed territory for Art Gallery Commissions
 	}
 
 	// PILLAR 2: High-Finance Audit. Use Locked variant to prevent recursive deadlock.
-	l.logAdminAuditLocked("AUCTION_CREATED", req.Wallet, fmt.Sprintf("ID: %s, Price: %.2f", auctionID, req.StartPrice))
+	l.logAdminAuditLocked("AUCTION_CREATED", targetWallet, fmt.Sprintf("ID: %s, Price: %.2f", auctionID, float64(startPriceMicro)/1000000.0))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(l.auctions[auctionID])
 }
 
-func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
+// HandlePlaceBid processes inbound currency for competitive item acquisition.
+func (s *AuctionService) HandlePlaceBid(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		AuctionID string `json:"auction_id"`
 		Bidder    string `json:"wallet"`
@@ -128,7 +146,8 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 
 	// PILLAR 5: Performance & Safety.
 	// Resolve names before acquiring the global lock to prevent I/O blocking and deadlocks.
-	bidderName := l.ResolveEnvoiName(req.Bidder)
+	targetWallet := strings.ToLower(req.Bidder)
+	bidderName := l.oracleService.ResolveEnvoiName(l, targetWallet)
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -139,19 +158,33 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Amount <= auction.CurrentBid {
-		http.Error(w, "Bid must be higher than current", http.StatusBadRequest)
+	// PILLAR 2: Minimum Bid Increment.
+	// Enforce a 1% minimum increment (with 0.01 VBV floor) to ensure meaningful auction velocity.
+	minIncrementMicro := (auction.CurrentBid + 99) / 100
+	if minIncrementMicro < 10000 { minIncrementMicro = 10000 } // 0.01 VBV floor
+
+	if req.Amount < auction.CurrentBid + minIncrementMicro {
+		http.Error(w, fmt.Sprintf("Bid increment too low. Minimum bid: %.2f $VBV", float64(auction.CurrentBid + minIncrementMicro)/1000000.0), http.StatusBadRequest)
 		return
 	}
 
-	if l.playerBalances[req.Bidder] < req.Amount {
-		http.Error(w, "Insufficient reward balance for bid", http.StatusBadRequest)
+	// PILLAR 2: Non-Custodial Bidding Verification.
+	// Check if the bidder has approved the vault to pull the VBV on-chain.
+	// This allows for high-value bidding without depositing rewards first.
+	approvedAmt, _ := l.oracleService.CheckAssetApproval(l, "VOI", targetWallet, l.vaultAddress, l.rewardAssetID)
+
+	hasVirtual := l.playerBalances[targetWallet] >= req.Amount
+	hasApproved := approvedAmt >= req.Amount
+
+	if !hasVirtual && !hasApproved {
+		http.Error(w, "Insufficient funds: Either internal rewards or on-chain approval required.", http.StatusPaymentRequired)
 		return
 	}
 
 	// Store previous highest bidder and their bid for refund
 	previousHighestBidder := auction.HighestBidder
 	previousHighestBid := auction.CurrentBid
+	wasApproved := auction.HighestBidIsApproved
 
 	nonceData, ok := l.nonces[req.ClientID]
 	if !ok || time.Since(nonceData.CreatedAt) > 5*time.Minute {
@@ -159,26 +192,39 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var stx types.SignedTxn
-	if err := msgpack.Decode(req.SignedTx, &stx); err != nil || stx.Txn.Sender.String() != req.Bidder || string(stx.Txn.Note) != nonceData.Value {
+	if err := msgpack.Decode(req.SignedTx, &stx); err != nil || !strings.EqualFold(stx.Txn.Sender.String(), targetWallet) || string(stx.Txn.Note) != nonceData.Value {
 		http.Error(w, "Bid authentication failed", http.StatusUnauthorized)
 		return
 	}
 
-	// 1. Deduct new bid from current bidder
-	l.playerBalances[req.Bidder] -= req.Amount
+	// 1. Payout Handling.
+	// If the user has sufficient internal rewards, we escrow them immediately to ensure 
+	// the bid is "locked." If they are using an approval, we skip the immediate 
+	// deduction and verify/pull at settlement.
+	if hasVirtual {
+		l.playerBalances[targetWallet] -= req.Amount
+		l.logAdminAuditLocked("AUCTION_BID_INTERNAL", targetWallet, fmt.Sprintf("Virtual deduction: %.2f", float64(req.Amount)/1000000.0))
+		auction.HighestBidIsApproved = false
+	} else {
+		l.logAdminAuditLocked("AUCTION_BID_APPROVED", targetWallet, fmt.Sprintf("Non-custodial approval verified: %.2f", float64(approvedAmt)/1000000.0))
+		auction.HighestBidIsApproved = true
+	}
 
 	// 2. Refund previous highest bidder (if any)
 	if previousHighestBidder != "" {
-		l.playerBalances[previousHighestBidder] += previousHighestBid
-		// Notify previous bidder of refund
-		l.sendToClientLocked(l.getClientIDFromWalletLocked(previousHighestBidder), Envelope{
-			Type:    "admin_notification",
-			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>AUCTION REFUND:</b> Your bid of %.2f $VBV for auction %s has been refunded."}`, float64(previousHighestBid)/1000000.0, req.AuctionID)),
-		})
+		// PILLAR 2: "Free Refund" Guard. Only refund if the previous bid was virtual.
+		if !wasApproved {
+			l.playerBalances[previousHighestBidder] += previousHighestBid
+			// Notify previous bidder of refund
+			l.sendToClientLocked(l.getClientIDFromWalletLocked(previousHighestBidder), Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>AUCTION REFUND:</b> Your bid of %.2f $VBV for auction %s has been refunded."}`, float64(previousHighestBid)/1000000.0, req.AuctionID)),
+			})
+		}
 	}
 
 	auction.CurrentBid = req.Amount
-	auction.HighestBidder = req.Bidder
+	auction.HighestBidder = targetWallet
 	auction.HighestBidderName = bidderName
 
 	// PILLAR 2: Ledger Integrity.
@@ -186,7 +232,7 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	// virtual liability categories. Scaling is recalculated based on the new liability sum.
 	l.applyDynamicScalingLocked()
 
-	l.logAdminAuditLocked("AUCTION_BID", req.Bidder, fmt.Sprintf("Auction: %s, Amount: %.2f", req.AuctionID, float64(req.Amount)/1000000.0))
+	l.logAdminAuditLocked("AUCTION_BID", targetWallet, fmt.Sprintf("Auction: %s, Amount: %.2f", req.AuctionID, float64(req.Amount)/1000000.0))
 	msg := l.getLobbyUpdateMsgLocked()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -195,8 +241,8 @@ func (l *Lobby) handlePlaceBid(w http.ResponseWriter, r *http.Request) {
 	go func() { l.broadcast <- msg }()
 }
 
-// processAuctions handles auction expiration and settlement.
-func (l *Lobby) processAuctions() {
+// ProcessAuctions handles auction expiration and settlement.
+func (s *AuctionService) ProcessAuctions(l *Lobby) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	now := time.Now()
@@ -208,7 +254,7 @@ func (l *Lobby) processAuctions() {
 			if auction.HighestBidder != "" {
 				// Settle auction: transfer item to winner, pay seller
 				// 1. Transfer items to winner
-				l.transferBundleItems(auction.HighestBidder, auction.Bundle, true)
+				s.TransferBundleItems(l, auction.HighestBidder, auction.Bundle, true)
 
 				// 2. Calculate commission (10%) and net payout to seller
 				// PILLAR 1: Precision Rounding for the Industrial Loop.
@@ -229,13 +275,24 @@ func (l *Lobby) processAuctions() {
 				}
 
 				// 3. Pay seller
+				if auction.HighestBidIsApproved {
+					// PILLAR 2: Non-Custodial Settlement.
+					// Winner used an on-chain approval. Pull the funds now.
+					if err := s.pullApprovedTokens(l, auction.HighestBidder, auction.CurrentBid); err != nil {
+						log.Printf("[AUCTION ERROR] Critical settlement failure: Failed to pull tokens from %s: %v\n", auction.HighestBidder, err)
+						// We proceed to pay the seller virtual rewards, maintaining the "Token-Sink" promise.
+					}
+				}
 				l.playerBalances[auction.SellerWallet] += netPayoutToSellerMicro
 
 				// 4. Distribute commission
 				artGalleryClub := l.getClubByTerritoryID(auction.TerritoryID) // "the_archive"
 				if artGalleryClub != nil {
 					totalCommissionBase := float64(commissionMicro) / 1000000.0
-					artGalleryClub.Treasury += totalCommissionBase
+
+					// Club.TreasuryMicro is the authoritative uint64 vault field.
+					artGalleryClub.TreasuryMicro += commissionMicro
+
 					artGalleryClub.LastActivity = now
 					l.logAdminAuditLocked("AUCTION_COMMISSION_TO_CLUB", artGalleryClub.ID, fmt.Sprintf("Auction: %s, Commission: %.2f", id, totalCommissionBase))
 				}
@@ -250,7 +307,7 @@ func (l *Lobby) processAuctions() {
 				winnerStats.AuctionsWon++
 				l.leaderboard[auction.HighestBidder] = winnerStats
 				if winnerStats.AuctionsWon >= 3 {
-					l.unlockAchievementLocked(auction.HighestBidder, "ART_COLLECTOR")
+					l.achievementService.UnlockAchievementLocked(l, auction.HighestBidder, "ART_COLLECTOR")
 				}
 
 				l.logAdminAuditLocked("AUCTION_SETTLED", auction.HighestBidder, fmt.Sprintf("Auction: %s, Winner: %s, Seller: %s, Amount: %.2f (Net: %.2f, Commission: %.2f)",
@@ -276,7 +333,7 @@ func (l *Lobby) processAuctions() {
 				})
 			} else {
 				// No bids, return item to seller
-				l.transferBundleItems(auction.SellerWallet, auction.Bundle, true)
+				s.TransferBundleItems(l, auction.SellerWallet, auction.Bundle, true)
 				l.logAdminAuditLocked("AUCTION_EXPIRED", auction.SellerWallet, fmt.Sprintf("Auction: %s, No bids, items returned.", id))
 				l.sendToClientLocked(l.getClientIDFromWalletLocked(auction.SellerWallet), Envelope{
 					Type:    "admin_notification",
@@ -296,12 +353,80 @@ func (l *Lobby) processAuctions() {
 
 }
 
+// pullApprovedTokens executes an on-chain transferFrom to move tokens from the winner to the vault.
+// PILLAR 2: High-Finance.
+func (s *AuctionService) pullApprovedTokens(l *Lobby, from string, amount uint64) error {
+	l.mutex.RLock()
+	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
+	vaultAddr := l.vaultAddress
+	rewardAsset := l.rewardAssetID
+	l.mutex.RUnlock()
+
+	if len(voiConfig.NodeURLs) == 0 {
+		return fmt.Errorf("no nodes available")
+	}
+
+	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
+	pk, _ := mnemonic.ToPrivateKey(os.Getenv("FAUCET_MNEMONIC"))
+	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
+	sp, _ := client.SuggestedParams().Do(context.Background())
+
+	// ARC-200 transferFrom(address from, address to, uint256 value) -> selector: 0x23b872dd
+	methodSelector := []byte{0x23, 0xb8, 0x72, 0xdd}
+	fromAddr, _ := types.DecodeAddress(from)
+	toAddr, _ := types.DecodeAddress(vaultAddr)
+	amountBytes := make([]byte, 32)
+	new(big.Int).SetUint64(amount).FillBytes(amountBytes)
+
+	appArgs := [][]byte{
+		methodSelector,
+		fromAddr[:],
+		toAddr[:],
+		amountBytes,
+	}
+
+	appID, _ := strconv.ParseUint(rewardAsset, 10, 64)
+	senderAddr, _ := types.DecodeAddress(vaultAddr)
+	note := []byte(fmt.Sprintf("VBT_AUCTION_PULL:{\"from\":\"%s\",\"amt\":%d}", from, amount))
+
+	txn, _ := transaction.MakeApplicationNoOpTx(appID, appArgs, nil, nil, nil, sp, senderAddr, note, types.Digest{}, [32]byte{}, types.Address{})
+	txid, stxn, err := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
+	if err != nil { return err }
+	
+	if _, err := client.SendRawTransaction(stxn).Do(context.Background()); err != nil {
+		return err
+	}
+	log.Printf("[AUCTION] Pulled %d micro-tokens from %s. TxID: %s\n", amount, from, txid)
+
+	l.mutex.Lock()
+	l.faucetBalanceMicro += amount
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+	// PILLAR 2: Real-time Reconciliation.
+	// Capture the non-custodial auction settlement in the authoritative audit trail.
+	if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+		// PILLAR 2: Structural Audit. Report zero siphon for standard on-chain pulls.
+		_ = l.tokenSinkRouter.Audit.InterceptAndAudit("AUCTION_PULL", amount, amount, 0, 0, 0)
+	}
+
+	l.mutex.Unlock()
+
+	return nil
+}
+
 // transferBundleItems handles adding or removing items from a player's inventory.
 // If add is true, items are added. If add is false, items are removed.
 // It assumes the lobby mutex is held.
-func (l *Lobby) transferBundleItems(wallet string, bundle CardBundle, add bool) {
+func (s *AuctionService) TransferBundleItems(l *Lobby, wallet string, bundle CardBundle, add bool) {
 	l.ensurePlayerStatsMapsInitialized(wallet)
 	stats := l.leaderboard[wallet]
+
+	// PILLAR 5: Defensive Map Handling.
+	// Initialize Inventory if nil to prevent panics during deductions, 
+	// ensuring parity with the global initialization helper.
+	if stats.Inventory == nil {
+		stats.Inventory = make(map[string]int)
+	}
 
 	if bundle.CardID != 0 {
 		cardKey := fmt.Sprintf("CARD-%d", bundle.CardID)

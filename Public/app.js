@@ -22,13 +22,15 @@ import {
     adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, 
     adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminSimulateMutationSuccess, adminSimulateMutationFailure,
     adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, adminAssetForfeiture, adminForcePayout, adminSimulateMojoDecay, adminCyberSecurityAudit,
-    onAdminNetworkSelectChange, adminSetActiveNetwork, adminSeasonRollover, adminExportAuditLog, adminCommissionAudit, adminTaxAudit
+    onAdminNetworkSelectChange, adminSetActiveNetwork, adminSeasonRollover, adminExportAuditLog, adminCommissionAudit, adminTaxAudit, adminRestockDLC
 } from './js/admin.js'; // Note: adminDistrictTaxAudit should be added here
-import { openShopsOverlay, buyClubItem, openClubFoundry, submitClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, buyBlackMarketItem, openClubLeaseBoard, switchPortfolioTab, takeLease, openCreateLeaseOverlay, submitCreateLease, openMutationHistoryOverlay, openVaultInteraction, submitDistrictTax } from './js/economy.js';
-import { openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer, sendAllianceInvite, acceptAlliance, dissolveAlliance, openTrophyView, reportPlayer } from './js/criminality.js';
+import { openShopsOverlay, buyClubItem, openClubFoundry, submitClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, buyBlackMarketItem, openClubLeaseBoard, switchPortfolioTab, takeLease, openCreateLeaseOverlay, submitCreateLease, openMutationHistoryOverlay, openVaultInteraction, submitDistrictTax, openRecoveryBountyOverlay } from './js/economy.js';
+import { openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer, sendAllianceInvite, acceptAlliance, dissolveAlliance, openTrophyView, reportPlayer, openLaunderingTerminal } from './js/criminality.js';
 import { 
     playProcedureInterruptedSFX, playLongWarningSFX, playCloakFailureSFX, playCloakDisruptorSFX, playMutationSoundscape, stopMutationSoundscape, playMutationSuccessSFX, playEcosystemAlertSFX
 } from './js/audio.js';
+import { initAudioContextManager, getAudioContextManager } from './js/audio_context.js';
+import { RivalryEngine } from './js/rivalry.js';
 import { 
     initParticleSystem, triggerCaptureParticles, triggerGlobalKidnapEffect, 
     triggerMutationScarEffect, triggerCloakFailureParticles, triggerCloakDisruptorParticles
@@ -51,6 +53,7 @@ window.toggleMuteSfx = toggleMuteSfx;
 window.setMasterVolume = updateMasterVolume;
 window.playMutationSuccessSFX = playMutationSuccessSFX;
 window.playCloakDisruptorSFX = playCloakDisruptorSFX;
+window.toggleContextualAmbients = toggleContextualAmbients;
 window.playProcedureInterruptedSFX = playProcedureInterruptedSFX;
 window.playCloakFailureSFX = playCloakFailureSFX;
 window.playLongWarningSFX = playLongWarningSFX;
@@ -91,10 +94,16 @@ window.adjustMapZoom = adjustMapZoom;
 window.openSocialPanelOverlay = openSocialPanelOverlay;
 window.switchSocialTab = switchSocialTab;
 window.openPortfolioView = openPortfolioView;
+window.openLaunderingTerminal = openLaunderingTerminal;
+window.openRecoveryBountyOverlay = openRecoveryBountyOverlay;
 window.switchPortfolioTab = switchPortfolioTab;
 window.openVaultInteraction = openVaultInteraction;
 window.tradeShares = tradeShares;
 window.openMutationHistoryOverlay = openMutationHistoryOverlay;
+window.adjustMutationVector = adjustMutationVector;
+window.submitVectorRealignment = submitVectorRealignment;
+window.submitMoodRecalibration = submitMoodRecalibration;
+window.submitMutationLoyaltySynthesis = submitMutationLoyaltySynthesis;
 window.submitDistrictTax = submitDistrictTax;
 window.openBlackMarket = openBlackMarket;
 window.buyBlackMarketItem = buyBlackMarketItem;
@@ -109,6 +118,7 @@ window.submitLinkWallet = submitLinkWallet;
 window.openClubLeaseBoard = openClubLeaseBoard;
 window.openCreateLeaseOverlay = openCreateLeaseOverlay;
 window.submitCreateLease = submitCreateLease;
+window.switchFoundryTab = switchFoundryTab; // PILLAR 4: Expose for inline HTML calls
 window.takeLease = takeLease;
 window.openCourthouse = openCourthouse;
 window.submitCourthouseFine = submitCourthouseFine;
@@ -121,6 +131,7 @@ window.spreadRumor = spreadRumor;
 window.openHeistPlanningOverlay = openHeistPlanningOverlay;
 window.updateHeistRiskAssessment = updateHeistRiskAssessment;
 window.executeHeistStrike = executeHeistStrike;
+window.sendHeistRequest = sendHeistRequest;
 window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
 window.executeKidnap = executeKidnap;
 window.payRansom = payRansom;
@@ -135,6 +146,7 @@ window.shareTournamentVictory = shareTournamentVictory;
 window.adminSeasonRollover = adminSeasonRollover;
 window.initiateRegionalSabotage = initiateRegionalSabotage; // New: Regional Warfare
 window.adminExportAuditLog = adminExportAuditLog;
+window.adminRestockDLC = adminRestockDLC;
 window.adminSimulateMutationSuccess = adminSimulateMutationSuccess;
 window.adminSimulateMutationFailure = adminSimulateMutationFailure;
 window.adminSimulateTournament = adminSimulateTournament;
@@ -177,6 +189,13 @@ window.onload = async () => {
         if (cachedBeacon) {
             try {
                 const beacon = JSON.parse(cachedBeacon);
+
+                // PILLAR 4: Session Identity Restoration.
+                // Must restore player index before syncing profile to ensure correct slot hydration.
+                if (beacon.local_player_index !== undefined && window.SetLocalPlayerIndex) {
+                    window.SetLocalPlayerIndex(beacon.local_player_index);
+                }
+
                 if (window.SyncFullProfile) window.SyncFullProfile(beacon.profile);
                 // PILLAR 4: Sequence Restoration.
                 // Restore the Replay Engine sequence count to enable seamless catch-up.
@@ -217,7 +236,11 @@ window.onload = async () => {
         
         window.syncUI();
 
-        // PILLAR 4: Warm-Boot Restoration.
+    // PILLAR 6: AudioContextManager initialization.
+        // Initialize contextual audio after WASM is active to ensure it has the audio module reference.
+        // We'll set it up once the WebSocket handshake completes and first syncUI fires.
+        
+    // PILLAR 4: Warm-Boot Restoration.
         // If the beacon restored an 'Active' state, trigger the catch-up protocol.
         const postSyncState = window.GetGameState("combat");
         if (postSyncState && postSyncState.phase === "Active") {
@@ -226,8 +249,33 @@ window.onload = async () => {
     } catch (err) {
         console.error("[BOOT ERROR] Engine initialization failed:", err);
         showToast("❌ Critical Error: Neural Uplink Failed. Please refresh.", "error", 0);
+     }
+ };
+
+/**
+ * handlePhaseMusicTransition - Bridges syncUI phase changes to AudioContextManager.
+ * PILLAR 6: Phase-Based Atmosphere. Dispatches game_phase_change events for context-aware music.
+ */
+function handlePhaseMusicTransition(state) {
+    const phaseToContext = {
+        "DISCONNECTED": "menu",
+        "Setup": "lobby",
+        "Lobby": "lobby",
+        "PreGame": "casual_2p",
+        "Active_Casual": "casual_2p",
+        "Active_Quick": "quick_play",
+        "Active_Tournament": "tournament",
+        "Active": "combat",
+        "TournamentLobby": "tournament_lobby",
+        "Finished": "finished"
+    };
+    
+    const context = phaseToContext[state.phase] || null;
+    if (context && context !== window._lastAudioContext) {
+        window._lastAudioContext = context;
+        window.dispatchEvent(new CustomEvent('game_phase_change', { detail: { context, reason: 'syncUI' } }));
     }
-};
+}
 
 // --- UI Performance Layer ---
 const UI_CACHE = new Map();
@@ -314,6 +362,61 @@ function updateVolumeSlidersUI() {
     if (mv) mv.value = localStorage.getItem('masterVolume') || 0.5;
     if (mu) mu.value = localStorage.getItem('musicVolume') || 0.5;
     if (sf) sf.value = localStorage.getItem('sfxVolume') || 0.5;
+    
+    // Update contextual ambients toggle status
+    updateAmbientsToggleUI();
+}
+
+/**
+ * updateAmbientsToggleUI updates the contextual ambients button/icon based on persisted state.
+ * PILLAR 6: Audio Context Manager.
+ */
+function updateAmbientsToggleUI() {
+    const statusEl = getEl("ambients-status");
+    const btnEl = getEl("ambients-toggle-btn");
+    
+    if (!statusEl || !btnEl) return;
+    
+    const isEnabled = localStorage.getItem('contextualAmbients') === 'true';
+    
+    statusEl.innerText = isEnabled ? "ON" : "OFF";
+    statusEl.style.color = isEnabled ? "var(--neon-green)" : "var(--opacity-6, rgba(255,255,255,0.6))";
+    btnEl.innerText = isEnabled ? "🎙️" : "⏺️"; // Active mic vs inactive
+    
+    // Add subtle glow if enabled
+    if (isEnabled) {
+        btnEl.style.boxShadow = "0 0 8px var(--neon-green)";
+        btnEl.style.borderColor = "var(--neon-green)";
+    } else {
+        btnEl.style.boxShadow = "";
+        btnEl.style.borderColor = "";
+    }
+}
+
+/**
+ * toggleContextualAmbients toggles the contextual ambients feature on/off.
+ * PILLAR 6: Audio Context Manager.
+ */
+function toggleContextualAmbients() {
+    const audioCtx = getAudioContextManager();
+    if (!audioCtx) {
+        showToast("Audio context not yet initialized. Try again in a moment.", "warning");
+        return;
+    }
+    
+    const isEnabled = localStorage.getItem('contextualAmbients') === 'true';
+    const newState = !isEnabled;
+    
+    localStorage.setItem('contextualAmbients', String(newState));
+    
+    // Apply to audio context manager
+    audioCtx.setAmbientEnabled(newState);
+    
+    // Update UI immediately
+    updateAmbientsToggleUI();
+    
+    // Log the change for audit purposes
+    console.log(`[Audio Context] Contextual ambients ${newState ? 'enabled' : 'disabled'}`);
 }
 
 /**
@@ -729,6 +832,25 @@ window.syncUI = (scope = "all", overrideData = null) => {
     dashboardCache.stateKey = currentStateKey;
     dashboardCache.lastBalance = state.faucet;
 
+    // PILLAR 6: Audio Context Transitions.
+    if (scope === "all" || scope === "meta") {
+        handlePhaseMusicTransition(state);
+        
+        // Dispatch game phase change event for AudioContextManager
+        initAudioContextManager(window.AudioModuleInstance);
+        const audioCtx = getAudioContextManager();
+        if (audioCtx) {
+            const contextMap = {
+                'Lobby': 'lobby',
+                'Active': 'combat',
+                'TournamentLobby': 'tournament',
+                'PreGame': 'casual_2p'
+            };
+            const contextKey = contextMap[state.phase] || 'menu';
+            audioCtx.transitionToContext(contextKey, 'syncUI');
+        }
+    }
+
     // PILLAR 4: Critical Alerts.
     // The native VOI 'gas_warning' toast is handled by the 'admin_notification'
     // system (network.js -> ui.js:showToast), not directly by syncUI.
@@ -914,6 +1036,7 @@ window.syncUI = (scope = "all", overrideData = null) => {
     if (scope === "all" && (state.phase === "Lobby" || state.phase === "Active") && userAddress) {
         const beaconData = {
             profile: state,
+            local_player_index: state.local_player_index, // PILLAR 4: Maintain identity across refreshes
             vault_balance: state.faucet, // PILLAR 2: Synchronize with WASM export key
             maintenance_priority: state.maintenance_priority, // PILLAR 4: Critical Alert state preservation
             match_id: state.match_id, // PILLAR 3: Standardized identification persistence

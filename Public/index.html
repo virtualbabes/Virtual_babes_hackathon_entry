@@ -148,6 +148,9 @@
             <!-- Bounty Tally HUD: Sector prize pool (Task 859) -->
             <div id="bounty-tally-hud" class="hidden ml-10"></div>
 
+            <!-- Mission HUD: Real-time objective tracking (Task 2232) -->
+            <div id="mission-hud-container" class="hidden ml-10"></div>
+
             <button id="music-toggle-btn" class="outline p-5-10 font-size-10px ml-10 mr-10" onclick="toggleMuteMusic()" aria-label="Toggle Background Music">🎵</button>
             <div id="wallet-controls">
                 <button id="wallet-btn" onclick="handleWalletAction()">Connect Authority Wallet</button>
@@ -316,6 +319,16 @@
                 <input type="range" id="sfx-volume" min="0" max="1" step="0.01" value="0.5" title="SFX Volume" oninput="setSfxVolume(this.value)" aria-label="Sound effects volume">
                 <button class="outline" onclick="toggleMuteSfx()">🔊</button>
             </div>
+            
+            <!-- Contextual Ambients Toggle (PILLAR 6: Audio Context Manager) -->
+            <div class="volume-control mt-20" style="border-top: 1px solid var(--glass-border, rgba(255,255,255,0.1)); padding-top: 15px;">
+                <label>Contextual Ambients</label>
+                <div class="flex-row align-center gap-10">
+                    <span id="ambients-status" class="font-xs opacity-6">OFF</span>
+                    <button class="outline" id="ambients-toggle-btn" onclick="toggleContextualAmbients()" aria-label="Toggle contextual ambients">⏺️</button>
+                </div>
+            </div>
+            
             <button class="outline mt-20 w-full" onclick="closeSettingsOverlay()">Close</button>
         </div>
     </div>
@@ -781,6 +794,20 @@
                     <div class="opacity-5 py-20 italic">Scanning network latency...</div>
                 </div>
             </div>
+
+            <!-- DLC Registry Management (Pillar 4: Console Expansion) -->
+            <div class="glass-panel admin-section admin-section-dlc-registry w-full mt-20">
+                <h2 class="text-neon-cyan">DLC Registry Management</h2>
+                <p class="font-size-0-75em opacity-6 mb-15">Real-time management of console DLC products. Add or update offerings without server restarts.</p>
+                <div id="admin-dlc-registry-display" class="overflow-x-auto">
+                    <div class="opacity-5 py-20 italic">Loading DLC products...</div>
+                </div>
+                <div class="flex-row gap-10 mt-15">
+                    <button onclick="fetchDLCRegistry()" class="outline flex-1 border-neon-cyan text-neon-cyan">REFRESH DLC REGISTRY</button>
+                    <button onclick="adminUpdateDLCProduct()" class="bg-neon-green text-dark flex-1">ADD NEW DLC PRODUCT</button>
+                </div>
+            </div>
+
 
             <!-- Admin Logs -->
             <div class="glass-panel admin-section admin-section-logs">

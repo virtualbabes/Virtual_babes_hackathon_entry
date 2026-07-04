@@ -1,13 +1,13 @@
 // Public/js/ui.js
 
 import { CONFIG } from './config.js'; // Removed triggerMoodMote from here
-import { triggerGlobalKidnapEffect, triggerMutationScarEffect, triggerCloakDisruptorParticles, triggerMutationSuccessParticles, triggerStaffTrainingEffect, triggerMoodMote } from './particles.js';
+import { triggerGlobalKidnapEffect, triggerMutationScarEffect, triggerCloakDisruptorParticles, triggerMutationSuccessParticles, triggerStaffTrainingEffect, triggerMoodMote, triggerContractCompleteEffect } from './particles.js';
 import { myClientId, currentLatency, lastPingTime, setLastPingTime, setCurrentLatency } from './network.js';
 import { userAddress } from './wallet.js'; // userAddress is now in wallet.js
 import { activeCardId, pendingQuickCastId, myPlayerIndex, currentOpponentId, spectatorMatchState, lastTauntPhase, lastTauntTurn, setLastTauntPhase, setLastTauntTurn, matchHistorySaved, setMatchHistorySaved, saveMatchResult, renderChatMessage, reportGloat, lastLobbyPlayers } from './game.js';
 import { masterVolume, musicVolume, sfxVolume, playProcedureInterruptedSFX, playLongWarningSFX, playMutationSuccessSFX, playCloakDisruptorSFX, playEcosystemAlertSFX, playMoodMoteSFX, playStaffTrainingSFX, playSabotageReparationSFX } from './audio.js';
 import { updateAdminRewardList, fetchAdminLogs, adminLogTicker, startAdminLogPolling, stopAdminLogPolling, globalClubs, availableNetworks } from './admin.js';
-import { updateActiveRumors, renderRumorBoard, initiateBail, deployTrap, payRansom, releaseHostage, spreadRumor } from './criminality.js';
+import { updateActiveRumors, renderRumBoard, initiateBail, deployTrap, payRansom, releaseHostage, spreadRumor, currentRewardRatio } from './criminality.js';
 import { seasonEnd, totalTournaments, tournamentLimit, currentTournamentPage, fetchTournamentHistory, fetchSeasonHistory } from './leaderboard.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, assetCache, resolveAssetSymbol, shortenAddress } from './utils.js';
 import { buyClubItem, submitClubFoundry, tradeShares, buyBlackMarketItem, submitConsignment, takeLease, submitDistrictTax, TERRITORY_MAP, MOOD_CLASS_MAP, MOOD_EMOJI_MAP } from './economy.js';
@@ -35,6 +35,77 @@ export function adjustMapZoom(delta) {
 }
 
 /**
+ * updateMissionHUD renders a faction-aware widget in the top bar when a mission/contract is active.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+export function updateMissionHUD(state) {
+    const container = document.getElementById("mission-hud-container");
+    if (!container) return;
+
+    const activeJM = state.active_justice_mission_id || "";
+    const activeUC = state.active_underworld_contract_id || "";
+
+    if (activeJM) {
+        let label = activeJM;
+        // PILLAR 3: Targeted Identification for High-Tier Justice Missions.
+        if (activeJM === "MISSION-023") label = "MISSION-023 [ULTIMATE SIG]";
+        else if (activeJM === "MISSION-022") label = "MISSION-022 [SOVEREIGN SIG]";
+        else if (activeJM === "MISSION-027") label = "MISSION-027 [BREACH SIG]";
+        else if (activeJM === "MISSION-025") label = "MISSION-025 [AUDIT SIG]";
+        else if (activeJM === "MISSION-012") label = "MISSION-012 [GOVERNOR SIG]";
+        else if (activeJM === "MISSION-011") label = "MISSION-011 [LEADERSHIP SIG]";
+        else if (activeJM === "MISSION-013") label = "MISSION-013 [KINGPIN SIG]";
+        else if (activeJM === "MISSION-014") label = "MISSION-014 [AUDIT SIG]";
+        else if (activeJM === "MISSION-015" || activeJM === "MISSION-016") label = `${activeJM} [HEGEMONY SIG]`;
+        else if (activeJM === "MISSION-017") label = "MISSION-017 [CHAOS SIG]";
+        else if (activeJM === "MISSION-018" || activeJM === "MISSION-021") label = `${activeJM} [SYNDICATE SIG]`;
+        else if (activeJM === "MISSION-019") label = "MISSION-019 [LAUNDRY SIG]";
+        else if (activeJM === "MISSION-020" || activeJM === "MISSION-024") label = `${activeJM} [APEX SIG]`;
+        else if (activeJM === "MISSION-009") label = "MISSION-009 [SECURITY SIG]";
+        else if (activeJM.startsWith("MISSION-010")) {
+            const parts = activeJM.split(":");
+            label = parts.length > 1 ? "MISSION-010 [ACCOMPLICE SIG]" : "MISSION-010";
+        }
+
+        container.innerHTML = `
+            <div class="mission-hud pulse glass-panel" style="border-color: var(--neon-cyan); --mission-color: var(--neon-cyan);">
+                <span class="text-neon-cyan font-bold font-size-0-7em letter-spacing-1">⚖️ JUSTICE MISSION:</span>
+                <b class="text-white font-mono font-size-0-8em">${label}</b>
+            </div>
+        `;
+        container.classList.remove("hidden");
+    } else if (activeUC) {
+        let label = activeUC;
+        // PILLAR 3: Targeted Identification for High-Tier Underworld Contracts.
+        if (activeUC === "CONTRACT-025") label = "CONTRACT-025 [KIDNAPPER SIG]";
+        else if (activeUC === "CONTRACT-027") label = "CONTRACT-027 [SMUGGLER SIG]";
+        else if (activeUC === "CONTRACT-021") label = "CONTRACT-021 [SYNDICATE SIG]";
+        else if (activeUC === "CONTRACT-024") label = "CONTRACT-024 [FENCE SIG]";
+        else if (activeUC === "CONTRACT-020" || activeUC === "CONTRACT-023") label = `${activeUC} [APEX SIG]`;
+        else if (activeUC === "CONTRACT-019") label = "CONTRACT-019 [CHAOS SIG]";
+        else if (activeUC === "CONTRACT-015" || activeUC === "CONTRACT-016") label = `${activeUC} [HEGEMONY SIG]`;
+        else if (activeUC === "CONTRACT-014" || activeUC === "CONTRACT-022") label = `${activeUC} [SOVEREIGN SIG]`; // Sovereign is for heist
+        else if (activeUC === "CONTRACT-013") label = "CONTRACT-013 [PREMIER SIG]";
+        else if (activeUC === "CONTRACT-012") label = "CONTRACT-012 [STABILIZER SIG]";
+        else if (activeUC === "CONTRACT-017") label = "CONTRACT-017 [LIBERATION SIG]";
+        else if (activeUC === "CONTRACT-018") label = "CONTRACT-018 [FORTRESS SIG]";
+        else if (activeUC === "CONTRACT-011") label = "CONTRACT-011 [TITAN SIG]";
+        else if (activeUC === "CONTRACT-010") label = "CONTRACT-010 [GOVERNOR SIG]";
+
+        container.innerHTML = `
+            <div class="mission-hud pulse glass-panel" style="border-color: var(--warning-orange); --mission-color: var(--warning-orange);">
+                <span class="text-warning font-bold font-size-0-7em letter-spacing-1">💀 UNDERWORLD CONTRACT:</span>
+                <b class="text-white font-mono font-size-0-8em">${label}</b>
+            </div>
+        `;
+        container.classList.remove("hidden");
+    } else {
+        container.classList.add("hidden");
+        container.innerHTML = "";
+    }
+}
+
+/**
  * updateAvatarIdentityStyle applies a "local-player" border to the correct avatar frame.
  * PILLAR 4: Session Identity.
  */
@@ -46,17 +117,41 @@ export function updateAvatarIdentityStyle(state) {
     // Reset styles
     p1Frame.classList.remove("local-player-frame");
     p2Frame.classList.remove("local-player-frame");
+    // Clear all faceplate classes
+    p1Frame.classList.remove("faceplate-neon_vibe", "faceplate-shadow", "faceplate-governor");
+    p2Frame.classList.remove("faceplate-neon_vibe", "faceplate-shadow", "faceplate-governor");
 
     // Apply high-visibility border to the local player's frame
     const localIdx = state.local_player_index || 0;
     const target = localIdx === 0 ? p1Frame : p2Frame;
     target.classList.add("local-player-frame");
 
+    // PILLAR 4: Multi-Player Cosmetic Identity.
+    // Apply faceplate styling to both frames if provided in the combat snapshot.
+    if (state.p1_faceplate) p1Frame.classList.add(`faceplate-${state.p1_faceplate}`);
+    if (state.p2_faceplate) p2Frame.classList.add(`faceplate-${state.p2_faceplate}`);
+
     // Update image sources for the lobby/combat frames
     const p1Img = document.getElementById("p1-avatar-img");
     const p2Img = document.getElementById("p2-avatar-img");
     if (p1Img && state.p1_avatar) p1Img.src = state.p1_avatar;
     if (p2Img && state.p2_avatar) p2Img.src = state.p2_avatar;
+
+    // PILLAR 4: Multi-Slot Card Identity.
+    // Apply identity markers to grid slots so that cards on the board reflect local ownership.
+    // This ensures that during capture events, the visual theme of the card slot reactively
+    // shifts to reflect whether the local player or the opponent now controls the position.
+    const slots = document.querySelectorAll(".grid-slot");
+    if (state.board && slots.length > 0) {
+        state.board.forEach((card, i) => {
+            const slot = slots[i];
+            if (!slot) return;
+            slot.classList.remove("local-owner-slot");
+            if (card && card.owner === localIdx) {
+                slot.classList.add("local-owner-slot");
+            }
+        });
+    }
 }
 
 /**
@@ -144,7 +239,7 @@ export function showToast(message, type = 'info', duration = 5000) {
 
     // PILLAR 1, 5 & 6: Immersive Feedback.
     // Trigger global particle effects for critical gameplay and economic events.
-    if (type === "critical" || message.includes("KIDNAP GAMBIT") || message.includes("HOSTAGE SECURED") || message.includes("MUTATION FAILURE") || message.includes("TERRITORY INVASION") || message.includes("CLOAK DISRUPTED") || message.includes("MUTATION SUCCESS") || message.includes("ECOSYSTEM GUARDIAN") || message.includes("STAFF TRAINING ACTIVE") || message.includes("REPARATION RECEIVED")) {
+    if (type === "critical" || message.includes("KIDNAP GAMBIT") || message.includes("HOSTAGE SECURED") || message.includes("MUTATION FAILURE") || message.includes("TERRITORY INVASION") || message.includes("CLOAK DISRUPTED") || message.includes("MUTATION SUCCESS") || message.includes("ECOSYSTEM GUARDIAN") || message.includes("STAFF TRAINING ACTIVE") || message.includes("REPARATION RECEIVED") || message.includes("CONTRACT COMPLETED")) {
         if (message.includes("MUTATION FAILURE")) {
             triggerMutationScarEffect();
             playProcedureInterruptedSFX();
@@ -164,6 +259,10 @@ export function showToast(message, type = 'info', duration = 5000) {
             playStaffTrainingSFX();
         } else if (message.includes("REPARATION RECEIVED")) {
             playSabotageReparationSFX();
+        } else if (message.includes("CONTRACT COMPLETED")) {
+            // PILLAR 3: Underworld mission completion signature.
+            toast.classList.add("contract-completed-flourish");
+            triggerContractCompleteEffect();
         } else {
             triggerGlobalKidnapEffect();
         }
@@ -354,20 +453,55 @@ export function openTerritoryView(territoryId) {
     // Regional Governors can adjust tax policy for their districts.
     let taxUI = "";
     if (club) {
-        const items = { "Elemental": [{ id: "mood_catalyst", name: "Mood Catalyst", price: 100, desc: "+50 Mood Bonus" }], "Tactical": [{ id: "rule_breaker", name: "Rule Breaker", price: 150, desc: "Force PLUS trigger" }], "Vitality": [{ id: "stamina_stim", name: "Stamina Stim", price: 100, desc: "-20 Fatigue" }] }[club.type] || [];
-        body = `<div class="flex-col gap-10">${items.map(i => `
-            <div class="shop-item-row glass-panel p-15 m-0 flex-row justify-between align-center">
-                <div class="text-left"><b>${i.name}</b><div class="font-size-0-8em opacity-6">${i.desc}</div></div>
-                <button class="outline" onclick="buyClubItem('${club.id}', '${i.id}', ${i.price}, '${territoryId}')">${i.price} $VBV</button>
-            </div>`).join('')}</div>`;
+        const userRole = state.job_role || "";
+        const isGovernor = (club.territories?.length || 0) + (club.allied_club_id ? (globalClubs[club.allied_club_id]?.territories?.length || 0) : 0) >= 2;
+        
+        let itemsHTML = "";
+        Object.entries(club.inventory || {}).forEach(([itemId, qty]) => {
+            if (qty <= 0) return;
+            const meta = GlobalShopRegistry[itemId];
+            if (!meta) return;
+
+            const meetsMojo = (club.mojo || 0) >= (meta.requiredMojo || 0);
+            const meetsRole = !meta.requiredRole || userRole === meta.requiredRole;
+            const meetsMaster = !meta.isMasterTier || isGovernor;
+            const isLocked = !meetsMojo || !meetsRole || !meetsMaster;
+
+            let reqLabels = [];
+            if (meta.requiredMojo) reqLabels.push(`<span class="${meetsMojo ? 'text-neon-green' : 'text-error'}">MOJO ${meta.requiredMojo}+</span>`);
+            if (meta.requiredRole) reqLabels.push(`<span class="${meetsRole ? 'text-neon-green' : 'text-error'}">${meta.requiredRole.toUpperCase()}</span>`);
+            if (meta.isMasterTier) reqLabels.push(`<span class="${meetsMaster ? 'text-neon-green' : 'text-error'}">GOVERNOR</span>`);
+
+            itemsHTML += `
+                <div class="shop-item-row glass-panel p-10 m-0 flex-row justify-between align-center ${meta.isMasterTier ? 'master-tier' : ''} ${isLocked ? 'opacity-5 locked-item' : ''}">
+                    <div class="text-left">
+                        <b class="${meta.isMasterTier ? 'text-gold' : 'text-white'}">${meta.name.toUpperCase()}</b>
+                        ${reqLabels.length > 0 ? `<div class="font-size-0-7em font-bold mt-2" style="letter-spacing: 1px;">${reqLabels.join(' • ')}</div>` : ''}
+                        <div class="font-size-0-75em opacity-6">${meta.desc}</div>
+                    </div>
+                    <div class="text-right">
+                        <button class="outline btn-small ${isLocked ? 'border-grey text-grey' : (meta.isMasterTier ? 'border-gold text-gold' : 'border-neon-cyan text-neon-cyan')}" 
+                                ${isLocked ? 'disabled' : ''}
+                                onclick="buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${territoryId}')">
+                            ${isLocked ? 'LOCKED' : `${meta.price} $VBV`}
+                        </button>
+                    </div>
+                </div>`;
+        });
+        body = `<div class="flex-col gap-10">${itemsHTML || '<div class="opacity-3 py-20 italic">District shop inventory is depleted.</div>'}</div>`;
 
         const isOwnerOfDistrict = userAddress && club.owner_wallet && club.owner_wallet.toLowerCase() === userAddress.toLowerCase();
         const combinedCount = (club.territories?.length || 0) + (club.allied_club_id ? (globalClubs[club.allied_club_id]?.territories?.length || 0) : 0);
         const isGovernor = isOwnerOfDistrict && combinedCount >= 2;
 
+        const targetOwnerStats = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === club.owner_wallet?.toLowerCase());
+        const isHardened = targetOwnerStats && (targetOwnerStats.reparations_received_count || 0) >= 5;
+
         if (isGovernor) {
+            const hardenedHTML = isHardened ? `<div class="badge-hardened text-gold font-bold font-size-0-7em mb-10 pulse" style="border: 1px solid gold; padding: 2px 8px; border-radius: 4px; display: inline-block;">🛡️ HARDENED SECURITY ACTIVE</div>` : '';
             taxUI = `
                 <div class="glass-panel p-15 m-0 border-gold mt-15" style="background: rgba(212, 175, 55, 0.1);">
+                    ${hardenedHTML}
                     <div class="text-gold font-bold font-size-0-8em mb-10 letter-spacing-1">🏛️ DISTRICT TAX POLICY</div>
                     <div class="flex-row align-center gap-10 mb-10">
                         <input type="number" id="district-tax-input" class="glass-input flex-1" placeholder="Rate (0-20)" min="0" max="20" step="0.5">
@@ -522,7 +656,12 @@ export function updateDynamicArenaFloor(state) {
 
     // PILLAR 3: Underworld Atmosphere cleanup.
     // Ensure the criminal-underworld class is only applied during active combat.
-    document.body.classList.toggle("criminal-underworld", state.phase === "Active" && (state.wanted_level || 0) >= 10);
+    const shouldShowUnderworld = state.phase === "Active" && (state.wanted_level || 0) >= 10;
+    if (document.body.classList.contains("criminal-underworld") && !shouldShowUnderworld) {
+        document.body.classList.remove("criminal-underworld");
+    } else if (shouldShowUnderworld) {
+        document.body.classList.add("criminal-underworld");
+    }
 
     if (state.phase === "TournamentLobby") {
         // Always show a tournament background in the tournament lobby
@@ -559,7 +698,12 @@ export function renderCardHTML(card) {
     const isSelected = activeCardId === card.id && (card.owner === -1 || card.owner === myPlayerIndex);
 
     // Generate a deterministic state key including selection status to prevent cache-ghosting.
-    const stateKey = `${card.id}-${card.owner}-${card.power.join('')}-${card.artifact}-${card.fatigue}-${card.loyalty}-${card.mood}-${card.image}-${isSelected}`;
+    const scarsKey = (card.scars || []).join(',');
+    
+    // PILLAR 3: Factional Sync. Include local faction in state key.
+    const combatState = window.GetGameState("combat");
+    const myFaction = combatState?.faction || "NEUTRAL";
+    const stateKey = `${card.id}-${card.owner}-${card.power.join('')}-${card.artifact}-${card.fatigue}-${card.loyalty}-${card.mood}-${card.image}-${isSelected}-${scarsKey}-${card.fallen}-${myFaction}`;
     if (cardHTMLPool.has(stateKey)) return cardHTMLPool.get(stateKey);
 
     const rarityBadge = (card.rarity && card.rarity > 1.0) ? `<div class="rarity-badge">${card.rarity.toFixed(1)}x</div>` : '';
@@ -571,6 +715,48 @@ export function renderCardHTML(card) {
     const artworkHTML = card.image ? `
         <div class="card-artwork-layer" style="background-image: url('${card.image}');"></div>
         <div class="card-glass-tint"></div>` : '';
+
+    // PILLAR 6: Mutation Scar Overlay Loop.
+    // Dynamically inject translucent overlays matching the card's procedure failure history.
+    let scarsHTML = '';
+    if (card.scars && Array.isArray(card.scars)) {
+        card.scars.forEach(scar => {
+            scarsHTML += `<div class="card-scar-overlay" style="background-image: url('./Assets/Images/Effects/${scar}.webp');"></div>`;
+        });
+    }
+
+    // PILLAR 5: Hardware Item Overlay Layer.
+    // Render trap/protection indicators for equipped items on cards.
+    // NOTE: Backend must expose card.equipped_items array from club active buffs mapping TRAP_* IDs to card IDs.
+    // Currently deferred pending Card struct enhancement in WASM GetGameState.
+    let itemsHTML = '';
+    if (card.equipped_items && Array.isArray(card.equipped_items)) {
+        card.equipped_items.forEach(itemId => {
+            // Map item ID to asset filename
+            const itemMap = {
+                'TRAP_BIO_GUARD_DOG': 'bio_guard_dog',
+                'TRAP_LASER_TRIPWIRE': 'laser_tripwire',
+                'TRAP_SENTRY_TURRET': 'sentry_turret'
+            };
+            const itemName = itemMap[itemId] || itemId.toLowerCase();
+            const isActiveTrap = card.active_items && card.active_items.includes(itemId);
+            itemsHTML += `<div class="item-overlay item-${itemName}${isActiveTrap ? ' item-pulse' : ''}" style="background-image: url('./Assets/Images/Items/${itemName}.webp');" title="Protected by ${itemName}"></div>`;
+        });
+    }
+
+    // PILLAR 3: Factional Alignment Highlighting
+    let factionBoostHTML = "";
+    if (myFaction === "JUSTICE" && card.fallen) {
+        factionBoostHTML = `<div class="faction-bonus-pulse animate-pulse" style="position:absolute; top:0; left:0; width:100%; height:100%; box-shadow: inset 0 0 20px var(--neon-cyan); pointer-events:none; border-radius: inherit;"></div>`;
+    } else if (myFaction === "UNDERWORLD" && !card.fallen) {
+        factionBoostHTML = `<div class="faction-bonus-pulse animate-pulse" style="position:absolute; top:0; left:0; width:100%; height:100%; box-shadow: inset 0 0 20px var(--neon-green); pointer-events:none; border-radius: inherit;"></div>`;
+    }
+
+    // PILLAR 7: Underworld Fallen Status.
+    let fallenHTML = '';
+    if (card.fallen) {
+        fallenHTML = `<div class="fallen-badge" title="Fallen Asset: -50 Power Penalty">☣️</div>`;
+    }
 
     // Mood Icon Mapping
     let moodHTML = '';
@@ -585,7 +771,7 @@ export function renderCardHTML(card) {
     if (card.artifact > 0) {
         artifactHTML = `<div class="artifact-badge" style="position: absolute; bottom: 30px; right: 5px; color: var(--neon-cyan); font-size: 9px; font-weight: bold; text-shadow: 0 0 5px var(--neon-cyan);">+${card.artifact}</div>`;
     } else if (card.artifact < 0) {
-        artifactHTML = `<div class="debuff-badge">PRISONER ${card.artifact}</div>`;
+        artifactHTML = `<div class="debuff-badge" title="Battle Scar / Prisoner Penalty">PRISONER ${card.artifact}</div>`;
     }
 
     // Fatigue & Loyalty Indicators
@@ -603,8 +789,12 @@ export function renderCardHTML(card) {
 
     const html = `
         ${artworkHTML} 
-        <div class="card-content-wrapper ${isSelected ? 'selected-item' : ''}">
+        ${scarsHTML}
+        ${itemsHTML}
+        <div class="card-content-wrapper ${isSelected ? 'selected-item' : ''} ${card.fallen ? 'fallen-asset' : ''}">
+            ${factionBoostHTML}
             ${rarityBadge}
+            ${fallenHTML}
             ${artifactHTML}
             ${moodHTML}
             <div class="power-grid" style="pointer-events: auto;">
@@ -795,9 +985,15 @@ export function handleLocalBanUI(banExpires) {
 }
 
 export function showMatchPreview(data) {
-    document.getElementById("preview-p1-id").innerText = data.p1_id;
+    // PILLAR 3: Factional Icon Identification.
+    const p1 = lastLobbyPlayers.find(p => p.id === data.p1_id);
+    const p2 = lastLobbyPlayers.find(p => p.id === data.p2_id);
+    const p1Icon = p1?.faction === "JUSTICE" ? "⚖️ " : (p1?.faction === "UNDERWORLD" ? "💀 " : "");
+    const p2Icon = p2?.faction === "JUSTICE" ? "⚖️ " : (p2?.faction === "UNDERWORLD" ? "💀 " : "");
+
+    document.getElementById("preview-p1-id").innerText = p1Icon + data.p1_id;
     document.getElementById("preview-p1-rating").innerText = data.p1_rating || "[Z]";
-    document.getElementById("preview-p2-id").innerText = data.p2_id;
+    document.getElementById("preview-p2-id").innerText = p2Icon + data.p2_id;
     document.getElementById("preview-p2-rating").innerText = data.p2_rating || "[Z]";
     
     document.getElementById("match-preview-overlay").classList.remove("hidden");
@@ -857,6 +1053,11 @@ export function generateBracketHTML(matches, activeRound = -1) {
         html += `<div class="bracket-round">`;
         html += `<div class="bracket-round-title">ROUND ${r}</div>`;
         rounds[r].forEach(m => {
+            const p1Obj = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === m.p1?.toLowerCase());
+            const p2Obj = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === m.p2?.toLowerCase());
+            const p1FactionIcon = p1Obj?.faction === "JUSTICE" ? "⚖️ " : (p1Obj?.faction === "UNDERWORLD" ? "💀 " : "");
+            const p2FactionIcon = p2Obj?.faction === "JUSTICE" ? "⚖️ " : (p2Obj?.faction === "UNDERWORLD" ? "💀 " : "");
+
             const p1Short = getCachedEnvoiName(m.p1);
             const p2Short = getCachedEnvoiName(m.p2);
             let p1Class = "", p2Class = "";
@@ -866,9 +1067,9 @@ export function generateBracketHTML(matches, activeRound = -1) {
             }
             html += `
                 <div id="match-${m.match_id}" class="bracket-match ${isCurrentRound && !m.winner ? 'active' : ''}">
-                    <div class="bracket-player ${p1Class}">${p1Short}</div>
+                    <div class="bracket-player ${p1Class}">${p1FactionIcon}${p1Short}</div>
                     <div class="vs-label">VS</div>
-                    <div class="bracket-player ${p2Class}">${p2Short}</div>
+                    <div class="bracket-player ${p2Class}">${p2FactionIcon}${p2Short}</div>
                 </div>`;
         });
         html += `</div>`;
@@ -994,7 +1195,7 @@ export function renderDonationLeaderboard() {
                 <div class="flex-row justify-between align-center font-size-0-9em">
                     <span class="flex-row align-center">
                         <span class="text-gold font-bold mr-10" style="min-width: 20px;">#${i+1}</span>
-                        <span class="text-white">${getCachedEnvoiName(p.wallet)}</span>
+                        <span class="text-white">${p.faction === 'JUSTICE' ? '⚖️ ' : (p.faction === 'UNDERWORLD' ? '💀 ' : '')}${getCachedEnvoiName(p.wallet)}</span>
                     </span>
                     <b class="text-neon-green font-mono">${(p.total_donated / 1000000).toFixed(2)} $VBV</b>
                 </div>
@@ -1106,7 +1307,10 @@ export function updateSpectatorHUD(state) {
     const isSpectating = spectatorMatchState !== null;
     
     if (!isSpectating || state.phase !== "Active") {
-        if (hud) hud.classList.add("hidden");
+        if (hud) {
+            hud.classList.add("hidden");
+            hud.remove(); // PILLAR 5: DOM Integrity. Destroy the HUD when the spectating context is inactive.
+        }
         return;
     }
 
@@ -1141,9 +1345,14 @@ export function updateSpectatorHUD(state) {
     const territory = (state.territory_id || "Arena Center").replace(/_/g, ' ').toUpperCase();
     const rulesCount = Object.values(state.rules || {}).filter(v => v).length;
 
+    // PILLAR 5: Reactive Atmosphere.
+    // Trigger a high-intensity 'LIVE' pulse when VBT Synergy reaches PEAK levels (>150).
+    const isPeak = synergy > 150;
+
     hud.innerHTML = `
         <div style="border-bottom: 1px solid rgba(0, 242, 254, 0.3); padding-bottom: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.6em; color: var(--neon-cyan); letter-spacing: 2px; font-weight: bold;">LIVE BROADCAST</span>
+            <span style="font-size: 0.6em; color: ${isPeak ? 'var(--error-red)' : 'var(--neon-cyan)'}; letter-spacing: 2px; font-weight: bold;" class="${isPeak ? 'animate-pulse' : ''}">
+                ${isPeak ? '🔴 ' : ''}LIVE BROADCAST</span>
             <span style="font-size: 0.7em; opacity: 0.8; font-family: monospace;">#${matchID.substring(0, 10)}</span>
         </div>
         <div class="flex-row gap-20" style="justify-content: space-between;">
@@ -1151,7 +1360,73 @@ export function updateSpectatorHUD(state) {
             <div style="text-align: center;"><small style="display: block; font-size: 0.6em; opacity: 0.5;">LOCATION</small><b class="text-neon-cyan" style="font-size: 0.9em; letter-spacing: 1px;">${territory}</b></div>
             <div style="text-align: center;"><small style="display: block; font-size: 0.6em; opacity: 0.5;">RULES</small><b class="text-neon-purple" style="font-size: 0.9em;">${rulesCount} ACTIVE</b></div>
         </div>
+        ${(userAddress && spectatorMatchState.p1_wallet?.toLowerCase() !== userAddress.toLowerCase() && spectatorMatchState.p2_wallet?.toLowerCase() !== userAddress.toLowerCase()) ? `
+            <div style="margin-top: 12px; pointer-events: auto;">
+                <button class="w-full bg-neon-green text-dark font-bold btn-small" 
+                        style="box-shadow: 0 0 10px var(--neon-green); border-radius: 4px;"
+                        onclick="window.openSpectatorWagerOverlay('${matchID}', '${spectatorMatchState.p1_wallet}', '${spectatorMatchState.p2_wallet}')">
+                    PLACE WAGER
+                </button>
+            </div>
+        ` : ''}
         <div style="margin-top: 12px; font-size: 0.7em; text-align: center; color: #888; font-style: italic; border-top: 1px solid rgba(255,255,255,0.05); pt-5">
             RESONANCE: ${synergy > 150 ? 'PEAK' : synergy > 120 ? 'STABLE' : 'SYNCING...'}
         </div>`;
+}
+
+/**
+ * updateEnforcementHUD renders status indicators for License, Insurance, and Bonds.
+ * PILLAR 1 & 3: Justice vs Underworld Hegemony.
+ */
+function updateEnforcementHUD(state) {
+    const container = getEl("enforcement-hud-container");
+    if (!container) return;
+
+    const hasLicense = state.bounty_hunter_license_expires_at && new Date(state.bounty_hunter_license_expires_at) > Date.now();
+    const hasInsurance = (state.raid_insurance_claims_remaining || 0) > 0 && new Date(state.raid_insurance_expires_at) > Date.now();
+    const hasBond = (state.bounty_hunter_bond_micro || 0) > 0;
+
+    // PILLAR 2: Siphon Alerts.
+    if (state.last_siphon_amt > 0) {
+        showToast(`💸 <b>PROTOCOL SIPHON:</b> ${(state.last_siphon_amt / 1000000).toFixed(2)} $VBV diverted to Faucet.`, "info");
+    }
+
+    if (!hasLicense && !hasInsurance && !hasBond) {
+        container.classList.add("hidden");
+        return;
+    }
+
+    let html = `<div class="flex-row gap-10">`;
+    if (hasLicense) {
+        html += `<div class="glass-panel p-5-10 border-neon-cyan flex-row align-center gap-5" style="height: 32px;" title="ENFORCEMENT LICENSE ACTIVE">
+                    <span class="text-neon-cyan font-bold font-size-0-7em">⚖️ LICENSED</span>
+                 </div>`;
+    }
+    if (hasBond) {
+        html += `<div class="glass-panel p-5-10 border-gold flex-row align-center gap-5" style="height: 32px;" title="SECURITY BOND DEPOSITED">
+                    <span class="text-gold font-bold font-size-0-7em">🛡️ BONDED</span>
+                 </div>`;
+    }
+    if (hasInsurance) {
+        html += `<div class="glass-panel p-5-10 border-neon-green flex-row align-center gap-5" style="height: 32px;" title="RAID INSURANCE ACTIVE">
+                    <span class="text-neon-green font-bold font-size-0-7em">🛡️ INSURED</span>
+                 </div>`;
+    }
+    html += `</div>`;
+
+    container.innerHTML = html;
+    container.classList.remove("hidden");
+
+    // PILLAR 3: Social Hub Sync.
+    const banner = document.getElementById("license-status-banner");
+    if (banner) {
+        const expiry = state.bounty_hunter_license_expires_at ? new Date(state.bounty_hunter_license_expires_at) : null;
+        const valid = expiry && expiry > Date.now();
+        banner.className = `glass-panel p-10 m-0 mb-15 flex-row justify-between align-center ${valid ? 'border-neon-cyan' : 'expired'}`;
+        const statusEl = banner.querySelector("b");
+        if (statusEl) {
+            statusEl.className = valid ? 'text-neon-green' : 'text-error';
+            statusEl.innerText = valid ? 'STATUS: VALID' : 'STATUS: EXPIRED / NONE';
+        }
+    }
 }

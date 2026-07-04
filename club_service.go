@@ -7,12 +7,17 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// handleHeist processes a criminal attempt to loot a Club Treasury.
-func (l *Lobby) handleHeist(env *Envelope) {
+// ClubService encapsulates logic for organization management, heists, and territory expansion.
+// PILLAR 5: Stateless Service Design.
+type ClubService struct{}
+
+// HandleHeist processes a criminal attempt to loot a Club Treasury.
+func (s *ClubService) HandleHeist(l *Lobby, env *Envelope) {
 	var data struct {
 		TargetClubID string `json:"target_club_id"`
 	}
@@ -39,13 +44,27 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	// PILLAR 1: Alliance Integration.
 	// Helper to check if perpetrator is allied with the target.
 	// You cannot heist your own alliance.
-	if l.isPlayerAffiliatedWithClubLocked(wallet, targetClub) {
+	if s.IsPlayerAffiliatedWithClubLocked(l, wallet, targetClub) {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ <b>HEIST BLOCKED:</b> Internal infiltration of alliance treasuries is strictly forbidden."}`)})
 		return
 	}
 
 	// SUCCESS CHANCE CALCULATION: Base 50% chance + (Effective Cunning - Security Level) / 100
-	successChance := 0.50
+	successChance := 0.5
+
+	// PILLAR 3: Career Path Influence. 'Heist Planners' in the operative's org provide a +5% buff.
+	var heistPlanner string
+	if playerStats.EmployerClubID != "" {
+		if heisterClub, ok := l.clubs[playerStats.EmployerClubID]; ok {
+			for w, r := range heisterClub.Staff {
+				if strings.EqualFold(r, "Heist Planner") {
+					heistPlanner = w
+					successChance += 0.05
+					break
+				}
+			}
+		}
+	}
 
 	// PILLAR 3: Sabotage Check.
 	// If the club is under a state of Sabotage, hardware-based traps are ignored.
@@ -73,8 +92,36 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}
 	}
 
+	// PILLAR 1: Infrastructure Security - Territory Invasion Alert
+	// Trigger high-priority warning if the treasury is highly capitalized (>= 5,000 $VBV).
+	// This alerts members and triggers the 'Warning_long.mp3' alarm on the client side.
+	if targetClub.Treasury >= 5000.0 {
+		invasionAlert := "🚨 <b>TERRITORY INVASION:</b> A rival cell is striking your high-value assets!"
+		warningPayload, _ := json.Marshal(map[string]string{
+			"text": invasionAlert,
+			"type": "critical",
+		})
+		warningEnv := Envelope{Type: "admin_notification", FromID: "SERVER", Payload: warningPayload}
+		warningMsg, _ := json.Marshal(warningEnv)
+
+		for cid, client := range l.clients {
+			cWallet, ok := l.wallets[cid]
+			if !ok {
+				continue
+			}
+			stats := l.leaderboard[strings.ToLower(cWallet)]
+			if stats.EmployerClubID == targetClub.ID || strings.EqualFold(cWallet, targetClub.OwnerWallet) {
+				select {
+				case client.send <- warningMsg:
+				default:
+				}
+			}
+		}
+		l.logAdminAuditLocked("TERRITORY_INVASION", targetClub.OwnerWallet, fmt.Sprintf("High-value heist detected on club %s", targetClub.Name))
+	}
+
 	// PILLAR 1: Regional Security Integration.
-	isRegion := l.isClubRegionalLocked(targetClub)
+	isRegion := s.IsClubRegionalLocked(l, targetClub)
 	securityLevel := float64(targetClub.Mojo) / 10.0
 	if isRegion {
 		// PILLAR 1: Regional Governor Security Scaling.
@@ -91,7 +138,7 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	}
 
 	// Apply Attribute Modifier: Players compete against the club's total security profile
-	successChance += (float64(playerStats.GetEffectiveCunning()) - securityLevel) / 100.0
+	successChance += (float64(l.playerService.GetEffectiveCunning(playerStats)) - securityLevel) / 100.0
 
 	// Apply Trap Penalties from the Club's active buffs with lazy pruning
 	for trapID, itemID := range targetClub.ActiveBuffs {
@@ -141,15 +188,23 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	if roll < successChance {
 		// SUCCESSFUL HEIST
 		status = "success"
-		if playerStats.GetEffectiveCunning() >= 3 && rand.Float64() < 0.25 {
+
+		// PILLAR 3: Career Path influence. 'Kidnappers' have double the baseline capture rate.
+		kidnapChance := 0.25
+		if playerStats.JobRole == "Kidnapper" {
+			kidnapChance = 0.50
+		}
+
+		if l.playerService.GetEffectiveCunning(playerStats) >= 3 && rand.Float64() < kidnapChance {
 			canKidnap = true
 		}
 
 		// Calculate Loot: 10% of target club's treasury, capped at 500 VBV
 		maxLootMicro := uint64(500 * 1000000)
-		// PILLAR 2: Precision Hardening. Convert treasury to micro-units first for accurate calculation.
-		clubTreasuryMicro := uint64(targetClub.Treasury*1000000 + 0.5) // Round to nearest micro-unit
-		lootMicro := (clubTreasuryMicro*10 + 50) / 100                  // 10% of treasury, rounded
+		// PILLAR 2: Precision Hardening. Convert treasury float to micro-units first (clamp dust via rounding).
+		// Avoid float fractional rounding constants that can trigger uint64 conversion drift at compile-time.
+		clubTreasuryMicro := uint64(targetClub.Treasury * 1000000) // floor to micro-unit
+		lootMicro := (clubTreasuryMicro*10 + 50) / 100            // 10% of treasury, rounded
 		if lootMicro > maxLootMicro {
 			lootMicro = maxLootMicro
 		}
@@ -159,6 +214,20 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		fenceFeeMicro := (lootMicro*10 + 50) / 100
 		netLootMicro := lootMicro - fenceFeeMicro
 		fenceFee = float64(fenceFeeMicro) / 1000000.0
+
+		// PILLAR 3: Heist Planner Commission.
+		// Planners claim a 5% cut of the net loot for their tactical oversight.
+		if heistPlanner != "" {
+			plannerCutMicro := (netLootMicro * 5) / 100
+			netLootMicro -= plannerCutMicro
+			l.playerBalances[heistPlanner] += plannerCutMicro
+
+			l.logAdminAuditLocked("HEIST_PLANNER_CUT", heistPlanner, fmt.Sprintf("Amount: %.2f (Source: %s)", float64(plannerCutMicro)/1000000.0, wallet))
+			if cid := l.getClientIDFromWalletLocked(heistPlanner); cid != "" {
+				l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💼 <b>PLANNER DIVIDEND:</b> You earned %.2f $VBV from %s's successful heist."}`, float64(plannerCutMicro)/1000000.0, l.oracleService.ResolveEnvoiName(l, wallet)))})
+			}
+		}
+
 		netLoot = float64(netLootMicro) / 1000000.0
 
 		sectorID := "neutral_zone"
@@ -186,11 +255,53 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.HeistAttempts++
 
 		// Execute internal reallocation
-		targetClub.Treasury -= float64(lootMicro) / 1000000.0
+		// PILLAR 2: Authoritative Treasury Sync.
+		// Ensure the organizational liability is correctly decremented in the accounting kernel.
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(targetClub.ID, "CLUB-"), 10, 64)
+		if l.tokenSinkRouter != nil {
+			l.tokenSinkRouter.Mu.Lock()
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				if node.TreasuryBalance >= lootMicro {
+					node.TreasuryBalance -= lootMicro
+				} else {
+					node.TreasuryBalance = 0
+				}
+				// Keep authoritative micro-unit ledger.
+				targetClub.TreasuryMicro = node.TreasuryBalance
+			} else {
+				// Fallback for clubs created before the router node migration:
+				// Update via micro to preserve uint64 ledger integrity.
+				targetClub.TreasuryMicro = uint64(targetClub.Treasury * 1000000.0) // floor to micro-unit
+				if targetClub.TreasuryMicro >= lootMicro {
+					targetClub.TreasuryMicro -= lootMicro
+				} else {
+					targetClub.TreasuryMicro = 0
+				}
+			}
+			l.tokenSinkRouter.Mu.Unlock()
+		} else {
+			// Non-router: update via micro-unit.
+			targetClub.TreasuryMicro = uint64(targetClub.Treasury * 1000000.0) // floor to micro-unit
+			if targetClub.TreasuryMicro >= lootMicro {
+				targetClub.TreasuryMicro -= lootMicro
+			} else {
+				targetClub.TreasuryMicro = 0
+			}
+		}
 		targetClub.LastActivity = now // Consistent activity tracking
 
 		// Add net loot to player's virtual rewards
 		l.playerBalances[wallet] += netLootMicro
+
+		// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+		// Route the 10% fence fee to the Faucet via the reconciliation kernel.
+		if l.tokenSinkRouter != nil {
+			matrix := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+			_ = l.tokenSinkRouter.RouteCriminalTax(sectorID, fenceFeeMicro, matrix, 0, "")
+
+			// Sync float balance with authoritative micro-unit total
+			l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		}
 
 		playerStats.WantedLevel += 5
 		playerStats.Cunning += 1 // Successful heists improve Cunning
@@ -212,9 +323,210 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		}(heistDetails)
 
 		// Achievement unlock uses the Locked variant since we already hold the lobby mutex.
-		l.unlockAchievementLocked(wallet, "FIRST_HEIST")
+		l.achievementService.UnlockAchievementLocked(l, wallet, "FIRST_HEIST")
 		playerStats = l.leaderboard[wallet] // Re-fetch to avoid clobbering achievement
 
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-009).
+		// Objective: Execute a successful Heist against a club controlled by a Regional Governor.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-009" {
+			if s.IsClubRegionalLocked(l, targetClub) {
+				const rewardMicro = 4000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-009, Payout: 4000.00")
+				l.sendToClientLocked(env.FromID, Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Regional Governor treasury breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+				})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-012).
+		// Objective: Successfully execute a Heist against a club with an active 'MOJO_STABILIZER'.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-012" {
+			if expiry, active := targetClub.BuffExpirations["MOJO_STABILIZER"]; active && time.Now().Before(expiry) {
+				const rewardMicro = 7500 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-012, Payout: 7500.00")
+				l.sendToClientLocked(env.FromID, Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Mojo field neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+				})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-013).
+		// Objective: Successful Heist against the Arena Center controller while in an Alliance.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-013" {
+			isArenaCenterOwner := false
+			for _, t := range targetClub.Territories {
+				if t == "arena_center" {
+					isArenaCenterOwner = true
+					break
+				}
+			}
+			if isArenaCenterOwner && targetClub.AlliedClubID != "" {
+				const rewardMicro = 10000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-013, Payout: 10000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Arena Center alliance breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-015).
+		// Objective: Successful Heist against Arena Center controller with Wanted Level 25+.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-015" {
+			isArenaCenterOwner := false
+			for _, t := range targetClub.Territories {
+				if t == "arena_center" {
+					isArenaCenterOwner = true
+					break
+				}
+			}
+			if isArenaCenterOwner && playerStats.WantedLevel >= 25 {
+				const rewardMicro = 12000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-015, Payout: 12000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Arena Center hegemony breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-017).
+		// Objective: Successful Heist against a Regional Governor holding 3+ hostages.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-017" {
+			victimWallet := strings.ToLower(targetClub.OwnerWallet)
+			if victimStats, vExists := l.leaderboard[victimWallet]; vExists && s.IsClubRegionalLocked(l, targetClub) && len(victimStats.HeldHostageCards) >= 3 {
+				const rewardMicro = 20000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-017, Payout: 20000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Governor's hostage ring breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-019).
+		// Objective: Successful Heist against Arena Center while Ghosted vs 3+ Allied Traps.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-019" {
+			if time.Now().Before(playerStats.GhostProtocolExpiresAt) {
+				isArenaCenter := false
+				for _, t := range targetClub.Territories {
+					if t == "arena_center" {
+						isArenaCenter = true
+						break
+					}
+				}
+				if isArenaCenter {
+					trapCount := 0
+					for bID := range targetClub.ActiveBuffs {
+						if strings.HasPrefix(bID, "TRAP_") {
+							if expiry, ok := targetClub.BuffExpirations[bID]; ok && time.Now().Before(expiry) {
+								trapCount++
+							}
+						}
+					}
+					if targetClub.AlliedClubID != "" {
+						if ally, ok := l.clubs[targetClub.AlliedClubID]; ok {
+							for bID := range ally.ActiveBuffs {
+								if strings.HasPrefix(bID, "TRAP_") {
+									if expiry, ok := ally.BuffExpirations[bID]; ok && time.Now().Before(expiry) {
+										trapCount++
+									}
+								}
+							}
+						}
+					}
+					if trapCount >= 3 {
+						const rewardMicro = 30000 * 1000000
+						l.playerBalances[wallet] += rewardMicro
+						playerStats.ActiveUnderworldContractID = ""
+						l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-019, Payout: 30000.00")
+						l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> The Invisible Hand of Chaos has struck. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+						l.applyDynamicScalingLocked()
+						l.leaderboard[wallet] = playerStats
+					}
+				}
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-020).
+		// Objective: Successful Heist vs Org with 5+ hostages while Wanted 40+.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-020" && playerStats.WantedLevel >= 40 {
+			victimWallet := strings.ToLower(targetClub.OwnerWallet)
+			if victimStats, vExists := l.leaderboard[victimWallet]; vExists && len(victimStats.HeldHostageCards) >= 5 {
+				const rewardMicro = 20000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-020, Payout: 40000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> The Apex Syndicate has been fleeced. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-022).
+		// Objective: Successful Heist vs Org with 10+ hostages while Wanted 60+.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-022" && playerStats.WantedLevel >= 60 {
+			victimWallet := strings.ToLower(targetClub.OwnerWallet)
+			if victimStats, vExists := l.leaderboard[victimWallet]; vExists && len(victimStats.HeldHostageCards) >= 10 {
+				const rewardMicro = 35000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-022, Payout: 60000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> The Sovereign Hostage Heist was successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-023).
+		// Objective: Successful Heist vs 'Arena Center' @ Wanted 100+.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-023" && playerStats.WantedLevel >= 100 {
+			isArenaCenter := false
+			for _, t := range targetClub.Territories {
+				if t == "arena_center" {
+					isArenaCenter = true
+					break
+				}
+			}
+
+			if isArenaCenter {
+				const rewardMicro = 50000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-023, Payout: 100000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> The Arena Center Apex Heist was successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				l.leaderboard[wallet] = playerStats
+			}
+		}
+
+		// PILLAR 3: Underworld Contract Completion (CONTRACT-027).
+		// Objective: Successful Heist while holding 'Smuggler' role and Wanted 30+.
+		if playerStats.ActiveUnderworldContractID == "CONTRACT-027" && playerStats.JobRole == "Smuggler" && playerStats.WantedLevel >= 30 {
+			const rewardMicro = 20000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-027, Payout: 20000.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Smuggling strike successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+			l.leaderboard[wallet] = playerStats
+		}
 	} else {
 		status = "failure"
 		playerStats.WantedLevel += 15
@@ -222,9 +534,9 @@ func (l *Lobby) handleHeist(env *Envelope) {
 		playerStats.HeistAttempts++
 
 		// MOJO GAIN: Reward the club for successful defense
-		mojoGain := l.calculateMojoGain(targetClub, "DEFENSE", 0)
+		mojoGain := s.CalculateMojoGain(l, targetClub, "DEFENSE", 0) // This calls s.CalculateMojoGain, not PlayerStats.GetEffectiveMojo
 		targetClub.Mojo += mojoGain
-		l.checkMojoSurgeAchievementLocked(targetClub.ID)
+		l.achievementService.CheckMojoSurgeAchievementLocked(l, targetClub.ID)
 
 		// PILLAR 1: Reputation Ripple.
 		// Update standings for all club employees to reflect the increased Mojo multiplier from defense.
@@ -308,9 +620,230 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	playerStats.Reputation = l.CalculateReputation(playerStats)
 	l.leaderboard[wallet] = playerStats
 
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-018).
+	// Objective: Sabotage the Arena Center while bolstered by 3+ allied traps.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-018" {
+		isArenaCenter := false
+		for _, t := range targetClub.Territories {
+			if t == "arena_center" {
+				isArenaCenter = true
+				break
+			}
+		}
+
+		if isArenaCenter {
+			trapCount := 0
+			for bID := range targetClub.ActiveBuffs {
+				if strings.HasPrefix(bID, "TRAP_") {
+					if expiry, ok := targetClub.BuffExpirations[bID]; ok && time.Now().Before(expiry) {
+						trapCount++
+					}
+				}
+			}
+			if targetClub.AlliedClubID != "" {
+				if ally, ok := l.clubs[targetClub.AlliedClubID]; ok {
+					for bID := range ally.ActiveBuffs {
+						if strings.HasPrefix(bID, "TRAP_") {
+							if expiry, ok := ally.BuffExpirations[bID]; ok && time.Now().Before(expiry) {
+								trapCount++
+							}
+						}
+					}
+				}
+			}
+			if trapCount >= 3 {
+				const rewardMicro = 25000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-018, Payout: 25000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Arena Center fortress breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+			}
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-021).
+	// Objective: Successful Sabotage vs Org with 7+ hostages while Wanted 50+.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-021" && playerStats.WantedLevel >= 50 {
+		victimWallet := strings.ToLower(targetClub.OwnerWallet)
+		if victimStats, vExists := l.leaderboard[victimWallet]; vExists && len(victimStats.HeldHostageCards) >= 7 {
+			const rewardMicro = 25000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-021, Payout: 50000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> The Hostage Hegemony has collapsed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-004).
+	// Check if the current sabotage attempt fulfills an active criminal mission.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-004" {
+		// Objective: Sabotage a district controlled by a Regional Governor.
+		// This check uses the ClubService's IsClubRegionalLocked helper.
+		if s.IsClubRegionalLocked(l, targetClub) {
+			const rewardMicro = 2000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-004, Payout: 2000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Regional Governor disrupted. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			// No explicit l.leaderboard[wallet] = playerStats needed here, as there's a final one at the end of the function.
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-007).
+	// Objective: Sabotage the club controlling the 'arena_center' district.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-007" {
+		isTargetDistrict := false
+		for _, t := range targetClub.Territories {
+			if t == "arena_center" {
+				isTargetDistrict = true
+				break
+			}
+		}
+		if isTargetDistrict {
+			const rewardMicro = 2500 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-007, Payout: 2500.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Arena Center neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-008).
+	// Objective: Successfully sabotage a club that has active 'Cyber-Counter' or 'Cyber-Lock' defenses.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-008" {
+		hasTargetDefenses := false
+		for _, itemID := range targetClub.ActiveBuffs {
+			if itemID == "cyber_counter" || itemID == "cyber_lock" {
+				hasTargetDefenses = true
+				break
+			}
+		}
+		if hasTargetDefenses {
+			const rewardMicro = 3500 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-008, Payout: 3500.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Defensive infrastructure compromised. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-016).
+	// Objective: Successfully sabotage the Arena Center with Wanted Level 30+.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-016" {
+		isArenaCenterOwner := false
+		for _, t := range targetClub.Territories {
+			if t == "arena_center" {
+				isArenaCenterOwner = true
+				break
+			}
+		}
+		if isArenaCenterOwner && playerStats.WantedLevel >= 30 {
+			const rewardMicro = 15000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-016, Payout: 15000.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Arena Center hegemony breached. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-014).
+	// Objective: Sabotage a Regional Governor's district with Wanted Level 20+.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-014" {
+		if s.IsClubRegionalLocked(l, targetClub) && playerStats.WantedLevel >= 20 {
+			const rewardMicro = 8000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-014, Payout: 8000.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Sovereign infrastructure crippled. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-011).
+	// Objective: Sabotage a titan club (controlling 3+ territories).
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-011" {
+		if len(targetClub.Territories) >= 3 {
+			const rewardMicro = 6000 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-011, Payout: 6000.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Titan infrastructure crippled. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion.
+	// Check if the current sabotage attempt fulfills an active criminal mission.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-001" {
+		// Objective: Sabotage a club controlling the East Gate district.
+		isTargetDistrict := false
+		for _, t := range targetClub.Territories {
+			if t == "east_gate" {
+				isTargetDistrict = true
+				break
+			}
+		}
+
+		if isTargetDistrict {
+			const rewardMicro = 1500 * 1000000
+			l.playerBalances[wallet] += rewardMicro
+			playerStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-001, Payout: 1500.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> High-infamy sabotage successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+		}
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-025).
+	// Objective: Successful Sabotage while holding 'Kidnapper' role.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-025" && playerStats.JobRole == "Kidnapper" {
+		const rewardMicro = 15000 * 1000000
+		l.playerBalances[wallet] += rewardMicro
+		playerStats.ActiveUnderworldContractID = ""
+		l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-025, Payout: 15000.00")
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Disruptive strike successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+		})
+		l.applyDynamicScalingLocked()
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-026).
+	// Objective: Successful Sabotage vs Org whose owner has received 5+ reparations.
+	if playerStats.ActiveUnderworldContractID == "CONTRACT-026" && playerStats.JobRole == "Saboteur" {
+		targetOwnerWallet := strings.ToLower(targetClub.OwnerWallet)
+		if targetOwnerStats, exists := l.leaderboard[targetOwnerWallet]; exists {
+			if targetOwnerStats.ReparationsReceivedCount >= 5 {
+				const rewardMicro = 18000 * 1000000
+				l.playerBalances[wallet] += rewardMicro
+				playerStats.ActiveUnderworldContractID = ""
+				l.logAdminAuditLocked("CONTRACT_COMPLETED", wallet, "ID: CONTRACT-026, Payout: 18000.00")
+				l.sendToClientLocked(env.FromID, Envelope{
+					Type:    "admin_notification",
+					Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Reparation sabotage successful. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+				})
+				l.applyDynamicScalingLocked()
+			}
+		}
+	}
+	l.leaderboard[wallet] = playerStats // Final write-back for contract state
+
 	// PILLAR 1: Achievement Integration.
 	// Evaluate Heist Saboteur progress after saving state to the leaderboard.
-	l.checkHeistSaboteurAchievementLocked(wallet)
+	l.achievementService.CheckHeistSaboteurAchievementLocked(l, wallet)
 
 	l.logAdminAuditLocked("HEIST_ATTEMPT", wallet, fmt.Sprintf("Target: %s, Result: %s, Loot: %.2f, FenceFee: %.2f", data.TargetClubID, status, netLoot, fenceFee))
 	if status == "success" {
@@ -333,8 +866,538 @@ func (l *Lobby) handleHeist(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleSabotage allows a player to pay $VBV to disable a target club's hardware defenses for 1 hour.
-func (l *Lobby) handleSabotage(env *Envelope) {
+// HandleMutationVectorRealignment allows players to re-allocate card power points at specialized facilities.
+// PILLAR 6: Specialized Gene-Editing.
+func (s *ClubService) HandleMutationVectorRealignment(l *Lobby, env *Envelope) {
+	var data struct {
+		CardID   int    `json:"card_id"`
+		ClubID   string `json:"club_id"`
+		NewPower [4]int `json:"new_power"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	// 1. Facility Verification: Mutation protocols require Vitality or Elemental labs.
+	club, exists := l.clubs[data.ClubID]
+	if !exists || (club.Type != "Vitality" && club.Type != "Elemental") {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Specialized lab facility required."}`)})
+		return
+	}
+
+	// 2. Ownership Verification: Player must possess the asset.
+	stats := l.leaderboard[wallet]
+	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
+	if count, has := stats.Inventory[cardKey]; !has || count <= 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: You do not possess this card."}`)})
+		return
+	}
+
+	// 3. Invariant Verification: Sum of power must remain constant (No Power Creep).
+	card := l.inventory[data.CardID]
+	currentSum, newSum := 0, 0
+	for i := 0; i < 4; i++ {
+		currentSum += card.Power[i]
+		newSum += data.NewPower[i]
+		if data.NewPower[i] < 5 { // Minimum operational floor for any side.
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Vector instability detected. Minimum side power is 5."}`)})
+			return
+		}
+	}
+	if currentSum != newSum {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Energy conservation breach. Power sum must be identical."}`)})
+		return
+	}
+
+	// 4. Industrial Fee Processing: 500 VBV per re-allocation.
+	const mutationCostMicro = 500 * 1000000
+	if l.playerBalances[wallet] < mutationCostMicro {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Insufficient VBV for protocol."}`)})
+		return
+	}
+
+	// Execute Virtual Liability Shift
+	l.playerBalances[wallet] -= mutationCostMicro
+
+	// PILLAR 6: Probability Modifier.
+	// Success is determined by facility quality (Mojo + Staff).
+	// If Mutation Insurance is active, success is guaranteed and the buff is consumed.
+	successChance := s.CalculateMutationSuccessChance(l, club)
+	usedInsurance := false
+	if stats.HasMutationInsurance {
+		successChance = 1.1 // Force 100% success
+		usedInsurance = true
+		stats.HasMutationInsurance = false
+	}
+
+	if rand.Float64() > successChance {
+		// FAILURE: Apply Mutation Scar (Permanent Artifact reduction)
+		l.applyMutationScars(data.CardID, 50)
+		club.MutationFailures++
+		l.logAdminAuditLocked("MUTATION_FAILURE", wallet, fmt.Sprintf("Vector realignment failed for card %d at club %s", data.CardID, club.Name))
+
+		failedCard := l.inventory[data.CardID]
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>MUTATION FAILURE:</b> The procedure failed. %s has suffered permanent mutation scars (-50 Artifact)."}`, failedCard.Name)),
+		})
+		l.applyDynamicScalingLocked()
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		return
+	}
+
+	// 5. Atomic Routing: Commission Split.
+	var govCutMicro uint64 = 0
+	context := "VECTOR_REALIGNMENT" // Context for telemetry
+
+	if club.AlliedClubID != "" && s.IsClubRegionalLocked(l, club) {
+		if ally, ok := l.clubs[club.AlliedClubID]; ok {
+			govCutMicro = (mutationCostMicro * 5) / 100 // 5% of total cost (integer micro math)
+
+
+			// Route the governor's cut separately
+			if l.tokenSinkRouter != nil {
+				// PILLAR 2: Instant Settlement. 
+				// Route to the ally as a ClubShare to update their treasury instantly.
+				matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+				numericID, _ := strconv.ParseUint(strings.TrimPrefix(ally.ID, "CLUB-"), 10, 64)
+				_ = l.tokenSinkRouter.RouteCriminalTax(context+"_GOV_SPLIT", govCutMicro, matrix, numericID, "")
+
+				// PILLAR 2: UI Parity Sync.
+				if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+					ally.TreasuryMicro = node.TreasuryBalance
+				}
+
+				// PILLAR 1: Organizational Progression.
+				// Allied governors earn Mojo for procedures performed within their coalition.
+				allyMojo := s.CalculateMojoGain(l, ally, "REVENUE", float64(govCutMicro)/1000000.0)
+				ally.Mojo += allyMojo
+				l.achievementService.CheckMojoSurgeAchievementLocked(l, ally.ID)
+			} else {
+				ally.TreasuryMicro += govCutMicro
+			}
+			ally.LastActivity = time.Now()
+
+			// Record event in alliance history
+			ally.CommissionHistory = append(ally.CommissionHistory, CommissionEvent{
+				Timestamp: time.Now().Unix(), SourceClub: club.Name, Type: "VECTOR", Amount: float64(govCutMicro) / 1000000.0,
+			})
+			if len(ally.CommissionHistory) > 50 {
+				ally.CommissionHistory = ally.CommissionHistory[len(ally.CommissionHistory)-50:]
+			}
+			l.logAdminAuditLocked("MUTATION_GOV_SPLIT", wallet, fmt.Sprintf("Recipient: %s, Fee: %.2f", ally.Name, float64(govCutMicro)/1000000.0))
+		}
+	}
+
+	// Route the remaining portion of the mutation cost
+	remainingCostMicro := mutationCostMicro - govCutMicro
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.90, ClubShare: 0.10, GovernanceShare: 0.0} // Default split for remaining
+		// Map string ID ("CLUB-123") to numeric router target
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		_ = l.tokenSinkRouter.RouteCriminalTax(context, remainingCostMicro, matrix, numericID, "GLOBAL")
+	}
+
+	if usedInsurance {
+		l.logAdminAuditLocked("INSURANCE_CONSUMED", wallet, fmt.Sprintf("Used on card %d realignment", data.CardID))
+	}
+
+	// 6. Commit State: Update both active inventory and persistent archival cache.
+	card.Power = data.NewPower
+	l.inventory[data.CardID] = card
+	club.MutationSuccesses++
+	l.persistentCardCache[data.CardID] = card
+
+	// PILLAR 1: Organizational Progression.
+	// Clubs earn Mojo for performing successful gene-editing procedures.
+	procMojo := s.CalculateMojoGain(l, club, "REVENUE", float64(mutationCostMicro)/1000000.0)
+	club.Mojo += procMojo
+
+	// 6.1 Record Forensic Mutation Event
+	stats.MutationHistory = append(stats.MutationHistory, MutationEvent{
+		Timestamp: time.Now().Unix(),
+		Type:      "VECTOR",
+		CardID:    data.CardID,
+		Details:   fmt.Sprintf("Power Realigned: %v", data.NewPower),
+	})
+
+	// Update reputation immediately to reflect the new tactical standing
+	stats.Reputation = l.CalculateReputation(stats)
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("VECTOR_REALIGNMENT", wallet, fmt.Sprintf("Vector realignment successful for card %d at club %s", data.CardID, club.Name))
+
+	// Immersion: Notify the player of successful gene-editing
+	l.sendToClientLocked(env.FromID, Envelope{
+		Type:    "admin_notification",
+		Payload: json.RawMessage(fmt.Sprintf(`{"text":"🧬 <b>MUTATION SUCCESS:</b> %s vectors have been realigned."}`, card.Name)),
+	})
+
+	// 7. Global Synchronization
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleMutationMoodRecalibration allows players to permanently change a card's native element.
+// PILLAR 6: Specialized Gene-Editing.
+func (s *ClubService) HandleMutationMoodRecalibration(l *Lobby, env *Envelope) {
+	var data struct {
+		CardID  int    `json:"card_id"`
+		ClubID  string `json:"club_id"`
+		NewMood string `json:"new_mood"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	// 1. Facility Verification: Vitality or Elemental labs required.
+	club, exists := l.clubs[data.ClubID]
+	if !exists || (club.Type != "Vitality" && club.Type != "Elemental") {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Specialized lab facility required."}`)})
+		return
+	}
+
+	// 2. Ownership Verification: Player must possess the asset and a Catalyst.
+	stats := l.leaderboard[wallet]
+	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
+	if count, has := stats.Inventory[cardKey]; !has || count <= 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: You do not possess this card."}`)})
+		return
+	}
+
+	if count, has := stats.Inventory["mood_catalyst"]; !has || count <= 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Mood Catalyst required in inventory."}`)})
+		return
+	}
+
+	// 3. Element Validation
+	validMoods := map[string]bool{"Volatile": true, "Serene": true, "Spirited": true, "Grounded": true, "Neutral": true}
+	if !validMoods[data.NewMood] {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Invalid mood element target."}`)})
+		return
+	}
+
+	// 4. Industrial Fee Processing: 250 VBV per recalibration.
+	const recalCostMicro = 250 * 1000000
+	if l.playerBalances[wallet] < recalCostMicro {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Mutation Failed: Insufficient VBV for protocol."}`)})
+		return
+	}
+
+	// Execute Deductions
+	l.playerBalances[wallet] -= recalCostMicro
+	stats.Inventory["mood_catalyst"]--
+	if stats.Inventory["mood_catalyst"] <= 0 {
+		delete(stats.Inventory, "mood_catalyst")
+	}
+
+	// PILLAR 6: Probability Modifier.
+	// Procedure requires Catalyst consumption regardless of success.
+	// Mutation Insurance guarantees success for elemental realignment.
+	successChance := s.CalculateMutationSuccessChance(l, club)
+	usedInsurance := false
+	if stats.HasMutationInsurance {
+		successChance = 1.1
+		usedInsurance = true
+		stats.HasMutationInsurance = false
+	}
+
+	if rand.Float64() > successChance {
+		// FAILURE: Apply Mutation Scar
+		l.applyMutationScars(data.CardID, 50)
+		club.MutationFailures++
+		l.logAdminAuditLocked("MUTATION_FAILURE", wallet, fmt.Sprintf("Mood recalibration failed for card %d at club %s", data.CardID, club.Name))
+
+		failedCard := l.inventory[data.CardID]
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>MUTATION FAILURE:</b> Elemental alignment failed. %s has suffered permanent mutation scars."}`, failedCard.Name)),
+		})
+		l.applyDynamicScalingLocked()
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		return
+	}
+
+	// 5. Atomic Routing: Commission Split.
+	var govCutMicro uint64 = 0
+	context := "MOOD_RECALIBRATION" // Context for telemetry
+
+	if club.AlliedClubID != "" && s.IsClubRegionalLocked(l, club) {
+		if ally, ok := l.clubs[club.AlliedClubID]; ok {
+			govCutMicro = (recalCostMicro * 5) / 100 // 5% of total cost (integer micro math)
+
+
+			// Route the governor's cut separately
+			if l.tokenSinkRouter != nil {
+				// PILLAR 2: Instant Settlement.
+				matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+				numericID, _ := strconv.ParseUint(strings.TrimPrefix(ally.ID, "CLUB-"), 10, 64)
+				_ = l.tokenSinkRouter.RouteCriminalTax(context+"_GOV_SPLIT", govCutMicro, matrix, numericID, "")
+
+				// PILLAR 2: UI Parity Sync.
+				if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+					ally.TreasuryMicro = node.TreasuryBalance
+				}
+
+				// PILLAR 1: Allied Mojo Gain.
+				allyMojo := s.CalculateMojoGain(l, ally, "REVENUE", float64(govCutMicro)/1000000.0)
+				ally.Mojo += allyMojo
+				l.achievementService.CheckMojoSurgeAchievementLocked(l, ally.ID)
+			} else {
+				ally.TreasuryMicro += govCutMicro
+			}
+			ally.LastActivity = time.Now()
+
+			// Record event in alliance history
+			ally.CommissionHistory = append(ally.CommissionHistory, CommissionEvent{
+				Timestamp: time.Now().Unix(), SourceClub: club.Name, Type: "MOOD", Amount: float64(govCutMicro) / 1000000.0,
+			})
+			if len(ally.CommissionHistory) > 50 {
+				ally.CommissionHistory = ally.CommissionHistory[len(ally.CommissionHistory)-50:]
+			}
+			l.logAdminAuditLocked("MUTATION_GOV_SPLIT", wallet, fmt.Sprintf("Recipient: %s, Fee: %.2f", ally.Name, float64(govCutMicro)/1000000.0))
+		}
+	}
+
+	// Route the remaining portion of the mutation cost
+	remainingCostMicro := recalCostMicro - govCutMicro
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.90, ClubShare: 0.10, GovernanceShare: 0.0} // Default split for remaining
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		_ = l.tokenSinkRouter.RouteCriminalTax(context, remainingCostMicro, matrix, numericID, "GLOBAL")
+	}
+
+	if usedInsurance {
+		l.logAdminAuditLocked("INSURANCE_CONSUMED", wallet, fmt.Sprintf("Used on card %d element shift", data.CardID))
+	}
+
+	// 6. Commit State: Update both active inventory and persistent archival cache.
+	card := l.inventory[data.CardID]
+	card.Mood = data.NewMood
+	club.MutationSuccesses++
+	l.inventory[data.CardID] = card
+	l.persistentCardCache[data.CardID] = card
+
+	// PILLAR 1: Organizational Progression.
+	procMojo := s.CalculateMojoGain(l, club, "REVENUE", float64(recalCostMicro)/1000000.0)
+	club.Mojo += procMojo
+	l.achievementService.CheckMojoSurgeAchievementLocked(l, club.ID)
+
+	// 6.1 Record Forensic Mutation Event
+	stats.MutationHistory = append(stats.MutationHistory, MutationEvent{
+		Timestamp: time.Now().Unix(),
+		Type:      "MOOD",
+		CardID:    data.CardID,
+		Details:   fmt.Sprintf("Element recalibrated to %s", data.NewMood),
+	})
+
+	// Update reputation and leaderboard
+	stats.Reputation = l.CalculateReputation(stats)
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("MOOD_RECALIBRATION", wallet, fmt.Sprintf("Mood recalibration successful for card %d at club %s", data.CardID, club.Name))
+
+	// Immersion: Notify the player of successful element shift
+	l.sendToClientLocked(env.FromID, Envelope{
+		Type:    "admin_notification",
+		Payload: json.RawMessage(fmt.Sprintf(`{"text":"🧬 <b>MUTATION SUCCESS:</b> %s is now aligned with the %s element."}`, card.Name, data.NewMood)),
+	})
+
+	// 7. Global Synchronization
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleMutationLoyaltySynthesis allows players to instantly soul-bond a card for a high fee.
+// PILLAR 6: Specialized Gene-Editing.
+func (s *ClubService) HandleMutationLoyaltySynthesis(l *Lobby, env *Envelope) {
+	var data struct {
+		CardID int    `json:"card_id"`
+		ClubID string `json:"club_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	// 1. Facility Verification: Vitality or Elemental labs required.
+	club, exists := l.clubs[data.ClubID]
+	if !exists || (club.Type != "Vitality" && club.Type != "Elemental") {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Synthesis Failed: Specialized lab facility required."}`)})
+		return
+	}
+
+	// 2. Ownership & Invariant Verification: Player must possess card and it must not be maxed.
+	stats := l.leaderboard[wallet]
+	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
+	if count, has := stats.Inventory[cardKey]; !has || count <= 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Synthesis Failed: You do not possess this card."}`)})
+		return
+	}
+
+	card := l.inventory[data.CardID]
+	if card.Loyalty >= 100 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Synthesis Failed: This asset is already Soul-Bonded."}`)})
+		return
+	}
+
+	// 3. Industrial Fee Processing: 1,000 VBV per synthesis.
+	const synthesisCostMicro = 1000 * 1000000
+	if l.playerBalances[wallet] < synthesisCostMicro {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Synthesis Failed: Insufficient VBV for soul-bonding protocol."}`)})
+		return
+	}
+
+	// Execute Virtual Liability Shift
+	l.playerBalances[wallet] -= synthesisCostMicro
+
+	// PILLAR 2: Industrial Seal. 
+	// The fee is routed regardless of the procedure outcome to ensure ledger circularity.	
+	var govCutMicro uint64 = 0
+	var targetGovDistrict string = "GLOBAL"
+	context := "LOYALTY_SYNTHESIS" // Context for telemetry
+
+	if club.AlliedClubID != "" && s.IsClubRegionalLocked(l, club) {
+		if ally, ok := l.clubs[club.AlliedClubID]; ok {
+			govCutMicro = (synthesisCostMicro * 5) / 100 // 5% of total cost (integer micro math)
+
+
+			// Route the governor's cut separately
+			if l.tokenSinkRouter != nil {
+				// PILLAR 2: Instant Settlement.
+				matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+				numericID, _ := strconv.ParseUint(strings.TrimPrefix(ally.ID, "CLUB-"), 10, 64)
+				_ = l.tokenSinkRouter.RouteCriminalTax(context+"_GOV_SPLIT", govCutMicro, matrix, numericID, "")
+
+				// PILLAR 2: UI Parity Sync.
+				if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+					ally.TreasuryMicro = node.TreasuryBalance
+				}
+
+				// PILLAR 1: Allied Mojo Gain.
+				allyMojo := s.CalculateMojoGain(l, ally, "REVENUE", float64(govCutMicro)/1000000.0)
+				ally.Mojo += allyMojo
+				l.achievementService.CheckMojoSurgeAchievementLocked(l, ally.ID)
+			} else {
+				ally.TreasuryMicro += govCutMicro
+			}
+			ally.LastActivity = time.Now()
+
+			// Record event in alliance history
+			ally.CommissionHistory = append(ally.CommissionHistory, CommissionEvent{
+				Timestamp: time.Now().Unix(), SourceClub: club.Name, Type: "LOYALTY", Amount: float64(govCutMicro) / 1000000.0,
+			})
+			if len(ally.CommissionHistory) > 50 {
+				ally.CommissionHistory = ally.CommissionHistory[len(ally.CommissionHistory)-50:]
+			}
+			l.logAdminAuditLocked("MUTATION_GOV_SPLIT", wallet, fmt.Sprintf("Recipient: %s, Fee: %.2f", ally.Name, float64(govCutMicro)/1000000.0))
+		}
+	}
+
+	// Route the remaining portion of the mutation cost
+	remainingCostMicro := synthesisCostMicro - govCutMicro
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.90, ClubShare: 0.10, GovernanceShare: 0.0} // Default split for remaining
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		_ = l.tokenSinkRouter.RouteCriminalTax(context, remainingCostMicro, matrix, numericID, "GLOBAL")
+	}
+
+	// PILLAR 6: Probability Modifier.
+	// Loyalty synthesis is a high-stakes roll; insurance is highly recommended.
+	successChance := s.CalculateMutationSuccessChance(l, club)
+	usedInsurance := false
+	if stats.HasMutationInsurance {
+		successChance = 1.1
+		usedInsurance = true
+		stats.HasMutationInsurance = false
+	}
+
+	if rand.Float64() > successChance {
+		// FAILURE: Apply Mutation Scar (Permanent Artifact reduction)
+		l.applyMutationScars(data.CardID, 50)
+		club.MutationFailures++
+		l.logAdminAuditLocked("MUTATION_FAILURE", wallet, fmt.Sprintf("Loyalty synthesis failed for card %d at club %s", data.CardID, club.Name))
+
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>MUTATION FAILURE:</b> Soul-bonding failed. %s has suffered permanent mutation scars."}`, card.Name)),
+		})
+		
+		// PILLAR 1: Career Service Update.
+		// Recalculate reputation even on failure to reflect procedure attempts.
+		stats.Reputation = l.CalculateReputation(stats)
+		l.leaderboard[wallet] = stats
+		
+		l.applyDynamicScalingLocked()
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		return
+	}
+
+	if usedInsurance {
+		l.logAdminAuditLocked("INSURANCE_CONSUMED", wallet, fmt.Sprintf("Used on card %d soul-bonding", data.CardID))
+	}
+
+	// 5. Commit State: Update both active inventory and persistent archival cache.
+	card.Loyalty = 100
+	l.inventory[data.CardID] = card
+
+	// PILLAR 1: Organizational Progression.
+	procMojo := s.CalculateMojoGain(l, club, "REVENUE", float64(synthesisCostMicro)/1000000.0)
+	club.Mojo += procMojo
+
+	club.MutationSuccesses++
+	l.persistentCardCache[data.CardID] = card
+
+	// 5.1 Record Forensic Mutation Event
+	stats.MutationHistory = append(stats.MutationHistory, MutationEvent{
+		Timestamp: time.Now().Unix(),
+		Type:      "LOYALTY",
+		CardID:    data.CardID,
+		Details:   "Instant Loyalty Synthesis (Soul-Bonded)",
+	})
+
+	// Update reputation immediately to reflect the new soul-bonded standing
+	stats.Reputation = l.CalculateReputation(stats)
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("LOYALTY_SYNTHESIS", wallet, fmt.Sprintf("Loyalty synthesis successful for card %d at club %s", data.CardID, club.Name))
+
+	// Immersion: Notify the player of successful synthesis
+	l.sendToClientLocked(env.FromID, Envelope{
+		Type:    "admin_notification",
+		Payload: json.RawMessage(fmt.Sprintf(`{"text":"🧬 <b>SYNTHESIS SUCCESS:</b> %s is now soul-bonded to your profile."}`, card.Name)),
+	})
+
+	// 6. Global Synchronization
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleSabotage allows a player to pay $VBV to disable a target club's hardware defenses for 1 hour.
+func (s *ClubService) HandleSabotage(l *Lobby, env *Envelope) {
 	var data struct {
 		TargetClubID string `json:"target_club_id"`
 	}
@@ -355,15 +1418,60 @@ func (l *Lobby) handleSabotage(env *Envelope) {
 		return
 	}
 
-	// COST: 1000 $VBV (micro-units)
-	const sabotageCostMicro = 1000 * 1000000
-	if l.playerBalances[wallet] < sabotageCostMicro {
-		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Sabotage Failed: Insufficient $VBV rewards."}`)})
+	// 1. Calculate Total Sabotage Cost (Industrial Loop)
+	// PILLAR 1: Political Influence. Use dynamic cost based on target resilience.
+	totalCostMicro := l.CalculateSabotageCostLocked(targetClub)
+	
+	if l.playerBalances[wallet] < totalCostMicro {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Sabotage Failed: Insufficient $VBV rewards. Total required: %.0f $VBV."}`, float64(totalCostMicro)/1000000.0))})
 		return
 	}
+	l.playerBalances[wallet] -= totalCostMicro
 
-	// Deduct payment and trigger industrial loop scaling
-	l.playerBalances[wallet] -= sabotageCostMicro
+	// Determine territory context for telemetry
+	telemetryContext := "neutral_zone"
+	if len(targetClub.Territories) > 0 {
+		telemetryContext = targetClub.Territories[0]
+	}
+
+	// PILLAR 2: Unified Organizational Accounting (Token-Sink Router migration).
+	if l.tokenSinkRouter != nil {
+		// Proportional split (2/3 to Faucet, 1/3 to Club) maintained for dynamic costs.
+		dynamicBaseMicro := (totalCostMicro * 1000) / 1500
+		dynamicSurchargeMicro := totalCostMicro - dynamicBaseMicro
+
+		// A. Route Dynamic Base Cost to Faucet
+		matrixBase := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+		_ = l.tokenSinkRouter.RouteCriminalTax("SABOTAGE_BASE", dynamicBaseMicro, matrixBase, 0, "")
+
+		// B. Route Infiltration Surcharge
+		if s.IsClubRegionalLocked(l, targetClub) {
+			matrixSurcharge := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+			numericID, _ := strconv.ParseUint(strings.TrimPrefix(targetClub.ID, "CLUB-"), 10, 64)
+			_ = l.tokenSinkRouter.RouteCriminalTax(telemetryContext, dynamicSurchargeMicro, matrixSurcharge, numericID, "")
+
+			// Sync treasury from authoritative router node
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				targetClub.TreasuryMicro = node.TreasuryBalance
+				targetClub.Treasury = float64(node.TreasuryBalance) / 1000000.0
+			}
+			l.SabotageSurchargeTotal += dynamicSurchargeMicro
+			l.logAdminAuditLocked("SABOTAGE_SURCHARGE_PAID", wallet, fmt.Sprintf("Recipient: %s (Target), Amount: 500.00", targetClub.Name))
+
+			// Trigger Security Telemetry logic (Reparations)
+			s.handleSabotageReparationsLocked(l, targetClub)
+		} else {
+			matrixSurcharge := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+			_ = l.tokenSinkRouter.RouteCriminalTax("SABOTAGE_SURCHARGE_FAUCET", dynamicSurchargeMicro, matrixSurcharge, 0, "")
+			l.logAdminAuditLocked("SABOTAGE_SURCHARGE_TO_FAUCET", wallet, fmt.Sprintf("Target %s is not a Regional Governor", targetClub.Name))
+		}
+
+		// Sync physical balance float
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	} else {
+	}
+
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
 	l.applyDynamicScalingLocked()
 
 	// Apply Sabotage: Set a special buff expiration key
@@ -379,7 +1487,7 @@ func (l *Lobby) handleSabotage(env *Envelope) {
 	sabotageDetails := map[string]interface{}{
 		"target_id": targetClub.ID,
 		"perp":      wallet,
-		"cost":      1000.0,
+		"cost":      float64(totalCostMicro) / 1000000.0,
 		"expiry":    expiry.Unix(),
 		"ts":        time.Now().Unix(),
 	}
@@ -436,8 +1544,236 @@ func (l *Lobby) handleSabotage(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleCreateClub allows a player to found a new organization.
-func (l *Lobby) handleCreateClub(env *Envelope) {
+// handleSabotageReparationsLocked processes the social and telemetry consequences of a sabotage surcharge payout.
+func (s *ClubService) handleSabotageReparationsLocked(l *Lobby, targetClub *Club) {
+	// PILLAR 1: Security Telemetry. Increment the owner's reparation counter (authoritative).
+	targetOwner := strings.ToLower(targetClub.OwnerWallet)
+	if ownerStats, exists := l.leaderboard[targetOwner]; exists {
+		ownerStats.ReparationsReceivedCount++
+		ownerStats.Reputation = l.CalculateReputation(ownerStats)
+		l.leaderboard[targetOwner] = ownerStats
+
+		// PILLAR 1: Resilience Alert. Broadcast milestone to the sector.
+		if ownerStats.ReparationsReceivedCount == 5 {
+			name := l.ResolveEnvoiName(targetClub.OwnerWallet)
+			alert := fmt.Sprintf("🛡️ <b>RESILIENCE ALERT:</b> Governor %s has been designated as a <b>Hardened Sector Leader</b> after securing their 5th reparation!", escapeHTML(name))
+			payload, _ := json.Marshal(map[string]string{"text": alert})
+			l.broadcast <- jsonListEnvelope("chat", payload)
+		}
+	}
+
+	// PILLAR 1: Reparation Notification. Inform the victim of the payout.
+	ownerCID := l.getClientIDFromWalletLocked(targetClub.OwnerWallet)
+	if ownerCID != "" {
+		msg := fmt.Sprintf(`{"text":"🛡️ <b>REPARATION RECEIVED:</b> Your organization received a 500 $VBV surcharge from an infiltration attempt on %s."}`, escapeHTML(targetClub.Name))
+		l.sendToClientLocked(ownerCID, Envelope{Type: "admin_notification", FromID: "SERVER", Payload: json.RawMessage(msg)})
+	}
+}
+
+// CalculateMutationSuccessChance evaluates the risk of specialized gene-editing.
+// PILLAR 6: Specialized Gene-Editing Scaling.
+func (s *ClubService) CalculateMutationSuccessChance(l *Lobby, club *Club) float64 {
+	// Base success rate for specialized gene-editing is 70%.
+	chance := 0.70
+
+	// PILLAR 1: Infrastructure Quality.
+	// Mojo represents the club's prestige and technical investment.
+	// Bonus: +1% per 50 Mojo (Max +20% at 1000 Mojo).
+	mojoBonus := float64(club.Mojo) / 5000.0
+	if mojoBonus > 0.20 {
+		mojoBonus = 0.20
+	}
+	chance += mojoBonus
+
+	// PILLAR 1: Organizational Capacity.
+	// Each active staff member adds +2% (Max +10% for 5 members).
+	staffBonus := float64(len(club.Staff)) * 0.02
+	if staffBonus > 0.10 {
+		staffBonus = 0.10
+	}
+	chance += staffBonus
+
+	// PILLAR 3: Sabotage Impact.
+	// Disrupted organization networks reduce procedure stability by 15%.
+	if expiry, active := club.BuffExpirations["SABOTAGE"]; active && time.Now().Before(expiry) {
+		chance -= 0.15
+	}
+
+	// PILLAR 1: Regional Governor Stability.
+	// Regional Governors (2+ districts) receive a flat +5% stability bonus.
+	if s.IsClubRegionalLocked(l, club) {
+		chance += 0.05
+	}
+
+	// PILLAR 6: Tactical Infrastructure Buffs.
+	// Staff Training provides a specialized boost to procedure stability.
+	if expiry, active := club.BuffExpirations["STAFF_TRAINING"]; active && time.Now().Before(expiry) {
+		// Use the value from the registry to ensure mathematical parity
+		if item, ok := GlobalShopRegistry["staff_training"]; ok {
+			chance += item.MutationSuccessModifier
+		}
+	}
+
+	// Safety Clamping: No procedure is risk-free without insurance.
+	if chance > 0.98 {
+		chance = 0.98
+	}
+	if chance < 0.50 {
+		chance = 0.50
+	}
+
+	return chance
+}
+
+// HandleRegionalSabotage allows elite players to disrupt coordinated alliance boosts in a target district.
+// PILLAR 1: Regional Warfare.
+func (s *ClubService) HandleRegionalSabotage(l *Lobby, env *Envelope) {
+	var data struct {
+		TargetClubID      string `json:"target_club_id"`
+		TargetTerritoryID string `json:"target_territory_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	targetClub, exists := l.clubs[data.TargetClubID]
+	if !exists {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Sabotage Failed: Target organization not found."}`)})
+		return
+	}
+
+	// 1. Calculate Aggregated Warfare Cost (Integer Supremacy)
+	// Base: 5,000 $VBV + 1,000 $VBV per allied district.
+	alliedDistricts := len(targetClub.Territories)
+	if targetClub.AlliedClubID != "" {
+		if ally, ok := l.clubs[targetClub.AlliedClubID]; ok {
+			alliedDistricts += len(ally.Territories)
+		}
+	}
+
+	warfareFeeMicro := uint64(5000+1000*alliedDistricts) * 1000000
+
+	// PILLAR 1: Reparation Multiplier.
+	// Apply the same security resilience scaling to regional warfare protocols.
+	multiplier := uint64(100)
+	targetOwner := strings.ToLower(targetClub.OwnerWallet)
+	if ownerStats, exists := l.leaderboard[targetOwner]; exists {
+		multiplier += uint64((ownerStats.ReparationsReceivedCount / 5) * 10)
+	}
+	warfareFeeMicro = (warfareFeeMicro * multiplier) / 100
+
+	// PILLAR 3: Career Path Influence. 'Saboteurs' receive a 1,500 $VBV discount on warfare protocols.
+	stats := l.leaderboard[wallet]
+	if stats.JobRole == "Saboteur" {
+		const discountMicro = 1500 * 1000000
+		if warfareFeeMicro > discountMicro {
+			warfareFeeMicro -= discountMicro
+		} else {
+			warfareFeeMicro = 0
+		}
+	}
+
+	if l.playerBalances[wallet] < warfareFeeMicro {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Sabotage Failed: Insufficient funds. Protocol requires %.0f $VBV."}`, float64(warfareFeeMicro)/1000000.0))})
+		return
+	}
+
+	// 2. Execute Virtual Liability Shift
+	l.playerBalances[wallet] -= warfareFeeMicro
+
+	// 3. Routing: 70% to Faucet, 30% to Competitor Pool (Industrial Loop).
+	// PILLAR 2: Unified Organizational Accounting (Token-Sink Router migration).
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.70, ClubShare: 0.30, GovernanceShare: 0.0}
+		_ = l.tokenSinkRouter.RouteCriminalTax("REGIONAL_WARFARE", warfareFeeMicro, matrix, 0, "GLOBAL")
+
+			// PILLAR 2: UI Parity Sync.
+			// Sync treasuries for all potential recipients from authoritative router nodes.
+			for id, club := range l.clubs {
+				numericID, _ := strconv.ParseUint(strings.TrimPrefix(id, "CLUB-"), 10, 64)
+				if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+					club.TreasuryMicro = node.TreasuryBalance
+				}
+			}
+	} else {
+		// Fallback for non-router environments (Pillar 6)
+		faucetCutMicro := (warfareFeeMicro * 70) / 100
+		competitorCutMicro := warfareFeeMicro - faucetCutMicro
+		l.faucetBalanceMicro += faucetCutMicro
+
+		var otherGovs []*Club
+		for _, c := range l.clubs {
+			if c.ID != targetClub.ID && c.ID != targetClub.AlliedClubID && s.IsClubRegionalLocked(l, c) {
+				otherGovs = append(otherGovs, c)
+			}
+		}
+		if len(otherGovs) > 0 {
+			shareMicro := competitorCutMicro / uint64(len(otherGovs))
+			for _, g := range otherGovs {
+				g.Treasury += float64(shareMicro) / 1000000.0
+			}
+		} else {
+			l.faucetBalanceMicro += competitorCutMicro
+		}
+	}
+
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	l.applyDynamicScalingLocked()
+
+	// 4. Apply Disruption: Disables Regional Boost and Coalition Defense
+	expiry := time.Now().Add(2 * time.Hour)
+	if targetClub.BuffExpirations == nil {
+		targetClub.BuffExpirations = make(map[string]time.Time)
+	}
+	// Key format: REGIONAL_DISRUPTION_<TerritoryID>
+	targetClub.BuffExpirations["DISRUPTION_"+data.TargetTerritoryID] = expiry
+	targetClub.LastActivity = time.Now()
+
+	l.logAdminAuditLocked("REGIONAL_SABOTAGE", wallet, fmt.Sprintf("Target: %s, District: %s, Cost: %d", targetClub.Name, data.TargetTerritoryID, warfareFeeMicro))
+
+	// 5. Broadcast Blackout Alert
+	blackoutAlert := fmt.Sprintf("📡 <b>NETWORK BLACKOUT:</b> Defensive coordination in %s has been disrupted! All Regional and Coalition boosts are OFFLINE for 2 hours.", data.TargetTerritoryID)
+	alertPayload, _ := json.Marshal(map[string]string{"text": blackoutAlert})
+	l.broadcast <- jsonListEnvelope("chat", alertPayload)
+
+	// PILLAR 5: Reactive Atmosphere.
+	// Dispatch high-intensity critical notification to trigger 'Warning_long.mp3' for affected governors.
+	criticalPayload, _ := json.Marshal(map[string]string{
+		"text": fmt.Sprintf("🔥 <b>CRITICAL ALERT:</b> A Regional Sabotage protocol in %s has severed your defensive coordination!", strings.ReplaceAll(strings.ToUpper(data.TargetTerritoryID), "_", " ")),
+		"type": "critical",
+	})
+	criticalEnv := Envelope{Type: "admin_notification", FromID: "SERVER", Payload: criticalPayload}
+
+	// Identify all affected governors (Target Owner and Alliance partner Owner)
+	affectedOwners := make(map[string]bool)
+	if targetClub.OwnerWallet != "" { affectedOwners[strings.ToLower(targetClub.OwnerWallet)] = true }
+	if targetClub.AlliedClubID != "" {
+		if ally, ok := l.clubs[targetClub.AlliedClubID]; ok && ally.OwnerWallet != "" {
+			affectedOwners[strings.ToLower(ally.OwnerWallet)] = true
+		}
+	}
+
+	for ownerWallet := range affectedOwners {
+		if cid := l.getClientIDFromWalletLocked(ownerWallet); cid != "" {
+			l.sendToClientLocked(cid, criticalEnv)
+		}
+	}
+
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"🥷 <b>SABOTAGE SUCCESS:</b> Sector coordination disrupted. Defensive boosts are disabled."}`)})
+
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleCreateClub allows a player to found a new organization.
+func (s *ClubService) HandleCreateClub(l *Lobby, env *Envelope) {
 	var data struct {
 		Name        string `json:"name"`
 		Type        string `json:"type"`
@@ -497,8 +1833,17 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 	// Prevent TxID recycling
 	l.registeredTxIDs[data.TxID] = time.Unix(txTime, 0)
 
-	// INDUSTRIAL LOOP: Update physical vault total and trigger reactive scaling.
-	l.faucetBalance += 5000.0
+	// INDUSTRIAL LOOP: Integer Supremacy.
+	// Physically increment the vault total to reflect confirmed on-chain inflow.
+	feeMicro := uint64(5000 * 1000000)
+	l.faucetBalanceMicro += feeMicro
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+	// PILLAR 2: Real-time Reconciliation.
+	if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+		_ = l.tokenSinkRouter.Audit.InterceptAndAudit("CLUB_FOUNDRY_FEE", feeMicro, feeMicro, 0, 0)
+	}
+
 	l.applyDynamicScalingLocked()
 
 	clubID := fmt.Sprintf("CLUB-%d", time.Now().Unix())
@@ -524,8 +1869,8 @@ func (l *Lobby) handleCreateClub(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleJoinClub allows a player to become a member of an existing club.
-func (l *Lobby) handleJoinClub(env *Envelope) {
+// HandleJoinClub allows a player to become a member of an existing club.
+func (s *ClubService) HandleJoinClub(l *Lobby, env *Envelope) {
 	var data struct {
 		ClubID  string `json:"club_id"`
 		TxID    string `json:"txid"`
@@ -552,6 +1897,25 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 	if strings.EqualFold(data.Network, "ALGO") || strings.HasPrefix(strings.ToUpper(data.Network), "ALGO") {
 		assetID = l.avoiAssetID
 		verifyNet = "Algorand"
+	}
+
+	// PILLAR 1: Capital Presence (Task 921).
+	// Apply a 10% 'Capital Entry Surcharge' if joining the organization controlling the Arena Center.
+	l.mutex.RLock()
+	targetClub, clubExists := l.clubs[data.ClubID]
+	isCapitalOwner := false
+	if clubExists {
+		for _, t := range targetClub.Territories {
+			if t == "arena_center" {
+				isCapitalOwner = true
+				break
+			}
+		}
+	}
+	l.mutex.RUnlock()
+
+	if isCapitalOwner {
+		joinFee = 550.0
 	}
 
 	// PILLAR 3: Dynamic Precision.
@@ -618,10 +1982,10 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 
 		playerStats := l.leaderboard[wallet]
 		// PILLAR 1: Real-time Standing Verification. Ensure we check the most current Reputation.
-		playerStats.Reputation = l.CalculateReputation(playerStats)
+		playerStats.Reputation = l.CalculateReputation(playerStats) // This calls CalculateReputation, not PlayerStats.GetEffectiveMojo
 		l.leaderboard[wallet] = playerStats
 
-		if minReputationRequired > 0 && (playerStats.Reputation < minReputationRequired || playerStats.GetEffectiveMojo() < minMojoRequired) {
+		if minReputationRequired > 0 && (playerStats.Reputation < minReputationRequired || l.playerService.GetEffectiveMojo(playerStats) < minMojoRequired) {
 			l.applyDynamicScalingLocked()
 			l.mutex.Unlock()
 			msg := fmt.Sprintf(`{"text":"❌ Club Entry Failed: Elite club %s requires %d Reputation and %d Mojo social standing to join."}`, club.Name, minReputationRequired, minMojoRequired)
@@ -630,20 +1994,41 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 		}
 
 		club.Members[strings.ToLower(wallet)] = time.Now()
-		club.Treasury += 250.0
 		club.LastActivity = time.Now()
 
+		// PILLAR 2: Unified Organizational Accounting.
+		// Update the club's treasury in the authoritative router node to ensure 
+		// accurate systemic liability reporting.
+		if l.tokenSinkRouter != nil {
+			l.tokenSinkRouter.Mu.Lock()
+			numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				node.TreasuryBalance += 250 * 1000000
+				club.TreasuryMicro = node.TreasuryBalance
+				club.Treasury = float64(node.TreasuryBalance) / 1000000.0
+			}
+			l.tokenSinkRouter.Mu.Unlock()
+		} else {
+			club.Treasury += 250.0
+		}
+
 		// PILLAR 1: Mojo Gain for Club Entry revenue.
-		mojoGain := l.calculateMojoGain(club, "REVENUE", 250.0)
+		mojoGain := s.CalculateMojoGain(l, club, "REVENUE", 250.0)
 		club.Mojo += mojoGain
-		l.checkMojoSurgeAchievementLocked(club.ID)
+		l.achievementService.CheckMojoSurgeAchievementLocked(l, club.ID)
 
 		// PILLAR 2: Ledger Integrity. Update scaling to reflect the new treasury liability.
 		l.applyDynamicScalingLocked()
 
 		l.mutex.Unlock()
-		l.logAdminAudit("CLUB_JOIN", wallet, fmt.Sprintf("Club: %s", data.ClubID))
-		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🤝 Welcome to %s!"}`, club.Name))})
+		l.logAdminAudit("CLUB_JOIN", wallet, fmt.Sprintf("Club: %s, CapitalSurcharge: %v", data.ClubID, isCapitalOwner))
+		
+		welcomeMsg := fmt.Sprintf(`{"text":"🤝 Welcome to %s!"}`, club.Name)
+		if isCapitalOwner {
+			welcomeMsg = fmt.Sprintf(`{"text":"🏛️ <b>CAPITAL AFFILIATION:</b> Welcome to %s! (Included 10%% Surcharge)"}`, club.Name)
+		}
+		
+		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(welcomeMsg)})
 
 		// Sync UI to update membership lists and treasury balances
 		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
@@ -654,8 +2039,8 @@ func (l *Lobby) handleJoinClub(env *Envelope) {
 	}
 }
 
-// handlePurchaseTerritory allows a club to expand its influence.
-func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
+// HandlePurchaseTerritory allows a club to expand its influence.
+func (s *ClubService) HandlePurchaseTerritory(l *Lobby, env *Envelope) {
 	var data struct {
 		ClubID      string `json:"club_id"`
 		TerritoryID string `json:"territory_id"`
@@ -699,7 +2084,7 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	}
 	l.mutex.RUnlock()
 
-	purchaseCost := 2500.0
+	purchaseCostMicro := uint64(2500 * 1000000)
 	assetID := voiConfig.AssetID
 	verifyNet := "Voi"
 
@@ -730,7 +2115,7 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	}
 	l.mutex.Unlock()
 
-	verified, txTime, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(purchaseCost*divisor), assetID, ownerWallet, vaultAddr, prefix)
+	verified, txTime, err := l.verifyBuyInTransaction(verifyNet, data.TxID, uint64(2500.0*divisor), assetID, ownerWallet, vaultAddr, prefix)
 	if err != nil || !verified {
 		l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Territory Purchase Failed: Payment verification failed."}`)})
 		return
@@ -752,8 +2137,17 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	// Prevent TxID recycling
 	l.registeredTxIDs[data.TxID] = time.Unix(txTime, 0)
 
-	// INDUSTRIAL LOOP: Add cost to vault before processing distributions
-	l.faucetBalance += purchaseCost
+	// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+	// Atomic redistribution of the 2,500 $VBV fee: 95% Faucet, 5% Regional Governors.
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.95, ClubShare: 0.0, GovernanceShare: 0.05}
+		_ = l.tokenSinkRouter.RouteCriminalTax("TERRITORY_PURCHASE", purchaseCostMicro, matrix, 0, data.TerritoryID)
+
+		// Sync float balance with authoritative micro-unit total
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	} else {
+		l.faucetBalance += 2500.0
+	}
 
 	club, exists = l.clubs[data.ClubID]
 	if !exists || !strings.EqualFold(club.OwnerWallet, ownerWallet) {
@@ -766,36 +2160,11 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 
 	// PILLAR 1: Immediate Regional Role & Achievement Integration.
 	// If this is the second district, trigger Governor status immediately to ensure atomic UI sync.
-	if l.isClubRegionalLocked(club) {
+	if s.IsClubRegionalLocked(l, club) {
 		if club.RegionName == "" {
 			club.RegionName = "Governor"
 		}
-		l.unlockAchievementLocked(strings.ToLower(club.OwnerWallet), "GOVERNOR")
-	}
-
-	// PILLAR 1: Regional Governor Protocol Fee.
-	// A portion (5%) of the territory purchase cost is distributed to existing Regional Governors.
-	var governorProtocolFee float64
-	var governors []*Club
-	for _, c := range l.clubs {
-		// Check if it's a Regional Governor (club with 2+ territories)
-		if l.isClubRegionalLocked(c) {
-			governors = append(governors, c)
-		}
-	}
-
-	if len(governors) > 0 {
-		// Calculate 5% of the purchase cost as a protocol fee.
-		// Use micro-unit math for precision.
-		protocolFeeMicro := uint64(purchaseCost * 0.05 * divisor)
-		governorProtocolFee = float64(protocolFeeMicro) / divisor
-
-		feePerGovernor := governorProtocolFee / float64(len(governors))
-		for _, govClub := range governors {
-			govClub.Treasury += feePerGovernor
-			govClub.LastActivity = time.Now()
-		}
-		l.logAdminAuditLocked("TERRITORY_PROTOCOL_FEE", data.TerritoryID, fmt.Sprintf("Distributed %.2f $VBV to %d Governors.", governorProtocolFee, len(governors)))
+		l.achievementService.UnlockAchievementLocked(l, strings.ToLower(club.OwnerWallet), "GOVERNOR")
 	}
 
 	// PILLAR 2: Ledger Integrity. Re-calculate scaling for faucet entry and reserve shifts.
@@ -812,8 +2181,8 @@ func (l *Lobby) handlePurchaseTerritory(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleRestockInventory allows authorized staff to restock items in the club shop.
-func (l *Lobby) handleRestockInventory(env *Envelope) {
+// HandleRestockInventory allows authorized staff to restock items in the club shop.
+func (s *ClubService) HandleRestockInventory(l *Lobby, env *Envelope) {
 	var data struct {
 		ClubID   string `json:"club_id"`
 		ItemID   string `json:"item_id"`
@@ -894,7 +2263,15 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	club.Inventory[data.ItemID] += data.Quantity
 
 	// PILLAR 2: Industrial Loop.
-	// Restocking reduces club reserves, returning funds to the unreserved pool.
+	// Restocking reduces club reserves, satisfy organizational debt via integer math.
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.Lock()
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+			node.TreasuryBalance = newTreasuryMicro
+		}
+		l.tokenSinkRouter.Mu.Unlock()
+	}
 	l.applyDynamicScalingLocked()
 
 	l.logAdminAuditLocked("CLUB_RESTOCK", ownerWallet, fmt.Sprintf("Club: %s, Item: %s, Qty: %d, Cost: %.2f", club.Name, data.ItemID, data.Quantity, totalCostBase))
@@ -904,9 +2281,9 @@ func (l *Lobby) handleRestockInventory(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handlePurchaseItem processes a player's request to buy an item from a district shop.
+// HandlePurchaseItem processes a player's request to buy an item from a district shop.
 // PILLAR 2: Ledger Integrity. Moves the logic from lobby_manager.go to enforce modular authority.
-func (l *Lobby) handlePurchaseItem(env *Envelope) {
+func (s *ClubService) HandlePurchaseItem(l *Lobby, env *Envelope) {
 	var data struct {
 		ItemID      string `json:"item_id"`
 		TerritoryID string `json:"territory_id"`
@@ -973,7 +2350,7 @@ func (l *Lobby) handlePurchaseItem(env *Envelope) {
 	}
 
 	// Regional Governance Check: Master Tier items require 2+ districts
-	if item.IsMasterTier && !l.isClubRegionalLocked(targetClub) {
+	if item.IsMasterTier && !s.IsClubRegionalLocked(l, targetClub) {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Purchase Failed: This is a Master Tier item. Requires Regional Governor status."}`)})
 		return
 	}
@@ -997,7 +2374,36 @@ func (l *Lobby) handlePurchaseItem(env *Envelope) {
 	l.leaderboard[wallet] = stats
 
 	// 3. Process Revenue (Industrial Loop)
-	l.distributeShopRevenueLocked(data.TerritoryID, data.Price, data.ItemID)
+	revenueToDistribute := data.Price
+
+	// PILLAR 3: Smuggler Facilitation Fee (Section 13.A).
+	// If the organization owner is a Smuggler, 5% is siphoned to Faucet.
+	if l.playerService.GetHegemonyPath(targetClub.Staff[targetClub.OwnerWallet]) == "UNDERWORLD" && 
+	   targetClub.Staff[targetClub.OwnerWallet] == "Smuggler" {
+		smuggleFeeMicro := (data.Price * 5) / 100
+		revenueToDistribute -= smuggleFeeMicro
+		if l.tokenSinkRouter != nil {
+			matrix := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+			_ = l.tokenSinkRouter.RouteCriminalTax("SMUGGLER_FEE", smuggleFeeMicro, matrix, 0, "")
+			l.logAdminAuditLocked("SMUGGLER_FEE_COLLECTED", targetClub.ID, fmt.Sprintf("Amt: %d", smuggleFeeMicro))
+		}
+	}
+
+	if item.IsMasterTier {
+		// PILLAR 2: Luxury Tax Logic.
+		// Divert 1% of the gross price from Master Tier items to fund the Global Faucet.
+		luxuryTaxMicro := uint64(float64(data.Price)*0.01 + 0.5)
+		l.faucetBalanceMicro += luxuryTaxMicro
+		l.LuxuryTaxTotal += luxuryTaxMicro
+		l.LuxuryTaxCount++
+		l.achievementService.CheckTaxMilestoneAchievementLocked(l)
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		
+		revenueToDistribute -= luxuryTaxMicro
+		l.logAdminAuditLocked("LUXURY_TAX_COLLECTED", wallet, fmt.Sprintf("Item: %s, Tax: %.2f", data.ItemID, float64(luxuryTaxMicro)/1000000.0))
+	}
+
+	s.DistributeShopRevenueLocked(l, data.TerritoryID, revenueToDistribute, data.ItemID)
 
 	l.logAdminAuditLocked("ITEM_PURCHASE", wallet, fmt.Sprintf("Item: %s, Territory: %s, Cost: %.2f", data.ItemID, data.TerritoryID, float64(data.Price)/1000000.0))
 
@@ -1009,8 +2415,8 @@ func (l *Lobby) handlePurchaseItem(env *Envelope) {
 	go func() { l.broadcast <- msg }()
 }
 
-// handleAllianceInvite allows a club owner to propose a partnership to another club.
-func (l *Lobby) handleAllianceInvite(env *Envelope) {
+// HandleAllianceInvite allows a club owner to propose a partnership to another club.
+func (s *ClubService) HandleAllianceInvite(l *Lobby, env *Envelope) {
 	var data struct {
 		MyClubID     string `json:"my_club_id"`
 		TargetClubID string `json:"target_club_id"`
@@ -1068,6 +2474,7 @@ func (l *Lobby) handleAllianceInvite(env *Envelope) {
 	}
 
 	clubB.AllianceInviteID = clubA.ID
+	clubB.AllianceInviteExpiresAt = time.Now().Add(24 * time.Hour) // PILLAR 1: 24h Proposal Window
 	l.logAdminAuditLocked("ALLIANCE_INVITE", wallet, fmt.Sprintf("From: %s, To: %s", clubA.Name, clubB.Name))
 
 	// Notify Target Owner
@@ -1078,8 +2485,8 @@ func (l *Lobby) handleAllianceInvite(env *Envelope) {
 	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"📡 <b>INVITATION SENT:</b> Awaiting response from alliance target."}`)})
 }
 
-// handleAllianceAccept allows a club owner to finalize a partnership.
-func (l *Lobby) handleAllianceAccept(env *Envelope) {
+// HandleAllianceAccept allows a club owner to finalize a partnership.
+func (s *ClubService) HandleAllianceAccept(l *Lobby, env *Envelope) {
 	var data struct {
 		MyClubID string `json:"my_club_id"`
 	}
@@ -1109,15 +2516,15 @@ func (l *Lobby) handleAllianceAccept(env *Envelope) {
 
 	// PILLAR 1: Region Synergy check.
 	// If the combined territories reach 2, both owners get Governor status.
-	if l.isClubRegionalLocked(clubA) {
+	if s.IsClubRegionalLocked(l, clubA) {
 		if clubA.RegionName == "" {
 			clubA.RegionName = "Governor"
 		}
 		if clubB.RegionName == "" {
 			clubB.RegionName = "Governor"
 		}
-		l.unlockAchievementLocked(strings.ToLower(clubA.OwnerWallet), "GOVERNOR")
-		l.unlockAchievementLocked(strings.ToLower(clubB.OwnerWallet), "GOVERNOR")
+		l.achievementService.UnlockAchievementLocked(l, strings.ToLower(clubA.OwnerWallet), "GOVERNOR")
+		l.achievementService.UnlockAchievementLocked(l, strings.ToLower(clubB.OwnerWallet), "GOVERNOR")
 	}
 
 	l.logAdminAuditLocked("ALLIANCE_FORMED", wallet, fmt.Sprintf("Clubs: %s & %s", clubA.Name, clubB.Name))
@@ -1126,8 +2533,8 @@ func (l *Lobby) handleAllianceAccept(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleAllianceDissolve allows a club owner to terminate their partnership.
-func (l *Lobby) handleAllianceDissolve(env *Envelope) {
+// HandleAllianceDissolve allows a club owner to terminate their partnership.
+func (s *ClubService) HandleAllianceDissolve(l *Lobby, env *Envelope) {
 	var data struct {
 		MyClubID string `json:"my_club_id"`
 	}
@@ -1153,11 +2560,28 @@ func (l *Lobby) handleAllianceDissolve(env *Envelope) {
 	// PILLAR 1: Regional Governor Update.
 	// After dissolution, re-evaluate Governor status for both clubs independently.
 	// If an organization no longer controls 2+ districts alone, the title is stripped.
-	if !l.isClubRegionalLocked(clubA) {
+	if !s.IsClubRegionalLocked(l, clubA) {
 		clubA.RegionName = ""
 	}
-	if existsB && !l.isClubRegionalLocked(clubB) {
+	if existsB && !s.IsClubRegionalLocked(l, clubB) {
 		clubB.RegionName = ""
+	}
+
+	// PILLAR 1: Conflict Cleanup.
+	// Clear any active coordinated-defense disruptions from both organizations.
+	// Since the alliance is severed, coordinated blackouts are no longer valid.
+	for key := range clubA.BuffExpirations {
+		if strings.HasPrefix(key, "DISRUPTION_") {
+			delete(clubA.BuffExpirations, key)
+		}
+	}
+
+	if existsB {
+		for key := range clubB.BuffExpirations {
+			if strings.HasPrefix(key, "DISRUPTION_") {
+				delete(clubB.BuffExpirations, key)
+			}
+		}
 	}
 
 	// PILLAR 1: Social Notification.
@@ -1177,8 +2601,8 @@ func (l *Lobby) handleAllianceDissolve(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// isClubRegionalLocked checks if a club (or its alliance) owns 2 or more territories.
-func (l *Lobby) isClubRegionalLocked(club *Club) bool {
+// IsClubRegionalLocked checks if a club (or its alliance) owns 2 or more territories.
+func (s *ClubService) IsClubRegionalLocked(l *Lobby, club *Club) bool {
 	count := len(club.Territories)
 	if club.AlliedClubID != "" {
 		if allied, ok := l.clubs[club.AlliedClubID]; ok {
@@ -1188,8 +2612,8 @@ func (l *Lobby) isClubRegionalLocked(club *Club) bool {
 	return count >= 2
 }
 
-// isPlayerAffiliatedWithClubLocked checks if a player is a member or owner of a club or its allied organization.
-func (l *Lobby) isPlayerAffiliatedWithClubLocked(wallet string, club *Club) bool {
+// IsPlayerAffiliatedWithClubLocked checks if a player is a member or owner of a club or its allied organization.
+func (s *ClubService) IsPlayerAffiliatedWithClubLocked(l *Lobby, wallet string, club *Club) bool {
 	lowerW := strings.ToLower(wallet)
 
 	// Direct affiliation: Owner, Staff, or Member
@@ -1221,19 +2645,18 @@ func (l *Lobby) isPlayerAffiliatedWithClubLocked(wallet string, club *Club) bool
 	return false
 }
 
-// distributeShopRevenue handles payout to club treasuries based on shop turnover.
-func (l *Lobby) distributeShopRevenue(territoryID string, amountMicro uint64, itemID string) {
+// DistributeShopRevenue handles payout to club treasuries based on shop turnover.
+func (s *ClubService) DistributeShopRevenue(l *Lobby, territoryID string, amountMicro uint64, itemID string) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	l.distributeShopRevenueLocked(territoryID, amountMicro, itemID)
+	s.DistributeShopRevenueLocked(l, territoryID, amountMicro, itemID)
 }
 
-// distributeShopRevenueLocked handles payout to club treasuries with Regional Taxation.
+// DistributeShopRevenueLocked handles payout to club treasuries with Regional Taxation.
 // PILLAR 2: Industrial Seal. Ensures any virtual balance not allocated as commission
 // returns to the Faucet pool to maintain mathematical circularity.
-func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint64, itemID string) {
+func (s *ClubService) DistributeShopRevenueLocked(l *Lobby, territoryID string, amountMicro uint64, itemID string) {
 	now := time.Now()
-	divisor := 1000000.0
 
 	// 1. Identify the specific club owning this territory
 	var owningClub *Club
@@ -1255,88 +2678,153 @@ func (l *Lobby) distributeShopRevenueLocked(territoryID string, amountMicro uint
 	// 2. Identify all Regional Governors (Clubs owning 2+ territories)
 	var governors []*Club
 	for _, club := range l.clubs {
-		if l.isClubRegionalLocked(club) {
+		if s.IsClubRegionalLocked(l, club) {
 			governors = append(governors, club)
 		}
 	}
 
-	// 3. Calculate total commission based on item type and club rate
+	// 3. Calculate proportions for the Token-Sink Router
 	rate := owningClub.Commission
-
-	// PILLAR 1: Context Preservation. isPerishable is a placeholder for future
-	// logic where certain items (food/meds) have different tax implications.
-	isPerishable := false
-	if _, ok := GlobalShopRegistry[itemID]; ok {
-		// Future: item-based perishability checks
+	// PILLAR 3: Justice Commissioner Influence.
+	// If a 'PRO_SOCIAL_COMMISSION' buff is active, override the club's commission rate.
+	if expiry, exists := owningClub.BuffExpirations["PRO_SOCIAL_COMMISSION"]; exists && now.Before(expiry) {
+		rate = 0.01 // Fixed 1% commission rate
+		l.logAdminAuditLocked("PRO_SOCIAL_COMMISSION_ACTIVE", owningClub.ID, fmt.Sprintf("Commission rate overridden to 1%% for %s", owningClub.Name))
 	}
+	if rate < 0.05 { rate = 0.05 }
+	if rate > 0.50 { rate = 0.50 }
 
-	if isPerishable {
-		if rate < 0.05 {
-			rate = 0.05
+	taxRate := 0.05 // Default 5% Governor Tax on the commission
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.RLock()
+		if metric, exists := l.tokenSinkRouter.RegionalDistricts[territoryID]; exists && metric.CustomTaxRate > 0 {
+			taxRate = metric.CustomTaxRate
 		}
-		if rate > 0.50 {
-			rate = 0.50
+		l.tokenSinkRouter.Mu.RUnlock()
+	}
+
+	// PILLAR 2: Unified Organizational Accounting.
+	// Migrate to the TokenSinkRouter to enforce the Industrial Seal and ensure
+	// organizational revenue is correctly vetted and audited.
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{
+			FaucetShare:     1.0 - rate,
+			ClubShare:       rate * (1.0 - taxRate),
+			GovernanceShare: rate * taxRate,
 		}
+
+		// PILLAR 1 & 2: Dividend Diversion.
+		// Deduct 0.5% of the gross price from the ClubShare allocation.
+		dividendAmt := (amountMicro * 5) / 1000
+		ownerWallet := strings.ToLower(owningClub.OwnerWallet)
+		node := l.getOrCreateMarketNodeLocked(ownerWallet)
+
+		// PILLAR 3: Dividend Freeze Check.
+		// If frozen by a Tax Auditor, dividends are seized as a Regulatory Fine.
+		if node.IsDividendFrozen {
+			if l.tokenSinkRouter != nil && l.tokenSinkRouter.GlobalFaucetPool != nil {
+				*l.tokenSinkRouter.GlobalFaucetPool += dividendAmt
+				l.logAdminAuditLocked("DIVIDEND_SEIZED", ownerWallet, fmt.Sprintf("Reg. Fine: %d micro-VBV", dividendAmt))
+			}
+		} else if node.TotalSharesIssued > 0 {
+			node.DividendPoolMicro += dividendAmt
+			// Update Cumulative Yield using fixed-point math (precision scaling by 1e12)
+			// to ensure tiny dividends are tracked correctly across high share counts.
+			node.CumulativeYieldPerShare += (dividendAmt * 1000000000000) / node.TotalSharesIssued
+		} else {
+			// Fallback: If no shares issued, return to Faucet.
+			if l.tokenSinkRouter != nil && l.tokenSinkRouter.GlobalFaucetPool != nil {
+				*l.tokenSinkRouter.GlobalFaucetPool += dividendAmt
+			}
+		}
+
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(owningClub.ID, "CLUB-"), 10, 64)
+		_ = l.tokenSinkRouter.RouteCriminalTax("SHOP_REVENUE", amountMicro, matrix, numericID, territoryID) // Governance share to territory owner
+
+		// PILLAR 2: UI Parity Sync. 
+		if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+			owningClub.TreasuryMicro = node.TreasuryBalance
+			owningClub.Treasury = float64(node.TreasuryBalance) / 1000000.0
+		}
+
+		// Sync float balance with authoritative micro-unit total
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		l.applyDynamicScalingLocked()
 	}
 
-	if rate < 0.05 {
-		rate = 0.05
-	}
-	if rate > 0.50 {
-		rate = 0.50
-	}
-
-	// Use micro-unit precision for all distribution logic to prevent dust leaks
-	totalCommissionMicro := uint64(float64(amountMicro)*rate + 0.5)
-
-	// MOJO GAIN: Progress the club's social standing based on shop turnover
-	mojoGain := l.calculateMojoGain(owningClub, "REVENUE", float64(amountMicro)/divisor)
+	// 4. Organizational Progression (Mojo Gain)
+	mojoGain := s.CalculateMojoGain(l, owningClub, "REVENUE", float64(amountMicro)/1000000.0)
 	owningClub.Mojo += mojoGain
-	l.checkMojoSurgeAchievementLocked(owningClub.ID)
+	owningClub.LastActivity = now
+	l.achievementService.CheckMojoSurgeAchievementLocked(l, owningClub.ID)
 
-	// 4. Regional Governor Tax: 5% is distributed to all Governors.
-	var totalDistributedToGovsMicro uint64 = 0
-	var regionalTaxPoolMicro uint64 = 0
-	if len(governors) > 0 {
-		regionalTaxPoolMicro = (totalCommissionMicro*5 + 50) / 100
-		taxPerGovernorMicro := regionalTaxPoolMicro / uint64(len(governors))
-
-		for _, govClub := range governors {
-			taxBase := float64(taxPerGovernorMicro) / divisor
-			govClub.Treasury += taxBase
+	// PILLAR 1: Localized Governor Mojo Gain.
+	// Mojo should only be awarded to the Regional Governor who actually received the tax.
+	if taxRate > 0 {
+		govClub := l.getClubByTerritoryID(territoryID)
+		if govClub != nil && s.IsClubRegionalLocked(l, govClub) {
+			govTaxMicro := uint64(float64(amountMicro)*rate*taxRate + 0.5)
+			govMojo := s.CalculateMojoGain(l, govClub, "REVENUE", float64(govTaxMicro)/1000000.0)
+			govClub.Mojo += govMojo
 			govClub.LastActivity = now
-
-			// PILLAR 1: Mojo Gain for Governor Tax revenue.
-			// Governors are rewarded with social prestige for maintaining the sector's industrial loop.
-			mojoGain := l.calculateMojoGain(govClub, "REVENUE", taxBase)
-			govClub.Mojo += mojoGain
-			l.checkMojoSurgeAchievementLocked(govClub.ID)
-		}
-		totalDistributedToGovsMicro = taxPerGovernorMicro * uint64(len(governors))
-
-		// PILLAR 2: Industrial Seal (Remainder Recovery for Governor Tax).
-		// Any micro-unit dust from the regional tax pool that couldn't be perfectly
-		// distributed to governors is returned to the Faucet.
-		regionalTaxDustMicro := regionalTaxPoolMicro - totalDistributedToGovsMicro
-		if regionalTaxDustMicro > 0 {
-			l.faucetBalance += float64(regionalTaxDustMicro) / divisor
-			l.logAdminAuditLocked("SHOP_GOV_TAX_DUST_TO_FAUCET", owningClub.ID, fmt.Sprintf("Regional tax remainder: %.2f", float64(regionalTaxDustMicro)/divisor))
+			l.achievementService.CheckMojoSurgeAchievementLocked(l, govClub.ID)
 		}
 	}
-
-	// 5. Final Payout to the Territory Owner (Net after Regional Tax)
-	netCommissionToOwningClubMicro := totalCommissionMicro - regionalTaxPoolMicro
-	owningClub.Treasury += float64(netCommissionToOwningClubMicro) / divisor
-	owningClub.LastActivity = now
-
-	// PILLAR 2: Ledger Integrity.
-	// Re-calculate scaling to reflect tokens moving into the club treasury.
-	l.applyDynamicScalingLocked()
 }
 
-// calculateMojoGain computes the Mojo increase for a club based on economic or defensive events.
+// DistributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
+func (s *ClubService) DistributeTournamentKickback(l *Lobby, playerWallet string, feeMicro uint64, registrationTime time.Time) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	s.DistributeTournamentKickbackLocked(l, playerWallet, feeMicro, registrationTime)
+}
+
+// DistributeTournamentKickbackLocked handles the kickback distribution assuming the mutex is already held.
+// PILLAR 2: Unified Organizational Accounting.
+func (s *ClubService) DistributeTournamentKickbackLocked(l *Lobby, playerWallet string, feeMicro uint64, registrationTime time.Time) {
+	lowerWallet := strings.ToLower(playerWallet)
+
+	for _, club := range l.clubs {
+		joinedAt, isMember := club.Members[lowerWallet]
+
+		if isMember && joinedAt.Before(registrationTime) {
+			// Base 1% kickback, scales with Club Mojo up to 5%
+			rate := 0.01 + (float64(club.Mojo)/1000.0)*0.04
+			if rate > 0.05 { rate = 0.05 }
+
+			kickbackMicro := uint64(float64(feeMicro)*rate + 0.5)
+			if kickbackMicro == 0 { return }
+
+			// PILLAR 2: Industrial Loop (Liability Shift).
+			// Move funds from the unreserved Faucet pool to the organizational treasury.
+			if l.faucetBalanceMicro >= kickbackMicro && l.tokenSinkRouter != nil {
+				l.faucetBalanceMicro -= kickbackMicro
+				l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+				matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+				numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+				_ = l.tokenSinkRouter.RouteCriminalTax("TOURN_KICKBACK", kickbackMicro, matrix, numericID, "arena_center")
+
+				if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+					club.TreasuryMicro = node.TreasuryBalance
+				}
+				l.applyDynamicScalingLocked()
+			} else if l.tokenSinkRouter == nil {
+				club.Treasury += float64(kickbackMicro) / 1000000.0
+			}
+
+			club.LastActivity = time.Now()
+			log.Printf("[REVENUE] Club %s received %.2f $VBV kickback from %s registration.\n",
+				club.Name, float64(kickbackMicro)/1000000.0, playerWallet)
+
+			return
+		}
+	}
+}
+
+// CalculateMojoGain computes the Mojo increase for a club based on economic or defensive events.
 // It weights the gain based on territory ownership and Regional Governor status.
-func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int {
+func (s *ClubService) CalculateMojoGain(l *Lobby, club *Club, reason string, value float64) int {
 	gain := 0
 	switch reason {
 	case "REVENUE":
@@ -1356,7 +2844,7 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 		// PILLAR 1: Regional Security Synergy.
 		// Governors (2+ territories) have interlocked security grids that yield
 		// more prestige upon successful defense.
-		if l.isClubRegionalLocked(club) {
+		if s.IsClubRegionalLocked(l, club) {
 			gain += 10
 		}
 
@@ -1393,62 +2881,102 @@ func (l *Lobby) calculateMojoGain(club *Club, reason string, value float64) int 
 	return finalGain
 }
 
-// distributeCourthouseFineMicroToClubsLocked distributes a portion of the fine among clubs and governors,
-// with the Regional Governor tax calculated as 15% of the TOTAL fine (30% of the club share).
-// This function assumes the main lobby mutex is already held by the caller.
-// Any micro-unit remainders are returned to the Faucet pool to maintain the Industrial Seal.
-func (l *Lobby) distributeCourthouseFineMicroToClubsLocked(amountMicro uint64) {
-	now := time.Now()
-	if len(l.clubs) == 0 {
+/**
+ * HandlePurifyCard allows a Vitality Lab to remove the 'Fallen' debuff from an asset.
+ * PILLAR 7: Underworld Recovery.
+ */
+func (s *ClubService) HandlePurifyCard(l *Lobby, env *Envelope) {
+	var data struct {
+		CardID int `json:"card_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
 		return
 	}
 
-	divisor := 1000000.0
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	club := l.clubs[stats.EmployerClubID]
+	if club == nil || club.Type != "Vitality" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Purification Rituals require a Vitality Lab."}`)})
+		return
+	}
+
+	const purifyCost = 750 * 1000000
+	if l.playerBalances[wallet] < purifyCost {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient rewards for purification."}`)})
+		return
+	}
+
+	if card, exists := l.inventory[data.CardID]; exists && card.Fallen {
+		l.playerBalances[wallet] -= purifyCost
+		card.Fallen = false
+		l.inventory[data.CardID] = card
+		l.persistentCardCache[data.CardID] = card
+		l.logAdminAuditLocked("ASSET_PURIFIED", wallet, fmt.Sprintf("Card: %d", data.CardID))
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✨ <b>PURIFICATION SUCCESS:</b> Fallen debuff removed. Genetic stability restored."}`)})
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	}
+}
+func (s *ClubService) DistributeCourthouseFineMicroToClubsLocked(l *Lobby, amountMicro uint64) {
+	if l.tokenSinkRouter == nil { return }
+
+	// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+	// Atomic redistribution: 50% Faucet, 35% Global Clubs, 15% Regional Governors.
+	// Passing targetID=0 and targetDistrict="GLOBAL" triggers sector-wide distribution.
+	matrix := RevenueSplitMatrix{FaucetShare: 0.50, ClubShare: 0.35, GovernanceShare: 0.15}
+	_ = l.tokenSinkRouter.RouteCriminalTax("COURTHOUSE_FINE", amountMicro, matrix, 0, "sector_all")
+
+	amountBase := float64(amountMicro) / 1000000.0
+
+	// PILLAR 1: Organizational Mojo.
+	// Organizations act as security guilds; processing global fines awards Mojo.
+	if len(l.clubs) > 0 {
+		shareBase := (amountBase * 0.35) / float64(len(l.clubs))
+		for _, club := range l.clubs {
+			mojo := s.CalculateMojoGain(l, club, "REVENUE", shareBase)
+			club.Mojo += mojo
+			club.LastActivity = time.Now()
+
+			// UI Parity Sync: Update the treasury float from the router node
+			numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				club.TreasuryMicro = node.TreasuryBalance
+				club.Treasury = float64(node.TreasuryBalance) / 1000000.0
+			}
+
+			l.achievementService.CheckMojoSurgeAchievementLocked(l, club.ID)
+		}
+	}
+
+	// PILLAR 1: Regional Governor Mojo.
+	// Governors are rewarded with social prestige for maintaining the sector's legal framework.
 	var governors []*Club
 	for _, club := range l.clubs {
-		if l.isClubRegionalLocked(club) {
+		if s.IsClubRegionalLocked(l, club) {
 			governors = append(governors, club)
 		}
 	}
-
-	// PILLAR 1: Regional Governor Tax Compliance (15% of Total).
-	// Since amountMicro is half of the total fine, we take 30% of it.
-	var totalDistributedToGovsMicro uint64
 	if len(governors) > 0 {
-		regionalTaxPoolMicro := (amountMicro*30 + 50) / 100
-		taxPerGovernorMicro := regionalTaxPoolMicro / uint64(len(governors))
-		for _, govClub := range governors {
-			govClub.Treasury += float64(taxPerGovernorMicro) / divisor
-			govClub.LastActivity = now
+		govShareBase := (amountBase * 0.15) / float64(len(governors))
+		for _, gov := range governors {
+			mojo := s.CalculateMojoGain(l, gov, "REVENUE", govShareBase)
+			gov.Mojo += mojo
+			gov.LastActivity = time.Now()
+			l.achievementService.CheckMojoSurgeAchievementLocked(l, gov.ID)
 		}
-		totalDistributedToGovsMicro = taxPerGovernorMicro * uint64(len(governors))
 	}
 
-	remainingPoolMicro := amountMicro - totalDistributedToGovsMicro
-	sharePerClubMicro := remainingPoolMicro / uint64(len(l.clubs))
-	shareBase := float64(sharePerClubMicro) / divisor
-	for _, club := range l.clubs {
-		club.Treasury += shareBase
-		club.LastActivity = now
-
-		// PILLAR 1: Mojo Gain for Fine redistribution revenue.
-		// Organizations act as "Security Guilds"; processing fines builds organizational Mojo.
-		mojoGain := l.calculateMojoGain(club, "REVENUE", shareBase)
-		club.Mojo += mojoGain
-		l.checkMojoSurgeAchievementLocked(club.ID)
-	}
-
-	// PILLAR 2: Industrial Seal (Remainder Recovery).
-	// Return unallocated micro-unit dust to the Faucet balance.
-	distributedToClubsMicro := sharePerClubMicro * uint64(len(l.clubs))
-	leftoverMicro := amountMicro - totalDistributedToGovsMicro - distributedToClubsMicro
-	if leftoverMicro > 0 {
-		l.faucetBalance += float64(leftoverMicro) / divisor
-	}
+	// PILLAR 2: Ledger Integrity.
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	l.applyDynamicScalingLocked()
 }
 
-// handleCreateLease allows a player to put a card up for lease in their club.
-func (l *Lobby) handleCreateLease(env *Envelope) {
+// HandleCreateLease allows a player to put a card up for lease in their club.
+func (s *ClubService) HandleCreateLease(l *Lobby, env *Envelope) {
 	var data struct {
 		ClubID        string  `json:"club_id"`
 		CardID        int     `json:"card_id"`
@@ -1507,8 +3035,8 @@ func (l *Lobby) handleCreateLease(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// handleTakeLease allows a player to rent a card from a club.
-func (l *Lobby) handleTakeLease(env *Envelope) {
+// HandleTakeLease allows a player to rent a card from a club.
+func (s *ClubService) HandleTakeLease(l *Lobby, env *Envelope) {
 	var data struct {
 		ClubID  string `json:"club_id"`
 		LeaseID string `json:"lease_id"`
@@ -1586,7 +3114,20 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	}
 
 	l.playerBalances[strings.ToLower(lease.LenderWallet)] += lenderShareMicro
-	club.Treasury += float64(clubShareMicro) / 1000000.0
+
+	// PILLAR 2: Unified Organizational Accounting.
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.Lock()
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+			node.TreasuryBalance += clubShareMicro
+			club.TreasuryMicro = node.TreasuryBalance
+			club.Treasury = float64(node.TreasuryBalance) / 1000000.0
+		}
+		l.tokenSinkRouter.Mu.Unlock()
+	} else {
+		club.Treasury += float64(clubShareMicro) / 1000000.0
+	}
 
 	// Execute lease
 	lease.Borrower = borrowerWallet
@@ -1611,8 +3152,8 @@ func (l *Lobby) handleTakeLease(env *Envelope) {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
-// processLeaseExpirations handles the return of leased cards to their owners.
-func (l *Lobby) processLeaseExpirations() {
+// ProcessLeaseExpirations handles the return of leased cards to their owners.
+func (s *ClubService) ProcessLeaseExpirations(l *Lobby) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	now := time.Now()

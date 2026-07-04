@@ -4,7 +4,11 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -25,20 +29,531 @@ import (
 // 2. DATA VAULT (The Unified State Machine)
 // -----------------------------------------------------------------------------
 
+type Language string
+
+const (
+	LangEnglish Language = "en"
+	LangSpanish Language = "es"
+)
+
+type AlertPayload struct {
+	Title       string
+	Description string
+	VisualType  string // "SECURITY" or "WARNING"
+}
+
+type AlertEngine struct {
+	CurrentLanguage Language
+	GlobalWindow    js.Value
+	TranslationMap  map[string]map[Language]AlertPayload
+}
+
+func NewAlertEngine(lang Language) *AlertEngine {
+	ae := &AlertEngine{
+		CurrentLanguage: lang,
+		GlobalWindow:    js.Global(),
+		TranslationMap:  make(map[string]map[Language]AlertPayload),
+	}
+	ae.bootstrapDictionary()
+	return ae
+}
+
+func (ae *AlertEngine) bootstrapDictionary() {
+	ae.TranslationMap["ErrSybilAccountBlocked"] = map[Language]AlertPayload{
+		LangEnglish: {Title: "Account Verification Needed", Description: "To keep our ecosystem fair, we require wallets with a longer history. Please try an older wallet.", VisualType: "SECURITY"},
+		LangSpanish: {Title: "Verificación de Cuenta Requerida", Description: "Para mantener un ecosistema justo, requerimos billeteras con mayor historial.", VisualType: "SECURITY"},
+	}
+	ae.TranslationMap["ErrInsufficientLiquidity"] = map[Language]AlertPayload{
+		LangEnglish: {Title: "Liquidity Floor Breach", Description: "Your wallet balance has dropped below the minimum required floor for match archival.", VisualType: "SECURITY"},
+		LangSpanish: {Title: "Balance Insuficiente", Description: "El saldo de su billetera ha caído por debajo del mínimo requerido para archivar la partida.", VisualType: "SECURITY"},
+	}
+	ae.TranslationMap["ErrInvalidSignature"] = map[Language]AlertPayload{
+		LangEnglish: {Title: "Transaction Secure Gate", Description: "The security signature did not match our records. Please try again.", VisualType: "SECURITY"},
+	}
+	ae.TranslationMap["ErrBufferOverflow"] = map[Language]AlertPayload{
+		LangEnglish: {Title: "Replay Saturated", Description: "Replay session has exceeded processing limits (10s). Re-initiating recovery...", VisualType: "WARNING"},
+		LangSpanish: {Title: "Replay Saturado", Description: "La sesión de repetición ha excedido los límites de procesamiento (10s). Reiniciando recuperación...", VisualType: "WARNING"},
+	}
+}
+
+func (ae *AlertEngine) DispatchFriendlyAlert(systemErrorCode string) {
+	alertObj := ae.GlobalWindow.Get("UnifiedAlertSystem")
+	if alertObj.IsUndefined() || alertObj.IsNull() {
+		return
+	}
+	payload := AlertPayload{Title: "Action Blocked", Description: "The transaction was halted by the verification engine (" + systemErrorCode + ").", VisualType: "WARNING"}
+	if langGroup, exists := ae.TranslationMap[systemErrorCode]; exists {
+		if localizedPayload, exists := langGroup[ae.CurrentLanguage]; exists {
+			payload = localizedPayload
+		}
+	}
+	alertObj.Call("showAlert", payload.Title, payload.Description, payload.VisualType)
+}
+
+type EvictionNotification struct {
+	WalletAddress string `json:"wallet_address"`
+	ReasonCode    string `json:"reason_code"`
+}
+
+type ClientRedirectManager struct {
+	GlobalWindow js.Value
+	Alerts       *AlertEngine
+}
+
+func NewClientRedirectManager(alerts *AlertEngine) *ClientRedirectManager {
+	return &ClientRedirectManager{
+		GlobalWindow: js.Global(),
+		Alerts:       alerts,
+	}
+}
+
+func (crm *ClientRedirectManager) HandleIncomingEvictionFrame(rawFramePayload []byte) bool {
+	var eviction EvictionNotification
+	if err := json.Unmarshal(rawFramePayload, &eviction); err != nil {
+		return false
+	}
+	if eviction.ReasonCode == "" {
+		return false
+	}
+
+	// 1. Instantly freeze interface controls
+	crm.lockCanvasInteractions()
+
+	// 2. Map system eviction codes to the Unified Localization Alert system
+	var mappingCode string
+	switch eviction.ReasonCode {
+	case "SESSION_EXPIRED":
+		mappingCode = "ErrSybilAccountBlocked"
+	case "INSUFFICIENT_LIQUIDITY":
+		mappingCode = "ErrInsufficientLiquidity"
+	default:
+		mappingCode = "SECURITY_AUDIT_FAILURE"
+	}
+
+	fmt.Printf(" [WASM Redirect] Session terminated by server. Reason: %s\n", eviction.ReasonCode)
+	crm.Alerts.DispatchFriendlyAlert(mappingCode)
+
+	// 3. Purge Local Memory
+	crm.flushLocalMemoryHeap()
+
+	// 4. Delayed Redirection (4 Seconds)
+	var redirectFunc js.Func
+	redirectFunc = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		defer redirectFunc.Release()
+		crm.GlobalWindow.Get("location").Set("href", "/login.html")
+		return nil
+	})
+	crm.GlobalWindow.Call("setTimeout", redirectFunc, 4000)
+
+	return true
+}
+
+var (
+	ErrExtensionMissing    = errors.New("wallet exception: no responsive provider found in browser window")
+	ErrUserCancelledAction = errors.New("wallet exception: user rejected transaction verification prompt")
+)
+
+type MarketActionRequest struct {
+	CommandType  uint8  `json:"command_type"`
+	EntityID     uint64 `json:"entity_id"`
+	ShareCount   uint64 `json:"share_count"`
+	MaxCost      uint64 `json:"max_cost"`
+	Nonce        uint64 `json:"nonce"`
+	Timestamp    int64  `json:"timestamp"`
+	BuyerAddress string `json:"buyer_address"`
+}
+
+type BridgeResponse struct {
+	Success   bool   `json:"success"`
+	Signature string `json:"signature"`
+	Error     string `json:"error"`
+}
+
+type WasmSignerHook struct {
+	GlobalWindow js.Value
+}
+
+func NewWasmSignerHook() *WasmSignerHook {
+	return &WasmSignerHook{
+		GlobalWindow: js.Global(),
+	}
+}
+
+// RequestWalletSignature targets the DOM bridge to execute an outward transaction confirmation loop.
+// PILLAR 3: Switchboard Security.
+func (wsh *WasmSignerHook) RequestWalletSignature(request MarketActionRequest) (string, error) {
+	// 1. Verify the target JS handler exists in the global DOM scope
+	bridgeObj := wsh.GlobalWindow.Get("WasmWalletBridge")
+	if bridgeObj.IsUndefined() || bridgeObj.IsNull() {
+		return "", ErrExtensionMissing
+	}
+
+	// 2. Marshal the request payload into a standard JSON wire string format
+	jsonBytes, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+
+	// 3. Invoke the asynchronous JavaScript entry point
+	// Go treats Javascript async/await methods as an implicit JS Promise resolver
+	promise := bridgeObj.Call("signMarketAction", string(jsonBytes))
+
+	// Create synchronization channels to await the JS promise settlement natively
+	resolveChan := make(chan js.Value, 1)
+	rejectChan := make(chan js.Value, 1)
+
+	// Attach anonymous callbacks to map Promise paths directly to Go channels
+	onSuccess := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resolveChan <- args[0]
+		return nil
+	})
+	defer onSuccess.Release()
+
+	onFailure := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		rejectChan <- args[0]
+		return nil
+	})
+	defer onFailure.Release()
+
+	// Connect the callbacks to the target promise pipeline
+	promise.Call("then", onSuccess).Call("catch", onFailure)
+
+	// Block the local WASM execution thread safely while the user interacts with the extension popup
+	select {
+	case result := <-resolveChan:
+		var resp BridgeResponse
+		respJSON := wsh.GlobalWindow.Get("JSON").Call("stringify", result).String()
+		if err := json.Unmarshal([]byte(respJSON), &resp); err != nil {
+			return "", err
+		}
+		if !resp.Success {
+			return "", fmt.Errorf("%w: %s", ErrUserCancelledAction, resp.Error)
+		}
+		return resp.Signature, nil
+	case errVal := <-rejectChan:
+		return "", fmt.Errorf("bridge runtime failure: %s", errVal.String())
+	}
+}
+
+// updateReplayProgress pulses the progress bar during state reconstruction.
+// PILLAR 4: Replay Resilience.
+func (crm *ClientRedirectManager) updateReplayProgress(current, total uint64) {
+	document := crm.GlobalWindow.Get("document")
+	bar := document.Call("getElementById", "replay-progress-bar")
+	text := document.Call("getElementById", "replay-progress-text")
+	if bar.IsNull() || text.IsNull() {
+		return
+	}
+
+	percent := 0.0
+	if total > 0 {
+		percent = (float64(current) / float64(total)) * 100.0
+	}
+
+	bar.Get("style").Set("width", fmt.Sprintf("%.1f%%", percent))
+	text.Set("innerText", fmt.Sprintf("%d / %d FRAMES", current, total))
+}
+
+// showSlowSyncWarning toggles a high-visibility warning if reconstruction is delayed.
+func (crm *ClientRedirectManager) showSlowSyncWarning(active bool) {
+	document := crm.GlobalWindow.Get("document")
+	status := document.Call("getElementById", "replay-status-text")
+	if status.IsNull() {
+		return
+	}
+	if active {
+		status.Set("innerText", "⚠ SLOW SYNC DETECTED...")
+		status.Get("style").Set("color", "#ff4b4b") // Warning red
+	}
+}
+
+func (crm *ClientRedirectManager) lockCanvasInteractions() {
+	document := crm.GlobalWindow.Get("document")
+	container := document.Call("getElementById", "main-game-container")
+	if !container.IsUndefined() && !container.IsNull() {
+		style := container.Get("style")
+		style.Set("pointerEvents", "none")
+		style.Set("opacity", "0.6")
+		style.Set("filter", "grayscale(0.5) blur(1px)")
+	}
+
+	// PILLAR 4: Replay Feedback UI.
+	overlay := document.Call("getElementById", "replay-sync-overlay")
+	if overlay.IsUndefined() || overlay.IsNull() {
+		overlay = document.Call("createElement", "div")
+		overlay.Set("id", "replay-sync-overlay")
+		s := overlay.Get("style")
+		s.Set("position", "absolute"); s.Set("top", "50%"); s.Set("left", "50%")
+		s.Set("transform", "translate(-50%, -50%)"); s.Set("color", "var(--neon-cyan)")
+		s.Set("fontSize", "1.5rem"); s.Set("fontWeight", "bold"); s.Set("letterSpacing", "4px")
+		s.Set("textShadow", "0 0 10px var(--neon-cyan)"); s.Set("zIndex", "10000")
+		s.Set("textAlign", "center")
+
+		title := document.Call("createElement", "div")
+		title.Set("innerText", "RECONSTRUCTING REALITY...")
+		overlay.Call("appendChild", title)
+
+		// Progress Bar Container
+		pContainer := document.Call("createElement", "div")
+		ps := pContainer.Get("style")
+		ps.Set("width", "240px"); ps.Set("height", "4px"); ps.Set("background", "rgba(255,255,255,0.1)")
+		ps.Set("marginTop", "20px"); ps.Set("borderRadius", "2px"); ps.Set("overflow", "hidden")
+		ps.Set("marginLeft", "auto"); ps.Set("marginRight", "auto")
+
+		bar := document.Call("createElement", "div")
+		bar.Set("id", "replay-progress-bar")
+		bs := bar.Get("style")
+		bs.Set("width", "0%"); bs.Set("height", "100%")
+		bs.Set("background", "var(--neon-cyan)"); bs.Set("boxShadow", "0 0 10px var(--neon-cyan)")
+		bs.Set("transition", "width 0.1s ease-out")
+
+		pContainer.Call("appendChild", bar)
+		overlay.Call("appendChild", pContainer)
+
+		// Progress Text
+		pText := document.Call("createElement", "div")
+		pText.Set("id", "replay-progress-text")
+		ts := pText.Get("style")
+		ts.Set("fontSize", "0.7rem"); ts.Set("marginTop", "8px"); ts.Set("opacity", "0.7")
+		ts.Set("fontFamily", "'Rajdhani', sans-serif")
+		pText.Set("innerText", "0 / 0 FRAMES")
+		overlay.Call("appendChild", pText)
+
+		// Status Text (Slow Sync warning)
+		statusText := document.Call("createElement", "div")
+		statusText.Set("id", "replay-status-text")
+		sts := statusText.Get("style")
+		sts.Set("fontSize", "0.9rem"); sts.Set("marginTop", "10px"); sts.Set("fontWeight", "bold")
+		sts.Set("letterSpacing", "2px"); sts.Set("minHeight", "1.2em")
+		sts.Set("transition", "all 0.3s ease")
+		overlay.Call("appendChild", statusText)
+
+		container.Call("appendChild", overlay)
+	}
+}
+
+// unlockCanvasInteractions restores UI functionality after a successful state catch-up.
+func (crm *ClientRedirectManager) unlockCanvasInteractions() {
+	document := crm.GlobalWindow.Get("document")
+	container := document.Call("getElementById", "main-game-container")
+	if !container.IsUndefined() && !container.IsNull() {
+		style := container.Get("style")
+		style.Set("pointerEvents", "auto")
+		style.Set("opacity", "1.0")
+		style.Set("filter", "none")
+	}
+
+	overlay := document.Call("getElementById", "replay-sync-overlay")
+	if !overlay.IsUndefined() && !overlay.IsNull() {
+		overlay.Call("remove")
+	}
+}
+
+func (crm *ClientRedirectManager) flushLocalMemoryHeap() {
+	sessionStorage := crm.GlobalWindow.Get("sessionStorage")
+	if !sessionStorage.IsUndefined() && !sessionStorage.IsNull() {
+		sessionStorage.Call("clear")
+	}
+	localStorage := crm.GlobalWindow.Get("localStorage")
+	if !localStorage.IsUndefined() && !localStorage.IsNull() {
+		localStorage.Call("removeItem", "vbabes_active_session")
+	}
+}
+
+type ClientGameState string
+
+const (
+	StateSynchronized ClientGameState = "SYNCHRONIZED"
+	StateReconnecting ClientGameState = "RECONNECTING"
+	StateReplaying    ClientGameState = "REPLAYING"
+)
+
+var ErrBufferOverflow = errors.New("recovery frame pipeline saturated: dropping connection")
+
+type GameFrame struct {
+	SequenceID uint64 `json:"sequence_id"`
+	Payload    []byte `json:"payload"`
+}
+
+type ClientReplayEngine struct {
+	Mu               sync.RWMutex
+	CurrentState     ClientGameState
+	LastSequenceID   uint64
+	SpeculativeQueue []AuthoritativeFrame // Holds input frames generated locally during latency spikes
+	ReplayStartTime  time.Time   // PILLAR 4: Session timing
+	LastVerifiedStateHash BoardStateHash   // PILLAR 4: StateHash Verification
+	ProcessedInSession uint64   // PILLAR 4: Progress tracking
+	IncomingBuffer   chan AuthoritativeFrame
+	RedirectManager  *ClientRedirectManager // PILLAR 3: Immediate UI Control
+}
+
+func NewClientReplayEngine(bufferSize int, crm *ClientRedirectManager) *ClientReplayEngine {
+	return &ClientReplayEngine{
+		CurrentState:    StateSynchronized,
+		IncomingBuffer:  make(chan AuthoritativeFrame, bufferSize),
+		RedirectManager: crm,
+	}
+}
+
+func (cre *ClientReplayEngine) InitiateRecovery() {
+	cre.Mu.Lock()
+	defer cre.Mu.Unlock()
+	
+	// PILLAR 4: Idempotency Guard. 
+	if cre.CurrentState == StateReconnecting {
+		return
+	}
+
+	cre.CurrentState = StateReconnecting
+	cre.SpeculativeQueue = nil 
+	cre.ProcessedInSession = 0 // Reset counter for new session
+	fmt.Println(" [WASM Client] Network drift detected. Input locked. Syncing state...")
+
+	// PILLAR 4: Visual Hardening.
+	if cre.RedirectManager != nil {
+		cre.RedirectManager.lockCanvasInteractions()
+	}
+
+	// PILLAR 4: Authoritative Recovery.
+	// Trigger the JS protocol to fetch missing frames from the backend.
+	js.Global().Call("requestMatchSync")
+}
+
+func (cre *ClientReplayEngine) ProcessIncomingPacket(frame AuthoritativeFrame) error {
+	// PILLAR 4: Immediate Gap Detection. 
+	// Trigger recovery freeze instantly if drift is detected in the ingest thread,
+	// preventing speculative interactions while the engine is awaiting catch-up.
+	cre.Mu.RLock()
+	// Hardening: check for gaps in Replaying state too to handle secondary drift.
+	if (cre.CurrentState == StateSynchronized || cre.CurrentState == StateReplaying) && frame.SequenceID > cre.LastSequenceID+1 {
+		cre.Mu.RUnlock()
+		cre.InitiateRecovery()
+	} else {
+		cre.Mu.RUnlock()
+	}
+
+	select {
+	case cre.IncomingBuffer <- frame:
+		return nil
+	default:
+		return ErrBufferOverflow
+	}
+}
+
+func (cre *ClientReplayEngine) ExecuteSyncHandshake(ctx context.Context, applyStateDelta func(AuthoritativeFrame)) {
+	// PILLAR 4: Session Pulse. Check for stale replay sessions every second.
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Trigger overflow alert if reconstruction takes longer than 10 seconds.
+			cre.Mu.RLock()
+			if cre.CurrentState == StateReplaying && !cre.ReplayStartTime.IsZero() {
+				elapsed := time.Since(cre.ReplayStartTime)
+				if elapsed > 10*time.Second {
+					cre.Mu.RUnlock()
+					fmt.Println(" [WASM Replay] Session timeout. Triggering overflow recovery.")
+					cre.RedirectManager.Alerts.DispatchFriendlyAlert("ErrBufferOverflow")
+					cre.InitiateRecovery()
+					continue
+				} else if elapsed > 5*time.Second && cre.RedirectManager != nil {
+					// PILLAR 4: User Feedback.
+					cre.RedirectManager.showSlowSyncWarning(true)
+				}
+			}
+			cre.Mu.RUnlock()
+		case frame := <-cre.IncomingBuffer:
+			cre.Mu.Lock()
+			
+			switch cre.CurrentState {
+			case StateReconnecting:
+				if frame.SequenceID == cre.LastSequenceID+1 {
+					cre.CurrentState = StateReplaying
+					cre.ReplayStartTime = time.Now()
+					cre.applyAuthoritativeFrame(frame, applyStateDelta)
+				}
+			case StateReplaying, StateSynchronized:
+				if frame.SequenceID == cre.LastSequenceID+1 {
+					cre.applyAuthoritativeFrame(frame, applyStateDelta)
+				} else if frame.SequenceID > cre.LastSequenceID+1 {
+					// PILLAR 4: Immediate UI Freeze. 
+					// Gaps in either synchronized or replaying states trigger authoritative recovery.
+					cre.Mu.Unlock()
+					cre.InitiateRecovery()
+					continue
+				}
+				// Redundant or old frames (<= LastSequenceID) are ignored to maintain catch-up stability.
+			}
+			cre.Mu.Unlock()
+		}
+	}
+}
+
+// applyAuthoritativeFrame applies the state delta from an authoritative frame.
+func (cre *ClientReplayEngine) applyAuthoritativeFrame(frame AuthoritativeFrame, applyStateDelta func(AuthoritativeFrame)) {
+	applyStateDelta(frame)
+	cre.LastSequenceID = frame.SequenceID
+	cre.LastVerifiedStateHash = frame.StateHash // Update LastVerifiedStateHash
+
+	// PILLAR 4: Progress Pulse. Update the RedirectManager with current session metrics.
+	cre.ProcessedInSession++
+	if cre.CurrentState == StateReplaying && cre.RedirectManager != nil {
+		total := cre.ProcessedInSession + uint64(len(cre.IncomingBuffer))
+		cre.RedirectManager.updateReplayProgress(cre.ProcessedInSession, total)
+	}
+
+	if len(cre.IncomingBuffer) == 0 && cre.CurrentState == StateReplaying {
+		cre.CurrentState = StateSynchronized
+		cre.ReplayStartTime = time.Time{} // Clear timing on success
+		fmt.Printf(" [WASM Client] System fully synchronized at Frame: %d. UI unlocked.\n", cre.LastSequenceID)
+
+		// PILLAR 4: Visual Hardening. Restore UI once spec has met authority.
+		if cre.RedirectManager != nil {
+			cre.RedirectManager.unlockCanvasInteractions()
+		}
+
+		// PILLAR 4: Post-Resync Alignment. Trigger a full UI update once the buffer is clear.
+		js.Global().Call("syncUI", "all")
+	}
+}
+
+// GetEffectiveCunning returns base cunning plus cosmetic bonuses.
+// PILLAR 5: Isomorphic Parity. Mirrors server-side logic.
+func (p Player) GetEffectiveCunning() int {
+	eff := p.Cunning
+	if p.EquippedFaceplate != "" {
+		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
+			eff += fp.CunningBonus
+		}
+	}
+	// Infamy Penalty: Every 5 levels of Wanted Level reduces effective Cunning by 1
+	penalty := p.WantedLevel / 5
+	eff -= penalty
+	if eff < 0 { eff = 0 }
+	return eff
+}
+
 type Card struct {
-	ID        int     `json:"id"`
-	Name      string  `json:"name"`
-	Power     [4]int  `json:"power"` // [Top, Right, Bottom, Left]
-	Owner     int     `json:"owner"` // 0 for Player 1, 1 for Player 2
-	Image     string  `json:"image"`
-	Tier      string  `json:"tier"`       // Iron, Bronze, Gold, Diamond
-	GlowColor string  `json:"glow_color"` // Hex color for UI effects
-	IsCombo   bool    `json:"is_combo"`   // True if flipped during a chain reaction
-	Rarity    float64 `json:"rarity"`     // Power multiplier based on supply
-	Mood      string  `json:"mood"`       // Volatile, Serene, Spirited, Grounded
-	Artifact  int     `json:"artifact"`   // Flat power bonus from equipped items
-	Fatigue   int     `json:"fatigue"`    // 0-100, high fatigue penalizes power
-	Loyalty   int     `json:"loyalty"`    // 0-100, high loyalty grants combo bonuses
+	ID            int       `json:"id"`
+	Name          string    `json:"name"`
+	Power         [4]int    `json:"power"` // [Top, Right, Bottom, Left]
+	Owner         int       `json:"owner"` // 0 for Player 1, 1 for Player 2
+	Image         string    `json:"image"`
+	Tier          string    `json:"tier"`       // Iron, Bronze, Gold, Diamond
+	GlowColor     string    `json:"glow_color"` // Hex color for UI effects
+	IsCombo       bool      `json:"is_combo"`   // True if flipped during a chain reaction
+	Rarity        float64   `json:"rarity"`     // Power multiplier based on supply
+	Mood          string    `json:"mood"`       // Volatile, Serene, Spirited, Grounded
+	Artifact      int       `json:"artifact"`   // Flat power bonus from equipped items
+	Fatigue       int       `json:"fatigue"`    // 0-100, high fatigue penalizes power
+	Loyalty       int       `json:"loyalty"`    // 0-100, high loyalty grants combo bonuses
+	Scars         []string  `json:"scars"`      // PILLAR 6: Procedure failure history
+	EquippedItems []string  `json:"equipped_items"` // PILLAR 5: Hardware trap/item overlay indicators (future card-specific items)
+	Fallen        bool      `json:"fallen"`         // Pillar 7: Underworld status
 }
 
 type ActiveBuff struct {
@@ -50,12 +565,15 @@ type ActiveBuff struct {
 type Player struct {
 	ID              string       `json:"id"`
 	Wallet          string       `json:"wallet"` // The connected blockchain address
-	Decks           [4][]Card    `json:"decks"`  // 4 saved deck slots
+	Decks           [4][]Card    `json:"decks"`  // 4 saved deck slots // PILLAR 2: Integer Supremacy
 	ActiveDeck      int          `json:"active_deck"`
 	Ready           bool         `json:"ready"`
 	Reputation      int          `json:"reputation"`
 	WantedLevel     int          `json:"wanted_level"`
 	Wins            int          `json:"wins"`
+	Salary          uint64       `json:"salary"`
+	MarketTokens    uint64       `json:"market_tokens"`
+	ArenaVouchers   uint64       `json:"arena_vouchers"`
 	VirtualBalance  uint64       `json:"virtual_balance"`
 	GloatMessage    string       `json:"gloat_message"`
 	AvatarURL       string       `json:"avatar_url"`
@@ -65,34 +583,34 @@ type Player struct {
 	Mojo            int          `json:"mojo"`             // Social standing for Club unlocks
 	SocialRank      string       `json:"social_rank"`      // e.g., "Nobody", "Regular", "Icon"
 	JobRole         string       `json:"job_role"`         // Manager, Security, Clerk, Freelancer
-	EmployerClubID  string       `json:"employer_club_id"` // The club currently paying this user
+	EmployerClubID  string       `json:"employer_id"`      // PILLAR 3: Standardized Org ID
 	AuctionsWon     int          `json:"auctions_won"`
+	ActiveItemBuffs map[string]int `json:"active_item_buffs"` // PILLAR 3: Persistent Buff Sync
 	BestRating      string       `json:"best_rating"`
 	Cunning         int          `json:"cunning"`
 	Nurturing       int          `json:"nurturing"`
 	Achievements    []string     `json:"achievements"`
+	CapturedOutlaws map[string]bool     `json:"captured_outlaws"` // PILLAR 3: WASM Mirror
 	// EmployerClubID string             `json:"employer_club_id"` // The club currently paying this user
-	JailedCards      map[int]string      `json:"jailed_cards"`       // CardID -> ClubID (cards currently in jail)
+	JailedCards      map[int]string      `json:"jailed_cards"`       // CardID -> ClubID (cards currently in jail) // PILLAR 2: Integer Supremacy
 	History          []MatchHistory      `json:"match_history"`
 	KidnappedCards   map[int]string      `json:"kidnapped_cards"`    // CardID -> VictimWallet (cards player has kidnapped)
 	HeldHostageCards map[int]string      `json:"held_hostage_cards"` // CardID -> KidnapperWallet (cards player has lost to kidnapping)
 	FavoriteCardID   int                 `json:"favorite_card_id"`   // Added for Collective Intelligence
+	ReparationsReceivedCount int         `json:"reparations_received_count"` // PILLAR 1: Security Resilience
+	TotalDonated     uint64              `json:"total_donated"`      // PILLAR 1: Philanthropy
+	GhostProtocolExpiresAt time.Time     `json:"ghost_protocol_expires_at"` // PILLAR 3: Signal Scrambling
+	DisruptorCooldownAt    time.Time     `json:"disruptor_cooldown_at"`     // PILLAR 3: Hunter Cooldown
+	IsMojoStabilizerActive bool          `json:"is_mojo_stabilizer_active"` // PILLAR 1: UI Sync
+	Faction          string              `json:"faction"`           // PILLAR 3: Hegemony Alignment
+	MojoDecayRate          float64       `json:"mojo_decay_rate"`           // PILLAR 1: UI Sync
+	MutationHistory  []MutationEvent     `json:"mutation_history"`   // PILLAR 6: Forensic Audit Trail
+	HasMutationInsurance bool          `json:"has_mutation_insurance"`    // PILLAR 6: UI Sync // PILLAR 2: Integer Supremacy
+	ActiveUnderworldContractID string      `json:"active_underworld_contract_id"` // PILLAR 3: Underworld mission tracking	
+	ActiveJusticeMissionID     string      `json:"active_justice_mission_id"`     // PILLAR 3: Justice mission tracking
 	RumorCount       int                 `json:"rumor_count"`        // Number of rumors spread by this player
-	Portfolio        map[string]float64  `json:"portfolio"`
+	Portfolio        map[string]uint64  `json:"portfolio"` // PILLAR 2: Integer Supremacy (micro-shares)
 	Playstyle        PlaystyleTendencies `json:"playstyle"`
-}
-
-// GetEffectiveCunning returns base cunning plus cosmetic bonuses and infamy penalties.
-func (p Player) GetEffectiveCunning() int {
-	eff := p.Cunning
-	if p.EquippedFaceplate != "" {
-		if fp, exists := FaceplateRegistry[p.EquippedFaceplate]; exists {
-			eff += fp.CunningBonus
-		}
-	}
-	penalty := p.WantedLevel / 5
-	if eff < penalty { return 0 }
-	return eff - penalty
 }
 
 // Engine acts as the supreme state machine for the entire App
@@ -118,6 +636,7 @@ type Engine struct {
 	Turn                int       // 0 for Player 1, 1 for Player 2
 	Scores              [2]int    // Final scores [P1, P2]
 	Maintenance         bool      // True if the arena is under maintenance
+	MaintenancePriority string    // "info", "warning", "critical"
 	TestingMode         bool      // If true, Player 1 always wins against AI
 	IsAdmin             bool      // True if the connected wallet is an administrator
 	Winner              int       // -1: None, 0: P1, 1: P2, 2: Draw
@@ -130,7 +649,11 @@ type Engine struct {
 	AIScore             int                       // Tactical value of the bot's intended move
 	ServerLoad          int                       // Current active matches on the server
 	SpecialFanfare      string                    // Archetype for specific win/loss tracks: "Emotional", "Witch"
+	InMatchmakingQueue  bool                      `json:"in_matchmaking_queue"` // PILLAR 4: Lobby state
 	TerritoryID         string                    // The location of the current match
+	TournamentMatchID   string                    // PILLAR 3: Standardized match identification
+	FaucetMicro         uint64                    // PILLAR 2: Integer precision
+	TotalVirtualLiability uint64                   // PILLAR 2: Systemic debt
 	ActiveItemBuffs     map[string]map[string]int // PlayerID -> ItemID -> MatchesRemaining
 	P1RegionalBoost     bool                      // Global +5% power for district region owners
 	P2RegionalBoost     bool                      // Global +5% power for district region owners
@@ -144,6 +667,10 @@ type Engine struct {
 	Latency             int                       // WebSocket ping in milliseconds
 	NetworkHealth       string                    // "Excellent", "Good", "Poor", "Critical"
 	Tournament          TournamentState           `json:"tournament"` // Current bracket info
+	ReplayEngine        *ClientReplayEngine       `json:"-"`          // PILLAR 4: Replay Resilience
+	Alerts              *AlertEngine              `json:"-"`          // PILLAR 3: Localized UI feedback
+	RedirectManager     *ClientRedirectManager    `json:"-"`          // PILLAR 3: Session Eviction
+	Signer              *WasmSignerHook           `json:"-"`          // PILLAR 3: Wallet Bridge
 	Clubs               map[string]*Club          `json:"clubs"`      // Global club registry
 	linkedWallets       map[string]WalletLinkInfo // Key: Primary AVM Wallet Address
 	mutex               sync.RWMutex              // Protects Engine state from concurrent WASM/JS events
@@ -196,6 +723,7 @@ var Game = Engine{
 	ServerLoad:     0,
 	SpecialFanfare: "",
 	TerritoryID:    "",
+	TournamentMatchID: "",
 	VaultLow:       false,
 	DeckRating:     "[Z]",
 	Latency:        0,
@@ -284,10 +812,11 @@ func SetAvatar(this js.Value, args []js.Value) interface{} {
 	}
 
 	Game.mutex.Lock()
-	Game.Players[0].AvatarURL = url
-	Game.Players[0].GloatMessage = gloat
-	Game.Players[0].AvatarBanNotice = notice
-	Game.Players[0].FavoriteCardID = favoriteCardID
+	pIdx := Game.LocalPlayerIndex
+	Game.Players[pIdx].AvatarURL = url
+	Game.Players[pIdx].GloatMessage = gloat
+	Game.Players[pIdx].AvatarBanNotice = notice
+	Game.Players[pIdx].FavoriteCardID = favoriteCardID
 	Game.Phase = "Lobby"
 	Game.mutex.Unlock()
 	fmt.Println("[ENGINE] Avatar Set. Transitioning to LOBBY.")
@@ -542,7 +1071,7 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	defer Game.mutex.Unlock()
 
 	p := &Game.Players[Game.LocalPlayerIndex]
-	p.Reputation = data.Get("reputation").Int()
+	p.Reputation = data.Get("reputation").Int() // PILLAR 2: Integer Supremacy
 	p.Wins = data.Get("wins").Int()
 	p.Mojo = data.Get("mojo").Int()
 	p.SocialRank = data.Get("social_rank").String()
@@ -550,14 +1079,48 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 	p.JobRole = data.Get("job_role").String()
 	p.EmployerClubID = data.Get("employer_id").String()
 	p.VirtualBalance = uint64(data.Get("virtual_balance").Float())
+	p.Salary = uint64(data.Get("salary").Float())
+	p.MarketTokens = uint64(data.Get("market_tokens").Float())
+	p.ArenaVouchers = uint64(data.Get("arena_vouchers").Float())
 	p.WantedLevel = data.Get("wanted_level").Int()
 	p.AuctionsWon = data.Get("auctions_won").Int()
 	p.Cunning = data.Get("cunning").Int()
 	p.Nurturing = data.Get("nurturing").Int()
 	p.RumorCount = data.Get("rumor_count").Int()
+	p.ReparationsReceivedCount = data.Get("reparations_received_count").Int()
+	p.IsMojoStabilizerActive = data.Get("is_mojo_stabilizer_active").Bool()
+	p.MojoDecayRate = data.Get("mojo_decay_rate").Float()
+	p.Faction = data.Get("faction").String()
+	p.TotalDonated = uint64(data.Get("total_donated").Float())
+
+	// PILLAR 4: Lobby Persistence.
+	// Restore matchmaking status during beacon recovery to ensure UI continuity.
+	if imq := data.Get("in_matchmaking_queue"); !imq.IsUndefined() {
+		Game.InMatchmakingQueue = imq.Bool()
+	}
 
 	p.EquippedFaceplate = data.Get("equipped_faceplate").String()
 	p.FavoriteCardID = data.Get("favorite_card_id").Int()
+	p.GhostProtocolExpiresAt = time.Time{}
+
+	// PILLAR 3: Persistent Buff Sync.
+	p.ActiveItemBuffs = make(map[string]int)
+	jsBuffs := data.Get("active_item_buffs")
+	if jsBuffs.Type() == js.TypeObject {
+		keys := js.Global().Get("Object").Call("keys", jsBuffs)
+		for i := 0; i < keys.Length(); i++ {
+			k := keys.Index(i).String()
+			p.ActiveItemBuffs[k] = jsBuffs.Get(k).Int()
+		}
+	}
+
+	if gpe := data.Get("ghost_protocol_expires_at"); !gpe.IsUndefined() {
+		p.GhostProtocolExpiresAt, _ = time.Parse(time.RFC3339, gpe.String())
+	}
+	p.DisruptorCooldownAt = time.Time{}
+	if dca := data.Get("disruptor_cooldown_at"); !dca.IsUndefined() {
+		p.DisruptorCooldownAt, _ = time.Parse(time.RFC3339, dca.String())
+	}
 	// Sync Jailed Cards map
 	p.JailedCards = make(map[int]string)
 	jsJailed := data.Get("jailed_cards")
@@ -567,6 +1130,17 @@ func SyncFullProfile(this js.Value, args []js.Value) interface{} {
 			k := keys.Index(i).String()
 			id, _ := strconv.Atoi(k)
 			p.JailedCards[id] = jsJailed.Get(k).String()
+		}
+	}
+
+	// Sync Captured Outlaws map for achievement progress tracking
+	p.CapturedOutlaws = make(map[string]bool)
+	jsCaptured := data.Get("captured_outlaws")
+	if jsCaptured.Type() == js.TypeObject {
+		keys := js.Global().Get("Object").Call("keys", jsCaptured)
+		for i := 0; i < keys.Length(); i++ {
+			k := keys.Index(i).String()
+			p.CapturedOutlaws[k] = jsCaptured.Get(k).Bool()
 		}
 	}
 
@@ -658,11 +1232,11 @@ func SyncPortfolio(this js.Value, args []js.Value) interface{} {
 	Game.mutex.Lock()
 	defer Game.mutex.Unlock()
 
-	Game.Players[0].Portfolio = make(map[string]float64)
+	Game.Players[0].Portfolio = make(map[string]uint64) // PILLAR 2: Integer Supremacy (micro-shares)
 	keys := js.Global().Get("Object").Call("keys", jsMap)
 	for i := 0; i < keys.Length(); i++ {
 		k := keys.Index(i).String()
-		Game.Players[0].Portfolio[k] = jsMap.Get(k).Float()
+		Game.Players[0].Portfolio[k] = uint64(jsMap.Get(k).Float() * 100) // Convert float (shares) to uint64 (micro-shares)
 	}
 
 	return true
@@ -686,20 +1260,43 @@ func SyncPlaystyle(this js.Value, args []js.Value) interface{} {
 	return true
 }
 
-// SyncMove allows spectators or remote syncs to place a card for a specific player
+// SyncMove allows spectators or remote syncs to place a card for a specific player.
+// It now receives the full AuthoritativeFrame from JavaScript.
 func SyncMove(this js.Value, args []js.Value) interface{} {
-	if len(args) < 3 {
+	if len(args) < 1 { return false }
+	
+	var frame AuthoritativeFrame
+	// Unmarshal the JS object passed as args[0] into our Go struct
+	if err := json.Unmarshal([]byte(js.Global().Get("JSON").Call("stringify", args[0]).String()), &frame); err != nil {
+		fmt.Printf(" [WASM ERROR] SyncMove: Failed to unmarshal AuthoritativeFrame: %v\n", err)
 		return false
 	}
-	gridIndex := args[0].Int()
-	cardID := args[1].Int()
-	pIdx := args[2].Int() // 0 for P1, 1 for P2
 
-	// Reset combo flags for visual feedback
-	for _, bc := range Game.Board {
-		if bc != nil {
-			bc.IsCombo = false
+	// Extract data from the AuthoritativeFrame
+	gridIndex := frame.MoveIntent.GridIndex
+	cardID := frame.MoveIntent.CardID
+	pIdx := frame.MoveIntent.PlayerIndex
+	sequenceID := frame.SequenceID
+
+	// PILLAR 4: Replay Kernel Sync.
+	// PILLAR 4: Deadlock Prevention.
+	// Validate sequence authority and update the Replay Engine BEFORE acquiring Game.mutex.
+	// This prevents the AB/BA deadlock with the ExecuteSyncHandshake catch-up thread.
+	if sequenceID > 0 {
+		Game.ReplayEngine.Mu.Lock()
+		if sequenceID > Game.ReplayEngine.LastSequenceID+1 {
+			Game.ReplayEngine.Mu.Unlock()
+			Game.ReplayEngine.InitiateRecovery() // Gap detected, freeze UI
+			return false
+		} else if sequenceID <= Game.ReplayEngine.LastSequenceID {
+			Game.ReplayEngine.Mu.Unlock()
+			return true // Stale packet or already replayed, ignore silently
 		}
+
+		// Valid move: Update sequence markers and release B-lock
+		Game.ReplayEngine.LastSequenceID = sequenceID
+		Game.ReplayEngine.LastVerifiedStateHash = frame.StateHash
+		Game.ReplayEngine.Mu.Unlock()
 	}
 
 	c, found := findCard(cardID)
@@ -709,10 +1306,30 @@ func SyncMove(this js.Value, args []js.Value) interface{} {
 	}
 
 	Game.mutex.Lock()
+	defer Game.mutex.Unlock()
+
+	// PILLAR 4: Visual Feedback Integrity.
+	// Reset combo flags for visual feedback before applying the remote move.
+	for _, bc := range Game.Board {
+		if bc != nil {
+			bc.IsCombo = false
+		}
+	}
+
 	c.Owner = pIdx
 	tier, color, _ := calculateTier(Game.Players[pIdx].Reputation)
 	c.Tier = tier
 	c.GlowColor = color
+
+	// PILLAR 5: Hand Integrity.
+	// Remove the card from the player's hand to ensure score parity during full board checks.
+	hand := &Game.Players[pIdx].Decks[Game.Players[pIdx].ActiveDeck]
+	for i, dc := range *hand {
+		if dc.ID == cardID {
+			*hand = append((*hand)[:i], (*hand)[i+1:]...)
+			break
+		}
+	}
 
 	heapCard := new(Card)
 	*heapCard = c
@@ -720,7 +1337,23 @@ func SyncMove(this js.Value, args []js.Value) interface{} {
 
 	checkCaptures(heapCard, gridIndex)
 	Game.Turn = 1 - pIdx // Keep local turn state in sync
-	Game.mutex.Unlock()
+	checkWinConditionLocked()
+
+	// PILLAR 4: Cryptographic Verification (Real-time).
+	// Validate the local board state against the authoritative server hash.
+	// Skip verification if the server provided a zero-hash (legacy/spectator compatibility).
+	if frame.StateHash != (BoardStateHash{}) {
+		localHash := ComputeBoardHash(Game.Board, pIdx)
+		if localHash != frame.StateHash {
+			fmt.Printf(" [WASM DESYNC] Real-time drift detected! Local: %x, Authority: %x\n", localHash, frame.StateHash)
+			Game.ReplayEngine.InitiateRecovery() // Trigger UI freeze and catch-up
+			return false
+		}
+	}
+
+	// PILLAR 4: Reactive Authority.
+	// Trigger immediate UI synchronization for real-time move updates.
+	js.Global().Call("syncUI", "combat")
 	return true
 }
 
@@ -884,30 +1517,35 @@ func SetAdminState(this js.Value, args []js.Value) interface{} {
 
 // SetMaintenanceState informs the engine about the arena's maintenance status
 func SetMaintenanceState(this js.Value, args []js.Value) interface{} {
-	if len(args) < 1 {
-		return false
-	}
+	if len(args) < 1 { return false }
+
 	Game.mutex.Lock()
 	Game.Maintenance = args[0].Bool()
+	if len(args) > 1 {
+		Game.MaintenancePriority = args[1].String()
+	}
 	Game.mutex.Unlock()
-	fmt.Printf("[ENGINE] Maintenance Mode set to: %v\n", Game.Maintenance)
+	fmt.Printf("[ENGINE] Maintenance Mode set to: %v (Priority: %s)\n", Game.Maintenance, Game.MaintenancePriority)
 	updateStartButton()
 	return true
 }
 
 // SyncOpponentProfile updates the metadata for an opponent during a multiplayer match
 func SyncOpponentProfile(this js.Value, args []js.Value) interface{} {
-	if len(args) < 3 {
-		return false
-	}
+	if len(args) < 3 { return false }
 	pIdx := args[0].Int()
 	avatar := args[1].String()
 	gloat := args[2].String()
+	faceplate := ""
+	if len(args) > 3 {
+		faceplate = args[3].String()
+	}
 
 	Game.mutex.Lock()
 	if pIdx >= 0 && pIdx < 2 {
 		Game.Players[pIdx].AvatarURL = avatar
 		Game.Players[pIdx].GloatMessage = gloat
+		Game.Players[pIdx].EquippedFaceplate = faceplate // PILLAR 4: Identity sync
 	}
 	Game.mutex.Unlock()
 	return true
@@ -966,6 +1604,18 @@ func SyncVaultBalance(this js.Value, args []js.Value) interface{} {
 	return true
 }
 
+// SyncSolvency updates the engine's view of the systemic reward pool and liabilities.
+func SyncSolvency(this js.Value, args []js.Value) interface{} {
+	if len(args) < 2 {
+		return false
+	}
+	Game.mutex.Lock()
+	Game.FaucetMicro = uint64(args[0].Float())
+	Game.TotalVirtualLiability = uint64(args[1].Float())
+	Game.mutex.Unlock()
+	return true
+}
+
 // TriggerManualSync allows the UI to force a server-side re-sync of the player's on-chain stats.
 func TriggerManualSync(this js.Value, args []js.Value) interface{} {
 	wallet := Game.Players[0].Wallet
@@ -991,12 +1641,18 @@ func TriggerManualSync(this js.Value, args []js.Value) interface{} {
 		// Execute fetch to the backend endpoint
 		promise := window.Call("fetch", Game.ApiBase+"/api/re-sync-stats", options)
 
-		success := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		var success, failure js.Func
+
+		success = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			defer success.Release()
+			defer failure.Release()
 			fmt.Println("[ENGINE] Manual sync initiated successfully.")
 			return nil
 		})
 
-		failure := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		failure = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			defer success.Release()
+			defer failure.Release()
 			fmt.Printf("[ENGINE ERROR] Manual sync request failed: %v\n", args[0])
 			return nil
 		})
@@ -1072,6 +1728,29 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 			owner := val.Get("owner").Int()
 			if c, found := findCard(id); found {
 				c.Owner = owner
+				// PILLAR 4: Tactical Metadata Ingestion.
+				// Ingest dynamic modifiers from the snapshot to ensure tooltip parity.
+				if art := val.Get("artifact"); !art.IsUndefined() { c.Artifact = art.Int() }
+				if fat := val.Get("fatigue"); !fat.IsUndefined() { c.Fatigue = fat.Int() }
+				if loy := val.Get("loyalty"); !loy.IsUndefined() { c.Loyalty = loy.Int() }
+				if mood := val.Get("mood"); !mood.IsUndefined() { c.Mood = mood.String() }
+				if scars := val.Get("scars"); !scars.IsUndefined() && scars.Type() == js.TypeObject {
+					c.Scars = []string{}
+					for j := 0; j < scars.Length(); j++ {
+						c.Scars = append(c.Scars, scars.Index(j).String())
+					}
+				}
+				// PILLAR 5: Hardware Item Overlay Framework
+				// Initialize equipped items array on board load (can be populated by future card-specific mechanics)
+				if equippedItems := val.Get("equipped_items"); !equippedItems.IsUndefined() && equippedItems.Type() == js.TypeObject {
+					c.EquippedItems = []string{}
+					for j := 0; j < equippedItems.Length(); j++ {
+						c.EquippedItems = append(c.EquippedItems, equippedItems.Index(j).String())
+					}
+				} else {
+					c.EquippedItems = []string{}
+				}
+
 				// Create a new pointer instance for the board
 				heapCard := new(Card)
 				*heapCard = c
@@ -1127,21 +1806,27 @@ func SetBoardState(this js.Value, args []js.Value) interface{} {
 	jsActiveItemBuffs := data.Get("active_item_buffs")
 	if jsActiveItemBuffs.Type() == js.TypeObject {
 		Game.ActiveItemBuffs = make(map[string]map[string]int)
-		js.Global().Get("Object").Call("keys", jsActiveItemBuffs).Call("forEach", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-			playerID := args[0].String()
+		// PILLAR 4: Memory Hardening.
+		// Use indexed for-loops over JS key arrays to avoid leaking dynamic Go callbacks in the bridge.
+		playerIDs := js.Global().Get("Object").Call("keys", jsActiveItemBuffs)
+		for i := 0; i < playerIDs.Length(); i++ {
+			playerID := playerIDs.Index(i).String()
 			Game.ActiveItemBuffs[playerID] = make(map[string]int)
-			js.Global().Get("Object").Call("keys", jsActiveItemBuffs.Get(playerID)).Call("forEach", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
-				itemID := args[0].String()
-				Game.ActiveItemBuffs[playerID][itemID] = jsActiveItemBuffs.Get(playerID).Get(itemID).Int()
-				return nil
-			}))
-			return nil
-		}))
+			
+			itemBuffs := jsActiveItemBuffs.Get(playerID)
+			itemIDs := js.Global().Get("Object").Call("keys", itemBuffs)
+			for j := 0; j < itemIDs.Length(); j++ {
+				itemID := itemIDs.Index(j).String()
+				Game.ActiveItemBuffs[playerID][itemID] = itemBuffs.Get(itemID).Int()
+			}
+		}
 	}
 	if a1 := data.Get("p1_avatar"); !a1.IsUndefined() { Game.Players[0].AvatarURL = a1.String() }
 	if g1 := data.Get("p1_gloat"); !g1.IsUndefined() { Game.Players[0].GloatMessage = g1.String() }
 	if a2 := data.Get("p2_avatar"); !a2.IsUndefined() { Game.Players[1].AvatarURL = a2.String() }
 	if g2 := data.Get("p2_gloat"); !g2.IsUndefined() { Game.Players[1].GloatMessage = g2.String() }
+	if f1 := data.Get("p1_faceplate"); !f1.IsUndefined() { Game.Players[0].EquippedFaceplate = f1.String() }
+	if f2 := data.Get("p2_faceplate"); !f2.IsUndefined() { Game.Players[1].EquippedFaceplate = f2.String() }
 
 	if w1 := data.Get("p1_wanted_level"); !w1.IsUndefined() { Game.Players[0].WantedLevel = w1.Int() }
 	if c1 := data.Get("p1_cunning"); !c1.IsUndefined() { Game.Players[0].Cunning = c1.Int() }
@@ -1207,6 +1892,9 @@ func SyncMatchMetadata(this js.Value, args []js.Value) interface{} {
 			}
 		}
 	}
+
+	// PILLAR 4: Replay Baseline. Initialize LastVerifiedStateHash for initial match metadata.
+	Game.ReplayEngine.LastVerifiedStateHash = ComputeBoardHash(Game.Board, Game.Turn)
 
 	fmt.Printf("[ENGINE] Match Metadata Synced. Territory: %s, P1Boost: %v, P2Boost: %v, P1Coalition: %v, P2Coalition: %v\n",
 		Game.TerritoryID, Game.P1RegionalBoost, Game.P2RegionalBoost, Game.P1CoalitionBoost, Game.P2CoalitionBoost)
@@ -1279,14 +1967,24 @@ func StartMatch(this js.Value, args []js.Value) interface{} {
 	Game.Phase = "Active"
 	Game.Turn = 0           // Player 1 starts
 	Game.Board = [9]*Card{} // Clear board
+	
+	// PILLAR 4: Replay Baseline. Initialize LastVerifiedStateHash for a fresh match.
+	Game.ReplayEngine.LastVerifiedStateHash = ComputeBoardHash(Game.Board, Game.Turn)
 
-	// Randomize Board Moods if Elemental Rule is active
-	moodTypes := []string{"Volatile", "Serene", "Spirited", "Grounded", "Neutral"}
-	for i := 0; i < 9; i++ {
-		if Game.Rules["Elemental_sync"] && rand.Intn(10) > 6 {
-			Game.BoardMoods[i] = moodTypes[rand.Intn(4)]
-		} else {
-			Game.BoardMoods[i] = "Neutral"
+	Game.Winner = -1
+	Game.Scores = [2]int{0, 0}
+
+	// PILLAR 4: Authoritative Parity.
+	// Only randomize Board Moods for local/AI matches. Multiplayer matches 
+	// rely on authoritative moods provided by the server via SyncMatchMetadata.
+	if !Game.Multiplayer {
+		moodTypes := []string{"Volatile", "Serene", "Spirited", "Grounded"}
+		for i := 0; i < 9; i++ {
+			if Game.Rules["Elemental_sync"] && rand.Intn(10) > 7 {
+				Game.BoardMoods[i] = moodTypes[rand.Intn(len(moodTypes))]
+			} else {
+				Game.BoardMoods[i] = "Neutral"
+			}
 		}
 	}
 
@@ -1319,17 +2017,18 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 	gridIndex := args[0].Int()
 	cardID := args[1].Int()
 
-	// Reset combo flags for all cards on board at the start of a move
+	// Reset AI score when the player takes their turn
+	Game.AIScore = 0
+
 	Game.mutex.Lock()
+	defer Game.mutex.Unlock()
+
+	// Reset combo flags for all cards on board at the start of a move
 	for _, boardCard := range Game.Board {
 		if boardCard != nil {
 			boardCard.IsCombo = false
 		}
 	}
-	Game.mutex.Unlock()
-	
-	// Reset AI score when the player takes their turn
-	Game.AIScore = 0
 
 	// Guardrails: Check if grid is valid and empty
 	if gridIndex < 0 || gridIndex > 8 || Game.Board[gridIndex] != nil {
@@ -1341,19 +2040,25 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 
 	p := &Game.Players[pIndex]
 	for i, c := range p.Decks[p.ActiveDeck] {
-		Game.mutex.Lock()
-		defer Game.mutex.Unlock()
 		if c.ID == cardID {
-			Game.Board[gridIndex] = &p.Decks[p.ActiveDeck][i]
+			// PILLAR 4: Pointer Safety.
+			// Create a heap-allocated copy of the card to ensure board stability 
+			// after the hand slice is mutated.
+			heapCard := new(Card)
+			*heapCard = c
+			Game.Board[gridIndex] = heapCard
 
 			// Apply Visual Tier Effects based on the player's current reputation
 			tier, color, _ := calculateTier(Game.Players[pIndex].Reputation)
-			Game.Board[gridIndex].Tier = tier
-			Game.Board[gridIndex].GlowColor = color
+			heapCard.Tier = tier
+			heapCard.GlowColor = color
 
-			fmt.Printf("[BATTLE] %s placed %s at Grid %d\n", Game.Players[pIndex].ID, c.Name, gridIndex)
+			fmt.Printf("[BATTLE] %s placed %s at Grid %d\n", Game.Players[pIndex].ID, heapCard.Name, gridIndex)
 
-			checkCaptures(&p.Decks[p.ActiveDeck][i], gridIndex)
+			// PILLAR 5: Hand Integrity. Remove the card from the player's hand.
+			p.Decks[p.ActiveDeck] = append(p.Decks[p.ActiveDeck][:i], p.Decks[p.ActiveDeck][i+1:]...)
+
+			checkCaptures(heapCard, gridIndex)
 			PlaySound("Select-place-card.mp3")
 
 			// Switch Turn
@@ -1371,13 +2076,14 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 							time.Sleep(2 * time.Second)
 						}
 						PerformAIMove()
+						js.Global().Call("syncUI", "combat") // PILLAR 4: Authoritative UI Sync after AI completes
 					}()
 				}
 			} else {
 				Game.Turn = 0
 			}
 
-			checkWinCondition()
+			checkWinConditionLocked()
 			UpdateAmbientMusic()
 			return true
 		}
@@ -1389,28 +2095,26 @@ func PlaceCard(this js.Value, args []js.Value) interface{} {
 func getEffectivePower(c *Card, sideIdx int, gridIdx int, pIdx int) int {
 	base := c.Power[sideIdx] + c.Artifact
 
-	// PILLAR 1: Regional Power Boost.
-	// Global +5% power for district region owners.
-	hasBoost := false
+	// PILLAR 1 & 7: Hegemony & Regional Power Boosts.
+	// Prioritize the +10% Coalition boost (Alliances) over the +5% Regional boost (Solo ownership).
+	// PILLAR 3: Career Path influence is calculated server-side and snapshotted into the boost flags.
 	if pIdx == 0 {
-		hasBoost = Game.P1RegionalBoost
+		// Check for DISRUPTION_ (Regional Sabotage) - if active, all boosters are neutralized.
+		if strings.HasPrefix(Game.TerritoryID, "DISRUPTION_") {
+			// Buffs offline
+		} else if Game.P1CoalitionBoost {
+			base += (base * 10) / 100
+		} else if Game.P1RegionalBoost {
+			base += (base * 5) / 100
+		}
 	} else {
-		hasBoost = Game.P2RegionalBoost
-	}
-	if hasBoost {
-		base += (base * 5) / 100
-	}
-
-	// PILLAR 1: Coalition Defense.
-	// Allied members fighting on a partner organization's territory receive a +10% power boost.
-	hasCoalition := false
-	if pIdx == 0 {
-		hasCoalition = Game.P1CoalitionBoost
-	} else {
-		hasCoalition = Game.P2CoalitionBoost
-	}
-	if hasCoalition {
-		base += (base * 10) / 100
+		if strings.HasPrefix(Game.TerritoryID, "DISRUPTION_") {
+			// Buffs offline
+		} else if Game.P2CoalitionBoost {
+			base += (base * 10) / 100
+		} else if Game.P2RegionalBoost {
+			base += (base * 5) / 100
+		}
 	}
 
 	player := &Game.Players[pIdx]
@@ -1491,6 +2195,14 @@ func checkCaptures(placedCard *Card, gridIndex int) int {
 	sameGroups := make(map[int][]int)
 	plusGroups := make(map[int][]int)
 
+	// PILLAR 3: Factional Alignment Analysis (Client)
+	attacker := Game.Players[placedCard.Owner]
+	opponentIdx := 1 - placedCard.Owner
+	opponent := Game.Players[opponentIdx]
+
+	attackerFaction := attacker.Faction
+	oppFaction := opponent.Faction
+
 	var comboQueue []int // Indices of cards flipped by Same/Plus to start combos
 
 	for _, n := range neighbors {
@@ -1501,6 +2213,17 @@ func checkCaptures(placedCard *Card, gridIndex int) int {
 			neighborCard := Game.Board[neighborIndex]
 			placedPower := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex, placedCard.Owner)
 			neighborPower := getEffectivePower(neighborCard, n.neighborPowerIdx, neighborIndex, neighborCard.Owner)
+
+			// PILLAR 3: Factional Power Scaling (Section 12.A & 12.B)
+			if attackerFaction == "JUSTICE" {
+				if neighborCard.Fallen || opponent.WantedLevel >= 15 {
+					placedPower = (placedPower * 110) / 100
+				}
+			} else if attackerFaction == "UNDERWORLD" {
+				if oppFaction == "JUSTICE" || opponent.WantedLevel <= 2 {
+					placedPower = (placedPower * 110) / 100
+				}
+			}
 
 			// 1. Prepare Power_copy Rule Data (Equality check)
 			if Game.Rules["Power_copy"] && placedPower == neighborPower {
@@ -1574,6 +2297,17 @@ func checkCaptures(placedCard *Card, gridIndex int) int {
 				cPower := getEffectivePower(currentCard, cn.placedPowerIdx, currentIndex, currentCard.Owner)
 				nPower := getEffectivePower(neighbor, cn.neighborPowerIdx, nbIdx, neighbor.Owner)
 
+				// PILLAR 3: Factional Power Scaling in Combo (Client)
+				if attackerFaction == "JUSTICE" {
+					if neighbor.Fallen || opponent.WantedLevel >= 15 {
+						cPower = (cPower * 110) / 100
+					}
+				} else if attackerFaction == "UNDERWORLD" {
+					if oppFaction == "JUSTICE" || opponent.WantedLevel <= 2 {
+						cPower = (cPower * 110) / 100
+					}
+				}
+
 				if neighbor.Owner != currentCard.Owner && cPower > nPower {
 					if flipCard(nbIdx, currentCard.Owner, "COMBO") {
 						totalFlips++
@@ -1601,6 +2335,15 @@ func flipCard(idx int, newOwner int, reason string) bool {
 
 	if Game.Rules["Fallen_penalty"] {
 		c.Artifact -= 20 // Permanent debuff for being captured
+
+		// PILLAR 3: Immediate Scars Persistence (WASM Parity).
+		// Update local inventory so the debuff persists even if the board is cleared.
+		for i, ic := range Game.Inventory {
+			if ic.ID == c.ID {
+				Game.Inventory[i].Artifact = c.Artifact
+				break
+			}
+		}
 	}
 	return true
 }
@@ -1628,6 +2371,14 @@ func simulateCapturesOnBoard(board [9]*Card, placedCard *Card, gridIndex int, pl
 	plusGroups := make(map[int][]int)
 	var comboQueue []int
 
+	// PILLAR 3: Factional Alignment Analysis (Simulation)
+	attacker := Game.Players[playerIndex]
+	opponentIdx := 1 - playerIndex
+	opponent := Game.Players[opponentIdx]
+
+	attackerFaction := attacker.Faction
+	oppFaction := opponent.Faction
+
 	// These weights are for evaluating the *player's* potential, so they should reflect
 	// how much the AI *doesn't* want the player to achieve these.
 	// Using the HardMode weights for the player's potential makes sense.
@@ -1642,6 +2393,17 @@ func simulateCapturesOnBoard(board [9]*Card, placedCard *Card, gridIndex int, pl
 			neighborCard := board[neighborIndex]
 			pPower := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex, playerIndex)
 			nPower := getEffectivePower(neighborCard, n.neighborPowerIdx, neighborIndex, neighborCard.Owner)
+
+			// PILLAR 3: Factional Power Scaling
+			if attackerFaction == "JUSTICE" {
+				if neighborCard.Fallen || opponent.WantedLevel >= 15 {
+					pPower = (pPower * 110) / 100
+				}
+			} else if attackerFaction == "UNDERWORLD" {
+				if oppFaction == "JUSTICE" || opponent.WantedLevel <= 2 {
+					pPower = (pPower * 110) / 100
+				}
+			}
 
 			if rules["Power_copy"] && pPower == nPower {
 				sameGroups[pPower] = append(sameGroups[pPower], neighborIndex)
@@ -1703,7 +2465,20 @@ func simulateCapturesOnBoard(board [9]*Card, placedCard *Card, gridIndex int, pl
 				// Combo only triggers Basic Capture logic (Power Comparison)
 				// Check if it flips an *opponent's* card (from the perspective of playerIndex)
 				if neighbor.Owner != playerIndex && !flipped[nbIdx] {
-					if getEffectivePower(currentCard, n.placedPowerIdx, currIdx, playerIndex) > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx, neighbor.Owner) {
+					cPower := getEffectivePower(currentCard, n.placedPowerIdx, currIdx, playerIndex)
+					
+					// PILLAR 3: Factional Power Scaling in Combo
+					if attackerFaction == "JUSTICE" {
+						if neighbor.Fallen || opponent.WantedLevel >= 15 {
+							cPower = (cPower * 110) / 100
+						}
+					} else if attackerFaction == "UNDERWORLD" {
+						if oppFaction == "JUSTICE" || opponent.WantedLevel <= 2 {
+							cPower = (cPower * 110) / 100
+						}
+					}
+
+					if cPower > getEffectivePower(neighbor, n.neighborPowerIdx, nbIdx, neighbor.Owner) {
 						neighbor.Owner = playerIndex
 						flipped[nbIdx] = true
 						totalScore += playerComboFlipWeight
@@ -1736,6 +2511,10 @@ func calculateMaxPlayerPotential(board [9]*Card, playerHand []Card, playerIndex 
 			// Create a deep copy of the playerCard to avoid modifying the original in hand
 			playerCardCopy := playerCard
 
+			// PILLAR 4: Safe Simulation. 
+			// Explicitly attribute ownership to ensure deterministic capture logic.
+			playerCardCopy.Owner = playerIndex
+
 			// Simulate the player placing their card on a temporary board
 			simulatedBoard := [9]*Card{}
 			for i, c := range board {
@@ -1758,7 +2537,7 @@ func calculateMaxPlayerPotential(board [9]*Card, playerHand []Card, playerIndex 
 }
 
 // simulateCaptures calculates how many cards would be flipped without modifying the board
-func simulateCaptures(placedCard *Card, gridIndex int) int {
+func simulateCaptures(board [9]*Card, placedCard *Card, gridIndex int) int {
 	totalScore := 0
 	flipped := make(map[int]bool)
 
@@ -1779,6 +2558,14 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 	plusGroups := make(map[int][]int)
 	var comboQueue []int
 
+	// PILLAR 3: Factional Alignment Analysis (AI Simulation)
+	attacker := Game.Players[placedCard.Owner]
+	opponentIdx := 1 - placedCard.Owner
+	opponent := Game.Players[opponentIdx]
+
+	attackerFaction := attacker.Faction
+	oppFaction := opponent.Faction
+
 	// Tactical Weights for Hard Mode
 	ruleTriggerWeight := 50
 	ruleFlipWeight := 20
@@ -1793,10 +2580,21 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 	// 1. Initial Scan
 	for _, n := range neighbors {
 		neighborIndex := gridIndex + n.offset
-		if n.boundaryCheck(gridIndex) && Game.Board[neighborIndex] != nil {
-			neighborCard := Game.Board[neighborIndex]
+		if n.boundaryCheck(gridIndex) && board[neighborIndex] != nil {
+			neighborCard := board[neighborIndex]
 			pPower := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex, placedCard.Owner)
 			nPower := getEffectivePower(neighborCard, n.neighborPowerIdx, neighborIndex, neighborCard.Owner)
+
+			// PILLAR 3: Factional Power Scaling (Section 12.A & 12.B)
+			if attackerFaction == "JUSTICE" {
+				if neighborCard.Fallen || opponent.WantedLevel >= 15 {
+					pPower = (pPower * 110) / 100
+				}
+			} else if attackerFaction == "UNDERWORLD" {
+				if oppFaction == "JUSTICE" || opponent.WantedLevel <= 2 {
+					pPower = (pPower * 110) / 100
+				}
+			}
 
 			if Game.Rules["Power_copy"] && pPower == nPower {
 				sameGroups[pPower] = append(sameGroups[pPower], neighborIndex)
@@ -1818,7 +2616,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 		if len(indices) >= 2 {
 			totalScore += ruleTriggerWeight // Rule trigger bonus (Tactical Priority)
 			for _, idx := range indices {
-				if Game.Board[idx].Owner != placedCard.Owner {
+				if board[idx].Owner != placedCard.Owner {
 					flipped[idx] = true
 					totalScore += ruleFlipWeight // Rule flip weight
 					comboQueue = append(comboQueue, idx)
@@ -1830,7 +2628,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 		if len(indices) >= 2 {
 			totalScore += ruleTriggerWeight // Rule trigger bonus
 			for _, idx := range indices {
-				if Game.Board[idx].Owner != placedCard.Owner {
+				if board[idx].Owner != placedCard.Owner {
 					flipped[idx] = true
 					totalScore += ruleFlipWeight // Rule flip weight
 					comboQueue = append(comboQueue, idx)
@@ -1843,12 +2641,12 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 	for len(comboQueue) > 0 {
 		currIdx := comboQueue[0]
 		comboQueue = comboQueue[1:]
-		currCard := Game.Board[currIdx]
+		currCard := board[currIdx]
 
 		for _, n := range neighbors {
 			nbIdx := currIdx + n.offset
-			if n.boundaryCheck(currIdx) && Game.Board[nbIdx] != nil {
-				neighbor := Game.Board[nbIdx]
+			if n.boundaryCheck(currIdx) && board[nbIdx] != nil {
+				neighbor := board[nbIdx]
 				
 				// Simulation logic: treat 'flipped' cards as belonging to the attacker for the power check
 				nOwner := neighbor.Owner
@@ -1868,7 +2666,7 @@ func simulateCaptures(placedCard *Card, gridIndex int) int {
 	if Game.HardMode {
 		// Defensive penalty: avoid placing weak sides against open board slots
 		for _, n := range neighbors {
-			if n.boundaryCheck(gridIndex) && Game.Board[gridIndex+n.offset] == nil {
+			if n.boundaryCheck(gridIndex) && board[gridIndex+n.offset] == nil {
 				power := getEffectivePower(placedCard, n.placedPowerIdx, gridIndex, placedCard.Owner)
 				if power < 1500 { // Significant penalty for exposing sides lower than Level P (1500)
 					totalScore -= (1500 - power) / 10
@@ -1931,8 +2729,8 @@ func PerformAIMove() {
 	// AI Strategy: Iterate through all possible moves and pick the one that maximizes flips
 	for cardHandIdx, card := range aiHand {
 		for _, gridIdx := range emptySlots {
-			// Simulate the move without actually modifying the game board
-			score := simulateCaptures(&card, gridIdx)
+			// PILLAR 4: Safe Simulation. Pass a copy of the board array (pointers).
+			score := simulateCaptures(Game.Board, &card, gridIdx)
 
 			// If HardMode is active, also consider the opponent's potential next move
 			if Game.HardMode {
@@ -1944,10 +2742,15 @@ func PerformAIMove() {
 						tempBoard[i] = &tempCard
 					}
 				}
-				tempCard := card // Copy the AI's card for the temporary board
-				tempBoard[gridIdx] = &tempCard
+				
+				// PILLAR 4: Holistic AI simulation.
+				// 1. Place AI card and apply its captures to the temp board to see the resulting state.
+				aiCard := card
+				aiCard.Owner = 1
+				tempBoard[gridIdx] = &aiCard
+				simulateCapturesOnBoard(tempBoard, &aiCard, gridIdx, 1, Game.Rules)
 
-				// Calculate opponent's hand (cards not yet on board)
+				// 2. Calculate opponent's hand (cards not yet on board)
 				opponentHand := []Card{}
 				placedCardIDs := make(map[int]bool)
 				for _, bc := range tempBoard {
@@ -1978,24 +2781,38 @@ func PerformAIMove() {
 
 	if bestCardIdx != -1 && bestGridIdx != -1 {
 		chosenCard := aiHand[bestCardIdx]
-		Game.Board[bestGridIdx] = &chosenCard
-		chosenCard.Owner = 1
+		
+		// PILLAR 4: Pointer Safety (AI).
+		// Ensure the AI move utilizes a heap-allocated copy to prevent 
+		// board cards pointing to stack-local variables.
+		heapCard := new(Card)
+		*heapCard = chosenCard
+		heapCard.Owner = 1
+		Game.Board[bestGridIdx] = heapCard
 
 		// Apply Visual Tier Effects based on the player's current reputation
 		tier, color, _ := calculateTier(Game.Players[1].Reputation)
-		Game.Board[bestGridIdx].Tier = tier
-		Game.Board[bestGridIdx].GlowColor = color
+		heapCard.Tier = tier
+		heapCard.GlowColor = color
 
-		fmt.Printf("[AI] %s placed %s at Grid %d (Score: %d)\n", aiPlayer.ID, chosenCard.Name, bestGridIdx, bestScore)
+		fmt.Printf("[AI] %s placed %s at Grid %d (Score: %d)\n", aiPlayer.ID, heapCard.Name, bestGridIdx, bestScore)
 		Game.AIScore = bestScore // Store AI's chosen score for UI feedback
 
-		checkCaptures(&chosenCard, bestGridIdx)
+		// PILLAR 4: Visual Feedback Integrity.
+		// Reset combo flags for all cards on board before AI applies its captures.
+		for _, boardCard := range Game.Board {
+			if boardCard != nil {
+				boardCard.IsCombo = false
+			}
+		}
+
+		checkCaptures(heapCard, bestGridIdx)
 		PlaySound("Select-place-card.mp3")
 
 		// Remove card from AI's hand
 		aiPlayer.Decks[aiPlayer.ActiveDeck] = append(aiHand[:bestCardIdx], aiHand[bestCardIdx+1:]...)
 		Game.Turn = 0 // Switch turn back to Player 1
-		checkWinCondition()
+		checkWinConditionLocked()
 	}
 }
 
@@ -2015,26 +2832,52 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 
 	state := make(map[string]interface{})
 
+	// Globalize player index to ensure identity markers are available in all phases (Lobby/Setup).
+	state["local_player_index"] = Game.LocalPlayerIndex
+	// PILLAR 4: Authoritative Identity.
+	// Export the local player's faceplate globally so it persists during combat scope syncs.
+	state["equipped_faceplate"] = Game.Players[Game.LocalPlayerIndex].EquippedFaceplate
+
 	// Profile & Stats
 	if filter == "all" || filter == "profile" {
-		state["reputation"] = Game.Players[0].Reputation
-		state["mojo"] = Game.Players[0].Mojo
-		state["social_rank"] = Game.Players[0].SocialRank
-		state["job_role"] = Game.Players[0].JobRole
-		state["employer_id"] = Game.Players[0].EmployerClubID
-		state["wanted_level"] = Game.Players[0].WantedLevel
-		state["auctions_won"] = Game.Players[0].AuctionsWon
-		state["jailed_cards"] = Game.Players[0].JailedCards
-		state["kidnapped_cards"] = Game.Players[0].KidnappedCards
-		state["held_hostage_cards"] = Game.Players[0].HeldHostageCards
-		state["virtual_balance"] = float64(Game.Players[0].VirtualBalance) / 1000000.0
-		state["rumor_count"] = Game.Players[0].RumorCount
-		state["playstyle"] = Game.Players[0].Playstyle
-		state["favorite_card_id"] = Game.Players[0].FavoriteCardID
-		state["cunning"] = Game.Players[0].GetEffectiveCunning()
-		state["nurturing"] = Game.Players[0].Nurturing
-		state["achievements"] = Game.Players[0].Achievements
+		pIdx := Game.LocalPlayerIndex
+		state["avatar_url"] = Game.Players[pIdx].AvatarURL
+		state["gloat_message"] = Game.Players[pIdx].GloatMessage
+		state["reputation"] = Game.Players[pIdx].Reputation
+		state["mojo"] = Game.Players[pIdx].Mojo
+		state["social_rank"] = Game.Players[pIdx].SocialRank
+		state["job_role"] = Game.Players[pIdx].JobRole
+		state["employer_id"] = Game.Players[pIdx].EmployerClubID
+		state["wanted_level"] = Game.Players[pIdx].WantedLevel
+		state["auctions_won"] = Game.Players[pIdx].AuctionsWon
+		state["jailed_cards"] = Game.Players[pIdx].JailedCards
+		state["kidnapped_cards"] = Game.Players[pIdx].KidnappedCards
+		state["held_hostage_cards"] = Game.Players[pIdx].HeldHostageCards
+		state["virtual_balance"] = float64(Game.Players[pIdx].VirtualBalance) / 1000000.0
+		state["rumor_count"] = Game.Players[pIdx].RumorCount
+		state["playstyle"] = Game.Players[pIdx].Playstyle
+		state["favorite_card_id"] = Game.Players[pIdx].FavoriteCardID
+		state["ghost_protocol_expires_at"] = Game.Players[pIdx].GhostProtocolExpiresAt
+		state["profile_buffs"] = Game.Players[pIdx].ActiveItemBuffs
+		state["reparations_received_count"] = Game.Players[pIdx].ReparationsReceivedCount
+		state["is_mojo_stabilizer_active"] = Game.Players[pIdx].IsMojoStabilizerActive
+		state["mojo_decay_rate"] = Game.Players[pIdx].MojoDecayRate
+		state["has_mutation_insurance"] = Game.Players[pIdx].HasMutationInsurance // PILLAR 6: UI Sync
+		state["cunning"] = Game.Players[pIdx].GetEffectiveCunning()
+		state["nurturing"] = Game.Players[pIdx].Nurturing
+		state["achievements"] = Game.Players[pIdx].Achievements
+		state["match_history"] = Game.Players[pIdx].History
+		state["mutation_history"] = Game.Players[pIdx].MutationHistory
 	}
+
+	// PILLAR 4: Critical Alerts.
+	// Ensure maintenance priority is exported for UI and Beacon synchronization.
+	state["maintenance"] = Game.Maintenance
+	state["maintenance_priority"] = Game.MaintenancePriority
+
+	// PILLAR 4: Session Authority.
+	// Globalize player index to ensure identity markers are available in all phases (Lobby/Setup).
+	state["local_player_index"] = Game.LocalPlayerIndex
 
 	// Combat State
 	if filter == "all" || filter == "combat" {
@@ -2049,11 +2892,14 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["p2_avatar"] = Game.Players[1].AvatarURL
 		state["p1_gloat"] = Game.Players[0].GloatMessage
 		state["p2_gloat"] = Game.Players[1].GloatMessage
+		state["p1_faceplate"] = Game.Players[0].EquippedFaceplate
+		state["p2_faceplate"] = Game.Players[1].EquippedFaceplate
 		state["p1_avatar_notice"] = Game.Players[0].AvatarBanNotice
 		state["p2_id"] = Game.Players[1].ID
 		state["multiplayer"] = Game.Multiplayer
 		state["special_fanfare"] = Game.SpecialFanfare
 		state["territory_id"] = Game.TerritoryID
+		state["match_id"] = Game.TournamentMatchID // PILLAR 3: Standardized Tag
 		state["active_item_buffs"] = Game.ActiveItemBuffs
 		// Expose player-specific stats for accurate client-side power calculations in tooltips
 		state["p1_wanted_level"] = Game.Players[0].WantedLevel
@@ -2067,28 +2913,53 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["p1_coalition_boost"] = Game.P1CoalitionBoost
 		state["p2_coalition_boost"] = Game.P2CoalitionBoost
 		state["rules"] = Game.Rules
-		state["local_player_index"] = Game.LocalPlayerIndex
+
+		// PILLAR 3: Identity sync for atmospheric transitions.
+		state["wanted_level"] = Game.Players[Game.LocalPlayerIndex].WantedLevel
+
+		// PILLAR 4: Replay Visibility.
+		// Export the engine's catch-up state to enable interaction guards in the UI.
+		if Game.ReplayEngine != nil {
+			state["replay_state"] = string(Game.ReplayEngine.CurrentState)
+		}
+
+		// PILLAR 5: Combat Asset Sync. 
+		// Hand cards are essential for move validation and UI hand rendering.
+		// Use LocalPlayerIndex to ensure the UI renders the user's hand, not the current actor's.
+		lp := &Game.Players[Game.LocalPlayerIndex]
+		state["deck"] = lp.Decks[lp.ActiveDeck]
+		state["deck_rating"] = calculateDeckRating(lp.Decks[lp.ActiveDeck])
 	}
 
 	// Economy
 	if filter == "all" || filter == "economy" {
 		state["rewards"] = Game.Rewards
 		state["faucet"] = Game.Faucet
-		state["vault_low"] = Game.VaultLow
-		state["portfolio"] = Game.Players[0].Portfolio
+		state["faucet_micro"] = Game.FaucetMicro
+		state["total_virtual_liability"] = Game.TotalVirtualLiability
+		state["vault_low"] = Game.VaultLow // PILLAR 2: Integer Supremacy
+		jsPortfolio := make(map[string]float64)
+		for k, v := range Game.Players[0].Portfolio {
+			jsPortfolio[k] = float64(v) / 100.0 // Convert uint64 (micro-shares) to float64 (shares) for JS display
+		}
+		state["portfolio"] = jsPortfolio // PILLAR 2: Integer Supremacy
 	}
 
 	// Player Assets
 	if filter == "all" || filter == "inventory" {
-		state["deck"] = Game.Players[Game.Turn].Decks[Game.Players[Game.Turn].ActiveDeck]
+		// PILLAR 5: Inventory Sync. Ensure the local player's deck and rating are returned.
+		p := &Game.Players[Game.LocalPlayerIndex]
+		state["deck"] = p.Decks[p.ActiveDeck]
+		state["active_deck"] = p.ActiveDeck
+		Game.DeckRating = calculateDeckRating(p.Decks[p.ActiveDeck])
+		state["deck_rating"] = Game.DeckRating
+	}
+	if filter == "inventory" {
 		state["inventory"] = Game.Inventory
-		state["active_deck"] = Game.Players[0].ActiveDeck
-		state["deck_rating"] = calculateDeckRating(Game.Players[0].Decks[Game.Players[0].ActiveDeck])
 	}
 
 	// System / Meta
 	if filter == "all" || filter == "meta" {
-		state["maintenance"] = Game.Maintenance
 		state["testing_mode"] = Game.TestingMode
 		state["is_admin"] = Game.IsAdmin
 		state["show_leaderboard"] = Game.ShowLeaderboard
@@ -2096,6 +2967,16 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 		state["server_load"] = Game.ServerLoad
 		state["latency"] = Game.Latency
 		state["network_health"] = Game.NetworkHealth
+		state["faucet_micro"] = Game.FaucetMicro
+		state["total_virtual_liability"] = Game.TotalVirtualLiability
+		state["in_matchmaking_queue"] = Game.InMatchmakingQueue
+		// PILLAR 4: Sequence Restoration.
+		// Export the current sequence ID to the state beacon for warm-boot recovery.
+		if Game.ReplayEngine != nil {
+			state["last_sequence_id"] = Game.ReplayEngine.LastSequenceID
+			state["replay_state"] = string(Game.ReplayEngine.CurrentState)
+			state["last_verified_state_hash"] = Game.ReplayEngine.LastVerifiedStateHash
+		}
 		state["api_base"] = Game.ApiBase
 		state["network"] = Game.Network
 		state["clubs"] = Game.Clubs
@@ -2115,11 +2996,9 @@ func GetGameState(this js.Value, args []js.Value) interface{} {
 	return js.Global().Get("JSON").Call("parse", string(stateJSON))
 }
 
-// checkWinCondition checks if the board is full and determines the winner.
-func checkWinCondition() {
-	Game.mutex.Lock()
-	defer Game.mutex.Unlock()
-
+// checkWinConditionLocked checks if the board is full and determines the winner.
+// Assumes Game.mutex is already held.
+func checkWinConditionLocked() {
 	full := true
 	for _, slot := range Game.Board {
 		if slot == nil {
@@ -2130,8 +3009,10 @@ func checkWinCondition() {
 
 	if full {
 		p1Score, p2Score := 0, 0
+		boardMap := make(map[int]bool)
 		for _, card := range Game.Board {
 			if card != nil {
+				boardMap[card.ID] = true
 				if card.Owner == 0 {
 					p1Score++
 				} else {
@@ -2139,6 +3020,16 @@ func checkWinCondition() {
 				}
 			}
 		}
+
+		// PILLAR 3: Deterministic Score Parity.
+		// Add remaining hand cards to the owner's score to match server verifyWinner logic.
+		for _, card := range Game.Players[0].Decks[Game.Players[0].ActiveDeck] {
+			if !boardMap[card.ID] { p1Score++ }
+		}
+		for _, card := range Game.Players[1].Decks[Game.Players[1].ActiveDeck] {
+			if !boardMap[card.ID] { p2Score++ }
+		}
+
 		Game.Scores = [2]int{p1Score, p2Score}
 		Game.Phase = "Finished"
 		if p1Score > p2Score {
@@ -2379,7 +3270,9 @@ func SetLocalPlayerIndex(this js.Value, args []js.Value) interface{} {
 	if idx < 0 || idx > 1 {
 		return false
 	}
+	Game.mutex.Lock()
 	Game.LocalPlayerIndex = idx
+	Game.mutex.Unlock()
 	fmt.Printf("[ENGINE] Local Player Index set to: %d\n", idx)
 	return true
 }
@@ -2392,6 +3285,12 @@ func ApplyArtifactToBoard(this js.Value, args []js.Value) interface{} {
 	gridIdx := args[0].Int()
 	bonus := args[1].Int()
 
+	// PILLAR 4: Deadlock Prevention. 
+	// Refactored lock acquisition to follow the cre.Mu -> Game.mutex order 
+	// established in the catch-up thread, ensuring thread safety during Quick-Cast.
+	Game.ReplayEngine.Mu.Lock()
+	defer Game.ReplayEngine.Mu.Unlock()
+
 	Game.mutex.Lock()
 	defer Game.mutex.Unlock()
 
@@ -2399,68 +3298,75 @@ func ApplyArtifactToBoard(this js.Value, args []js.Value) interface{} {
 		return false
 	}
 
+	// PILLAR 4: Visual Feedback Integrity.
+	// Reset combo flags to ensure the board doesn't show stale flip animations
+	// when the UI syncs following an artifact application.
+	for _, boardCard := range Game.Board {
+		if boardCard != nil { boardCard.IsCombo = false }
+	}
+
 	Game.Board[gridIdx].Artifact += bonus
+
+	// PILLAR 3: Persistence Sync.
+	// Update local inventory to ensure the artifact bonus persists across board clears.
+	targetID := Game.Board[gridIdx].ID
+	for i, ic := range Game.Inventory {
+		if ic.ID == targetID {
+			Game.Inventory[i].Artifact = Game.Board[gridIdx].Artifact
+			break
+		}
+	}
+
+	// PILLAR 4: State Synchronization.
+	// Update the baseline hash for the Replay Engine to ensure that subsequent
+	// real-time move verifications account for the artifact adjustment.
+	Game.ReplayEngine.LastVerifiedStateHash = ComputeBoardHash(Game.Board, Game.Turn)
+
 	return true
 }
 
-func registerFunctions() {
-	js.Global().Set("connectWallet", js.FuncOf(connectWallet))
-	js.Global().Set("disconnectWallet", js.FuncOf(disconnectWallet))
-	js.Global().Set("toggleNetwork", js.FuncOf(toggleNetwork))
-	js.Global().Set("SetAvatar", js.FuncOf(SetAvatar))
-	js.Global().Set("SendReward", js.FuncOf(SendReward))
+// PushReplayFrame allows the JS network layer to feed catch-up frames into the engine.
+func PushReplayFrame(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 { return false }
+	var frame AuthoritativeFrame
+	if err := json.Unmarshal([]byte(args[0].String()), &frame); err != nil {
+		fmt.Printf(" [WASM REPLAY ERROR] Frame unmarshal: %v\n", err)
+		return false
+	}
+	Game.ReplayEngine.ProcessIncomingPacket(frame)
+	return true
+}
 
-	js.Global().Set("ToggleRule", js.FuncOf(ToggleRule))
-	js.Global().Set("AddToDeck", js.FuncOf(AddToDeck))
-	js.Global().Set("AutoBuildDeck", js.FuncOf(AutoBuildDeck))
-	js.Global().Set("PlaySelectSound", js.FuncOf(PlaySelectSound))
-	js.Global().Set("SelectDeck", js.FuncOf(SelectDeck))
-	js.Global().Set("RemoveFromDeck", js.FuncOf(RemoveFromDeck))
-	js.Global().Set("SyncOpponentDeck", js.FuncOf(SyncOpponentDeck))
-	js.Global().Set("SyncOpponentProfile", js.FuncOf(SyncOpponentProfile))
-	js.Global().Set("SetPlayerReady", js.FuncOf(SetPlayerReady))
-	js.Global().Set("SyncFullProfile", js.FuncOf(SyncFullProfile))
-	js.Global().Set("SyncPlaystyle", js.FuncOf(SyncPlaystyle))
-	js.Global().Set("SyncOpponentWanted", js.FuncOf(SyncOpponentWanted))
-	js.Global().Set("SyncPortfolio", js.FuncOf(SyncPortfolio))
+// CompleteRecovery manually exits the recovery state if no frames were required.
+// PILLAR 4: Replay Resilience.
+func CompleteRecovery(this js.Value, args []js.Value) interface{} {
+	Game.ReplayEngine.Mu.Lock()
+	defer Game.ReplayEngine.Mu.Unlock()
 
-	js.Global().Set("StartMatch", js.FuncOf(StartMatch))
-	js.Global().Set("PlaceCard", js.FuncOf(PlaceCard))
-	js.Global().Set("GetGameState", js.FuncOf(GetGameState)) // Expose the Camera
-	js.Global().Set("SetAdminState", js.FuncOf(SetAdminState))
-	js.Global().Set("SyncPlayerStats", js.FuncOf(SyncPlayerStats))
-	js.Global().Set("SyncServerLoad", js.FuncOf(SyncServerLoad))
-	js.Global().Set("SyncLatency", js.FuncOf(SyncLatency))
-	js.Global().Set("GetLevelLabelForDisplay", js.FuncOf(GetLevelLabelForDisplay))
-	js.Global().Set("TriggerManualSync", js.FuncOf(TriggerManualSync))
-	js.Global().Set("SyncMatchMetadata", js.FuncOf(SyncMatchMetadata))
-	js.Global().Set("SyncTournament", js.FuncOf(SyncTournament))
-	js.Global().Set("GetTournamentArchiveBadge", js.FuncOf(GetTournamentArchiveBadge))
-	js.Global().Set("SyncMove", js.FuncOf(SyncMove))
-	js.Global().Set("SetPhase", js.FuncOf(SetPhase))
-	js.Global().Set("GetServerLoadColor", js.FuncOf(GetServerLoadColor))
-	js.Global().Set("SetTestingMode", js.FuncOf(SetTestingMode))
-	js.Global().Set("SetHardMode", js.FuncOf(SetHardMode))
-	js.Global().Set("GetTierInfo", js.FuncOf(GetTierInfo))
-	js.Global().Set("ToggleLeaderboard", js.FuncOf(ToggleLeaderboard))
-	js.Global().Set("SyncRules", js.FuncOf(SyncRules))
-	js.Global().Set("SyncRewards", js.FuncOf(SyncRewards))
-	js.Global().Set("SyncVaultBalance", js.FuncOf(SyncVaultBalance))
-	js.Global().Set("SyncClubs", js.FuncOf(SyncClubs))
-	js.Global().Set("SetMaintenanceState", js.FuncOf(SetMaintenanceState))
-	js.Global().Set("ForceActive", js.FuncOf(ForceActive))
-	js.Global().Set("SetBoardState", js.FuncOf(SetBoardState))
-	js.Global().Set("ResetGame", js.FuncOf(ResetGame))
-	js.Global().Set("SetMasterVolume", js.FuncOf(SetMasterVolume))
-	js.Global().Set("SetMusicVolume", js.FuncOf(SetMusicVolume))
-	js.Global().Set("SetSfxVolume", js.FuncOf(SetSfxVolume))
-	js.Global().Set("SetAssetBase", js.FuncOf(SetAssetBase))
-	js.Global().Set("SetApiBase", js.FuncOf(SetApiBase))
-	js.Global().Set("SetLocalPlayerIndex", js.FuncOf(SetLocalPlayerIndex))
-	js.Global().Set("ImportARC72Card", js.FuncOf(ImportARC72Card))
-	js.Global().Set("SyncCardMetadata", js.FuncOf(SyncCardMetadata))
-	js.Global().Set("initiateSuddenDeath", js.FuncOf(initiateSuddenDeath))
-	js.Global().Set("ApplyArtifactToBoard", js.FuncOf(ApplyArtifactToBoard))
+	// Hardening: Always ensure RedirectManager unlocks if manually invoked.
+	if Game.ReplayEngine.RedirectManager != nil {
+		Game.ReplayEngine.RedirectManager.unlockCanvasInteractions()
+	}
+
+	if Game.ReplayEngine.CurrentState == StateReconnecting || Game.ReplayEngine.CurrentState == StateReplaying {
+		fmt.Println(" [WASM Replay] Recovery completed (0 frames required). Unlocking UI.")
+		Game.ReplayEngine.CurrentState = StateSynchronized
+		Game.ReplayEngine.ReplayStartTime = time.Time{}
+
+		js.Global().Call("syncUI", "all")
+	}
+	return true
+}
+
+// SetInMatchmakingQueue updates the engine's lobby status.
+func SetInMatchmakingQueue(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		return false
+	}
+	Game.mutex.Lock()
+	Game.InMatchmakingQueue = args[0].Bool()
+	Game.mutex.Unlock()
+	return true
 }
 
 // GetTournamentArchiveBadge returns a stylized HTML badge based on verification status
@@ -2521,8 +3427,13 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 
 		promise := window.Call("fetch", url)
 
+		var success, failure js.Func
+
 		// Handle success
-		success := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		success = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			defer success.Release()
+			defer failure.Release()
+
 			resp := args[0]
 			if !resp.Get("ok").Bool() {
 				fmt.Printf("[ENGINE ERROR] Failed to fetch card %d from backend: %s\n", tokenID, resp.Get("statusText").String())
@@ -2530,7 +3441,11 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 			}
 
 			jsonPromise := resp.Call("json")
-			jsonPromise.Call("then", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			
+			var onJSON js.Func
+			onJSON = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+				defer onJSON.Release()
+				
 				cardsJS := args[0] // This will be a JS array of card objects
 				if cardsJS.Length() == 0 {
 					fmt.Printf("[ENGINE ERROR] Backend returned no data for card %d\n", tokenID)
@@ -2544,6 +3459,22 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 				newCard.Name = cardJSON.Get("name").String()
 				newCard.Image = cardJSON.Get("image").String()
 				newCard.Rarity = cardJSON.Get("rarity").Float()
+
+				// PILLAR 3: Metadata Ingestion.
+				// Ensure battle scars and persistent attributes are captured during discovery.
+				if art := cardJSON.Get("artifact"); !art.IsUndefined() { newCard.Artifact = art.Int() }
+				if fat := cardJSON.Get("fatigue"); !fat.IsUndefined() { newCard.Fatigue = fat.Int() }
+				if loy := cardJSON.Get("loyalty"); !loy.IsUndefined() { newCard.Loyalty = loy.Int() }
+				if mood := cardJSON.Get("mood"); !mood.IsUndefined() { newCard.Mood = mood.String() }
+				if scars := cardJSON.Get("scars"); !scars.IsUndefined() && scars.Type() == js.TypeObject {
+					newCard.Scars = []string{}
+					for i := 0; i < scars.Length(); i++ {
+						newCard.Scars = append(newCard.Scars, scars.Index(i).String())
+					}
+				}
+				// PILLAR 5: Hardware Item Overlay Framework
+				// Initialize equipped items array (populated by card-specific item mechanics in future phases)
+				newCard.EquippedItems = []string{}
 
 				// Extract power values with safety checks
 				jsPower := cardJSON.Get("power")
@@ -2561,7 +3492,19 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 				newCard.Image = Game.resolvePath("Images", newCard.Image)
 
 				Game.mutex.Lock()
-				Game.Inventory = append(Game.Inventory, newCard)
+				// PILLAR 3: State Bloat Prevention.
+				// Handle potential duplicate IDs by updating in-place to prevent inventory state bloat.
+				exists := false
+				for idx, invCard := range Game.Inventory {
+					if invCard.ID == newCard.ID {
+						Game.Inventory[idx] = newCard // Update existing entry with fresh metadata
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					Game.Inventory = append(Game.Inventory, newCard)
+				}
 
 				// CORRECTION MECHANISM: Scan board for "Syncing..." dummies and update them
 				for _, boardCard := range Game.Board {
@@ -2570,6 +3513,7 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 						boardCard.Power = newCard.Power
 						boardCard.Image = newCard.Image
 						boardCard.Rarity = newCard.Rarity
+						boardCard.Scars = newCard.Scars
 						fmt.Printf("[ENGINE] Corrected dummy card on board: %s\n", boardCard.Name)
 					}
 				}
@@ -2578,12 +3522,15 @@ func ImportARC72Card(this js.Value, args []js.Value) interface{} { // Renamed to
 				fmt.Printf("[ENGINE] Imported %s | ID: %d | Power: %v | Rarity: %.2f\n", newCard.Name, newCard.ID, newCard.Power, newCard.Rarity)
 				js.Global().Call("syncUI") // Trigger UI update
 				return nil
-			}))
+			})
+			jsonPromise.Call("then", onJSON)
 			return nil
 		})
 
 		// Handle error
-		failure := js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		failure = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			defer success.Release()
+			defer failure.Release()
 			err := args[0]
 			fmt.Printf("[ENGINE ERROR] Fetching card %d from backend failed: %v\n", tokenID, err.String())
 			return nil
@@ -2616,6 +3563,12 @@ func SyncCardMetadata(this js.Value, args []js.Value) interface{} {
 			found := false
 			for idx, c := range Game.Inventory {
 				if c.ID == id {
+					// PILLAR 6: Data Preservation.
+					// If the incoming metadata (likely ServerCard schema) omits scars,
+					// preserve the existing forensic history.
+					if len(updatedCard.Scars) == 0 {
+						updatedCard.Scars = c.Scars
+					}
 					Game.Inventory[idx] = updatedCard
 					found = true
 					break
@@ -2623,6 +3576,19 @@ func SyncCardMetadata(this js.Value, args []js.Value) interface{} {
 			}
 			if !found {
 				Game.Inventory = append(Game.Inventory, updatedCard)
+			}
+
+			// PILLAR 4: Tactical Accuracy.
+			// Synchronize cards currently on the board to ensure tooltips accurately
+			// reflect battle scars (Artifact reduction) and procedure failures.
+			for _, boardCard := range Game.Board {
+				if boardCard != nil && boardCard.ID == id {
+					boardCard.Artifact = updatedCard.Artifact
+					boardCard.Fatigue = updatedCard.Fatigue
+					boardCard.Loyalty = updatedCard.Loyalty
+					boardCard.Mood = updatedCard.Mood
+					boardCard.Scars = updatedCard.Scars
+				}
 			}
 		}
 	}
@@ -2632,10 +3598,22 @@ func SyncCardMetadata(this js.Value, args []js.Value) interface{} {
 // initiateSuddenDeath clears the board and resets game markers for tie-breaker rounds.
 func initiateSuddenDeath(this js.Value, args []js.Value) interface{} {
 	Game.mutex.Lock()
+	defer Game.mutex.Unlock()
+
 	Game.Board = [9]*Card{}
 	Game.Winner = -1
 	Game.Scores = [2]int{0, 0}
-	Game.mutex.Unlock()
+
+	// PILLAR 4: Sudden Death Integrity.
+	// Reset Fatigue for redistributed hands to ensure tie-breakers start at peak power.
+	// Also align both players to Deck Slot 0 where the tie-breaker hands are synced.
+	for pIdx := 0; pIdx < 2; pIdx++ {
+		Game.Players[pIdx].ActiveDeck = 0
+		for i := range Game.Players[pIdx].Decks[0] {
+			Game.Players[pIdx].Decks[0][i].Fatigue = 0
+		}
+	}
+
 	return true
 }
 
@@ -2750,6 +3728,109 @@ func main() {
 		Game.Inventory = append(Game.Inventory, c)
 	}
 
-	registerFunctions()
+	// PILLAR 3: Security & Feedback Kernel Initialization
+	Game.Alerts = NewAlertEngine(LangEnglish)
+	Game.RedirectManager = NewClientRedirectManager(Game.Alerts)
+	Game.Signer = NewWasmSignerHook()
+
+	// PILLAR 4: Replay Bridge Registration.
+	js.Global().Set("InitiateRecovery", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		Game.ReplayEngine.InitiateRecovery()
+		return nil
+	}))
+
+	// PILLAR 4: Replay Resilience Initialization.
+	Game.ReplayEngine = NewClientReplayEngine(100, Game.RedirectManager)
+	go Game.ReplayEngine.ExecuteSyncHandshake(context.Background(), func(frame AuthoritativeFrame) {
+		pIdx := frame.MoveIntent.PlayerIndex
+		c, found := findCard(frame.MoveIntent.CardID)
+		if !found {
+			c = Card{ID: frame.MoveIntent.CardID, Name: "Reconstructing...", Power: frame.MoveIntent.Power, Owner: pIdx}
+		}
+
+		Game.mutex.Lock()
+
+		// Reset combo flags for visual feedback
+		for _, bc := range Game.Board {
+			if bc != nil { bc.IsCombo = false }
+		}
+
+		c.Owner = pIdx
+		tier, color, _ := calculateTier(Game.Players[pIdx].Reputation)
+		c.Tier = tier
+		c.GlowColor = color
+
+		heapCard := new(Card)
+		*heapCard = c
+		Game.Board[frame.MoveIntent.GridIndex] = heapCard
+
+		// PILLAR 5: Hand Integrity (Replay).
+		// Remove the card from the local simulation hand during catch-up.
+		hand := &Game.Players[pIdx].Decks[Game.Players[pIdx].ActiveDeck]
+		for i, dc := range *hand {
+			if dc.ID == frame.MoveIntent.CardID {
+				*hand = append((*hand)[:i], (*hand)[i+1:]...)
+				break
+			}
+		}
+
+		checkCaptures(heapCard, frame.MoveIntent.GridIndex)
+		Game.Turn = 1 - pIdx
+		checkWinConditionLocked()
+
+		// PILLAR 4: Cryptographic Verification.
+		// Validate the local board state against the authoritative server hash.
+		// Skip verification if the server provided a zero-hash (legacy/spectator compatibility).
+		if frame.StateHash != (BoardStateHash{}) {
+			localHash := ComputeBoardHash(Game.Board, pIdx)
+			if localHash != frame.StateHash {
+				fmt.Printf(" [WASM DESYNC] Cryptographic drift detected! Local: %x, Authority: %x\n", localHash, frame.StateHash)
+				Game.mutex.Unlock()
+				Game.ReplayEngine.InitiateRecovery() // Trigger UI freeze and catch-up
+				return
+			}
+		}
+		Game.mutex.Unlock()
+
+		// PILLAR 4: Catch-up Immersion.
+		// Ensure the UI renders every move in the catch-up log so the user sees the reconstruction.
+		js.Global().Call("syncUI", "combat")
+		fmt.Printf(" [WASM Replay] Applied authoritative move: Grid %d, Player %d (Seq: %d)\n", frame.MoveIntent.GridIndex, pIdx, frame.SequenceID)
+	})
+
+	registerWasmHooks()
 	<-wait
+}
+
+// ComputeBoardHash creates a deterministic checksum of the board for client verification.
+// PILLAR 4: Bit-Perfect Parity.
+func ComputeBoardHash(board [9]*Card, playerIndex int) BoardStateHash {
+	hasher := sha256.New()
+	for _, c := range board {
+		var id uint32 = 0
+		var owner int32 = -1
+		var artifact int32 = 0
+
+		if c != nil {
+			id = uint32(c.ID)
+			owner = int32(c.Owner)
+			artifact = int32(c.Artifact)
+		}
+
+		buf := make([]byte, 4)
+		binary.BigEndian.PutUint32(buf, id)
+		hasher.Write(buf)
+		binary.BigEndian.PutUint32(buf, uint32(owner))
+		hasher.Write(buf)
+		binary.BigEndian.PutUint32(buf, uint32(artifact))
+		hasher.Write(buf)
+	}
+
+	turnBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(turnBuf, uint32(playerIndex))
+	hasher.Write(turnBuf)
+
+	var hash BoardStateHash
+	copy(hash[:], hasher.Sum(nil))
+	return hash
 }

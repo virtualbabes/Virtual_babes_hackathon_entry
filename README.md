@@ -1,6 +1,6 @@
 # 🚀 Virtualbabes Arena: The Social Economic Simulation
 
-![Status](https://img.shields.io/badge/Status-In_Development-orange?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Alpha_Development-orange?style=for-the-badge)
 ![Tech Stack](https://img.shields.io/badge/Go-Server_%2B_WASM-00ADD8?style=for-the-badge&logo=go)
 ![Network](https://img.shields.io/badge/Network-Voi-purple?style=for-the-badge)
 
@@ -16,7 +16,10 @@
 
 > **Virtualbabes Arena** is a groundbreaking experiment evolving the tactical card battler into a high-stakes **Social Economic Simulation** on the Voi Network. 
 
-The project is currently in the **Alpha / Architectural Prototype** phase. Utilizing a **dB-Less Authoritative Core**, the Arena archives 100% of its state via GZIP-compressed blockchain snapshots, enabling bit-perfect deterministic replays and a self-sustaining industrial economy.
+The project is currently in a **Pre-Functional Alpha** phase. The aim is to utilize a **Database-Less Authoritative Core** where the Arena archives 100% of its state via GZIP-compressed blockchain snapshots. Once fully stabilized, this architecture is designed to enable bit-perfect deterministic replays, yield-bearing organizational equity, and a factional "Hegemony" layer (Justice vs. Underworld) that dictates combat and economic influence.
+
+### 🏛️ The Industrial Seal
+The intended economic model utilizes an autonomous **Token-Sink Router** and **Reconciliation Kernel** to track every micro-unit of $VBV, aiming for 100% solvency and zero systemic drift.
 
 ---
 
@@ -98,10 +101,22 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 
 ## ⚡ Engineering Status
 
-- [x] **Hardened Grid Interactivity**
-- [x] **Deterministic Replay Kernel**
-- [x] **Industrial Loop**
-- [ ] **Asset Finalization**
+- [x] **Verified Grid Interactivity** — Confirmed live via particles.js + game.js
+- [x] **Deterministic Replay Kernel** — WASM main.go deterministic engine live
+- [x] **Industrial Loop (Token-Sink Router)** — RevenueSplitMatrix + TokenSinkRouter complete
+- [ ] **Yield-Bearing Assets (Dividends)** — Logic implemented, testing required
+- [x] **Factional Sovereignty (Hegemony)** — JusticeService + CourthouseService complete
+- [x] **Blockchain-Native Snapshots** — PersistenceSyncWorker 15-min snapshot daemon live
+- [ ] **Final Audio/Visual Asset Integration** — 70+ tracks present, boss/miniboss integration pending
+
+## 🛡️ Infrastructure (Phase 1 Foundation)
+
+| Pillar | Status | Details |
+|--------|--------|---------|
+| Rate Limiting | ✅ Complete | Token bucket + sliding window, per-wallet tiers, Prometheus telemetry |
+| Career XP Engine | ⚠️ Partial | Fence career wired (black_market_service.go:153), ~89 careers unwired |
+| $VBV-Gate Validation | ✅ Proven | Gossip career validates $VBB-gate pattern ready for scaling |
+| Build Verification | ✅ PASS | Go build completes without errors |
 
 ---
 
@@ -116,4 +131,4 @@ The project is currently in the **Alpha / Architectural Prototype** phase. Utili
 ---
 
 ### 📄 Supplemental Blueprint (PDF)
-[📘 Virtualbabes_Arena_Architecture.pdf](https://github.com/<your‑user>/<your‑repo>/blob/main/Virtualbabes_Arena_Architecture.pdf)
+[📘 Virtualbabes_Arena_Architecture.pdf](/Public/Assets/Learning-media/Virtualbabes_Arena_Architecture.pdf)

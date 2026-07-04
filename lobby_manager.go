@@ -3,7 +3,10 @@
 package main
 
 import (
+	"context"
 	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"crypto/ed25519"
 
 	"compress/gzip"
@@ -21,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	// For Solana verification
@@ -38,6 +42,195 @@ var safeAvatarPool = []string{
 	"Cards/Clohey.webp",
 	"Cards/Ellie.webp",
 	"Cards/Fran.webp",
+}
+
+// NewGracePeriodMatrix initializes the connection quarantine manager.
+func (l *Lobby) NewGracePeriodMatrix(grace time.Duration, evictionCallback func(string)) *GracePeriodMatrix {
+	return &GracePeriodMatrix{
+		ActiveSessions:  make(map[string]*PlayerSession),
+		DisconnectGrace: grace,
+		EvictionWorker:  evictionCallback,
+	}
+}
+
+// HandleConnectionDrop intercepts unexpected WebSocket disconnect events.
+// PILLAR 4: Connection Quarantine.
+func (gpm *GracePeriodMatrix) HandleConnectionDrop(walletAddress string) {
+	gpm.Mu.Lock()
+	session, exists := gpm.ActiveSessions[walletAddress]
+	if !exists || session.CurrentState != StateConnected {
+		gpm.Mu.Unlock()
+		return
+	}
+
+	// 1. Pivot session state to Quarantine boundaries
+	session.CurrentState = StatePendingDisconnect
+	log.Printf(" [Grace Matrix] Player %s lost connection. Entering 60s quarantine window.\n", walletAddress)
+
+	// 2. Spawn an atomic, cancellable context for the countdown timer
+	ctx, cancel := context.WithCancel(context.Background())
+	session.CancelTimer = cancel
+	gpm.Mu.Unlock()
+
+	// 3. Launch the asynchronous countdown tracker
+	go func(wAddress string, trackingCtx context.Context) {
+		select {
+		case <-time.After(gpm.DisconnectGrace):
+			// The timer completed natively without reconnection intervention
+			gpm.Mu.Lock()
+			currentSession, stillExists := gpm.ActiveSessions[wAddress]
+			if stillExists && currentSession.CurrentState == StatePendingDisconnect {
+				delete(gpm.ActiveSessions, wAddress)
+				gpm.Mu.Unlock()
+
+				log.Printf(" [Grace Matrix] Quarantine expired for %s. Triggering forfeit eviction.\n", wAddress)
+				gpm.EvictionWorker(wAddress) // Execute harsh match forfeit rule
+				return
+			}
+			gpm.Mu.Unlock()
+
+		case <-trackingCtx.Done():
+			// The context was explicitly cancelled by a successful reconnection handshake
+			log.Printf(" [Grace Matrix] Disconnect timer safely aborted for player: %s\n", wAddress)
+			return
+		}
+	}(walletAddress, ctx)
+}
+
+// HandleReconnectionHandshake processes inbound user catch-up attempts.
+func (gpm *GracePeriodMatrix) HandleReconnectionHandshake(walletAddress string) (uint64, error) {
+	gpm.Mu.Lock()
+	defer gpm.Mu.Unlock()
+
+	session, exists := gpm.ActiveSessions[walletAddress]
+	if !exists {
+		// New login session initialization entirely
+		gpm.ActiveSessions[walletAddress] = &PlayerSession{
+			WalletAddress:   walletAddress,
+			CurrentState:    StateConnected,
+			LastActiveFrame: 0,
+		}
+		return 0, nil
+	}
+
+	// 🛡️ Safe Reconnection Window Intercepted:
+	// Kill the background eviction countdown before it fires the forfeit rule
+	if session.CancelTimer != nil {
+		session.CancelTimer()
+	}
+
+	session.CurrentState = StateConnected
+	log.Printf(" [Grace Matrix] Player %s reconnected within window.\n", walletAddress)
+
+	return session.LastActiveFrame, nil
+}
+
+// handleAuthoritativeForfeit executes the match cleanup for a player who failed to reconnect.
+func (l *Lobby) handleAuthoritativeForfeit(wallet string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// Find the ClientID associated with this wallet
+	clientID := ""
+	for id, w := range l.wallets {
+		if strings.EqualFold(w, wallet) {
+			clientID = id
+			break
+		}
+	}
+
+	if clientID == "" {
+		return
+	}
+
+	// Execute Match Forfeit Logic
+	if match, ok := l.matches[clientID]; ok {
+		isP1 := clientID == match.P1ID
+		isP2 := clientID == match.P2ID
+
+		if isP1 || isP2 {
+			// PILLAR 4: Combatant Eviction.
+			opponentID := match.P2ID
+			if isP2 {
+				opponentID = match.P1ID
+			}
+			if opponentID != "" {
+				// Award advancement/win to the opponent
+				if match.TournamentMatchID != "" {
+					if oppWallet, ok := l.wallets[opponentID]; ok {
+						l.tournamentService.ProcessTournamentResult(l, match.TournamentMatchID, oppWallet)
+					}
+				}
+				delete(l.matches, opponentID)
+			}
+			delete(l.matchHandshakers, match.P1ID) // PILLAR 4: Handshaker Pruning.
+		} else {
+			// PILLAR 4: Spectator Eviction. 
+			// Timeout reached without reconnection; remove from stream list.
+			var remaining []string
+			for _, sID := range match.Spectators {
+				if sID != clientID { remaining = append(remaining, sID) }
+			}
+			match.Spectators = remaining
+		}
+
+		delete(l.matches, clientID)
+
+		// Penalize the leaver
+		l.incrementDNF(wallet, 0, "", match.TournamentMatchID)
+	}
+
+	delete(l.wallets, clientID)
+	l.UntrackSession(wallet)
+
+	// Sync UI to remove the dead session from lobby lists
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// NewSyncHandshaker initializes the multi-frame state verification engine.
+func (l *Lobby) NewSyncHandshaker() *SyncHandshaker {
+	return &SyncHandshaker{
+		HistoricalFrames: make(map[uint64]FrameDelta),
+	}
+}
+
+// ReconcileFrame verifies client speculative frames against authoritative records.
+// PILLAR 4: Frame sequence matching.
+func (sh *SyncHandshaker) ReconcileFrame(clientFrame FrameDelta) (bool, error) {
+	sh.Mu.Lock()
+	defer sh.Mu.Unlock()
+
+	// PILLAR 4: Duplicate Sequence Guard.
+	// Gracefully ignore frames that have already been processed to support rapid reconnection retries.
+	if clientFrame.SequenceID <= sh.CurrentSequence {
+		return true, nil
+	}
+
+	// Verify continuous, chronological frame increments
+	if clientFrame.SequenceID != sh.CurrentSequence+1 {
+		return false, fmt.Errorf("sequence gap: expected %d, got %d", sh.CurrentSequence+1, clientFrame.SequenceID)
+	}
+
+	// Commit frame to recovery history log
+	sh.CurrentSequence = clientFrame.SequenceID
+	sh.HistoricalFrames[sh.CurrentSequence] = clientFrame
+	sh.LastVerifiedHash = clientFrame.StateHash
+
+	return true, nil
+}
+
+// CatchUpPlayer generates a structural playback history buffer to clear network drift.
+func (sh *SyncHandshaker) CatchUpPlayer(fromSequence uint64) []FrameDelta {
+	sh.Mu.RLock()
+	defer sh.Mu.RUnlock()
+
+	var recoveryBuffer []FrameDelta
+	for i := fromSequence + 1; i <= sh.CurrentSequence; i++ {
+		if frame, exists := sh.HistoricalFrames[i]; exists {
+			recoveryBuffer = append(recoveryBuffer, frame)
+		}
+	}
+	return recoveryBuffer
 }
 
 const linkedWalletsName = "linked_wallets.json"
@@ -105,19 +298,20 @@ func (l *Lobby) run() {
 	cacheSaveTicker := time.NewTicker(15 * time.Minute)
 	defer cacheSaveTicker.Stop()
 
-	go l.refreshGlobalLeaderboard()
+	go l.oracleService.RefreshGlobalLeaderboard(l)
 
 	for {
 		select {
 		case <-ticker.C:
 			l.cleanupNonces()
-			l.processAuctions()
+			l.auctionService.ProcessAuctions(l)
 			l.processPlaystyleDecay()      // New: Decay playstyle tendencies
 			l.processRumors()              // New: Check for expired rumors
-			l.processLoans()               // New: Check for defaulted loans
+			l.loanService.ProcessLoans(l)  // New: Check for defaulted loans
 			l.processMojoDecay()           // New: Penalize stagnant clubs
 			l.processInsuranceRecovery()   // New: Check for expired kidnappings
-			l.processLeaseExpirations()    // New: Check for expired card leases
+			l.clubService.ProcessLeaseExpirations(l)    // New: Check for expired card leases
+			l.processAllianceExpirations() // PILLAR 1: Clear stale proposals
 			l.broadcastBountyBoard()       // PILLAR 3: Criminality Intel
 			l.processTreasuryAnalytics()   // PILLAR 2: Economic Intel
 			go l.observeGlobalSentiments() // Pillar 3: Aggregate meta trends
@@ -135,15 +329,16 @@ func (l *Lobby) run() {
 			}
 			go l.broadcastHealthReport()
 		case <-cacheSaveTicker.C:
-			go l.savePersistentCardCache()
+			l.CheckCorporateBailouts() // PILLAR 1: Macro-economic organizational check
+			go l.oracleService.SavePersistentCardCache(l)
 			go l.saveRegisteredTxIDs()
 			go l.saveLinkedWallets()
-			go l.saveOnboardedWallets()
+			go l.oracleService.SaveOnboardedWallets(l)
 			go l.saveLeaderboard()  // PILLAR 3: Persistent Behavioral Analysis
 			go l.saveEconomyState() // PILLAR 2: Persistent Virtual Ledger
 		case <-vaultCheckTicker.C:
-			go l.checkVaultBalanceOnChain() // Monitor $VBV Reward Pool
-			go l.checkNativeVaultBalanceOnChain()
+			go l.oracleService.CheckVaultBalanceOnChain(l) // Monitor $VBV Reward Pool
+			go l.oracleService.CheckNativeVaultBalanceOnChain(l)
 		case client := <-l.register:
 			l.mutex.Lock()
 			l.clients[client.id] = client
@@ -266,8 +461,109 @@ func (l *Lobby) loadLeaderboard() {
 // PILLAR 6: Blockchain Persistence. This now sends a compressed JSON snapshot as a VBT_STATE_SNAPSHOT blockchain note.
 func (l *Lobby) saveLeaderboard() {
 	l.mutex.RLock()
-	data, err := json.Marshal(l.leaderboard)
+
+	// PILLAR 4: Mutex Contention Minimization.
+	// Extract a point-in-time snapshot of the leaderboard state while holding RLock.
+	// This allows the expensive JSON marshalling to happen outside the lock.
+	leaderboardSnapshot := make(map[string]PlayerStats, len(l.leaderboard))
+
+	for wallet, stats := range l.leaderboard {
+		// Create a deep copy of the PlayerStats struct to prevent concurrent access panics
+		cloned := stats
+
+		// 1. Deep Copy Nested Maps
+		if stats.Inventory != nil {
+			cloned.Inventory = make(map[string]int, len(stats.Inventory))
+			for k, v := range stats.Inventory { cloned.Inventory[k] = v }
+		}
+		if stats.Relationships != nil {
+			cloned.Relationships = make(map[string]int, len(stats.Relationships))
+			for k, v := range stats.Relationships { cloned.Relationships[k] = v }
+		}
+		if stats.Portfolio != nil {
+			cloned.Portfolio = make(map[string]uint64, len(stats.Portfolio)) // PILLAR 2: Integer Supremacy
+			for k, v := range stats.Portfolio { cloned.Portfolio[k] = v }
+		}
+		if stats.JailedCards != nil {
+			cloned.JailedCards = make(map[int]string, len(stats.JailedCards))
+			for k, v := range stats.JailedCards { cloned.JailedCards[k] = v }
+		}
+		if stats.KidnappedCards != nil {
+			cloned.KidnappedCards = make(map[int]string, len(stats.KidnappedCards))
+			for k, v := range stats.KidnappedCards { cloned.KidnappedCards[k] = v }
+		}
+		if stats.HeldHostageCards != nil {
+			cloned.HeldHostageCards = make(map[int]string, len(stats.HeldHostageCards))
+			for k, v := range stats.HeldHostageCards { cloned.HeldHostageCards[k] = v }
+		}
+		if stats.AuditedClubs != nil {
+			cloned.AuditedClubs = make(map[string]bool, len(stats.AuditedClubs))
+			for k, v := range stats.AuditedClubs { cloned.AuditedClubs[k] = v }
+		}
+		if stats.CapturedOutlaws != nil {
+			cloned.CapturedOutlaws = make(map[string]bool, len(stats.CapturedOutlaws))
+			for k, v := range stats.CapturedOutlaws { cloned.CapturedOutlaws[k] = v }
+		}
+		if stats.PreferredRules != nil {
+			cloned.PreferredRules = make(map[string]int, len(stats.PreferredRules))
+			for k, v := range stats.PreferredRules { cloned.PreferredRules[k] = v }
+		}
+		if stats.Moods != nil {
+			cloned.Moods = make(map[string]int, len(stats.Moods))
+			for k, v := range stats.Moods { cloned.Moods[k] = v }
+		}
+		if stats.ActiveItemBuffs != nil {
+			cloned.ActiveItemBuffs = make(map[string]int, len(stats.ActiveItemBuffs))
+			for k, v := range stats.ActiveItemBuffs { cloned.ActiveItemBuffs[k] = v }
+		}
+
+		// 2. Playstyle Tendencies Maps
+		if stats.Playstyle.PreferredRules != nil {
+			cloned.Playstyle.PreferredRules = make(map[string]float64, len(stats.Playstyle.PreferredRules))
+			for k, v := range stats.Playstyle.PreferredRules { cloned.Playstyle.PreferredRules[k] = v }
+		}
+		if stats.Playstyle.PreferredCardMoods != nil {
+			cloned.Playstyle.PreferredCardMoods = make(map[string]float64, len(stats.Playstyle.PreferredCardMoods))
+			for k, v := range stats.Playstyle.PreferredCardMoods { cloned.Playstyle.PreferredCardMoods[k] = v }
+		}
+		if stats.Playstyle.PreferredItems != nil {
+			cloned.Playstyle.PreferredItems = make(map[string]float64, len(stats.Playstyle.PreferredItems))
+			for k, v := range stats.Playstyle.PreferredItems { cloned.Playstyle.PreferredItems[k] = v }
+		}
+
+		// 3. Deep Copy Slices
+		if stats.Achievements != nil {
+			cloned.Achievements = make([]string, len(stats.Achievements))
+			copy(cloned.Achievements, stats.Achievements)
+		}
+		if stats.History != nil {
+			cloned.History = make([]MatchHistory, len(stats.History))
+			copy(cloned.History, stats.History)
+		}
+		if stats.MutationHistory != nil {
+			cloned.MutationHistory = make([]MutationEvent, len(stats.MutationHistory))
+			copy(cloned.MutationHistory, stats.MutationHistory)
+		}
+		if stats.CapturedOutlaws != nil {
+			cloned.CapturedOutlaws = make(map[string]bool, len(stats.CapturedOutlaws))
+			for k, v := range stats.CapturedOutlaws { cloned.CapturedOutlaws[k] = v }
+		}
+		if stats.ActiveItemBuffs != nil {
+			cloned.ActiveItemBuffs = make(map[string]int, len(stats.ActiveItemBuffs))
+			for k, v := range stats.ActiveItemBuffs { cloned.ActiveItemBuffs[k] = v }
+		}
+		if stats.AuditedClubs != nil {
+			cloned.AuditedClubs = make(map[string]bool, len(stats.AuditedClubs))
+			for k, v := range stats.AuditedClubs { cloned.AuditedClubs[k] = v }
+		}
+
+		leaderboardSnapshot[wallet] = cloned
+	}
+
 	l.mutex.RUnlock()
+
+	// Marshalling Phase (Lock-Free)
+	data, err := json.Marshal(leaderboardSnapshot)
 	if err != nil {
 		log.Printf("[CACHE ERROR] Failed to marshal leaderboard for blockchain snapshot: %v\n", err)
 		return
@@ -277,7 +573,7 @@ func (l *Lobby) saveLeaderboard() {
 
 // loadEconomyState reconstructs virtual balances (salaries/heists) and active kidnappings from the latest VBT_ECONOMY_SNAPSHOT blockchain note.
 // PILLAR 6: Blockchain Persistence. Reconstructs economy state from blockchain snapshots.
-func (l *Lobby) loadEconomyState() {
+func (l *Lobby) loadEconomyState() bool {
 	// PILLAR 6: Blockchain Persistence.
 	l.mutex.Lock() // Acquire lock for initialization and modification
 	defer l.mutex.Unlock()
@@ -290,7 +586,7 @@ func (l *Lobby) loadEconomyState() {
 
 	if !ok || vaultAddr == "" {
 		log.Println("[CACHE] Voi Mainnet config or Vault address missing. Cannot reconstruct economy state from blockchain.")
-		return
+		return false
 	}
 
 	log.Println("[CACHE] Reconstructing economy state from blockchain snapshots...")
@@ -300,13 +596,13 @@ func (l *Lobby) loadEconomyState() {
 
 	if err != nil {
 		log.Printf("[CACHE ERROR] Failed to query indexer for economy snapshots: %v\n", err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("[CACHE ERROR] Indexer returned non-200 status for economy snapshots: %d %s\n", resp.StatusCode, resp.Status)
-		return
+		return false
 	}
 
 	var res struct {
@@ -319,7 +615,7 @@ func (l *Lobby) loadEconomyState() {
 
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		log.Printf("[CACHE ERROR] Failed to decode indexer response for economy snapshots: %v\n", err)
-		return
+		return false
 	}
 
 	var latestSnapshotData []byte
@@ -356,13 +652,20 @@ func (l *Lobby) loadEconomyState() {
 
 	if latestSnapshotData != nil {
 		var state struct {
-			Balances     map[string]uint64       `json:"balances"`
-			Kidnappings  map[int]KidnapState     `json:"active_kidnappings"`
-			MatchHistory map[string]MatchHistory `json:"match_history"`
-			Tournament   TournamentState         `json:"tournament"`
-			SeasonNum    int                     `json:"season_num"`
-			SeasonStart  time.Time               `json:"season_start"`
-			Rewards      map[string]uint64       `json:"initial_rewards"`
+			Balances         map[string]uint64           `json:"balances"`
+			Kidnappings      map[int]KidnapState         `json:"active_kidnappings"`
+			MatchHistory     map[string]MatchHistory     `json:"match_history"`
+			Tournament       TournamentState             `json:"tournament"`
+			SeasonNum        int                         `json:"season_num"`
+			MarketNodes      map[string]EntityMarketNode `json:"market_nodes"`
+			SeasonStart      time.Time                   `json:"season_start"`
+			Rewards          map[string]uint64           `json:"initial_rewards"`
+			OnboardedWallets map[string]bool             `json:"onboarded_wallets"`
+			PaidParticipants []string                    `json:"paid_participants"`
+			AuditInflow      uint64                      `json:"audit_inflow"`    // PILLAR 2: Reconstruction Parity
+			AuditAllocated   uint64                      `json:"audit_allocated"`
+			AuditSiphoned    uint64                      `json:"audit_siphoned"`
+			AuditExited       uint64                      `json:"audit_exited"`
 		}
 		if err := json.Unmarshal(latestSnapshotData, &state); err != nil {
 			log.Printf("[CACHE ERROR] Failed to unmarshal latest economy snapshot: %v\n", err)
@@ -371,6 +674,36 @@ func (l *Lobby) loadEconomyState() {
 			l.activeKidnappings = state.Kidnappings
 			l.tournament = state.Tournament
 			l.seasonNumber = state.SeasonNum
+
+			// PILLAR 2: Authoritative Reconciliation.
+			// Restore absolute ledger counters to prevent Structural Drift after blockchain recovery.
+			if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+				atomic.StoreUint64(&l.tokenSinkRouter.Audit.TotalSystemInputVetted, state.AuditInflow)
+				atomic.StoreUint64(&l.tokenSinkRouter.Audit.TotalSystemAllocated, state.AuditAllocated)
+				atomic.StoreUint64(&l.tokenSinkRouter.Audit.TotalSystemSiphoned, state.AuditSiphoned)
+				atomic.StoreUint64(&l.tokenSinkRouter.Audit.TotalRewardsExited, state.AuditExited)
+			}
+
+			// PILLAR 6: Bootstrap Optimization.
+			// Restore cached onboarding and registration lists to minimize indexer traffic.
+			if state.OnboardedWallets != nil {
+				l.onboardedWallets = state.OnboardedWallets
+				l.SybilSyncComplete = true
+			}
+			if state.PaidParticipants != nil {
+				l.paidParticipants = state.PaidParticipants
+			}
+
+			// PILLAR 4: AMM Reconstruction.
+			// Re-link Market Nodes to both Lobby and Router, initializing fresh mutexes.
+			l.marketNodes = make(map[string]*EntityMarketNode)
+			for id, node := range state.MarketNodes {
+				captured := node
+				captured.Mu = sync.RWMutex{}
+				l.marketNodes[id] = &captured
+			}
+			if l.tokenSinkRouter != nil { l.tokenSinkRouter.MarketNodes = l.marketNodes }
+
 			l.seasonStart = state.SeasonStart
 			l.initialRewards = state.Rewards
 			if state.MatchHistory != nil {
@@ -382,6 +715,7 @@ func (l *Lobby) loadEconomyState() {
 			}
 			log.Printf("[CACHE] Reconstructed economy state: %d active balances, %d hostage records, %d pending rewards (Snapshot TS: %s).\n",
 				len(l.playerBalances), len(l.activeKidnappings), len(l.matchHistory), time.Unix(latestTimestamp, 0).Format(time.RFC3339))
+			return true
 		}
 	} else {
 		if l.playerBalances == nil {
@@ -389,34 +723,114 @@ func (l *Lobby) loadEconomyState() {
 		}
 		log.Println("[CACHE] No VBT_ECONOMY_SNAPSHOT found on-chain. Initializing empty economy state.")
 	}
+	return false
 }
 
 // saveEconomyState sends a compressed JSON snapshot of virtual balances and active kidnappings.
 func (l *Lobby) saveEconomyState() {
 	l.mutex.RLock()
-	state := struct {
-		Balances     map[string]uint64       `json:"balances"`
-		Kidnappings  map[int]KidnapState     `json:"active_kidnappings"`
-		MatchHistory map[string]MatchHistory `json:"match_history"`
-		Tournament   TournamentState         `json:"tournament"`
-		SeasonNum    int                     `json:"season_num"`
-		SeasonStart  time.Time               `json:"season_start"`
-		Rewards      map[string]uint64       `json:"initial_rewards"`
-	}{
-		Balances:     l.playerBalances,
-		Kidnappings:  l.activeKidnappings,
-		MatchHistory: l.matchHistory,
-		Tournament:   l.tournament,
-		SeasonNum:    l.seasonNumber,
-		SeasonStart:  l.seasonStart,
-		Rewards:      l.initialRewards,
+
+	// PILLAR 4: Mutex Contention Minimization.
+	// Extract a point-in-time snapshot of the economic state while holding RLock.
+	// This allows the expensive JSON marshalling to happen outside the lock.
+
+	// 1. Deep Copy Maps
+	balancesSnapshot := make(map[string]uint64, len(l.playerBalances))
+	for k, v := range l.playerBalances {
+		balancesSnapshot[k] = v
 	}
-	data, err := json.Marshal(state)
+
+	kidnappingsSnapshot := make(map[int]KidnapState, len(l.activeKidnappings))
+	for k, v := range l.activeKidnappings {
+		kidnappingsSnapshot[k] = v
+	}
+
+	matchHistorySnapshot := make(map[string]MatchHistory, len(l.matchHistory))
+	for k, v := range l.matchHistory {
+		matchHistorySnapshot[k] = v
+	}
+
+	rewardsSnapshot := make(map[string]uint64, len(l.initialRewards))
+	for k, v := range l.initialRewards {
+		rewardsSnapshot[k] = v
+	}
+
+	marketNodesSnapshot := make(map[string]EntityMarketNode)
+	for id, node := range l.marketNodes {
+		if node != nil { marketNodesSnapshot[id] = *node }
+	}
+
+	// PILLAR 2: Authoritative Counter Persistence.
+	var auditInflow, auditAllocated, auditSiphoned, auditExited uint64
+	if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+		auditInflow = atomic.LoadUint64(&l.tokenSinkRouter.Audit.TotalSystemInputVetted)
+		auditAllocated = atomic.LoadUint64(&l.tokenSinkRouter.Audit.TotalSystemAllocated)
+		auditSiphoned = atomic.LoadUint64(&l.tokenSinkRouter.Audit.TotalSystemSiphoned)
+		auditExited = atomic.LoadUint64(&l.tokenSinkRouter.Audit.TotalRewardsExited)
+	}
+
+	// 2. Capture Structs and Basic Types
+	// TournamentState contains slices which require deep copying to prevent races
+	tournament := l.tournament
+	tournament.Participants = make([]string, len(l.tournament.Participants))
+	copy(tournament.Participants, l.tournament.Participants)
+	tournament.Matches = make([]TournamentMatch, len(l.tournament.Matches))
+	copy(tournament.Matches, l.tournament.Matches)
+
+	// PILLAR 6: Historical State Capture.
+	// Snapshot onboarding and participant lists to ensure warm-start performance.
+	onboardedSnapshot := make(map[string]bool, len(l.onboardedWallets))
+	for k, v := range l.onboardedWallets {
+		onboardedSnapshot[k] = v
+	}
+	participantsSnapshot := make([]string, len(l.paidParticipants))
+	copy(participantsSnapshot, l.paidParticipants)
+
+	seasonNum := l.seasonNumber
+	seasonStart := l.seasonStart
+
 	l.mutex.RUnlock()
 
-	if err == nil {
-		l.dispatchBlockchainSnapshot("VBT_ECONOMY_SNAPSHOT:", data)
+	// 3. Marshalling Phase (Lock-Free)
+	state := struct {
+		Balances         map[string]uint64           `json:"balances"`
+		Kidnappings      map[int]KidnapState         `json:"active_kidnappings"`
+		MatchHistory     map[string]MatchHistory     `json:"match_history"`
+		Tournament       TournamentState             `json:"tournament"`
+		SeasonNum        int                         `json:"season_num"`
+		MarketNodes      map[string]EntityMarketNode `json:"market_nodes"`
+		SeasonStart      time.Time                   `json:"season_start"`
+		Rewards          map[string]uint64           `json:"initial_rewards"`
+		OnboardedWallets map[string]bool             `json:"onboarded_wallets"`
+		PaidParticipants []string                    `json:"paid_participants"`
+		AuditInflow      uint64                      `json:"audit_inflow"`
+		AuditAllocated   uint64                      `json:"audit_allocated"`
+		AuditSiphoned    uint64                      `json:"audit_siphoned"`
+		AuditExited      uint64                      `json:"audit_exited"`
+	}{
+		Balances:     balancesSnapshot,
+		Kidnappings:  kidnappingsSnapshot,
+		MatchHistory: matchHistorySnapshot,
+		Tournament:   tournament,
+		MarketNodes:  marketNodesSnapshot,
+		SeasonNum:    seasonNum,
+		SeasonStart:  seasonStart,
+		Rewards:      rewardsSnapshot,
+		OnboardedWallets: onboardedSnapshot,
+		PaidParticipants: participantsSnapshot,
+		AuditInflow:      auditInflow,
+		AuditAllocated:   auditAllocated,
+		AuditSiphoned:    auditSiphoned,
+		AuditExited:      auditExited,
 	}
+
+	data, err := json.Marshal(state)
+	if err != nil {
+		log.Printf("[CACHE ERROR] Failed to marshal economy snapshot: %v\n", err)
+		return
+	}
+
+	l.dispatchBlockchainSnapshot("VBT_ECONOMY_SNAPSHOT:", data)
 }
 
 // dispatchBlockchainSnapshot handles the authoritative compression and on-chain dispatch of serialized state.
@@ -454,25 +868,6 @@ func (l *Lobby) saveBlockchainStateSnapshotLocked(prefix string, state interface
 	l.dispatchBlockchainSnapshot(prefix, data)
 }
 
-// savePersistentCardCache persists the current card inventory to a blockchain snapshot.
-func (l *Lobby) savePersistentCardCache() {
-	l.mutex.RLock()
-	state := l.persistentCardCache
-	l.mutex.RUnlock()
-	l.saveBlockchainStateSnapshotLocked("VBT_CARD_CACHE_SNAPSHOT:", state)
-}
-
-// loadPersistentCardCache reconstructs the card cache from blockchain snapshots.
-func (l *Lobby) loadPersistentCardCache() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	l.persistentCardCache = make(map[int]ServerCard)
-	if l.loadBlockchainStateSnapshotLocked("VBT_CARD_CACHE_SNAPSHOT:", &l.persistentCardCache) {
-		for k, v := range l.persistentCardCache {
-			l.inventory[k] = v
-		}
-	}
-}
 
 // loadBlockchainStateSnapshotLocked is a helper to reconstruct state from blockchain snapshots.
 func (l *Lobby) loadBlockchainStateSnapshotLocked(prefix string, target interface{}) bool {
@@ -560,7 +955,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 		l.ensurePlayerStatsMapsInitialized(normalizedWallet)
 
 		// Trigger NPC Welcome Commentary if they have a distinct style
-		go l.generateNPCCommentary(env.FromID, "LOBBY_ENTRY")
+		go l.narrativeService.GenerateNPCCommentary(l, env.FromID, "LOBBY_ENTRY")
 
 		stats := l.leaderboard[normalizedWallet]
 		portfolioPayload, _ := json.Marshal(stats.Portfolio) // Marshal portfolio while lock is held
@@ -572,6 +967,15 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 				c.isAdmin = true
 			}
 		}
+
+		// PILLAR 4: Reconnection Handshake.
+		if l.gracePeriodMatrix != nil {
+			_, _ = l.gracePeriodMatrix.HandleReconnectionHandshake(normalizedWallet)
+		}
+
+		// PILLAR 3: Continuous Verification.
+		// Start tracking the session for the watchdog auditor.
+		l.TrackSession(normalizedWallet)
 		l.mutex.Unlock() // Release lock after all state modifications
 		go l.syncStatsFromBlockchain(env.FromID, normalizedWallet)
 		l.sendToClient(env.FromID, Envelope{Type: "portfolio_update", Payload: portfolioPayload})
@@ -594,6 +998,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Avatar Registration Failed: Wallet not registered."}`)})
 			return
 		}
+
+		// PILLAR 5: Identity Hardening.
+		l.ensurePlayerStatsMapsInitialized(wallet)
 
 		// Enforce Avatar Ban: check against active bans
 		if expiry, banned := l.bannedAvatars[targetURL]; banned && time.Now().Before(expiry) {
@@ -636,7 +1043,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			} // Initialize match state
 			l.updatePlayerPlaystyleTendenciesLocked(wallet, false, [2]int{}, data.Deck, false, false) // Update playstyle based on deck
 
-			go l.generateNPCCommentary(env.FromID, "MATCH_START")
+			go l.narrativeService.GenerateNPCCommentary(l, env.FromID, "MATCH_START")
 		}
 		l.mutex.Unlock()
 		l.sendToClient(env.FromID, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(`{"status":"queued"}`)})
@@ -646,6 +1053,43 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 		l.nonces[env.FromID] = NonceData{Value: nonce, CreatedAt: time.Now()}
 		l.mutex.Unlock()
 		l.sendToClient(env.FromID, Envelope{Type: "nonce_response", FromID: "SERVER", Payload: json.RawMessage(fmt.Sprintf(`{"nonce":"%s"}`, nonce))})
+	case "sync_request":
+		var data struct { LastSeq uint64 `json:"last_sequence_id"` }
+		json.Unmarshal(env.Payload, &data)
+		
+		l.mutex.Lock()
+		match, ok := l.matches[env.FromID]
+		if ok {
+			// PILLAR 4: Replay Resilience.
+			// Ensure the handshaker is resolved or initialized under the master lock
+			// to prevent map access panics and guarantee a response.
+			sh, exists := l.matchHandshakers[match.P1ID]
+			if !exists {
+				sh = l.NewSyncHandshaker()
+				l.matchHandshakers[match.P1ID] = sh
+			}
+			
+			delta := sh.CatchUpPlayer(data.LastSeq)
+			var catchup []json.RawMessage
+			for _, f := range delta { catchup = append(catchup, f.MoveIntent) }
+			
+			resp, _ := json.Marshal(map[string]interface{}{"frames": catchup})
+			l.sendToClientLocked(env.FromID, Envelope{Type: "sync_response", FromID: "SERVER", Payload: resp})
+		}
+		l.mutex.Unlock()
+	case "redemption_gateway":
+		var req RedemptionRequest
+		if err := json.Unmarshal(env.Payload, &req); err != nil {
+			return
+		}
+		l.mutex.Lock()
+		err := l.executeRedemptionLocked(req)
+		if err != nil {
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Redemption Failed: %s"}`, err.Error()))})
+		} else {
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>REDEMPTION SUCCESS:</b> Your console DLC has been unlocked."}`)})
+		}
+		l.mutex.Unlock()
 	case "link_wallet_request":
 		var data struct {
 			PrimaryAVMWallet string `json:"primary_avm_wallet"`
@@ -756,6 +1200,11 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 		}
 
 		l.addOrUpdateLinkedWallet(primaryWallet, linkedAddr, data.LinkedChain)
+
+		// PILLAR 2: Phase 4 Conversion Funnel.
+		// Trigger the migration of non-crypto Arena Vouchers accumulated on console hardware.
+		l.onboardingService.HandleVoucherConversion(l, primaryWallet)
+
 		l.sendToClient(env.FromID, Envelope{Type: "link_wallet_response", Payload: json.RawMessage(fmt.Sprintf(`{"status":"success","message":"Wallet linked successfully","address":"%s"}`, linkedAddr))})
 		log.Printf("[LINK] Successfully linked %s (%s) to primary AVM wallet %s\n", linkedAddr, data.LinkedChain, primaryWallet)
 	case "move":
@@ -785,6 +1234,21 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 		if move.GridIndex >= 0 && move.GridIndex < 9 {
 			// SECURE SYNC: Fetch card from server authoritative inventory to prevent power spoofing
 			card, exists := l.inventory[move.CardID]
+
+			// PILLAR 5: Hardware Inversion.
+			// Map active club hardware traps to the card instance on placement.
+			if match.TerritoryID != "" {
+				owningClub := l.getClubByTerritoryID(match.TerritoryID)
+				if owningClub != nil && owningClub.ActiveBuffs != nil {
+					for buffID := range owningClub.ActiveBuffs {
+						if strings.HasPrefix(buffID, "TRAP_") {
+							if expiry, ok := owningClub.BuffExpirations[buffID]; ok && time.Now().Before(expiry) {
+								card.EquippedItems = append(card.EquippedItems, buffID)
+							}
+						}
+					}
+				}
+			}
 			if !exists {
 				// Hardening: If card isn't in server cache, use a baseline weak card to prevent spoofing
 				card = ServerCard{ID: move.CardID, Power: [4]int{5, 5, 5, 5}}
@@ -797,9 +1261,109 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			card.Owner = pIdx
 			match.Board[move.GridIndex] = &card
 
-			// serverCheckCaptures now returns captured cards, append them to match state
-			_, flips := l.serverCheckCaptures(match, move.GridIndex, pIdx)
+			// serverCheckCaptures now returns captured cards and the deterministic state hash.
+			// PILLAR 4: Deterministic Sync.
+			_, flips, stateHash := l.serverCheckCaptures(match, move.GridIndex, pIdx)
 			match.CapturedCards = append(match.CapturedCards, flips...)
+
+			// PILLAR 5: Reactive Atmosphere.
+			// If the move resulted in a rule-based trigger (Same/Plus) or a combo chain,
+			// send a specific "turn_change" notification to trigger high-intensity UI feedback.
+			hasCombo := false
+			for _, f := range flips {
+				if f.CaptureType != "BASIC" {
+					hasCombo = true
+					break
+				}
+			}
+			if hasCombo {
+				// PILLAR 5: Authoritative Feedback.
+				// Snapshot IDs and delay slightly to ensure ordering after the main 'move' broadcast.
+				p1, p2 := match.P1ID, match.P2ID
+				specs := make([]string, len(match.Spectators))
+				copy(specs, match.Spectators)
+				go func() {
+					time.Sleep(150 * time.Millisecond)
+					l.sendToClient(p1, Envelope{Type: "turn_change", FromID: "SERVER", Payload: json.RawMessage(`{"combo":true}`)})
+					l.sendToClient(p2, Envelope{Type: "turn_change", FromID: "SERVER", Payload: json.RawMessage(`{"combo":true}`)})
+					for _, sID := range specs {
+						l.sendToClient(sID, Envelope{Type: "turn_change", FromID: "SERVER", Payload: json.RawMessage(`{"combo":true}`)})
+					}
+				}()
+			}
+
+			wallet := l.wallets[env.FromID]
+
+			// PILLAR 4: Sequence Hardening.
+			// Generate FrameDelta and increment SequenceID atomically with the state transition.
+			// This ensures that desync recovery catch-up always sees a continuous chronological chain.
+			// PILLAR 4: Sequence Reset.
+			// Explicitly initialize or reset the handshaker for the new match.
+			// This ensures that SequenceID starts at 0 for every fresh engagement,
+			// preventing catch-up loops from previous sessions.
+			sh, exists := l.matchHandshakers[match.P1ID] // Use P1ID as the canonical match ID for handshaker
+			if !exists || sh.CurrentSequence == 0 { // Re-initialize if not exists or if it's a new match (sequence 0)
+				// If it's a new match, ensure the handshaker is clean
+				delete(l.matchHandshakers, match.P1ID) // Prune old handshaker if it exists
+				sh = l.NewSyncHandshaker()
+				l.matchHandshakers[match.P1ID] = sh
+			}
+
+			sh.Mu.Lock()
+			sh.CurrentSequence++
+
+			// PILLAR 4: Session Parity (Multi-Participant Sync).
+			// Synchronize the 'LastActiveFrame' for all participants and spectators
+			// to ensure they receive a continuous catch-up stream upon reconnection.
+			if l.gracePeriodMatrix != nil {
+				l.gracePeriodMatrix.Mu.Lock()
+				
+				// 1. Update Sender
+				if sess, ok := l.gracePeriodMatrix.ActiveSessions[wallet]; ok {
+					sess.LastActiveFrame = sh.CurrentSequence
+				}
+
+				// 2. Update Opponent
+				oppID := match.P1ID
+				if env.FromID == match.P1ID { oppID = match.P2ID }
+				if oppW, ok := l.wallets[oppID]; ok {
+					if sess, ok := l.gracePeriodMatrix.ActiveSessions[strings.ToLower(oppW)]; ok {
+						sess.LastActiveFrame = sh.CurrentSequence
+					}
+				}
+
+				// 3. Update Spectators
+				for _, sID := range match.Spectators {
+					if sW, ok := l.wallets[sID]; ok {
+						if sess, ok := l.gracePeriodMatrix.ActiveSessions[strings.ToLower(sW)]; ok {
+							sess.LastActiveFrame = sh.CurrentSequence
+						}
+					}
+				}
+				l.gracePeriodMatrix.Mu.Unlock()
+			}
+
+			// PILLAR 4: Authoritative Snapshot.
+			// Move PlayerIndex assignment up to ensure it's captured in the marshaled broadcast.
+			move.PlayerIndex = pIdx
+
+			// Construct the AuthoritativeFrame for broadcast and replay storage.
+			authoritativeFrame := AuthoritativeFrame{
+				SequenceID: sh.CurrentSequence,
+				MoveIntent: move, // Use the MoveData struct directly
+				StateHash:  stateHash,
+			}
+			// Marshal the entire AuthoritativeFrame to be sent as env.Payload
+			env.Payload, _ = json.Marshal(authoritativeFrame)
+
+			// Store the same authoritative frame in HistoricalFrames for recovery catch-up.
+			sh.HistoricalFrames[sh.CurrentSequence] = FrameDelta{
+				SequenceID: sh.CurrentSequence,
+				MoveIntent: env.Payload,
+				StateHash:  stateHash,
+			}
+			sh.LastVerifiedHash = stateHash
+			sh.Mu.Unlock()
 
 			// PILLAR 3: Hand Integrity.
 			// Remove the card from the player's hand slice to prevent reuse and ensure score accuracy.
@@ -863,6 +1427,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			return
 		}
 
+		// PILLAR 5: Identity Hardening.
+		l.ensurePlayerStatsMapsInitialized(wallet)
+
 		playerStats := l.leaderboard[wallet]
 		if playerStats.Inventory == nil || playerStats.Inventory[data.ItemID] <= 0 {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Item Use Failed: Item not found in inventory."}`)})
@@ -899,37 +1466,83 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 		// Trigger global sync to update UI (inventory, card stats, match state)
 		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	case "purchase_item":
-		l.handlePurchaseItem(env)
+		l.clubService.HandlePurchaseItem(l, env)
 	case "restock_inventory":
-		l.handleRestockInventory(env)
+		l.clubService.HandleRestockInventory(l, env)
 	case "alliance_invite":
-		l.handleAllianceInvite(env)
+		l.clubService.HandleAllianceInvite(l, env)
 	case "alliance_accept":
-		l.handleAllianceAccept(env)
+		l.clubService.HandleAllianceAccept(l, env)
 	case "alliance_dissolve":
-		l.handleAllianceDissolve(env)
+		l.clubService.HandleAllianceDissolve(l, env)
 	// DELEGATED TO market_service.go
 	case "trade_shares":
 		l.handleTradeShares(env)
 	// DELEGATED TO club_service.go
 	case "heist":
-		l.handleHeist(env)
+		l.clubService.HandleHeist(l, env)
 	case "sabotage":
-		l.handleSabotage(env)
+		l.clubService.HandleSabotage(l, env)
 	// DELEGATED TO club_service.go
 	case "create_club":
-		l.handleCreateClub(env)
+		l.clubService.HandleCreateClub(l, env)
 	// DELEGATED TO club_service.go
 	case "join_club":
-		l.handleJoinClub(env)
+		l.clubService.HandleJoinClub(l, env)
 	// DELEGATED TO employment_service.go
 	case "hire_player":
 		l.handleHirePlayer(env)
 	// DELEGATED TO club_service.go
 	case "purchase_territory":
-		l.handlePurchaseTerritory(env)
+		l.clubService.HandlePurchaseTerritory(l, env)
 	case "kidnap_request":
 		l.handleKidnapRequest(env)
+	case "vector_realignment": // Pillar 6: Mutation Foundry
+		l.clubService.HandleMutationVectorRealignment(l, env)
+	case "mood_recalibration": // Pillar 6: Mutation Foundry
+		l.clubService.HandleMutationMoodRecalibration(l, env)
+	case "loyalty_synthesis": // Pillar 6: Mutation Foundry
+		l.clubService.HandleMutationLoyaltySynthesis(l, env)
+	case "sell_to_black_market": // PILLAR 3: Silkroad Expansion
+		l.blackMarketService.HandleSellToBlackMarket(l, env)
+	case "abort_underworld_contract": // PILLAR 3: Underworld Contracts
+		l.blackMarketService.HandleAbortUnderworldContract(l, env)
+	case "launder_capital": // PILLAR 3: Career Path Actions
+		l.HandleLaunderCapital(env)
+	case "purify_card": // PILLAR 7: Underworld Recovery
+		l.clubService.HandlePurifyCard(l, env)
+	case "justice_flag_player": // PILLAR 3: Justice Terminal
+		l.HandleJusticeFlagPlayer(env)
+	case "abort_justice_mission": // PILLAR 3: Justice Layer
+		l.HandleAbortJusticeMission(env)
+	case "accept_justice_mission": // PILLAR 3: Justice Layer
+		l.HandleAcceptJusticeMission(env)
+	case "accept_underworld_contract": // PILLAR 3: Underworld Contracts
+		l.blackMarketService.HandleAcceptUnderworldContract(l, env)
+	case "aos_raid": // PILLAR 3: Justice Layer
+		l.HandleAOSRaid(env)
+	case "purchase_raid_insurance": // PILLAR 1 & 3
+		l.HandlePurchaseRaidInsurance(env)
+	case "purchase_bounty_license": // PILLAR 3: Justice Layer
+		l.HandlePurchaseBountyLicense(env)
+	case "purchase_bounty_bond": // PILLAR 1: Justice Layer
+		l.HandlePurchaseBountyHunterBond(env)
+	case "refund_bounty_bond": // PILLAR 1: Justice Layer
+		l.HandleRefundBountyHunterBond(env)
+	case "claim_dividends": // PILLAR 1: Organizational Yield
+		l.HandleClaimDividends(env)
+	case "freeze_dividends": // PILLAR 3: Justice Path
+		l.HandleJusticeFreezeDividends(env)
+	case "harvest_all_dividends": // PILLAR 1: Organizational Yield
+		l.HandleHarvestAllDividends(env)
+	case "regional_sabotage": // New: Regional Warfare Protocol
+		l.clubService.HandleRegionalSabotage(l, env)
+	case "refresh_identity": // PILLAR 3: Identity Management
+		l.onboardingService.HandleIdentityRefresh(l, env)
+	case "initiate_recovery": // PILLAR 7: Underworld Recovery
+		l.HandleInitiateRecovery(env)
+	case "list_recovery_bounty": // PILLAR 7: Recovery Bounties
+		l.blackMarketService.HandleListRecoveryBounty(l, env)
 	case "pay_ransom":
 		l.handlePayRansom(env)
 	case "release_hostage":
@@ -937,9 +1550,9 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 	case "spread_rumor":
 		l.handleSpreadRumor(env)
 	case "create_lease":
-		l.handleCreateLease(env)
+		l.clubService.HandleCreateLease(l, env)
 	case "take_lease":
-		l.handleTakeLease(env)
+		l.clubService.HandleTakeLease(l, env)
 	case "spectate":
 		l.handleSpectate(env)
 	case "bail_card":
@@ -958,12 +1571,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Equip Failed: Wallet not registered."}`)})
 			return
 		}
-		stats, exists := l.leaderboard[wallet] // Check if player stats exist
-		if !exists {
-			l.mutex.Unlock()
-			return
-		}
-		// stats already declared above
+		stats, exists := l.leaderboard[wallet]
 		var success bool
 		var notification string
 		var auditAction string
@@ -972,9 +1580,10 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 			l.sendToClient(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Equip Failed: Player stats not found."}`)})
 			return
 		}
+
 		if data.FaceplateID == "" {
 			stats.EquippedFaceplate = ""
-			stats.Reputation = l.CalculateReputation(stats) // CalculateReputation is safe to call with lock held
+			stats.Reputation = l.CalculateReputation(stats)
 			l.leaderboard[wallet] = stats
 			success = true
 			notification = "🎭 Cosmetic unequipped."
@@ -986,7 +1595,7 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 				notification = "❌ Equip Failed: You do not own this cosmetic."
 			} else {
 				stats.EquippedFaceplate = data.FaceplateID
-				stats.Reputation = l.CalculateReputation(stats) // CalculateReputation is safe to call with lock held
+				stats.Reputation = l.CalculateReputation(stats)
 				l.leaderboard[wallet] = stats
 				success = true
 				notification = fmt.Sprintf("🎭 <b>COSMETIC EQUIPPED:</b> You are now wearing %s.", data.FaceplateID)
@@ -1002,6 +1611,81 @@ func (l *Lobby) handleGameProtocol(env *Envelope, _ []byte) {
 	default:
 		log.Printf("[LOBBY] Unhandled message type: %s from %s\n", env.Type, env.FromID)
 	}
+}
+
+// HandleInitiateRecovery sets the state for a 3-win asset retrieval challenge.
+func (l *Lobby) HandleInitiateRecovery(env *Envelope) {
+	var data struct {
+		CardID int `json:"card_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	l.ensurePlayerStatsMapsInitialized(wallet)
+	stats := l.leaderboard[wallet]
+
+	if stats.RecoveryChallengeCardID != 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚠️ <b>ACTIVE CHALLENGE:</b> Complete your current retrieval first."}`)})
+		return
+	}
+
+	// PILLAR 7: Challenge Escrow.
+	// If the player holds the 'Fallen' version of the asset, remove it from inventory.
+	// It will be restored upon 3 successful wins.
+	cardKey := fmt.Sprintf("CARD-%d", data.CardID)
+	if qty, has := stats.Inventory[cardKey]; has && qty > 0 {
+		stats.Inventory[cardKey]--
+		if stats.Inventory[cardKey] <= 0 {
+			delete(stats.Inventory, cardKey)
+		}
+		l.logAdminAuditLocked("RECOVERY_ESCROW", wallet, fmt.Sprintf("Card: %d", data.CardID))
+	}
+
+	stats.RecoveryChallengeCardID = data.CardID
+	stats.RecoveryChallengeWins = 0
+	l.leaderboard[wallet] = stats
+
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🏴‍☠️ <b>SILKROAD:</b> 3-win challenge initiated for BABE #%d. Maintain the streak to liberate the asset."}`, data.CardID))})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleAOSRaid is declared in handlers_criminality.go to avoid duplicate method definitions.
+
+// HandlePurchaseBountyLicense processes a $VBV payment for a law-enforcement license.
+func (l *Lobby) HandlePurchaseBountyLicense(env *Envelope) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	const licenseCost = 50 * 1000000
+	if l.playerBalances[wallet] < licenseCost {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Insufficient rewards for license (50 $VBV required)."}`)})
+		return
+	}
+
+	l.playerBalances[wallet] -= licenseCost
+	l.faucetBalanceMicro += licenseCost
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+	// Set or extend license for 7 days
+	baseTime := time.Now()
+	if stats.BountyHunterLicenseExpiresAt.After(baseTime) {
+		baseTime = stats.BountyHunterLicenseExpiresAt
+	}
+	stats.BountyHunterLicenseExpiresAt = baseTime.Add(168 * time.Hour)
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("LICENSE_PURCHASED", wallet, "Bounty Hunter License (7 Days)")
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>LICENSE ACTIVE:</b> Status maintained for 7 days. Enforcer Dashboard updated."}`)})
+	
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
 // getClientIDFromWallet is a helper to find an active connection ID by wallet address.
@@ -1065,18 +1749,55 @@ func (l *Lobby) cleanupNonces() {
 			delete(l.registeredTxIDs, txid)
 		}
 	}
+
+	// PILLAR 4: Handshaker Memory Hardening.
+	// Aggressively prune handshakers for IDs that are no longer associated with active matches.
+	for id := range l.matchHandshakers {
+		if _, ok := l.matches[id]; !ok {
+			delete(l.matchHandshakers, id)
+		}
+	}
 }
 
 func (l *Lobby) handleUnregister(client *Client) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
-	if match, ok := l.matches[client.id]; ok {
-		// Hardening: Only invalidate match if the disconnecting client is P1 or P2
-		if client.id == match.P1ID || client.id == match.P2ID {
-			opponentID := match.P1ID
-			if client.id == match.P1ID {
-				opponentID = match.P2ID
+
+	wallet, ok := l.wallets[client.id]
+	if ok {
+		// PILLAR 4: Connection Quarantine Hardening.
+		// Only combatants (P1/P2) qualify for the 60s recovery window.
+		match, inMatch := l.matches[client.id]
+		isCombatant := inMatch && (client.id == match.P1ID || client.id == match.P2ID)
+
+		if isCombatant && l.gracePeriodMatrix != nil {
+			// Check if the match is actually ongoing before triggering quarantine
+			if !match.IsFinished {
+				l.mutex.Unlock()
+				l.gracePeriodMatrix.HandleConnectionDrop(wallet)
+				l.mutex.Lock()
+
+				// Remove only the connection object; wallet/match state persists in matrix
+				delete(l.clients, client.id)
+				return
 			}
+		}
+
+		// PILLAR 4: Memory Management. 
+		// Prune idlers from the grace matrix to prevent map leaks.
+		l.UntrackSession(wallet)
+		if l.gracePeriodMatrix != nil {
+			l.gracePeriodMatrix.Mu.Lock()
+			delete(l.gracePeriodMatrix.ActiveSessions, wallet)
+			l.gracePeriodMatrix.Mu.Unlock()
+		}
+	}
+
+	if match, ok := l.matches[client.id]; ok {
+		// Immediate cleanup for P1/P2 ONLY if grace matrix is NOT active
+		if (client.id == match.P1ID || client.id == match.P2ID) && l.gracePeriodMatrix == nil {
+			opponentID := match.P1ID
+			if client.id == match.P1ID { opponentID = match.P2ID }
 			if opponentID != "" {
 				if opponent, exists := l.clients[opponentID]; exists {
 					notification, _ := json.Marshal(Envelope{
@@ -1110,7 +1831,7 @@ func (l *Lobby) handleUnregister(client *Client) {
 				if match.TournamentMatchID != "" {
 					if oppWallet, ok := l.wallets[opponentID]; ok {
 						log.Printf("[TOURNAMENT] Awarding win to %s due to opponent DNF.\n", oppWallet)
-						l.processTournamentResult(match.TournamentMatchID, oppWallet)
+						l.tournamentService.ProcessTournamentResult(l, match.TournamentMatchID, oppWallet)
 					}
 				}
 				delete(l.matches, opponentID)
@@ -1153,6 +1874,11 @@ func (l *Lobby) incrementDNF(wallet string, round int, opponent string, tid stri
 
 	// Recalculate reputation to reflect the social penalty of abandoning a match
 	stats.Reputation = l.CalculateReputation(stats)
+
+	// PILLAR 7: Underworld Streak Reset (DNF Case).
+	// Abandoning a match terminates any active recovery challenge.
+	stats.RecoveryChallengeWins = 0
+
 	l.leaderboard[wallet] = stats
 
 	log.Printf("[BATTLE] Player %s penalized for DNF (Round: %d, Wanted: +%d). Standing: %d\n", wallet, round, infamyGain, stats.Reputation)
@@ -1167,6 +1893,10 @@ func (l *Lobby) handleBroadcast(message []byte) {
 		return
 	}
 	l.handleGameProtocol(&env, message) // Process logic before routing
+
+	// PILLAR 4: Frame Integrity.
+	// Re-marshal the envelope to include any injected metadata (like SequenceID) before transmission.
+	message, _ = json.Marshal(env)
 
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
@@ -1261,6 +1991,13 @@ func (l *Lobby) handleSpectate(env *Envelope) {
 		l.matches[env.FromID] = match // Map session to match for move routing
 	}
 
+	// PILLAR 4: Replay Resilience. 
+	// Proactively ensure a handshaker exists for the match to prevent 
+	// sync_request failures if the viewer joins before the first move.
+	if _, exists := l.matchHandshakers[match.P1ID]; !exists {
+		l.matchHandshakers[match.P1ID] = l.NewSyncHandshaker()
+	}
+
 	// Marshal entire MatchState which now includes snake_case tags for penalty snapshots
 	payload, _ := json.Marshal(match)
 	l.sendToClientLocked(env.FromID, Envelope{
@@ -1291,6 +2028,7 @@ func (l *Lobby) countUniqueMatchesLocked() int {
 // PILLAR 4: Performance Hardening. Moved to package scope to resolve local unusedwrite diagnostics.
 type LobbyPlayerInfo struct {
 	ID                       string              `json:"id"`
+	Wallet                   string              `json:"wallet"` // PILLAR 3: Identity resolution
 	IsAdmin                  bool                `json:"is_admin"`
 	AvatarURL                string              `json:"avatar_url"`
 	Gloat                    string              `json:"gloat"`
@@ -1299,12 +2037,16 @@ type LobbyPlayerInfo struct {
 	HasMardonBadge           bool                `json:"has_mardon_badge"`
 	Wins                     int                 `json:"wins"`
 	Reputation               int                 `json:"reputation"`
+	BestRating               string              `json:"best_rating"`
 	AuctionsWon              int                 `json:"auctions_won"`
+	Salary                   uint64              `json:"salary"`
+	MarketTokens             uint64              `json:"market_tokens"`
 	VirtualBalance           uint64              `json:"virtual_balance"`
 	WantedLevel              int                 `json:"wanted_level"`
 	Cunning                  int                 `json:"cunning"`
 	Mojo                     int                 `json:"mojo"`
 	Nurturing                int                 `json:"nurturing"`
+	Inventory                map[string]int      `json:"inventory"`
 	JailedCards              map[int]string      `json:"jailed_cards"`
 	SocialRank               string              `json:"social_rank"`
 	EquippedFaceplate        string              `json:"equipped_faceplate"`
@@ -1313,12 +2055,40 @@ type LobbyPlayerInfo struct {
 	HeldHostageCards         map[int]string      `json:"held_hostage_cards"`
 	HeistAlarmsJammerCount   int                 `json:"heist_alarms_jammer_count"`
 	Achievements             []string            `json:"achievements"`
+	CapturedOutlaws          map[string]bool     `json:"captured_outlaws"` // PILLAR 3: Unique capture progress
 	Playstyle                PlaystyleTendencies `json:"playstyle"`
 	GhostProtocolExpiresAt   time.Time           `json:"ghost_protocol_expires_at"`
 	DistrictScannerExpiresAt time.Time           `json:"district_scanner_expires_at"`
+	DisruptorCooldownAt      time.Time           `json:"disruptor_cooldown_at"` // PILLAR 3: Tactical HUD sync
 	RumorCount               int                 `json:"rumor_count"`
 	JobRole                  string              `json:"job_role"`
 	EmployerID               string              `json:"employer_id"`
+	LastSeenDistrict         string              `json:"last_seen_district"` // PILLAR 3: Tactical Tracking
+	TotalDonated             uint64              `json:"total_donated"`      // PILLAR 1: Philanthropy
+	IsMojoStabilizerActive   bool                `json:"is_mojo_stabilizer_active"` // PILLAR 1: UI Sync
+	MojoDecayRate            float64             `json:"mojo_decay_rate"`           // PILLAR 1: UI Sync
+}
+
+func (l *Lobby) isClubRegionalLocked(club *Club) bool {
+	if l == nil || club == nil || l.clubService == nil {
+		return false
+	}
+	return l.clubService.IsClubRegionalLocked(l, club)
+}
+
+func (l *Lobby) unlockAchievementLocked(wallet, achievementID string) {
+	if l == nil || l.achievementService == nil {
+		return
+	}
+	targetWallet := strings.ToLower(wallet)
+	l.achievementService.UnlockAchievementLocked(l, targetWallet, achievementID)
+}
+
+func (l *Lobby) processTournamentResult(tournamentMatchID string, wallet string) {
+	if l == nil || l.tournamentService == nil {
+		return
+	}
+	l.tournamentService.ProcessTournamentResult(l, tournamentMatchID, wallet)
 }
 
 func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
@@ -1326,32 +2096,45 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	for _, client := range l.clients {
 		hasMardon := false
 		var banExpires time.Time
-		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon, vBal := 0, 0, 0, 0, 0, 0, 0, uint64(0)
+		var salary, marketTokens uint64
+		wins, reputation, wanted, cunning, nurturing, mojo, auctionsWon, vBal, arenaVouchers := 0, 0, 0, 0, 0, 0, 0, uint64(0), uint64(0)
+		var totalDonated uint64
+		var inventory map[string]int
 		var jailedCards, kidnappedCards, heldHostageCards map[int]string
 		var matches []MatchHistory
 		var districtScannerExpiresAt time.Time
+		var disruptorCooldownAt time.Time
+		var lastSeenDistrict string
+		var bestRating string
 		var heistAlarmsJammerCount int
 		var equippedFaceplate string
 		var socialRank string
 		var ghostProtocolExpiresAt time.Time
+		var capturedOutlaws map[string]bool
 		var achievements []string
 		var jobRole string
 		var employerID string
 		var rumorCount int
 		var playstyle PlaystyleTendencies
+		var walletAddr string
 		if wallet, ok := l.wallets[client.id]; ok {
 			if stats, exists := l.leaderboard[wallet]; exists {
 				banExpires = stats.BanExpires
 				wins = stats.Wins
 				reputation = stats.Reputation
+				bestRating = stats.BestRating
 				vBal = l.playerBalances[wallet]
+				salary = stats.Salary
+				marketTokens = stats.MarketTokens
+				arenaVouchers = stats.ArenaVouchers
 				auctionsWon = stats.AuctionsWon
 				// UI Sync: Use Effective Mojo (including faceplate) for Career Path display
-				mojo = stats.GetEffectiveMojo()
+				mojo = l.playerService.GetEffectiveMojo(stats)
 				wanted = stats.WantedLevel
 				// Alignment: Broadcast the Effective Cunning (including faceplate/penalty)
 				// to ensure the UI heist heuristic matches the server calculation.
-				cunning = stats.GetEffectiveCunning()
+				cunning = l.playerService.GetEffectiveCunning(stats)
+				inventory = stats.Inventory
 				nurturing = stats.Nurturing
 				jailedCards = stats.JailedCards
 				kidnappedCards = stats.KidnappedCards
@@ -1361,11 +2144,18 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 				socialRank = stats.SocialRank
 				jobRole = stats.JobRole
 				districtScannerExpiresAt = stats.DistrictScannerExpiresAt
+				disruptorCooldownAt = stats.DisruptorCooldownAt
 				heistAlarmsJammerCount = stats.HeistAlarmsJammerCount
 				ghostProtocolExpiresAt = stats.GhostProtocolExpiresAt
 				employerID = stats.EmployerClubID
+				totalDonated = stats.TotalDonated
+				capturedOutlaws = stats.CapturedOutlaws
+				// PILLAR 1: Mojo Decay Status Sync.
+				isMojoStabilizerActive, mojoDecayRate := l.calculateMojoDecayRateLocked(stats.EmployerClubID)
 				achievements = stats.Achievements
 				// PILLAR 4: Historical Immersion. Send the last 5 matches for display.
+				walletAddr = wallet
+				lastSeenDistrict = l.lastSeenDistricts[wallet]
 				matches = stats.History
 				if len(matches) > 5 {
 					matches = matches[:5]
@@ -1377,22 +2167,32 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 			}
 		}
 		players = append(players, LobbyPlayerInfo{
-			ID: client.id, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
+			ID: client.id, Wallet: walletAddr, IsAdmin: client.isAdmin, AvatarURL: client.avatarURL,
 			Gloat: client.gloat, AvatarNotice: client.avatarBanNotice,
 			BanExpires: banExpires, HasMardonBadge: hasMardon, Wins: wins, Reputation: reputation,
-			AuctionsWon: auctionsWon, VirtualBalance: vBal,
+			BestRating: bestRating,
+			AuctionsWon: auctionsWon, VirtualBalance: vBal, Salary: salary, MarketTokens: marketTokens,
 			WantedLevel: wanted, Cunning: cunning, Nurturing: nurturing, Mojo: mojo,
 			MatchHistory:     matches,
+			Inventory:        inventory,
 			JailedCards:      jailedCards,
 			KidnappedCards:   kidnappedCards,
 			HeldHostageCards: heldHostageCards,
 			SocialRank:       socialRank, EquippedFaceplate: equippedFaceplate,
 			Achievements: achievements, RumorCount: rumorCount,
+			CapturedOutlaws: capturedOutlaws,
 			GhostProtocolExpiresAt:   ghostProtocolExpiresAt,
 			DistrictScannerExpiresAt: districtScannerExpiresAt,
+			DisruptorCooldownAt:      disruptorCooldownAt,
 			HeistAlarmsJammerCount:   heistAlarmsJammerCount,
 			Playstyle:                playstyle,
+			Faction:                  l.playerService.GetHegemonyPath(jobRole),
 			JobRole:                  jobRole, EmployerID: employerID,
+			LastSeenDistrict: lastSeenDistrict,
+			TotalDonated:     totalDonated,
+			IsMojoStabilizerActive:   isMojoStabilizerActive,
+			MojoDecayRate:            mojoDecayRate,
+			ArenaVouchers:            arenaVouchers,
 		})
 	}
 
@@ -1401,6 +2201,34 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	var totalLiabilities uint64
 	for _, bal := range l.playerBalances {
 		totalLiabilities += bal
+	}
+
+	// PILLAR 2: Account for non-crypto Arena Vouchers in total systemic liability.
+	for _, stats := range l.leaderboard {
+		totalLiabilities += stats.ArenaVouchers
+		for _, bounty := range stats.RecoveryBounties {
+			totalLiabilities += bounty
+		}
+		totalLiabilities += stats.BountyHunterBondMicro
+	}
+	totalLiabilities += l.pendingTournamentPayoutsMicro // PILLAR 2: Integer Supremacy
+
+	// PILLAR 2: Authoritative Accounting.
+	// Include Club Treasuries and Regional Dividends in the systemic liability total.
+	// This ensures the solvency dashboard accurately reflects all virtual commitments.
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.RLock()
+		for _, clubNode := range l.tokenSinkRouter.ActiveClubs {
+			if clubNode != nil {
+				totalLiabilities += clubNode.TreasuryBalance
+			}
+		}
+		for _, districtNode := range l.tokenSinkRouter.RegionalDistricts {
+			if districtNode != nil {
+				totalLiabilities += districtNode.DistrictDividendPool
+			}
+		}
+		l.tokenSinkRouter.Mu.RUnlock()
 	}
 
 	// PILLAR 4: UI Stability. Sort players by ID to prevent random shuffling in the lobby list.
@@ -1412,7 +2240,9 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Players               []LobbyPlayerInfo        `json:"players"`
 		MaintenanceActive     bool                     `json:"maintenance_active"`
 		MaintenanceTime       time.Time                `json:"maintenance_time"`
+		MaintenancePriority   string                   `json:"maintenance_priority"`
 		FaucetBalance         float64                  `json:"faucet_balance"`
+		FaucetBalanceMicro    uint64                   `json:"faucet_balance_micro"`
 		TotalVirtualLiability uint64                   `json:"total_virtual_liability"`
 		Clubs                 map[string]*Club         `json:"clubs"`
 		RewardStack           map[string]uint64        `json:"reward_stack"`
@@ -1426,7 +2256,9 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 	}{
 		Players: players, MaintenanceActive: l.maintenanceMode,
 		MaintenanceTime: l.maintenanceTime,
+		MaintenancePriority: l.maintenancePriority,
 		Clubs:           l.clubs,
+		FaucetBalanceMicro:    l.faucetBalanceMicro,
 		RewardStack:     l.rewardStack, FaucetBalance: l.faucetBalance,
 		TotalVirtualLiability: totalLiabilities,
 		ActiveMatchCount:      l.countUniqueMatchesLocked(), Tournament: l.tournament,
@@ -1434,6 +2266,7 @@ func (l *Lobby) getLobbyUpdateMsgLocked() []byte {
 		Rumors:        l.rumors,
 		BannedAvatars: l.bannedAvatars,
 		BlackMarket:   l.blackMarket,
+		RewardRatio:   l.RewardRatio,
 	}
 
 	payload, _ := json.Marshal(update)
@@ -1483,14 +2316,10 @@ func (l *Lobby) processMatchmaking() {
 					}
 				}
 				if idx1 != -1 && idx2 != -1 {
-					if l.initiatePairedMatch(l.matchmakingPool[idx1].ClientID, l.matchmakingPool[idx2].ClientID) {
+					if l.initiatePairedMatch(l.matchmakingPool[idx1].ClientID, l.matchmakingPool[idx2].ClientID, match.ID) {
 						// Link to bracket for automatic result reporting
 						if mState, ok := l.matches[l.matchmakingPool[idx1].ClientID]; ok {
 							mState.TournamentID = l.tournament.ID
-							// PILLAR 3: Authoritative Read.
-							// Directly accessing the field for assignment to the MatchState
-							// satisfies the analyzer's read requirement for the struct field.
-							mState.TournamentMatchID = l.tournament.Matches[i].ID
 						}
 						matchedIndices[idx1], matchedIndices[idx2] = true, true
 						log.Printf("[MATCHMAKING] Tournament Pairing: %s vs %s\n", match.P1, match.P2)
@@ -1543,7 +2372,7 @@ func (l *Lobby) processMatchmaking() {
 				}
 
 				if repDiff <= 400 {
-					if l.initiatePairedMatch(p1.ClientID, p2.ClientID) {
+					if l.initiatePairedMatch(p1.ClientID, p2.ClientID, "") {
 						matchedIndices[i], matchedIndices[j] = true, true
 						// Flag the match as a bounty duel
 						if mState, ok := l.matches[p1.ClientID]; ok {
@@ -1594,7 +2423,7 @@ func (l *Lobby) processMatchmaking() {
 			}
 
 			if repDiff <= 200 && gradeDiff <= 2 {
-				if l.initiatePairedMatch(p1.ClientID, p2.ClientID) {
+				if l.initiatePairedMatch(p1.ClientID, p2.ClientID, "") {
 					matchedIndices[i], matchedIndices[j] = true, true
 					break
 				}
@@ -1610,7 +2439,7 @@ func (l *Lobby) processMatchmaking() {
 	l.matchmakingPool = remaining
 }
 
-func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
+func (l *Lobby) initiatePairedMatch(id1, id2 string, tournamentMatchID string) bool {
 	m1, ok1 := l.matches[id1]
 	m2, ok2 := l.matches[id2]
 	if !ok1 || !ok2 {
@@ -1625,6 +2454,30 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	// PILLAR 3: Environment Authorization.
 	// Determine territory and authoritative moods before match initialization.
 	territoryID := l.assignMatchTerritoryLocked()
+
+	// PILLAR 1: Regional Transit Tax (Section 11)
+	// Deduct 1 $VBV if entering match in non-allied territory.
+	const transitTaxMicro = 1 * 1000000
+	owningClub := l.getClubByTerritoryID(territoryID)
+	
+	for _, player := range []struct{ w string; stats *PlayerStats }{ {p1Wallet, &p1Stats}, {p2Wallet, &p2Stats} } {
+		if owningClub != nil && !l.clubService.IsPlayerAffiliatedWithClubLocked(l, player.w, owningClub) {
+			// PILLAR 3: Smuggler Exemption. Professional transporters ignore regional fees.
+			if player.stats.JobRole != "Smuggler" && l.playerBalances[player.w] >= transitTaxMicro {
+				l.playerBalances[player.w] -= transitTaxMicro
+				
+				// Routing: 50% Club Treasury / 50% Governor. If unclaimed, 100% Faucet.
+				matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 0.5, GovernanceShare: 0.5}
+				clubID, _ := strconv.ParseUint(strings.TrimPrefix(owningClub.ID, "CLUB-"), 10, 64)
+
+				_ = l.tokenSinkRouter.RouteCriminalTax("TRANSIT_TAX", transitTaxMicro, matrix, clubID, territoryID)
+				l.logAdminAuditLocked("TRANSIT_TAX_COLLECTED", player.w, fmt.Sprintf("District: %s", territoryID))
+			}
+		}
+	}
+
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	l.applyDynamicScalingLocked()
 
 	// PILLAR 3: Intelligence Tracking. Update positions for both combatants.
 	l.lastSeenDistricts[p1Wallet] = territoryID
@@ -1648,16 +2501,33 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 	// PILLAR 1: Regional Power Boost Calculation.
 	// Determine if the territory belongs to a Region (2+ districts)
 	// and if players are affiliated with the owning club.
-	p1Boost, p2Boost := false, false
-	if owningClub := l.getClubByTerritoryID(territoryID); owningClub != nil && l.isClubRegionalLocked(owningClub) {
-		p1Boost = l.isPlayerAffiliatedWithClubLocked(p1Wallet, owningClub)
-		p2Boost = l.isPlayerAffiliatedWithClubLocked(p2Wallet, owningClub)
+	p1Boost, p2Boost, p1Coalition, p2Coalition := false, false, false, false
+	owningClub := l.getClubByTerritoryID(territoryID)
+
+	// PILLAR 1: Conflict Enforcement.
+	// Check if the current district is under a Regional Sabotage blackout.
+	// If disrupted, all organizational and coalition defensive boosts are disabled.
+	disrupted := false
+	if owningClub != nil && owningClub.BuffExpirations != nil {
+		if expiry, exists := owningClub.BuffExpirations["DISRUPTION_"+territoryID]; exists {
+			if time.Now().Before(expiry) {
+				disrupted = true
+				log.Printf("[WARFARE] Blackout enforced for match in %s. Organizational boosters OFFLINE.\n", territoryID)
+			} else {
+				// Lazy pruning of expired disruption tags
+				delete(owningClub.BuffExpirations, "DISRUPTION_"+territoryID)
+			}
+		}
+	}
+
+	if !disrupted && owningClub != nil && l.clubService.IsClubRegionalLocked(l, owningClub) {
+		p1Boost = l.clubService.IsPlayerAffiliatedWithClubLocked(l, p1Wallet, owningClub)
+		p2Boost = l.clubService.IsPlayerAffiliatedWithClubLocked(l, p2Wallet, owningClub)
 	}
 
 	// PILLAR 1: Coalition Defense Calculation.
 	// Members of an allied club receive a +10% boost when defending a partner's territory.
-	p1Coalition, p2Coalition := false, false
-	if owningClub := l.getClubByTerritoryID(territoryID); owningClub != nil && owningClub.AlliedClubID != "" {
+	if !disrupted && owningClub != nil && owningClub.AlliedClubID != "" {
 		if allied := l.clubs[owningClub.AlliedClubID]; allied != nil {
 			// Check P1
 			lowerP1 := strings.ToLower(p1Wallet)
@@ -1689,13 +2559,14 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		StartTime:        m1.StartTime,
 		MatchRating:      m1.MatchRating, // PILLAR 4: Tier Snapshotting.
 		P2Wallet:         p2Wallet,
+		TournamentMatchID: tournamentMatchID,
 		Rules:            matchRules,
 		BoardMoods:       boardMoods,
 		P1WantedLevel:    p1Stats.WantedLevel,
 		P2WantedLevel:    p2Stats.WantedLevel,
 		P1Cunning:        p1Stats.GetEffectiveCunning(),
 		P1Nurturing:      p1Stats.Nurturing,
-		P2Cunning:        p2Stats.GetEffectiveCunning(),
+		P2Cunning:        l.playerService.GetEffectiveCunning(p2Stats),
 		P2Nurturing:      p2Stats.Nurturing,
 		Round:            1, // Standard match initialization
 		TerritoryID:      territoryID,
@@ -1730,13 +2601,19 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 
 	l.matches[id1], l.matches[id2] = match, match
 
+	// PILLAR 4: Sequence Reset.
+	// Explicitly initialize or reset the handshaker for the new match.
+	// This ensures that SequenceID starts at 0 for every fresh engagement,
+	// preventing catch-up loops from previous sessions.
+	l.matchHandshakers[id1] = l.NewSyncHandshaker()
+
 	p1Sync, _ := json.Marshal(Envelope{
 		Type: "challenge", FromID: id2, ToID: id1,
-		Payload: json.RawMessage(fmt.Sprintf(`{"action":"accept","deck":%v,"wanted_level":%d,"territory":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"p1_coalition_boost":%v,"p2_coalition_boost":%v,"moods":%v}`, jsonList(match.P2Deck), match.P2WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, match.P1CoalitionBoost, match.P2CoalitionBoost, jsonListString(match.BoardMoods[:]))),
+		Payload: json.RawMessage(fmt.Sprintf(`{"action":"accept","deck":%v,"wanted_level":%d,"territory":"%s","match_id":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"p1_coalition_boost":%v,"p2_coalition_boost":%v,"moods":%v}`, jsonList(match.P2Deck), match.P2WantedLevel, match.TerritoryID, match.TournamentMatchID, match.P1RegionalBoost, match.P2RegionalBoost, match.P1CoalitionBoost, match.P2CoalitionBoost, jsonListString(match.BoardMoods[:]))),
 	})
 	p2Sync, _ := json.Marshal(Envelope{
 		Type: "challenge", FromID: id1, ToID: id2,
-		Payload: json.RawMessage(fmt.Sprintf(`{"action":"sync_back","deck":%v,"wanted_level":%d,"territory":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"p1_coalition_boost":%v,"p2_coalition_boost":%v,"moods":%v}`, jsonList(match.P1Deck), match.P1WantedLevel, match.TerritoryID, match.P1RegionalBoost, match.P2RegionalBoost, match.P1CoalitionBoost, match.P2CoalitionBoost, jsonListString(match.BoardMoods[:]))),
+		Payload: json.RawMessage(fmt.Sprintf(`{"action":"sync_back","deck":%v,"wanted_level":%d,"territory":"%s","match_id":"%s","p1_regional_boost":%v,"p2_regional_boost":%v,"p1_coalition_boost":%v,"p2_coalition_boost":%v,"moods":%v}`, jsonList(match.P1Deck), match.P1WantedLevel, match.TerritoryID, match.TournamentMatchID, match.P1RegionalBoost, match.P2RegionalBoost, match.P1CoalitionBoost, match.P2CoalitionBoost, jsonListString(match.BoardMoods[:]))),
 	})
 
 	if c1, ok := l.clients[id1]; ok {
@@ -1746,8 +2623,8 @@ func (l *Lobby) initiatePairedMatch(id1, id2 string) bool {
 		c2.send <- p2Sync
 	}
 
-	l.sendToClient(id1, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(`{"status":"match_found"}`)})
-	l.sendToClient(id2, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(`{"status":"match_found"}`)})
+	l.sendToClient(id1, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(fmt.Sprintf(`{"status":"match_found","opponent":"%s"}`, p2Wallet))})
+	l.sendToClient(id2, Envelope{Type: "matchmaking_status", Payload: json.RawMessage(fmt.Sprintf(`{"status":"match_found","opponent":"%s"}`, p1Wallet))})
 
 	log.Printf("[MATCHMAKING] Duel started on %s between %s and %s. Boosts - P1: %v, P2: %v\n",
 		territoryID, p1Wallet, p2Wallet, p1Boost, p2Boost)
@@ -1847,15 +2724,12 @@ func (l *Lobby) getLobbyUpdateMsg() []byte {
 }
 
 // loadRegisteredTxIDs loads tournament registration transaction IDs from a file.
+// PILLAR 6: Blockchain Persistence. Reconstructs state from on-chain snapshots.
 func (l *Lobby) loadRegisteredTxIDs() {
-	data, err := os.ReadFile(l.getDataPath(regCacheName))
-	if err != nil {
-		return
-	}
 	l.mutex.Lock()
-	json.Unmarshal(data, &l.registeredTxIDs)
-	l.mutex.Unlock()
-	log.Printf("[CACHE] Loaded %d tournament registration records.\n", len(l.registeredTxIDs))
+	defer l.mutex.Unlock()
+	l.registeredTxIDs = make(map[string]time.Time)
+	l.loadBlockchainStateSnapshotLocked("VBT_REG_TX_SNAPSHOT:", &l.registeredTxIDs)
 }
 
 // saveRegisteredTxIDs saves tournament registration transaction IDs to a file.
@@ -1868,16 +2742,12 @@ func (l *Lobby) saveRegisteredTxIDs() {
 }
 
 // loadLinkedWallets loads linked wallet information from a file.
+// PILLAR 6: Blockchain Persistence.
 func (l *Lobby) loadLinkedWallets() {
-	data, err := os.ReadFile(l.getDataPath(linkedWalletsName))
-	if err != nil {
-		log.Printf("[CACHE] No linked_wallets.json found, starting fresh: %v\n", err)
-		return
-	}
 	l.mutex.Lock()
-	json.Unmarshal(data, &l.linkedWallets)
-	l.mutex.Unlock()
-	log.Printf("[CACHE] Loaded %d linked wallet records.\n", len(l.linkedWallets))
+	defer l.mutex.Unlock()
+	l.linkedWallets = make(map[string]WalletLinkInfo)
+	l.loadBlockchainStateSnapshotLocked("VBT_LINK_SNAPSHOT:", &l.linkedWallets)
 }
 
 // saveLinkedWallets saves linked wallet information to a file.
@@ -1913,7 +2783,10 @@ func (l *Lobby) addOrUpdateLinkedWallet(primaryAVM, linkedAddr, linkedChain stri
 		linkInfo.Linked = append(linkInfo.Linked, LinkedWallet{Address: linkedAddr, Chain: linkedChain, Verified: true, Timestamp: time.Now()})
 	}
 	l.linkedWallets[primaryAVM] = linkInfo
-	l.saveLinkedWallets() // Save immediately on change
+
+	// PILLAR 6: Blockchain Persistence.
+	// Snapshot the updated state immediately while holding the mutex to prevent deadlocks.
+	l.saveBlockchainStateSnapshotLocked("VBT_LINK_SNAPSHOT:", l.linkedWallets)
 }
 
 // updatePlayerPlaystyleTendencies calculates and updates a player's observed playstyle, including rule and card preferences.
@@ -2144,7 +3017,18 @@ func (l *Lobby) broadcastBountyBoard() {
 
 	// 2. Filter for high-wanted connected players
 	for w, stats := range l.leaderboard {
-		isGhost := time.Now().Before(stats.GhostProtocolExpiresAt)
+		// PILLAR 3: Signal Scrambling. Check for Signal Dampener in organization.
+		isDamped := false
+		if stats.EmployerClubID != "" {
+			if c, ok := l.clubs[stats.EmployerClubID]; ok {
+				if exp, act := c.BuffExpirations["SIGNAL_DAMPENER"]; act && time.Now().Before(exp) {
+					isDamped = true
+				}
+			}
+		}
+
+		// PILLAR 3: Intelligence Counter. Revealing a cloaked signal via Disruptor.
+		isGhost := (time.Now().Before(stats.GhostProtocolExpiresAt) || isDamped) && time.Now().After(stats.CloakDisruptedUntil)
 		if connected[strings.ToLower(w)] && stats.WantedLevel >= 10 {
 			district := l.lastSeenDistricts[w]
 			if district == "" {
@@ -2282,8 +3166,8 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 			l.paidParticipants = append(l.paidParticipants, mockWallet)
 			l.faucetBalance += (50.0 / 2.0) // Simulate half buy-in to pot
 			l.tournamentPotBonus += (50.0 / 2.0)
-			// PILLAR 3: Deadlock Fix. Use variant that assumes lock is held.
-			l.distributeTournamentKickbackLocked(mockWallet, uint64(50*1000000), time.Now(), "Voi")
+			// PILLAR 2: Unified Accounting.
+			l.clubService.DistributeTournamentKickbackLocked(l, mockWallet, uint64(50*1000000), time.Now())
 		}
 	}
 
@@ -2303,10 +3187,10 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 		})
 	}
 
-	pot := 500.0
+	potMicro := uint64(500 * 1000000)
 	if isBuyIn {
-		pot += l.tournamentPotBonus
-		l.tournamentPotBonus = 0
+		potMicro += l.tournamentPotBonusMicro
+		l.tournamentPotBonusMicro = 0
 	}
 
 	l.tournament = TournamentState{
@@ -2314,9 +3198,9 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 		ID:           fmt.Sprintf("SIM-T-%d", time.Now().Unix()),
 		Participants: participants,
 		Matches:      matches,
-		CurrentRound: 1,
-		Pot:          pot,
-		BuyInAmount:  50.0,
+		CurrentRound: 1, // PILLAR 2: Integer Supremacy
+		PotMicro:     potMicro,
+		BuyInMicro:   uint64(50 * 1000000),
 		IsBuyInMode:  isBuyIn,
 		OpenTime:     time.Now().Add(-1 * time.Hour), // Set in the past for registration
 	}
@@ -2348,7 +3232,7 @@ func (l *Lobby) simulateTournament(size int, isBuyIn bool) {
 			if rand.Intn(2) == 1 {
 				winner = m.P2
 			}
-			l.processTournamentResult(m.ID, winner)
+			l.tournamentService.ProcessTournamentResult(l, m.ID, winner)
 		}
 		l.mutex.Unlock()
 		// PILLAR 3: Performance Hardening. Pulse the lock to allow standard lobby traffic.
@@ -2418,50 +3302,8 @@ func (l *Lobby) processMojoDecay() {
 			continue
 		}
 
-		// PILLAR 1: Infrastructure Prestige.
-		// Check for active MOJO_STABILIZER buff.
-		isMojoStabilizerActive := false
-		if expiry, exists := club.BuffExpirations["MOJO_STABILIZER"]; exists {
-			if now.Before(expiry) {
-				isMojoStabilizerActive = true
-			} else {
-				// Buff expired, remove it
-				delete(club.ActiveBuffs, "MOJO_STABILIZER")
-				delete(club.BuffExpirations, "MOJO_STABILIZER")
-				log.Printf("[INDUSTRIAL] MOJO_STABILIZER expired for club %s\n", club.Name)
-			}
-		}
-
 		if now.Sub(club.LastActivity) > stagnationThreshold {
-			// PILLAR 1: Dynamic Decay Scaling.
-			// Larger clubs lose more Mojo to maintain competitive churn.
-
-			// PILLAR 1: Alliance-Aware Ranking.
-			// Use the authoritative helper to ensure Regional Governor status
-			// correctly accounts for combined territory counts in alliances.
-			isRegion := l.isClubRegionalLocked(club)
-			decayRate := 0.02
-			minDecay := 5
-
-			if isRegion {
-				// PILLAR 1: Regional Governor Accountability.
-				// Established regions suffer 2.5x higher decay to prevent sector stagnation.
-				decayRate = 0.05
-				minDecay = 15
-			}
-
-			// PILLAR 1: Inactive Member Scaling.
-			// Larger clubs lose Mojo faster when stagnant to reflect organizational overhead.
-			// Add 0.2% to the decay rate for every member (e.g. 50 members = +10% rate).
-			decayRate += float64(len(club.Members)) * 0.002
-
-			// PILLAR 1: District Stabilizer Effect.
-			// Reduce decay rate by 50% if MOJO_STABILIZER is active.
-			if isMojoStabilizerActive {
-				decayRate *= 0.50
-				minDecay = int(float64(minDecay) * 0.50) // Also reduce minimum decay
-				log.Printf("[INDUSTRIAL] Club %s Mojo decay reduced by 50%% due to active MOJO_STABILIZER.\n", club.Name)
-			}
+			isMojoStabilizerActive, decayRate := l.calculateMojoDecayRateLocked(club.ID)
 			decayAmount := int(float64(club.Mojo)*decayRate + 0.5)
 			if decayAmount < minDecay {
 				decayAmount = minDecay
@@ -2473,7 +3315,7 @@ func (l *Lobby) processMojoDecay() {
 			}
 			decayOccurred = true
 			decayedClubIDs[club.ID] = true
-			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay (isRegion: %v). New Mojo: %d\n", club.Name, isRegion, club.Mojo)
+			log.Printf("[INDUSTRIAL] Club %s suffered Mojo decay (isRegional: %v). New Mojo: %d\n", club.Name, l.isClubRegionalLocked(club), club.Mojo)
 
 			// Reset clock to 'now' so decay is periodic (e.g., every 48h) rather than continuous
 			club.LastActivity = now
@@ -2578,9 +3420,7 @@ func (l *Lobby) archiveSeason() {
 		Highlights: highlights,
 		Top:        standings[:limit],
 	}
-
 	jsonData, _ := json.Marshal(summary)
-
 	// PILLAR 3: Local Persistent Archive.
 	// Save a high-fidelity JSON snapshot to the DATA_DIR before resetting state.
 	archivePath := l.getDataPath(fmt.Sprintf("season_%d_archive.json", l.seasonNumber))
@@ -2625,6 +3465,44 @@ func (l *Lobby) archiveSeason() {
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }
 
+// ProcessDailyAdministrativeMaintenanceFee deducts a fee from all organizational treasuries daily.
+// PILLAR 2: Administrative Maintenance Pool (Task 2412).
+func (l *Lobby) ProcessDailyAdministrativeMaintenanceFee() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	const maintenanceFeeMicro = 10 * 1000000 // 10 $VBV
+	anyFeeCollected := false
+
+	if l.tokenSinkRouter != nil {
+		for _, club := range l.clubs {
+			numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+			l.tokenSinkRouter.Mu.Lock()
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				if node.TreasuryBalance >= maintenanceFeeMicro {
+					node.TreasuryBalance -= maintenanceFeeMicro
+					club.TreasuryMicro = node.TreasuryBalance
+					club.Treasury = club.TreasuryMicro
+
+					// Route to Faucet via Router (100% Faucet share)
+					matrix := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+					_ = l.tokenSinkRouter.RouteCriminalTax("ADMIN_MAINTENANCE", maintenanceFeeMicro, matrix, 0, "")
+					l.logAdminAuditLocked("ADMIN_MAINTENANCE_FEE", club.ID, "Deducted 10 $VBV daily maintenance fee")
+					anyFeeCollected = true
+				} else {
+					l.logAdminAuditLocked("ADMIN_MAINTENANCE_SKIPPED", club.ID, "Treasury insufficient for daily maintenance fee")
+				}
+			}
+			l.tokenSinkRouter.Mu.Unlock()
+		}
+		if anyFeeCollected {
+			l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+}
+
 // ensurePlayerStatsMapsInitialized ensures that all map fields in PlayerStats are initialized.
 func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	stats := l.leaderboard[wallet]
@@ -2640,7 +3518,7 @@ func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 		stats.Relationships = make(map[string]int)
 	}
 	if stats.Portfolio == nil {
-		stats.Portfolio = make(map[string]float64)
+		stats.Portfolio = make(map[string]uint64) // PILLAR 2: Integer Supremacy
 	}
 	if stats.JailedCards == nil {
 		stats.JailedCards = make(map[int]string)
@@ -2653,6 +3531,9 @@ func (l *Lobby) ensurePlayerStatsMapsInitialized(wallet string) {
 	}
 	if stats.AuditedClubs == nil {
 		stats.AuditedClubs = make(map[string]bool)
+	}
+	if stats.CapturedOutlaws == nil {
+		stats.CapturedOutlaws = make(map[string]bool)
 	}
 	if stats.PreferredRules == nil {
 		stats.PreferredRules = make(map[string]int)
@@ -2698,7 +3579,7 @@ func (l *Lobby) refreshRegionalRoles() {
 			// Grant the GOVERNOR trophy to the club owner for expanded regional influence.
 			// Note: unlockAchievementLocked handles reputation recalculation and seeds
 			// the record if this is running immediately after a season reset.
-			l.unlockAchievementLocked(strings.ToLower(club.OwnerWallet), "GOVERNOR")
+			l.achievementService.UnlockAchievementLocked(l, strings.ToLower(club.OwnerWallet), "GOVERNOR")
 		} else {
 			if wasRegional {
 				// Remove governor status if they no longer control 2+ territories
@@ -2795,4 +3676,989 @@ func (l *Lobby) simulateMojoDecayStressTest(numClubs int, durationMinutes int) {
 	l.mutex.Lock()
 	l.clubs = originalClubs // Restore original clubs
 	l.mutex.Unlock()
+}
+
+// processAllianceExpirations checks for expired alliance invitations and clears them.
+// PILLAR 1: Alliance Integration.
+func (l *Lobby) processAllianceExpirations() {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	now := time.Now()
+	anyExpired := false
+
+	for _, club := range l.clubs {
+		if club.AllianceInviteID != "" && !club.AllianceInviteExpiresAt.IsZero() && now.After(club.AllianceInviteExpiresAt) {
+			log.Printf("[SOCIAL] Alliance proposal from %s to %s has expired.\n", club.AllianceInviteID, club.Name)
+
+			// Log the expiration for administrative tracking
+			l.logAdminAuditLocked("ALLIANCE_EXPIRED", club.ID, fmt.Sprintf("Proposal from %s expired.", club.AllianceInviteID))
+
+			club.AllianceInviteID = ""
+			club.AllianceInviteExpiresAt = time.Time{}
+			anyExpired = true
+		}
+	}
+
+	if anyExpired {
+		go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+	}
+}
+
+// calculateMojoDecayRateLocked determines the current Mojo decay rate for a club.
+// This function assumes the Lobby mutex is held by the caller.
+// PILLAR 1: Infrastructure Prestige.
+func (l *Lobby) calculateMojoDecayRateLocked(clubID string) (bool, float64) {
+	club, exists := l.clubs[clubID]
+	if !exists || club.Mojo <= 0 {
+		return false, 0.0
+	}
+
+	now := time.Now()
+	stagnationThreshold := 48 * time.Hour
+
+	// If not stagnant, no decay is currently applied.
+	if now.Sub(club.LastActivity) <= stagnationThreshold {
+		return false, 0.0
+	}
+
+	// 1. Check for active MOJO_STABILIZER buff.
+	isMojoStabilizerActive := false
+	if expiry, exists := club.BuffExpirations["MOJO_STABILIZER"]; exists {
+		if now.Before(expiry) {
+			isMojoStabilizerActive = true
+		} else {
+			// Buff expired, remove it
+			delete(club.ActiveBuffs, "MOJO_STABILIZER")
+			delete(club.BuffExpirations, "MOJO_STABILIZER")
+			log.Printf("[INDUSTRIAL] MOJO_STABILIZER expired for club %s\n", club.Name)
+		}
+	}
+
+	// 2. Determine base decay rate.
+	isRegion := l.isClubRegionalLocked(club)
+	decayRate := 0.02
+
+	if isRegion {
+		// Established regions suffer 2.5x higher decay to prevent sector stagnation.
+		decayRate = 0.05
+	}
+
+	// Inactive Member Scaling.
+	decayRate += float64(len(club.Members)) * 0.002
+
+	// 3. Apply District Stabilizer Effect.
+	if isMojoStabilizerActive {
+		decayRate *= 0.50
+	}
+
+	return isMojoStabilizerActive, decayRate
+}
+
+// PILLAR 3: Justice Layer.
+func (l *Lobby) HandleGetJusticeMissions(w http.ResponseWriter, r *http.Request) {
+	// Pro-social objectives: Bounty hunting, Bail assistance, and Regulatory audits.
+	missions := []JusticeMission{
+		{
+			ID:          "MISSION-001",
+			Title:       "Apprehend High-Infamy Signatures",
+			Description: "Capture a player with Wanted Level 15+ in combat. Uphold the Arena's security protocols.",
+			RewardMicro: 1200 * 1000000, // 1,200 VBV
+			Target:      "wanted_15",
+			Type:        "Bounty",
+		},
+		{
+			ID:          "MISSION-002",
+			Title:       "Facilitate Legal Rehabilitation",
+			Description: "Process a Bail payment for any card currently held in organization jails. Restore liquidity to the sector.",
+			RewardMicro: 500 * 1000000, // 500 VBV
+			Target:      "jail_bail",
+			Type:        "Bail",
+		},
+		{
+			ID:          "MISSION-003",
+			Title:       "Conduct Regulatory Audit",
+			Description: "Perform a successful Cyber-Audit on any club controlling the Elemental Forge district. Monitor organizational health.",
+			RewardMicro: 800 * 1000000, // 800 VBV
+			Target:      "elemental_forge",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-004",
+			Title:       "Regional Peacekeeping",
+			Description: "Apprehend a signature associated with a Regional Governor (Clubs owning 2+ districts). Enforce sector stability.",
+			RewardMicro: 1000 * 1000000, // 1,000 VBV
+			Target:      "governor_member",
+			Type:        "Bounty",
+		},
+		{
+			ID:          "MISSION-005",
+			Title:       "Forensic Audit: Grade F",
+			Description: "Conduct a forensic audit that reduces a target card's grade to 'F' (Artifact <= -100).",
+			RewardMicro: 2000 * 1000000, // 2,000 VBV
+			Target:      "card_grade_f",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-006",
+			Title:       "Amplify Justice Reputation",
+			Description: "Successfully spread a Positive Rumor about a Justice-aligned player. Reinforce sector trust.",
+			RewardMicro: 1500 * 1000000, // 1,500 VBV
+			Target:      "justice_player_rumor",
+			Type:        "Rumor",
+		},
+		{
+			ID:          "MISSION-007",
+			Title:       "Targeted Forensic Seizure",
+			Description: "Conduct a forensic audit that reduces a card owned by a high-infamy outlaw (Wanted 15+) to 'F' grade (Artifact <= -100).",
+			RewardMicro: 2500 * 1000000, // 2,500 VBV
+			Target:      "outlaw_card_grade_f",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-008",
+			Title:       "Governor's Asset Devaluation",
+			Description: "Conduct a forensic audit that reduces a Regional Governor's favorite card to 'F' grade (Artifact <= -100).",
+			RewardMicro: 3000 * 1000000, // 3,000 VBV
+			Target:      "governor_favorite_f",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-009",
+			Title:       "Security Corruption Exposure",
+			Description: "Flag an outlaw (Wanted 15+) currently employed as 'Security' by a Regional Governor. Expose organizational corruption.",
+			RewardMicro: 4000 * 1000000, // 4,000 VBV
+			Target:      "governor_security_outlaw",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-010",
+			Title:       "Alliance Shadow Network",
+			Description: "Flag two different outlaws (Wanted 10+) belonging to the same Alliance. Expose coordinated criminal syndicates.",
+			RewardMicro: 5000 * 1000000, // 5,000 VBV
+			Target:      "alliance_coordinated_outlaws",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-011",
+			Title:       "Cripple Criminal Leadership",
+			Description: "Flag an outlaw (Wanted 20+) who is currently the Owner of a club. Strike at the head of the serpent.",
+			RewardMicro: 6000 * 1000000, // 6,000 VBV
+			Target:      "outlaw_club_owner",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-012",
+			Title:       "Regional Corruption Audit",
+			Description: "Flag a Regional Governor (Owner of 2+ districts) with a Wanted Level of 10+. Enforce transparency at the highest level.",
+			RewardMicro: 10000 * 1000000, // 10,000 VBV
+			Target:      "governor_wanted_10",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-013",
+			Title:       "Hostage Kingpin Takedown",
+			Description: "Flag an outlaw (Wanted 25+) who has kidnapped at least 2 cards from different owners. Dismantle criminal abduction rings.",
+			RewardMicro: 7500 * 1000000, // 7,500 VBV
+			Target:      "hostage_kingpin",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-014",
+			Title:       "High-Stakes Governor Audit",
+			Description: "Flag a Regional Governor (Wanted 15+) currently holding 2+ hostages. Dismantle institutional kidnapping rings.",
+			RewardMicro: 15000 * 1000000, // 15,000 VBV
+			Target:      "governor_wanted_15_hostage_2",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-015",
+			Title:       "Hegemony Counter-Strike",
+			Description: "Flag an outlaw (Wanted 30+) whose infamy indicates involvement in an Arena Center Fortress Breach. Protect the core.",
+			RewardMicro: 20000 * 1000000, // 20,000 VBV
+			Target:      "fortress_breach_perp",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-016",
+			Title:       "Arena Center Hegemony Audit",
+			Description: "Flag an outlaw (Wanted 35+) who is currently the Owner of the organization controlling the 'Arena Center'. Decapitate the sector's central authority.",
+			RewardMicro: 25000 * 1000000, // 25,000 VBV
+			Target:      "arena_center_owner_wanted_35",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-017",
+			Title:       "Chaos Containment Protocol",
+			Description: "Flag an outlaw (Wanted 40+) who has executed a 'CONTRACT-019' event (The Invisible Hand of Chaos). Restore order.",
+			RewardMicro: 30000 * 1000000, // 30,000 VBV
+			Target:      "chaos_perp_wanted_40",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-018",
+			Title:       "Criminal Employment Audit",
+			Description: "Flag an outlaw (Wanted 20+) who is currently employing a 'Criminal' role player. Dismantle the illicit workforce.",
+			RewardMicro: 10000 * 1000000, // 10,000 VBV
+			Target:      "criminal_employer_wanted_20",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-019",
+			Title:       "Financial Laundering Audit",
+			Description: "Flag an outlaw (Wanted 25+) who is currently employing a 'Launderer' role player. Sever the criminal financial link.",
+			RewardMicro: 15000 * 1000000, // 15,000 VBV
+			Target:      "launderer_employer_wanted_25",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-020",
+			Title:       "Apex Predator Takedown",
+			Description: "Flag an outlaw (Wanted 50+) who has successfully executed both 'CONTRACT-018' and 'CONTRACT-019'. Neutralize the ultimate threat.",
+			RewardMicro: 40000 * 1000000, // 40,000 VBV
+			Target:      "apex_predator_wanted_50",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-021",
+			Title:       "Hostage Syndicate Takedown",
+			Description: "Flag an outlaw (Wanted 60+) who is currently holding 3+ hostages simultaneously. Terminate the syndicate.",
+			RewardMicro: 50000 * 1000000, // 50,000 VBV
+			Target:      "hostage_syndicate_wanted_60",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-022",
+			Title:       "Sovereign Hostage Recovery",
+			Description: "Flag an outlaw (Wanted 70+) who has successfully executed 'CONTRACT-022'. Bring the ultimate syndicate to justice.",
+			RewardMicro: 35000 * 1000000, // 35,000 VBV
+			Target:      "sovereign_perp_wanted_70",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-023",
+			Title:       "Ultimate Syndicate Dissolution",
+			Description: "Flag an outlaw (Wanted 80+) who has successfully executed both 'CONTRACT-021' and 'CONTRACT-022'. Bring an end to the peak syndicate dominance.",
+			RewardMicro: 40000 * 1000000, // 40,000 VBV
+			Target:      "syndicate_boss_wanted_80",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-024",
+			Title:       "Apex Scourge Neutralization",
+			Description: "Flag an outlaw (Wanted 110+) who has successfully executed 'CONTRACT-023'. End the ultimate criminal threat.",
+			RewardMicro: 50000 * 1000000, // 50,000 VBV
+			Target:      "apex_scourge_wanted_110",
+			Type:        "Enforcement",
+		},
+		{
+			ID:          "MISSION-025",
+			Title:       "Tax Haven Exposure",
+			Description: "Flag a Club Owner whose Treasury exceeds 10,000 $VBV. Requires the 'Tax Auditor' career role.",
+			RewardMicro: 25000 * 1000000, // 25,000 VBV
+			Target:      "tax_haven_audit",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-026",
+			Title:       "Abduction Staff Audit",
+			Description: "Flag an outlaw (Wanted 15+) who employs at least one 'Kidnapper' in their organization. Requires the 'Tax Auditor' career role.",
+			RewardMicro: 12000 * 1000000, // 12,000 VBV
+			Target:      "kidnapper_staff_audit",
+			Type:        "Audit",
+		},
+		{
+			ID:          "MISSION-027",
+			Title:       "Arena Center Breach Audit",
+			Description: "Flag an outlaw (Wanted 40+) who has successfully executed a heist in the 'Arena Center' district. Requires the 'Intel-Agent' career role.",
+			RewardMicro: 15000 * 1000000, // 15,000 VBV
+			Target:      "arena_center_heist_audit",
+			Type:        "Enforcement",
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(missions)
+}
+
+// HandleAcceptJusticeMission processes a player's request to begin a law-enforcement objective.
+// PILLAR 3: Justice Layer.
+// $VBV-GATE + CareerXP Discount: Mission deployment fees scale with Justice career tier.
+func (l *Lobby) HandleAcceptJusticeMission(env *Envelope) {
+	var data struct {
+		MissionID string `json:"mission_id"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		log.Printf("[JUSTICE] Invalid accept_justice_mission payload from %s: %v\n", env.FromID, err)
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Identification failed."}`)})
+		return
+	}
+
+	l.ensurePlayerStatsMapsInitialized(wallet)
+	stats := l.leaderboard[wallet]
+
+	// PILLAR 3: CareerXP Discount — Justice deployment fee scales by career tier.
+	// Base cost: 1,000 $VBV. Tiers: Bronze(0%), Silver(-15%), Gold(-30%), Boss/Platinum(-45%).
+	const standardJusticeMissionFee = 1000 * 1000000
+	justiceMissionFee := standardJusticeMissionFee
+
+	if stats.JobRole == "Intel-Agent" || stats.JobRole == "Bounty Hunter" ||
+		stats.JobRole == "AOS Leader" || stats.JobRole == "Justice Recruiter" ||
+		stats.JobRole == "Warden" || stats.JobRole == "Forensic Analyst" ||
+		stats.JobRole == "Tax Auditor" || stats.JobRole == "Judge" ||
+		stats.JobRole == "Justice Commissioner" || stats.JobRole == "Sector Peacekeeper" {
+
+		if stats.CareerXP != nil && stats.CareerXP.Level > 0 {
+			discount := stats.CareerXP.GetJusticeMissionFeeDiscount()
+			justiceMissionFee = int(float64(standardJusticeMissionFee) * discount)
+
+			// PILLAR 13: Add visible buff tag when discount active
+			if stats.ActiveBuffs == nil {
+				stats.ActiveBuffs = make(map[string]string)
+			}
+			if discount < 1.0 {
+				stats.ActiveBuffs["Justice_Discount"] = "active"
+				log.Printf("[JUSTICE] CareerXP discount applied: %s (Tier %d, Rate: %.0f%%)\n",
+					stats.JobRole, stats.CareerXP.Level, discount*100)
+			} else {
+				delete(stats.ActiveBuffs, "Justice_Discount")
+			}
+		}
+	}
+
+	if l.playerBalances[wallet] < justiceMissionFee {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"❌ Mission Failed: Insufficient $VBV. Deployment fee: %.0f $VBV (CareerXP discount applied)."}`, float64(justiceMissionFee)/1000000.0))})
+		return
+	}
+
+	// Charge deployment fee
+	l.playerBalances[wallet] -= justiceMissionFee
+
+	// PILLAR 3: Career Role Gating (must come AFTER fee check so discount applies)
+	if (data.MissionID == "MISSION-025" || data.MissionID == "MISSION-026") && stats.JobRole != "Tax Auditor" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: This mission requires the 'Tax Auditor' career path."}`)})
+		return
+	}
+	if data.MissionID == "MISSION-027" && stats.JobRole != "Intel-Agent" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: This mission requires the 'Intel-Agent' career path."}`)})
+		return
+	}
+
+	// PILLAR 3: Bounty Hunter License Gating (Section 11).
+	isJustice := l.playerService.GetHegemonyPath(stats.JobRole) == "JUSTICE"
+	if isJustice && (stats.BountyHunterLicenseExpiresAt.IsZero() || time.Now().After(stats.BountyHunterLicenseExpiresAt)) {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Enforcement License expired. Renew at the Social Hub."}`)})
+		return
+	}
+
+	// PILLAR 1 & 3: Justice Bond Gating.
+	// Missions MISSION-020 through MISSION-027 represent high-tier objectives requiring capital commitment.
+	isHighTier := false
+	if strings.HasPrefix(data.MissionID, "MISSION-") {
+		midStr := strings.TrimPrefix(data.MissionID, "MISSION-")
+		// Support multi-stage mission ID parsing (e.g., MISSION-010:target)
+		midStr = strings.Split(midStr, ":")[0]
+		mid, _ := strconv.Atoi(midStr)
+		if mid >= 20 && mid <= 27 { isHighTier = true }
+	}
+	if isHighTier && stats.BountyHunterBondMicro == 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: High-tier Justice missions require a security bond deposit."}`)})
+		return
+	}
+
+	// 1. Mission Capacity Check
+	if stats.ActiveJusticeMissionID != "" {
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(`{"text":"⚖️ <b>MISSION ACTIVE:</b> You are already assigned to a pro-social operation. Complete or abort it first."}`),
+		})
+		return
+	}
+
+	// 2. Mission Validation
+	valid := false
+	switch data.MissionID {
+	case "MISSION-001", "MISSION-002", "MISSION-003", "MISSION-004", "MISSION-005", "MISSION-006", "MISSION-007", "MISSION-008", "MISSION-009", "MISSION-010", "MISSION-011", "MISSION-012", "MISSION-013", "MISSION-014", "MISSION-015", "MISSION-016", "MISSION-017", "MISSION-018", "MISSION-019", "MISSION-020", "MISSION-021", "MISSION-022", "MISSION-023", "MISSION-024", "MISSION-025", "MISSION-026", "MISSION-027":
+		valid = true
+	}
+
+	if !valid {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Error: Specified mission dossier is restricted or missing."}`)})
+		return
+	}
+
+	// 3. Mission Assignment
+	stats.ActiveJusticeMissionID = data.MissionID
+	l.leaderboard[wallet] = stats
+	l.logAdminAuditLocked("JUSTICE_MISSION_ACCEPTED", wallet, fmt.Sprintf("ID: %s", data.MissionID))
+
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>MISSION ACCEPTED:</b> Dossier downloaded. Enforce the Arena's protocols."}`)})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// HandleJusticeFlagPlayer processes a request from a law-enforcement player to flag an outlaw.
+// PILLAR 3: Criminality & Intelligence.
+func (l *Lobby) HandleJusticeFlagPlayer(env *Envelope) {
+	var data struct {
+		TargetWallet string `json:"target_wallet"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		log.Printf("[JUSTICE] Invalid justice_flag_player payload from %s: %v\n", env.FromID, err)
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	senderWallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	l.ensurePlayerStatsMapsInitialized(senderWallet)
+	stats := l.leaderboard[senderWallet]
+
+	// 1. Authorization Check: Only Justice-aligned players can use the terminal.
+	if l.playerService.GetHegemonyPath(stats.JobRole) != "JUSTICE" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Justice Terminal restricted to law enforcement personnel."}`)})
+		return
+	}
+
+	targetWallet := strings.ToLower(data.TargetWallet)
+	targetStats, exists := l.leaderboard[targetWallet]
+
+	// 2. Target Validation: High infamy check (Wanted Level 10+).
+	if !exists || targetStats.WantedLevel < 10 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚠️ <b>INVALID SIGNATURE:</b> Target does not meet the infamy threshold for priority flagging."}`)})
+		return
+	}
+
+	// 3. Flagging & Audit
+	l.logAdminAuditLocked("JUSTICE_FLAG", senderWallet, fmt.Sprintf("Flagged: %s (Wanted: %d)", targetWallet, targetStats.WantedLevel))
+
+	// PILLAR 3: Justice Mission Completion (MISSION-009)
+	// Security Corruption Exposure: Flag an outlaw (Wanted 15+) employed as 'Security' by a Regional Governor.
+	if stats.ActiveJusticeMissionID == "MISSION-009" && targetStats.WantedLevel >= 15 && targetStats.JobRole == "Security" && targetStats.EmployerClubID != "" {
+		club, exists := l.clubs[targetStats.EmployerClubID]
+		if exists && l.clubService.IsClubRegionalLocked(l, club) {
+			const rewardMicro = 4000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-009, Payout: 4000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Security corruption exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-010)
+	// Alliance Shadow Network: Flag two different outlaws (Wanted 10+) in the same Alliance.
+	if strings.HasPrefix(stats.ActiveJusticeMissionID, "MISSION-010") && targetStats.WantedLevel >= 10 {
+		if club, exists := l.clubs[targetStats.EmployerClubID]; exists && club.AlliedClubID != "" {
+			// Determine unique Alliance ID (sorted pair of club IDs)
+			cid1, cid2 := club.ID, club.AlliedClubID
+			if cid1 > cid2 {
+				cid1, cid2 = cid2, cid1
+			}
+			allianceUID := cid1 + ":" + cid2
+
+			if stats.ActiveJusticeMissionID == "MISSION-010" {
+				// First target flagged
+				stats.ActiveJusticeMissionID = fmt.Sprintf("MISSION-010:%s:%s", targetWallet, allianceUID)
+				l.leaderboard[senderWallet] = stats
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⚖️ <b>MISSION UPDATE:</b> First target flagged. Locate another outlaw in alliance with %s."}`, escapeHTML(club.Name)))})
+			} else {
+				// Second target check
+				parts := strings.Split(stats.ActiveJusticeMissionID, ":")
+				if len(parts) == 3 && parts[0] == "MISSION-010" {
+					prevWallet := parts[1]
+					prevAlliance := parts[2]
+
+					if !strings.EqualFold(targetWallet, prevWallet) && allianceUID == prevAlliance {
+						const rewardMicro = 5000 * 1000000
+						l.playerBalances[senderWallet] += rewardMicro
+						stats.ActiveJusticeMissionID = ""
+						l.leaderboard[senderWallet] = stats
+						l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-010, Payout: 5000.00")
+						l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Alliance shadow network exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+						l.applyDynamicScalingLocked()
+						go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+					} else if strings.EqualFold(targetWallet, prevWallet) {
+						l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚠️ Already flagged this signature. Locate their accomplice."}`)})
+					}
+				}
+			}
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-011)
+	// Cripple Criminal Leadership: Flag an outlaw (Wanted 20+) who is a Club Owner.
+	if stats.ActiveJusticeMissionID == "MISSION-011" && targetStats.WantedLevel >= 20 {
+		isOwner := false
+		for _, club := range l.clubs {
+			if strings.EqualFold(club.OwnerWallet, targetWallet) {
+				isOwner = true
+				break
+			}
+		}
+		if isOwner {
+			const rewardMicro = 6000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-011, Payout: 6000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Criminal leadership exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-012)
+	// Regional Corruption Audit: Flag a Regional Governor with Wanted Level 10+.
+	if stats.ActiveJusticeMissionID == "MISSION-012" && targetStats.WantedLevel >= 10 {
+		isGov := false
+		if club, exists := l.clubs[targetStats.EmployerClubID]; exists && strings.EqualFold(club.OwnerWallet, targetWallet) {
+			if l.clubService.IsClubRegionalLocked(l, club) {
+				isGov = true
+			}
+		}
+		if isGov {
+			const rewardMicro = 10000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-012, Payout: 10000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Regional corruption flagged. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-013)
+	// Hostage Kingpin Takedown: Flag an outlaw (Wanted 25+) with 2+ kidnapped cards from different owners.
+	if stats.ActiveJusticeMissionID == "MISSION-013" && targetStats.WantedLevel >= 25 {
+		if len(targetStats.KidnappedCards) >= 2 {
+			uniqueVictims := make(map[string]bool)
+			for _, victim := range targetStats.KidnappedCards {
+				uniqueVictims[strings.ToLower(victim)] = true
+			}
+			if len(uniqueVictims) >= 2 {
+				const rewardMicro = 7500 * 1000000
+				l.playerBalances[senderWallet] += rewardMicro
+				stats.ActiveJusticeMissionID = ""
+				l.leaderboard[senderWallet] = stats
+				l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-013, Payout: 7500.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Hostage ring dismantled. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+			}
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-014)
+	// High-Stakes Governor Audit: Flag a Regional Governor (Wanted 15+) holding 2+ hostages.
+	if stats.ActiveJusticeMissionID == "MISSION-014" && targetStats.WantedLevel >= 15 {
+		isGov := false
+		if club, exists := l.clubs[targetStats.EmployerClubID]; exists && strings.EqualFold(club.OwnerWallet, targetWallet) {
+			if l.clubService.IsClubRegionalLocked(l, club) {
+				isGov = true
+			}
+		}
+		if isGov && len(targetStats.KidnappedCards) >= 2 {
+			const rewardMicro = 15000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-014, Payout: 15000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Governor's hostage ring exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-015)
+	// Hegemony Counter-Strike: Flag an outlaw (Wanted 30+) involved in extreme breaches.
+	if stats.ActiveJusticeMissionID == "MISSION-015" && targetStats.WantedLevel >= 30 {
+		executedContract018 := false
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-018" && h.IsUnderworldContractSuccess {
+				executedContract018 = true
+				break
+			}
+		}
+		if executedContract018 {
+			const rewardMicro = 20000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-015, Payout: 20000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> High-tier threat neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-016)
+	// Arena Center Hegemony Audit: Flag an outlaw (Wanted 35+) who owns the Arena Center.
+	if stats.ActiveJusticeMissionID == "MISSION-016" && targetStats.WantedLevel >= 35 {
+		var arenaCenterOwner string
+		for _, club := range l.clubs {
+			for _, t := range club.Territories {
+				if t == "arena_center" {
+					arenaCenterOwner = club.OwnerWallet
+					break
+				}
+			}
+			if arenaCenterOwner != "" {
+				break
+			}
+		}
+
+		if arenaCenterOwner != "" && strings.EqualFold(targetWallet, arenaCenterOwner) {
+			const rewardMicro = 25000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-016, Payout: 25000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Sector hegemony challenged. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-017)
+	// Chaos Containment Protocol: Flag an outlaw (Wanted 40+) involved in chaos-tier heists.
+	if stats.ActiveJusticeMissionID == "MISSION-017" && targetStats.WantedLevel >= 40 {
+		executedContract019 := false
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-019" && h.IsUnderworldContractSuccess {
+				executedContract019 = true
+				break
+			}
+		}
+		if executedContract019 {
+			const rewardMicro = 30000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-017, Payout: 30000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Chaos contained. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-018)
+	// Criminal Employment Audit: Flag an outlaw (Wanted 20+) employing a 'Criminal'.
+	if stats.ActiveJusticeMissionID == "MISSION-018" && targetStats.WantedLevel >= 20 {
+		isCriminalEmployer := false
+		for _, club := range l.clubs {
+			// Check if target is the owner
+			if strings.EqualFold(club.OwnerWallet, targetWallet) {
+				// Check for 'Criminal' role in staff
+				for _, role := range club.Staff {
+					if strings.EqualFold(role, "Criminal") {
+						isCriminalEmployer = true
+						break
+					}
+				}
+			}
+			if isCriminalEmployer { break }
+		}
+
+		if isCriminalEmployer {
+			const rewardMicro = 10000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-018, Payout: 10000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Illicit workforce exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-019)
+	// Financial Laundering Audit: Flag an outlaw (Wanted 25+) employing a 'Launderer'.
+	if stats.ActiveJusticeMissionID == "MISSION-019" && targetStats.WantedLevel >= 25 {
+		isLaundererEmployer := false
+		for _, club := range l.clubs {
+			// Check if target is the owner
+			if strings.EqualFold(club.OwnerWallet, targetWallet) {
+				// Check for 'Launderer' role in staff
+				for _, role := range club.Staff {
+					if strings.EqualFold(role, "Launderer") {
+						isLaundererEmployer = true
+						break
+					}
+				}
+			}
+			if isLaundererEmployer { break }
+		}
+
+		if isLaundererEmployer {
+			const rewardMicro = 15000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-019, Payout: 15000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Financial laundering link severed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-020)
+	// Apex Predator Takedown: Flag an outlaw (Wanted 50+) who executed CONTRACT-018 and CONTRACT-019.
+	if stats.ActiveJusticeMissionID == "MISSION-020" && targetStats.WantedLevel >= 50 {
+		executedContract018 := false
+		executedContract019 := false
+
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-018" && h.IsUnderworldContractSuccess {
+				executedContract018 = true
+			}
+			if h.UnderworldContractID == "CONTRACT-019" && h.IsUnderworldContractSuccess {
+				executedContract019 = true
+			}
+			if executedContract018 && executedContract019 { break }
+		}
+
+		if executedContract018 && executedContract019 {
+			const rewardMicro = 40000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-020, Payout: 40000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Apex predator neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-021)
+	// Hostage Syndicate Takedown: Flag an outlaw (Wanted 60+) holding 3+ hostages.
+	if stats.ActiveJusticeMissionID == "MISSION-021" && targetStats.WantedLevel >= 60 {
+		if len(targetStats.KidnappedCards) >= 3 {
+			const rewardMicro = 50000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-021, Payout: 50000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Syndicate dismantled. Order restored. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-022)
+	// Sovereign Hostage Recovery: Flag an outlaw (Wanted 70+) who executed CONTRACT-022.
+	if stats.ActiveJusticeMissionID == "MISSION-022" && targetStats.WantedLevel >= 70 {
+		executedContract022 := false
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-022" && h.IsUnderworldContractSuccess {
+				executedContract022 = true
+				break
+			}
+		}
+
+		if executedContract022 {
+			const rewardMicro = 60000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-022, Payout: 60000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Sovereign threat neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-023)
+	// Ultimate Syndicate Dissolution: Flag an outlaw (Wanted 80+) who executed 021 AND 022.
+	if stats.ActiveJusticeMissionID == "MISSION-023" && targetStats.WantedLevel >= 80 {
+		executed021 := false
+		executed022 := false
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-021" && h.IsUnderworldContractSuccess {
+				executed021 = true
+			}
+			if h.UnderworldContractID == "CONTRACT-022" && h.IsUnderworldContractSuccess {
+				executed022 = true
+			}
+			if executed021 && executed022 {
+				break
+			}
+		}
+
+		if executed021 && executed022 {
+			const rewardMicro = 40000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-023, Payout: 75000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> The peak syndicate has been dissolved. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-024)
+	// Apex Scourge Neutralization: Flag an outlaw (Wanted 110+) who executed CONTRACT-023.
+	if stats.ActiveJusticeMissionID == "MISSION-024" && targetStats.WantedLevel >= 110 {
+		executedContract023 := false
+		for _, h := range targetStats.History {
+			if h.UnderworldContractID == "CONTRACT-023" && h.IsUnderworldContractSuccess {
+				executedContract023 = true
+				break
+			}
+		}
+
+		if executedContract023 {
+			const rewardMicro = 50000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-024, Payout: 100000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Apex Scourge neutralized. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-025)
+	// Tax Haven Exposure: Flag an owner with > 10,000 VBV treasury.
+	if stats.ActiveJusticeMissionID == "MISSION-025" && stats.JobRole == "Tax Auditor" {
+		isTargetOwner := false
+		var targetClub *Club
+		for _, club := range l.clubs {
+			if strings.EqualFold(club.OwnerWallet, targetWallet) {
+				isTargetOwner = true
+				targetClub = club
+				break
+			}
+		}
+
+		if isTargetOwner && targetClub.Treasury >= 10000.0 {
+			// PILLAR 1: Tactical Defense Check.
+			// Verify if the target organization has an active Audit Shield before allowing exposure.
+			if exp, active := targetClub.BuffExpirations["AUDIT_SHIELD"]; active && time.Now().Before(exp) {
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ <b>TERMINAL ERROR:</b> Target organization is protected by an active Audit Shield."}`)})
+				return
+			}
+
+			const rewardMicro = 25000 * 1000000
+			l.playerBalances[senderWallet] += rewardMicro
+			stats.ActiveJusticeMissionID = ""
+			l.leaderboard[senderWallet] = stats
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-025, Payout: 25000.00")
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Tax haven exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+			l.applyDynamicScalingLocked()
+			go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-026)
+	// Abduction Staff Audit: Flag an outlaw (Wanted 15+) employing a 'Kidnapper'.
+	if stats.ActiveJusticeMissionID == "MISSION-026" && stats.JobRole == "Tax Auditor" {
+		if targetStats.WantedLevel >= 15 {
+			isTargetEmployer := false
+			for _, club := range l.clubs {
+				if strings.EqualFold(club.OwnerWallet, targetWallet) {
+					for _, role := range club.Staff {
+						if strings.EqualFold(role, "Kidnapper") {
+							isTargetEmployer = true
+							break
+						}
+					}
+				}
+				if isTargetEmployer {
+					break
+				}
+			}
+
+			if isTargetEmployer {
+				const rewardMicro = 12000 * 1000000
+				l.playerBalances[senderWallet] += rewardMicro
+				stats.ActiveJusticeMissionID = ""
+				l.leaderboard[senderWallet] = stats
+				l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-026, Payout: 12000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Abduction staff exposed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+			}
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-027)
+	// Arena Center Breach Audit: Flag Wanted 40+ who heisted Arena Center.
+	if stats.ActiveJusticeMissionID == "MISSION-027" && stats.JobRole == "Intel-Agent" {
+		if targetStats.WantedLevel >= 40 {
+			heistedArenaCenter := false
+			for _, h := range targetStats.History {
+				// CONTRACT-015 and CONTRACT-023 are Arena Center heists.
+				if (h.UnderworldContractID == "CONTRACT-015" || h.UnderworldContractID == "CONTRACT-023") && h.IsUnderworldContractSuccess {
+					heistedArenaCenter = true
+					break
+				}
+			}
+
+			if heistedArenaCenter {
+				const rewardMicro = 15000 * 1000000
+				l.playerBalances[senderWallet] += rewardMicro
+				stats.ActiveJusticeMissionID = ""
+				l.leaderboard[senderWallet] = stats
+				l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", senderWallet, "ID: MISSION-027, Payout: 15000.00")
+				l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> District breach confirmed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+				l.applyDynamicScalingLocked()
+				go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+			}
+		}
+	}
+
+	adminMsg := fmt.Sprintf("⚖️ <b>JUSTICE TERMINAL:</b> %s has flagged high-infamy outlaw %s for priority review.", escapeHTML(l.oracleService.ResolveEnvoiName(l, senderWallet)), escapeHTML(l.oracleService.ResolveEnvoiName(l, targetWallet)))
+	l.broadcastToAdmins(adminMsg)
+
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>FLAGGED:</b> Outlaw signature submitted for priority administrative review."}`)})
+}
+
+// HandleAbortJusticeMission terminates the active law-enforcement objective.
+// PILLAR 3: Justice Layer.
+func (l *Lobby) HandleAbortJusticeMission(env *Envelope) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	l.ensurePlayerStatsMapsInitialized(wallet)
+	stats := l.leaderboard[wallet]
+
+	if stats.ActiveJusticeMissionID == "" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Error: No active mission to abort."}`)})
+		return
+	}
+
+	missionID := stats.ActiveJusticeMissionID
+	stats.ActiveJusticeMissionID = ""
+
+	// Aborting reflects administrative withdrawal.
+	stats.Reputation -= 25
+	if stats.Reputation < 0 { stats.Reputation = 0 }
+
+	l.leaderboard[wallet] = stats
+	l.logAdminAuditLocked("JUSTICE_MISSION_ABORTED", wallet, fmt.Sprintf("ID: %s", missionID))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>MISSION ABORTED:</b> Dossier returned to archives. Reputation penalized."}`)})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }

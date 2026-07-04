@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -25,6 +26,132 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
+
+// TransferTokens executes a single on-chain transfer from the vault to a governor.
+// This satisfies the ExternalLedgerClient interface for the PayoutScheduler.
+// PILLAR-B: Multi-chain routing via LoadBalancedLedgerClient cluster.
+func (l *Lobby) TransferTokens(ctx context.Context, toWallet string, amount uint64) error {
+	if amount == 0 {
+		return nil
+	}
+
+	l.mutex.RLock()
+	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	vaultAddr := l.vaultAddress
+	hasRouter := l.multiChainRouter != nil
+	l.mutex.RUnlock()
+
+	if !ok || vaultAddr == "" {
+		return errors.New("ledger error: voi network configuration missing")
+	}
+
+	// PILLAR 2: Single-Transaction Safety Cap.
+	// Prevent anomalous outflows from draining the vault in a single event.
+	if amount > MaxGovPayoutMicro {
+		return fmt.Errorf("ledger error: amount %d exceeds governor payout cap", amount)
+	}
+
+	// 1. Gas Floor Audit (Voi native balance check)
+	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
+	accInfo, err := client.AccountInformation(vaultAddr).Do(ctx)
+	if err != nil || accInfo.Amount < 1000000 {
+		return errors.New("ledger error: vault native balance below gas floor")
+	}
+
+	// 2. Multi-chain dispatch via router (PILLAR-B)
+	if hasRouter {
+		err = l.multiChainRouter.TransferToChain(ctx, toWallet, amount, "voi")
+		if err != nil {
+			return fmt.Errorf("multi-chain dispatch failed: %w", err)
+		}
+
+		// 3. Economic state reconciliation (PILLAR 2: Industrial Loop)
+		l.mutex.Lock()
+		if l.faucetBalanceMicro >= amount {
+			l.faucetBalanceMicro -= amount
+		} else {
+			l.faucetBalanceMicro = 0
+		}
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		l.applyDynamicScalingLocked()
+
+		if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+			l.tokenSinkRouter.Audit.LogPhysicalOutflow(amount)
+		}
+		l.mutex.Unlock()
+
+		return nil
+	}
+
+	// 3. Fallback: Direct Voi ARC-200 transfer (legacy path)
+	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
+	if mnemonicRaw == "" {
+		return errors.New("ledger error: faucet mnemonic missing from environment")
+	}
+
+	pk, err := mnemonic.ToPrivateKey(mnemonicRaw)
+	if err != nil {
+		return errors.New("ledger error: malformed mnemonic")
+	}
+	faucetAccount, _ := crypto.AccountFromPrivateKey(pk)
+
+	sp, err := client.SuggestedParams().Do(ctx)
+	if err != nil {
+		return fmt.Errorf("ledger error: failed to fetch suggested params: %w", err)
+	}
+
+	// 4. Construct ARC-200 Transfer
+	// method: transfer(address,uint256) -> selector: 0x2b426dec
+	recipientAddr, _ := types.DecodeAddress(toWallet)
+	methodSelector := []byte{0x2b, 0x42, 0x6d, 0xec}
+	amountBytes := make([]byte, 32)
+	new(big.Int).SetUint64(amount).FillBytes(amountBytes)
+
+	appArgs := [][]byte{
+		methodSelector,
+		recipientAddr[:],
+		amountBytes,
+	}
+
+	appID, _ := strconv.ParseUint(voiConfig.AssetID, 10, 64)
+	senderAddr, _ := types.DecodeAddress(vaultAddr)
+	note := []byte(fmt.Sprintf("VBT_GOV_DIVIDEND:{\"amount\":%d}", amount))
+
+	txn, err := transaction.MakeApplicationNoOpTx(appID, appArgs, nil, nil, nil, sp, senderAddr, note, types.Digest{}, [32]byte{}, types.Address{})
+	if err != nil {
+		return fmt.Errorf("ledger error: transaction construction failed: %w", err)
+	}
+
+	// 5. Dispatch and Wait (fallback path)
+	txid, stxn, err := crypto.SignTransaction(faucetAccount.PrivateKey, txn)
+	if err != nil {
+		return fmt.Errorf("ledger error: signing failed: %w", err)
+	}
+
+	if _, err := client.SendRawTransaction(stxn).Do(ctx); err != nil {
+		return fmt.Errorf("ledger error: dispatch failed: %w", err)
+	}
+
+	_, err = transaction.WaitForConfirmation(client, txid, 4, ctx)
+	if err == nil {
+		// PILLAR 2: Industrial Loop (Physical Outflow).
+		// Decrement the authoritative integer reservoir after successful confirmation.
+		l.mutex.Lock()
+		if l.faucetBalanceMicro >= amount {
+			l.faucetBalanceMicro -= amount
+		} else {
+			l.faucetBalanceMicro = 0
+		}
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		l.applyDynamicScalingLocked()
+
+		if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+			l.tokenSinkRouter.Audit.LogPhysicalOutflow(amount)
+		}
+		l.mutex.Unlock()
+	}
+	return err
+}
 
 // handleReward processes a request for a reward payout, verifying the client's intent
 // via a reverse-signed nonce and then dispatching the reward on-chain.
@@ -77,7 +204,16 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 
 	l.mutex.Lock()
 	history, hasHistory := l.matchHistory[req.ClientID]
-	lastStarted, isProcessing := l.processingRewards[req.ClientID]
+
+	// PILLAR 5: Defensive Map Handling.
+	if l.processingRewards == nil {
+		l.processingRewards = make(map[string]time.Time)
+	}
+
+	// PILLAR 2: Secure Payout Tracking.
+	// Use the authoritative wallet (Claimant) as the key to prevent multi-session claim exploits.
+	lastStarted, isProcessing := l.processingRewards[req.Claimant]
+
 	if !hasHistory || (isProcessing && !lastStarted.IsZero()) {
 		l.mutex.Unlock()
 		http.Error(w, "Unauthorized: Payout unavailable or processing.", http.StatusUnauthorized)
@@ -99,13 +235,13 @@ func (l *Lobby) handleReward(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l.processingRewards[req.ClientID] = time.Now() // Mark as processing
+	l.processingRewards[req.Claimant] = time.Now() // Mark as processing
 	l.mutex.Unlock()
 
 	// Ensure processing status is cleared after function execution
 	defer func() {
 		l.mutex.Lock()
-		delete(l.processingRewards, req.ClientID)
+		delete(l.processingRewards, req.Claimant)
 		l.mutex.Unlock()
 	}()
 
@@ -232,7 +368,7 @@ func (l *Lobby) verifyVoiPayoutOptIn(recipient string) error {
 		return nil
 	}
 
-	optedIn, _, err := l.checkAssetOptIn("VOI", recipient, assetID)
+	optedIn, _, err := l.oracleService.CheckAssetOptIn(l, "VOI", recipient, assetID)
 	if err != nil {
 		return fmt.Errorf("failed to verify payout recipient opt-in: %w", err)
 	}
@@ -243,6 +379,11 @@ func (l *Lobby) verifyVoiPayoutOptIn(recipient string) error {
 }
 
 func (l *Lobby) dispatchReward(recipient, claimant, network string, history MatchHistory) (string, bool, []string, error) {
+	// PILLAR 2: Ledger Integrity.
+	// This function dispatches rewards from the 'playerBalances' virtual liability ledger.
+	// 'ArenaVouchers' are non-crypto and must be converted to 'playerBalances' via
+	// HandleVoucherConversion (onboarding_service.go) before they can be dispatched on-chain.
+	// Therefore, this function correctly does NOT directly access 'PlayerStats.ArenaVouchers'.
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	activeRewards := l.rewardStack
@@ -303,6 +444,7 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 
 	var txns []types.Transaction
 	var totalUnits float64
+	var totalMicro uint64
 	vaultAddrObj, _ := types.DecodeAddress(vaultAddr)
 	// PILLAR 4: Match History Continuity. Include tournament ID and scores for reconstruction.
 	// Refactored: mid = Match ID, tid = Tournament Instance ID
@@ -313,31 +455,42 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	l.playerBalances[claimant] = 0 // Reset virtual balance as it's being committed to this payout
 	l.mutex.Unlock()
 
+	// PILLAR 2: Exit Siphon (Section 11).
+	// A 2% fee is extracted when converting virtual $VBV into on-chain tokens.
+	// This amount returns to the Faucet pool to maintain mathematical circularity.
+	exitSiphonMicro := (virtualBalance * 2) / 100
+	actualPayoutMicro := virtualBalance - exitSiphonMicro
+
+	l.logAdminAudit("EXIT_SIPHON", claimant, fmt.Sprintf("Extracted %d micro-VBV from bridge conversion.", exitSiphonMicro))
+
+	virtualBalanceIncluded := false
+
 	for appIDStr, baseAmt := range activeRewards {
 		appID, err := strconv.ParseUint(appIDStr, 10, 64)
 		if err != nil {
 			continue
 		}
-		amt := uint64(float64(baseAmt) * multiplier)
+		// PILLAR 3: Integer Supremacy. Avoid floating point for balance derivation.
+		amt := (baseAmt * uint64(multiplier*100)) / 100
 
 		// PILLAR 2: Virtual Balance Integration.
 		// Add accumulated balances from non-match activities (Salaries, Heists, Loans) to the primary reward.
 		if appIDStr == l.rewardAssetID {
-			amt += virtualBalance
+			amt += actualPayoutMicro
 		}
 
 		// PILLAR 4: Bounty System Integration.
 		// Add the calculated bounty from MatchHistory if this is the primary Arena asset.
-		if appIDStr == l.rewardAssetID && history.BountyReward > 0 {
+		if appIDStr == l.rewardAssetID && history.BountyRewardMicro > 0 {
 			// Apply Mojo tier multiplier to the bounty portion
-			finalBounty := history.BountyReward * mojoMultiplier
+			finalBounty := float64(history.BountyRewardMicro) / 1000000.0 * mojoMultiplier
 			amt += uint64(finalBounty * 1000000)
 			log.Printf("[FAUCET] Bounty payout of %.2f (scaled by %.2fx Mojo) included for %s", finalBounty, mojoMultiplier, recipient)
 		}
 
 		// NEW: Granular Opt-in Verification
 		// Check if the recipient has a balance box/opt-in for this specific asset in the stack.
-		optedIn, _, err := l.checkAssetOptIn("VOI", recipient, appIDStr)
+		optedIn, _, err := l.oracleService.CheckAssetOptIn(l, "VOI", recipient, appIDStr)
 		if err != nil {
 			log.Printf("[FAUCET] Opt-in check failed for %s on asset %s: %v", recipient, appIDStr, err)
 			skippedAssets = append(skippedAssets, appIDStr)
@@ -367,12 +520,44 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 		}
 
 		totalUnits += float64(amt) / 1000000.0
+		totalMicro += amt
 		txn, _ := transaction.MakeApplicationNoOpTx(appID, nil, []string{recipient}, nil, nil, sp, vaultAddrObj, winNote, types.Digest{}, [32]byte{}, types.Address{})
 		txns = append(txns, txn)
+
+		// PILLAR 2: Virtual Balance Tracking.
+		// Mark that the virtual liability has been successfully included in the outgoing group.
+		if appIDStr == l.rewardAssetID {
+			virtualBalanceIncluded = true
+		}
+	}
+
+	// PILLAR 2: Single-Transaction Safety Cap.
+	// Enforce the 'Circuit Breaker' (1,000 VBV) before signing or dispatching.
+	// If the group exceeds the systemic limit, rollback the virtual balance.
+	if totalMicro > MaxSinglePayoutMicro {
+		l.mutex.Lock()
+		l.playerBalances[claimant] += virtualBalance // ROLLBACK
+		l.mutex.Unlock()
+		log.Printf("[SECURITY ALERT] Payout for %s BLOCKED: Total %d exceeds safety cap.\n", recipient, totalMicro)
+		return "", false, skippedAssets, fmt.Errorf("payout exceeds single-transaction safety limit (%d VBV)", MaxSinglePayoutMicro/1000000)
 	}
 
 	if len(txns) == 0 {
+		// PILLAR 2: Rollback Circuit.
+		// If no transactions were built, restore the player's virtual balance to the ledger.
+		l.mutex.Lock()
+		l.playerBalances[claimant] += virtualBalance
+		l.mutex.Unlock()
 		return "", false, skippedAssets, fmt.Errorf("no rewards dispatched due to insufficient pool balance or configuration issues")
+	}
+
+	// PILLAR 2: Partial Rollback.
+	// If the group is valid but the primary asset was skipped, restore the virtual balance.
+	if !virtualBalanceIncluded && virtualBalance > 0 {
+		l.mutex.Lock()
+		l.playerBalances[claimant] += virtualBalance
+		l.mutex.Unlock()
+		log.Printf("[FAUCET] Virtual balance of %d returned to %s: Primary asset was skipped.", virtualBalance, claimant)
 	}
 
 	gid, _ := crypto.ComputeGroupID(txns)
@@ -388,6 +573,11 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	}
 
 	if _, err := client.SendRawTransaction(signedGroup).Do(context.Background()); err != nil {
+		// PILLAR 2: Rollback Circuit.
+		// If the broadcast fails, restore the virtual balance to the ledger to prevent fund loss.
+		l.mutex.Lock()
+		l.playerBalances[claimant] += virtualBalance
+		l.mutex.Unlock()
 		return "", false, skippedAssets, fmt.Errorf("failed to send reward transaction: %v", err)
 	}
 
@@ -395,10 +585,21 @@ func (l *Lobby) dispatchReward(recipient, claimant, network string, history Matc
 	transaction.WaitForConfirmation(client, firstTxID, 4, context.Background())
 
 	l.mutex.Lock()                // Lock to update faucet balance and re-evaluate dynamic scaling
-	l.faucetBalance -= totalUnits // Deduct from the overall faucet balance
+	// PILLAR 2: Integer Supremacy.
+	// Decrement the authoritative integer reservoir before deriving the display float.
+	if l.faucetBalanceMicro >= totalMicro {
+		l.faucetBalanceMicro -= totalMicro
+	} else {
+		l.faucetBalanceMicro = 0
+	}
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
 	l.applyDynamicScalingLocked() // Re-evaluate dynamic scaling after payout
+
+	if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+		l.tokenSinkRouter.Audit.LogPhysicalOutflow(totalMicro)
+	}
 	l.mutex.Unlock()
 
-	logWinAudit(recipient, network, firstTxID, base64.StdEncoding.EncodeToString(gid[:]), uint64(totalUnits*1000000), history)
+	logWinAudit(recipient, network, firstTxID, base64.StdEncoding.EncodeToString(gid[:]), totalMicro, history)
 	return firstTxID, bonusApplied, skippedAssets, nil
 }

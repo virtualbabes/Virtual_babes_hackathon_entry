@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"strconv"
@@ -42,6 +43,16 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	for _, bal := range l.playerBalances {
 		totalLiabilitiesMicro += bal
 	}
+
+	// PILLAR 2: Phase 4 Expansion. Include non-crypto vouchers in total liabilities
+	// to ensure reward scaling remains conservative and solvent.
+	for _, stats := range l.leaderboard {
+		totalLiabilitiesMicro += stats.ArenaVouchers
+		for _, bounty := range stats.RecoveryBounties {
+			totalLiabilitiesMicro += bounty
+		}
+		totalLiabilitiesMicro += stats.BountyHunterBondMicro
+	}
 	totalLiabilities := float64(totalLiabilitiesMicro) / 1000000.0
 
 	totalClubReserves := 0.0
@@ -49,12 +60,12 @@ func (l *Lobby) applyDynamicScalingLocked() {
 		totalClubReserves += club.Treasury
 	}
 
-	tournamentCommitment := l.tournamentPotBonus
+	tournamentCommitment := float64(l.tournamentPotBonusMicro) / 1000000.0 // PILLAR 2: Integer Supremacy
 	if l.tournament.Active {
-		tournamentCommitment += l.tournament.Pot
+		tournamentCommitment += float64(l.tournament.PotMicro) / 1000000.0 // PILLAR 2: Integer Supremacy
 	}
 
-	usableBalance := l.faucetBalance - 1.0 - totalLiabilities - totalClubReserves - tournamentCommitment - l.pendingTournamentPayouts
+	usableBalance := l.faucetBalance - 1.0 - totalLiabilities - totalClubReserves - tournamentCommitment - (float64(l.pendingTournamentPayoutsMicro) / 1000000.0) // PILLAR 2: Integer Supremacy
 	if usableBalance < 0 {
 		usableBalance = 0
 	}
@@ -73,10 +84,28 @@ func (l *Lobby) applyDynamicScalingLocked() {
 	// 2. Iterate through the entire reward stack and scale based on unscaled initial values.
 	// We clear the stack first to ensure assets removed from the template are purged.
 	l.rewardStack = make(map[string]uint64)
+	var rewardSum uint64
 	for assetID, initialAmt := range l.initialRewards {
 		scaledAmt := uint64(float64(initialAmt) * ratio)
 		l.rewardStack[assetID] = scaledAmt
+		rewardSum += scaledAmt
 	}
+
+	// PILLAR 2: Safety Cap Alignment.
+	// Ensure the sum of un-boosted base rewards does not exceed 50% of the MaxSinglePayoutMicro.
+	// This reserves headroom for Reputation multipliers, Bounties, and Virtual Balances (Salaries/Heists).
+	const rewardSafetyLimit = MaxSinglePayoutMicro / 2
+	if rewardSum > rewardSafetyLimit {
+		log.Printf("[ECONOMY WARNING] Aggregated base rewards (%d) exceed safety limit (%d). Clamping stack to preserve headroom.\n", rewardSum, rewardSafetyLimit)
+		clampRatio := float64(rewardSafetyLimit) / float64(rewardSum)
+		for assetID := range l.rewardStack {
+			l.rewardStack[assetID] = uint64(float64(l.rewardStack[assetID]) * clampRatio)
+		}
+		// Sync the legacy baseReward field
+		l.baseReward = l.rewardStack[l.rewardAssetID]
+	}
+
+	l.RewardRatio = ratio // PILLAR 2: Persist ratio for UI transparency
 
 	log.Printf("[ECONOMY] Dynamic Scaling Applied (Ratio: %.2f). Faucet Capacity: %.2f units.\n", ratio, l.faucetBalance)
 }
@@ -95,15 +124,26 @@ func (l *Lobby) saveSeasonMetadataLocked() {
 		Tournament   TournamentState         `json:"tournament"`
 		SeasonNum    int                     `json:"season_num"`
 		SeasonStart  time.Time               `json:"season_start"`
+		MarketNodes  map[string]EntityMarketNode `json:"market_nodes"` // PILLAR 2: AMM State
 		Rewards      map[string]uint64       `json:"initial_rewards"`
 	}{
+		TournamentPotBonusMicro: l.tournamentPotBonusMicro, // PILLAR 2: Integer Supremacy
 		Balances:     l.playerBalances,
 		Kidnappings:  l.activeKidnappings,
 		MatchHistory: l.matchHistory,
 		Tournament:   l.tournament,
 		SeasonNum:    l.seasonNumber,
 		SeasonStart:  l.seasonStart,
+		MarketNodes:  make(map[string]EntityMarketNode),
 		Rewards:      l.initialRewards,
+		TournamentPotBonusMicro: l.tournamentPotBonusMicro, // PILLAR 2: Integer Supremacy
+	}
+
+	// Deep copy AMM state for snapshotting
+	for id, node := range l.marketNodes {
+		if node != nil {
+			state.MarketNodes[id] = *node
+		}
 	}
 
 	// PILLAR 2: Ledger Integrity.
@@ -227,7 +267,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 			bonus = 300 // Seasonal peak mojo milestone
 		case "TOURNAMENT_CHAMPION":
 			bonus = 200 // Bracket dominance milestone
-		case "GOVERNOR":
+		case "GOVERNOR", "PATRON_OF_THE_ARTS":
 			bonus = 250 // Regional influence milestone
 		case "TREASURY_RECOVERY":
 			bonus = 150 // Organizational resilience milestone
@@ -304,7 +344,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 			// PILLAR 1: Regional Governor Administrative Bonus.
 			// Club owners managing a region (2+ districts) receive a +10% bonus to reflect
 			// their superior administrative influence.
-			if strings.EqualFold(club.OwnerWallet, stats.Wallet) && l.isClubRegionalLocked(club) {
+			if strings.EqualFold(club.OwnerWallet, stats.Wallet) && l.clubService.IsClubRegionalLocked(l, club) {
 				multiplier += 0.10
 			}
 
@@ -317,7 +357,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 	// For Diamond Tier (Rep >= 500) players, cosmetics provide a "Prestige Multiplier".
 	if stats.EquippedFaceplate != "" {
 		if fp, exists := FaceplateRegistry[stats.EquippedFaceplate]; exists {
-			if rep >= 500 {
+			if rep >= 500 { // This is a direct check on 'rep', not stats.GetEffectiveMojo
 				// Diamond Tier: 1 Mojo point = 0.5% prestige multiplier (Max +25% for Governor)
 				prestigeMult := 1.0 + (float64(fp.MojoBonus) * 0.005)
 				rep = int(float64(rep) * prestigeMult)
@@ -325,7 +365,7 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 				// Standard: Additive bonus (1 Mojo = 10 Reputation points)
 				rep += (fp.MojoBonus * 10)
 			}
-		}
+		} // This is a direct check on 'rep', not stats.GetEffectiveMojo
 	}
 
 	// 7. Spreader Multiplier (Market Manipulation Reward)
@@ -366,8 +406,322 @@ func (l *Lobby) CalculateReputation(stats PlayerStats) int {
 		rep += auditBonus
 	}
 
+	// 9. Capital Presence Multiplier (Pillar 1)
+	// Members of the organization controlling the Arena Center receive a 1.25x prestige
+	// boost to reflect their proximity to the sector's administrative core.
+	if stats.EmployerClubID != "" {
+		capitalClub := l.getClubByTerritoryID("arena_center")
+		if capitalClub != nil && capitalClub.ID == stats.EmployerClubID {
+			rep = int(float64(rep) * 1.25)
+		}
+	}
+
+	// PILLAR 3: Career Role Weighting. Apply Hegemony path multiplier.
+	reputationWeighting := float64(l.playerService.GetReputationWeighting(stats.JobRole)) / 100.0
+	rep = int(float64(rep) * reputationWeighting)
+
+	// 10. Security Bonus (Pillar 1)
+	// Regional Governors who have received 5 or more reparations (sabotage surcharges)
+	// this session receive a 1.1x 'Security Bonus' to reflect organizational resilience.
+	if stats.ReparationsReceivedCount >= 5 && stats.EmployerClubID != "" {
+		if club, exists := l.clubs[stats.EmployerClubID]; exists && strings.EqualFold(club.OwnerWallet, stats.Wallet) {
+			if l.clubService.IsClubRegionalLocked(l, club) {
+				rep = int(float64(rep) * 1.1)
+			}
+		}
+	}
+
+	// PILLAR 1: House Authority.
+	// The House Account (Vault) receives a 1.5x multiplier to its total Reputation
+	// to ensure it maintains a top-tier rank as the sector's primary liquidity hub.
+	if l.vaultAddress != "" && strings.EqualFold(stats.Wallet, l.vaultAddress) {
+		rep = int(float64(rep) * 1.5)
+	}
+
 	if rep < 0 {
 		return 0
 	}
 	return rep
+}
+
+// ApplyBountyHunterTaxLocked calculates and logs the 5% Justice Faction tax.
+// PILLAR 1: Industrial Loop.
+func (l *Lobby) ApplyBountyHunterTaxLocked(bountyMicro uint64) uint64 {
+	if bountyMicro == 0 {
+		return 0
+	}
+	// PILLAR 2: Integer Supremacy.
+	taxMicro := (bountyMicro * 5) / 100
+	netMicro := bountyMicro - taxMicro
+
+	l.logAdminAuditLocked("BOUNTY_TAX_COLLECTED", "JUSTICE_POOL", fmt.Sprintf("Amount: %.2f $VBV", float64(taxMicro)/1000000.0))
+	
+	// Taxed funds remain in l.faucetBalanceMicro as a physical asset but are 
+	// removed from the virtual reward liability for this match result.
+	return netMicro
+}
+
+// handleSetDistrictTax allows Regional Governors to adjust the localized sales tax for their territories.
+// PILLAR 1: Political Influence.
+func (l *Lobby) handleSetDistrictTax(env *Envelope) {
+	var data struct {
+		TerritoryID string  `json:"territory_id"`
+		NewRate     float64 `json:"new_rate"` // e.g., 0.08 for 8%
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	wallet, ok := l.wallets[env.FromID]
+	if !ok {
+		return
+	}
+
+	// 1. Identify Authority: Does the club owning this district have Governor status?
+	owningClub := l.getClubByTerritoryID(data.TerritoryID)
+	if owningClub == nil || !strings.EqualFold(owningClub.OwnerWallet, wallet) || !l.clubService.IsClubRegionalLocked(l, owningClub) {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ <b>POLITICAL ERROR:</b> You must be the Regional Governor of this district to adjust taxes."}`)})
+		return
+	}
+
+	// 2. Regulatory Window: Enforce a 0% to 20% tax ceiling.
+	if data.NewRate < 0 || data.NewRate > 0.20 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ <b>POLITICAL ERROR:</b> District tax must be between 0% and 20%."}`)})
+		return
+	}
+
+	// 2.5 Policy Shift: Calculate 1% 'Governor Surcharge' (PILLAR 1).
+	// Governors pay a fee from their organization's treasury to the Arena Center owner
+	// to enact localized tax policy changes.
+	
+	numericID, _ := strconv.ParseUint(strings.TrimPrefix(owningClub.ID, "CLUB-"), 10, 64)
+	var surchargeMicro uint64
+
+	// PILLAR 2: Authoritative Treasury Deduction.
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.Lock()
+		if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+			surchargeMicro = uint64(float64(node.TreasuryBalance) * 0.01 + 0.5)
+			if node.TreasuryBalance >= surchargeMicro {
+				node.TreasuryBalance -= surchargeMicro
+			} else {
+				surchargeMicro = node.TreasuryBalance
+				node.TreasuryBalance = 0
+			}
+			// Sync the UI float from the authoritative integer node
+			owningClub.Treasury = float64(node.TreasuryBalance) / 1000000.0
+		}
+		l.tokenSinkRouter.Mu.Unlock()
+	}
+
+	if surchargeMicro > 0 {
+		arenaCenterClub := l.getClubByTerritoryID("arena_center")
+		matrix := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+		targetClubID := uint64(0)
+
+		if arenaCenterClub != nil {
+			matrix = RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+			targetClubID, _ = strconv.ParseUint(strings.TrimPrefix(arenaCenterClub.ID, "CLUB-"), 10, 64)
+			arenaCenterClub.LastActivity = time.Now()
+			l.GovernorSurchargeTotal += surchargeMicro
+		}
+
+		// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+		if l.tokenSinkRouter != nil {
+			_ = l.tokenSinkRouter.RouteCriminalTax("GOV_SURCHARGE", surchargeMicro, matrix, targetClubID, "")
+
+			// Sync recipients float if it's a club
+			if targetClubID != 0 && arenaCenterClub != nil {
+				if node, ok := l.tokenSinkRouter.ActiveClubs[targetClubID]; ok {
+					arenaCenterClub.Treasury = float64(node.TreasuryBalance) / 1000000.0
+				}
+			}
+
+			l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// 3. Update the TokenSinkRouter registry
+	if l.tokenSinkRouter != nil {
+		l.tokenSinkRouter.Mu.Lock()
+		if metric, exists := l.tokenSinkRouter.RegionalDistricts[data.TerritoryID]; exists {
+			metric.CustomTaxRate = data.NewRate
+			l.tokenSinkRouter.RegionalDistricts[data.TerritoryID] = metric
+		} else {
+			// Initialize metric if it doesn't exist for this district yet
+			l.tokenSinkRouter.RegionalDistricts[data.TerritoryID] = &RegionalGovernanceMetric{
+				GovernorAddress: wallet,
+				CustomTaxRate:   data.NewRate,
+			}
+		}
+		l.tokenSinkRouter.Mu.Unlock()
+	}
+
+	l.logAdminAuditLocked("DISTRICT_TAX_ADJUSTED", wallet, fmt.Sprintf("District: %s, New Rate: %.1f%%", data.TerritoryID, data.NewRate*100))
+
+	// 4. Public Proclamation: Notify the lobby of the policy change.
+	proclamation := fmt.Sprintf("🏛️ <b>GOVERNANCE UPDATE:</b> Governor %s has set the sales tax for %s to <b>%.1f%%</b>.",
+		template.HTMLEscapeString(l.ResolveEnvoiName(wallet)),
+		strings.ReplaceAll(strings.ToUpper(data.TerritoryID), "_", " "),
+		data.NewRate*100)
+
+	// PILLAR 1: High-Intensity Policy Alert.
+	if data.NewRate > 0.10 {
+		proclamation = fmt.Sprintf("⚖️ <b>TAX POLICY ALERT:</b> Governor %s has implemented a high-intensity tax of <b>%.1f%%</b> in %s!",
+			template.HTMLEscapeString(l.ResolveEnvoiName(wallet)),
+			data.NewRate*100,
+			strings.ReplaceAll(strings.ToUpper(data.TerritoryID), "_", " "))
+	}
+
+	payload, _ := json.Marshal(map[string]string{"text": proclamation})
+	l.broadcast <- jsonListEnvelope("chat", payload)
+
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>POLICY UPDATED:</b> Localized sales tax is now active."}`)})
+
+	// Sync UI
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// CalculateSabotageCostLocked determines the dynamic cost of initiating a sabotage protocol.
+// PILLAR 1: Political Influence (Reparation Surcharge).
+func (l *Lobby) CalculateSabotageCostLocked(targetClub *Club) uint64 {
+	// Base: 1,000 $VBV. Surcharge: 500 $VBV.
+	const baseSabotageCostMicro = 1000 * 1000000
+	const infiltrationSurchargeMicro = 500 * 1000000
+	totalBaseMicro := baseSabotageCostMicro + infiltrationSurchargeMicro
+
+	if targetClub == nil {
+		return totalBaseMicro
+	}
+
+	// PILLAR 1: Reparation Surcharge.
+	// Increase cost by 10% for every 5 reparations the owner has received.
+	ownerWallet := strings.ToLower(targetClub.OwnerWallet)
+	ownerStats, exists := l.leaderboard[ownerWallet]
+	if !exists || ownerStats.ReparationsReceivedCount < 5 {
+		return totalBaseMicro
+	}
+
+	// PILLAR 2: Integer Supremacy. 
+	// Calculate surcharge: 10% increase for every 5 reparations. (5-9 -> 1.1x, 10-14 -> 1.2x)
+	multiplierPercent := uint64(100 + (ownerStats.ReparationsReceivedCount/5)*10)
+	finalCostMicro := (totalBaseMicro * multiplierPercent) / 100
+
+	return finalCostMicro
+}
+
+/**
+ * HandlePurchaseRaidInsurance allows a Hostage Host to secure a 24h protection buffer.
+ * PILLAR 1: Industrial Loop (VBV Sink).
+ */
+func (l *Lobby) HandlePurchaseRaidInsurance(env *Envelope) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	if stats.JobRole != "Hostage Host" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Raid Insurance restricted to 'Hostage Host' career path."}`)})
+		return
+	}
+
+	const insuranceCost = 3000 * 1000000
+	if l.playerBalances[wallet] < insuranceCost {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Insufficient rewards for premium (3,000 $VBV required)."}`)})
+		return
+	}
+
+	l.playerBalances[wallet] -= insuranceCost
+	l.faucetBalanceMicro += insuranceCost
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+	stats.RaidInsuranceExpiresAt = time.Now().Add(24 * time.Hour)
+	stats.RaidInsuranceClaimsRemaining = 1
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("RAID_INSURANCE_PURCHASED", wallet, "Premium Paid (3,000 $VBV)")
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"🛡️ <b>INSURANCE ACTIVE:</b> One successful AOS Raid will be blocked for 24 hours."}`)})
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+/**
+ * HandlePurchaseBountyHunterBond allows a player to lock a 1,000 $VBV deposit.
+ * PILLAR 1: Industrial Loop (Locked Capital).
+ */
+func (l *Lobby) HandlePurchaseBountyHunterBond(env *Envelope) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	const bondCost = 1000 * 1000000
+	if stats.BountyHunterBondMicro > 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚠️ <b>BOND ACTIVE:</b> You already have a security deposit in the Justice pool."}`)})
+		return
+	}
+
+	if l.playerBalances[wallet] < bondCost {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Insufficient rewards for bond (1,000 $VBV required)."}`)})
+		return
+	}
+
+	// Execute Liability Shift: Liquid -> Locked
+	l.playerBalances[wallet] -= bondCost
+	stats.BountyHunterBondMicro = bondCost
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("BOND_PURCHASED", wallet, "Bounty Hunter Bond (1,000 $VBV)")
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>BOND SECURED:</b> 1,000 $VBV deposit locked. High-tier Justice missions unlocked."}`)})
+	
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+/**
+ * HandleRefundBountyHunterBond allows a clean player to retrieve their deposit.
+ * PILLAR 1: Industrial Loop (Capital Retrieval).
+ */
+func (l *Lobby) HandleRefundBountyHunterBond(env *Envelope) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	if stats.BountyHunterBondMicro == 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Refund Failed: No active bond found."}`)})
+		return
+	}
+
+	// "Clean Retirement" check: Wanted Level must be low
+	if stats.WantedLevel > 2 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Refund Denied: Signature is currently flagged for infamy. Seek rehabilitation at the Courthouse first."}`)})
+		return
+	}
+
+	// Check for active missions
+	if stats.ActiveJusticeMissionID != "" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Refund Denied: Active mission dossier in progress. Complete or abort it first."}`)})
+		return
+	}
+
+	bondAmount := stats.BountyHunterBondMicro
+	
+	// Execute Liability Shift: Locked -> Liquid
+	stats.BountyHunterBondMicro = 0
+	l.playerBalances[wallet] += bondAmount
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("BOND_REFUNDED", wallet, fmt.Sprintf("Refunded %.2f $VBV", float64(bondAmount)/1000000.0))
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"⚖️ <b>BOND REFUNDED:</b> Security deposit returned to your liquid rewards. High-tier status revoked."}`)})
+	
+	l.applyDynamicScalingLocked()
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }

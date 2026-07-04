@@ -1,16 +1,31 @@
 #### DIRECTORY INDEX & ARCHITECTURE ####
 
 ### 1. AI Development Context
-* `AI-Brain/A.I_memory.md`
+* `AI-Brain/A.I_memory.md` (Authoritative: Tasks Completed)
 * `AI-Brain/DIR.md`
-* `AI-Brain/File-Flow-Overview-1.md`
+* `AI-Brain/File-Flow-Overview-1.md` (Authoritative: Build Map / Blueprint)
 * `AI-Brain/Game_expansion_plan.md`
+* `AI-Brain/LICENSE`
 * `AI-Brain/orphan_fix_list.md`
+* `AI-Brain/Problems.md`
 * `AI-Brain/Rules.md`
-* `AI-Brain/ToDo.md`
+* `AI-Brain/development_plan.md` (Staging & Production Readiness)
+* `AI-Brain/ToDo.md` (Authoritative: Tasks to Complete)
 * `AI-Brain/What_is_this_repository.md`
 * `AI-Brain/Project overview.md`
-* `AI-Brain/Problems.md`
+* `AI-Brain/Telemetry.md`
+
+### 1.1 Development Plans & Archived Blueprints
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/Archived_completed_plans/First-critic-update/`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/second-critic-update/`
+* `Development-production-build/Markdown_developer_volume/development_plan.md`
+* `Development-production-build/Markdown_developer_volume/Devsum.md`
+* `Development-production-build/Markdown_developer_volume/Game_expansion_plan.md`
+* `Development-production-build/Markdown_developer_volume/LICENSE`
+* `Development-production-build/Markdown_developer_volume/Project overview.md`
+* `Development-production-build/Markdown_developer_volume/What_is_this_repository.md`
+* `Development-production-build/NFT-Seduction-Console/LICENSE`
+* `AI-Brain/Console.MD` (Inactive: Platform Expansion Spec)
 
 ### 2. Public Audio Asset Files 
 
@@ -29,6 +44,7 @@
 * `Public/Assets/Audio/Lady/woman-laugh-6421.mp3`
 * `Public/Assets/Audio/Mini-Boss/creepy-laugh-36864.mp3`
 * `Public/Assets/Audio/Mini-Boss/possessed-laugh-laugh-stereo-95060.mp3`
+* `Public/Assets/Audio/Mini-Boss/very-evil-laugh-205258.mp3`
 * `Public/Assets/Audio/Mini-Boss/sinister-laugh-146634.mp3`
 * `Public/Assets/Audio/Witch/evil-laugh-7-103773.mp3`
 * `Public/Assets/Audio/Witch/evil-witch-laugh-140135.mp3`
@@ -57,18 +73,22 @@
 * `Public/Assets/Audio/click.mp3`
 * `Public/Assets/Audio/Connected.mp3`
 * `Public/Assets/Audio/Disconnect.mp3`
+* `Public/Assets/Audio/Start_intense.mp3`
 * `Public/Assets/Audio/Gear_up_shot.mp3`
 * `Public/Assets/Audio/Pay_out-in.mp3`
+* `Public/Assets/Audio/Pay_out-in-2.mp3`
+* `Public/Assets/Audio/Toggle_bip.mp3`
+* `Public/Assets/Audio/Select-place-card.mp3`
+* `Public/Assets/Audio/Chain_reaction.mp3`
+* `Public/Assets/Audio/flip.mp3`
 
 ## D: Game_Feedback
-* `AI-Brain/File-Flow-Overview-1.md`
 * `Public/Assets/Audio/Chalenge_declined.mp3`
 * `Public/Assets/Audio/Chalenge_declined1.mp3`
 * `Public/Assets/Audio/Chalenge_declined2.mp3`
 * `Public/Assets/Audio/Chalenge_declined3.mp3`
 * `Public/Assets/Audio/Challenge_wait.mp3`
 * `Public/Assets/Audio/ehn.wav`
-* `Public/Assets/Audio/flip.mp3`
 * `Public/Assets/Audio/grah.wav`
 * `Public/Assets/Audio/opponent_lose.wav`
 * `Public/Assets/Audio/opponent_lose_2.wav`
@@ -91,11 +111,16 @@
 * `Public/Assets/Audio/opponent_win_lucky.wav`
 * `Public/Assets/Audio/opponent_winning_witch.wav`
 * `Public/Assets/Audio/opponet_losing_witch.wav`
-* `Public/Assets/Audio/Select-place-card.mp3`
-* `Public/Assets/Audio/Toggle_bip.mp3`
 * `Public/Assets/Audio/ugh_3.wav`
-* `Public/Assets/Audio/Crowd/applause_player_win.mp3`
-* `Public/Assets/Audio/Start_intense.mp3`
+* `Public/Assets/Audio/Cyber-Pulse.mp3`
+* `Public/Assets/Audio/Industrial_Hum.mp3`
+* `Public/Assets/Audio/interupt_warning.mp3`
+* `Public/Assets/Audio/Warning_long.mp3`
+* `Public/Assets/Audio/Challenge_accepted.mp3`
+* `Public\Assets\Audio\High-pitched_static_discharge.mp3`
+* `Public\Assets\Audio\Dog_bark.mp3`
+* `Public\Assets\Audio\High-fidelity-synth.mp3`
+* `Public\Assets\Audio\Pay_out-in-2.mp3`
 
 ### 3. Public Visuals
 
@@ -117,39 +142,63 @@
 * `Public/Assets/Images/Cards/Triz.webp`
 * `Public/Assets/Images/Cards/Xai.webp`
 
-## B: Fan_fare_Avatars
-* `Public/Assets/Images/portraits/Boss/The_architect/The_architect.mp4`
-* `Public/Assets/Images/portraits/Boss/The_architect/The_architect (2).mp4`
-* `Public/Assets/Images/portraits/Boss/The_architect/The_architect (3).mp4`
-* `Public/Assets/Images/portraits/Boss/The_architect/The_architect.webp`
-* `Public/Assets/Images/portraits/cute/Angelina/Angelina.mp4`
-* `Public/Assets/Images/portraits/cute/Angelina/Angelina_2.mp4`
-* `Public/Assets/Images/portraits/cute/Angelina/Angelina.webp`
-* `Public/Assets/Images/portraits/cute/Crypto_seraph/Crypto_seraph.mp4`
-* `Public/Assets/Images/portraits/cute/Crypto_seraph/Crypto_seraph_2.mp4`
-* `Public/Assets/Images/portraits/cute/Crypto_seraph/Crypto_seraph_3.mp4`
-* `Public/Assets/Images/portraits/cute/Crypto_seraph/Crypto_seraph.webp`
-* `Public/Assets/Images/portraits/Lady/Beaten_angelina/Beaten_angelina.mp4`
-* `Public/Assets/Images/portraits/Lady/Beaten_angelina/beaten_angelina (2).mp4`
-* `Public/Assets/Images/portraits/Lady/Beaten_angelina/Beaten_angelina.webp`
-* `Public/Assets/Images/portraits/Lady/Casino_sucubus/Casino_sucubus.mp4`
-* `Public/Assets/Images/portraits/Lady/Casino_sucubus/Casino_sucubus_2.mp4`
-* `Public/Assets/Images/portraits/Lady/Casino_sucubus/Casino_sucubus_3.mp4`
-* `Public/Assets/Images/portraits/Lady/Casino_sucubus/Casino_sucubus.webp`
-* `Public/Assets/Images/portraits/Lady/Zoe/zoe.mp4`
-* `Public/Assets/Images/portraits/Lady/Zoe/zoe_2.mp4`
-* `Public/Assets/Images/portraits/Lady/Zoe/zoe_3.mp4`
-* `Public/Assets/Images/portraits/Mini-Boss/Evil_angelina/Evil_angelina.mp4`
-* `Public/Assets/Images/portraits/Mini-Boss/Evil_angelina/Evil_angelina (2).mp4`
-* `Public/Assets/Images/portraits/Mini-Boss/Evil_angelina/Evil_angelina (3).mp4`
-* `Public/Assets/Images/portraits/Mini-Boss/Evil_angelina/Evil_angelina.webp`
-* `Public/Assets/Images/portraits/Witch/Evil_jackpot_Jessica/Evil_jackpot_jessica.mp4`
-* `Public/Assets/Images/portraits/Witch/Evil_jackpot_Jessica/Evil_jackpot_jessica.png`
-* `Public/Assets/Images/portraits/Witch/Evil_jackpot_Jessica/Evil_jackpot_Jessica.webp`
-* `Public/Assets/Images/portraits/Witch/Jackpot_jessica/jackpot_jessica.mp4`
-* `Public/Assets/Images/portraits/Witch/Jackpot_jessica/Jackpot_jessica.webp`
+## B: Cosmetics
+* `Public/Assets/Images/Cosmetics/faceplate_governor.webp`
+* `Public/Assets/Images/Cosmetics/faceplate_neon_vibe.webp`
+* `Public/Assets/Images/Cosmetics/faceplate_shadow.webp`
 
-## C: Textures
+## C: Effects
+* `Public/Assets/Images/Effects/Biological-corruption.webp`
+* `Public/Assets/Images/Effects/Buffer-overflow.webp`
+* `Public/Assets/Images/Effects/Core-dissolution.webp`
+* `Public/Assets/Images/Effects/Crystalline-overgrowth.webp`
+* `Public/Assets/Images/Effects/Cybernetic-fracture.webp`
+* `Public/Assets/Images/Effects/Data-purge.webp`
+* `Public/Assets/Images/Effects/Entropic-leak.webp`
+* `Public/Assets/Images/Effects/Firewall-breach.webp`
+* `Public/Assets/Images/Effects/Grid-decoupling.webp`
+* `Public/Assets/Images/Effects/Hardware-override.webp`
+* `Public/Assets/Images/Effects/Kernel-panic.webp`
+* `Public/Assets/Images/Effects/Memory-leak.webp`
+* `Public/Assets/Images/Effects/mutation_scar_overlay_complete.webp`
+* `Public/Assets/Images/Effects/mutation_scar_overlay.webp`
+* `Public/Assets/Images/Effects/Nano-plague.webp`
+* `Public/Assets/Images/Effects/Neural-overclock.webp`
+* `Public/Assets/Images/Effects/Organic-corruption.webp`
+* `Public/Assets/Images/Effects/System-meltdown.webp`
+
+## D: Icons
+* `Public/Assets/Images/icons/Grounded.webp`
+* `Public/Assets/Images/icons/Serene.webp`
+* `Public/Assets/Images/icons/Spirited.webp`
+* `Public/Assets/Images/icons/Volatile.webp`
+
+## E: Items
+* `Public/Assets/Images/Items/bio_guard_dog.webp`
+* `Public/Assets/Images/Items/laser_tripwire.webp`
+* `Public/Assets/Images/Items/sentry_turret.webp`
+
+## F: Portraits (Avatars)
+* `Public/Assets/Images/portraits/Boss/The_architect/`
+* `Public/Assets/Images/portraits/cute/Angelina/`
+* `Public/Assets/Images/portraits/cute/Crypto_seraph/`
+* `Public/Assets/Images/portraits/Lady/Beaten_angelina/`
+* `Public/Assets/Images/portraits/Lady/Casino_sucubus/`
+* `Public/Assets/Images/portraits/Lady/Zoe/`
+* `Public/Assets/Images/portraits/Mini-Boss/Evil_angelina/`
+* `Public/Assets/Images/portraits/Witch/Evil_jackpot_jessica/`
+* `Public/Assets/Images/portraits/Witch/Jackpot_jessica/`
+
+## G: Learning-media
+* `Public/Assets/Learning-media/*.mp4`
+* `Public/Assets/Learning-media/*.pdf`
+* `Public/Assets/Learning-media/*.pptx`
+
+## H: Markdown-guide-volumes
+* `Public/Assets/Markdown-guide-volumes/*.md`
+* `Public/Assets/Markdown-guide-volumes/LICENSE`
+
+## I: Textures
 * `Public/Assets/Textures/arena_floor.png`
 * `Public/Assets/Textures/arena_floor_challenge.png`
 * `Public/Assets/Textures/arena_floor_tournament.png`
@@ -158,33 +207,29 @@
 
 ## D: UI_filesys
 * `Public/index.html`
+* `Public/favicon.ico`
+* `Public/favicon.png`
+* `Public/LICENSE`
 * `Public/styles.css`
 * `Public/styles.css.map`
 * `Public/src/scss/main.scss`
-* `Public/src/scss/base/_reset.scss`
-* `Public/src/scss/base/_typography.scss`
-* `Public/src/scss/base/_variables.scss`
-* `Public/src/scss/base/_dashboard.scss`
-* `Public/src/scss/components/_buttons.scss`
-* `Public/src/scss/components/_cards.scss`
-* `Public/src/scss/components/_overlays.scss`
-* `Public/src/scss/features/_criminality.scss`
-* `Public/src/scss/features/_economy.scss`
-* `Public/src/scss/features/_shops.scss`
-* `Public/src/scss/features/_social.scss`
-* `Public/src/scss/features/_territory.scss`
-* `Public/src/scss/layouts/_dashboard.scss`
-* `Public/src/scss/layouts/_main-layout.scss`
-* `Public/src/scss/themes/_neon-glass.scss`
-* `Public/src/scss/utilities/_animations.scss`
-* `Public/src/scss/utilities/_spacing.scss`
+* `Public/src/scss/base/`
+* `Public/src/scss/components/`
+* `Public/src/scss/features/`
+* `Public/src/scss/layouts/`
+* `Public/src/scss/themes/`
+* `Public/src/scss/utilities/`
 
 ### 4. Public-js-Scripts
 * `Public/app.js`
 * `Public/collective-intelligence.js`
+* `Public/wasm_exec.js`
+* `Public/main.wasm`
 * `Public/js/admin.js`
 * `Public/js/audio.js`
+* `Public/js/audio_context.js` (Phase 6: Contextual Ambient Music Manager — game-phase-aware audio transitions)
 * `Public/js/config.js`
+* `Public/js/rivalry.js` (Rival Engagement Manager — NPC interaction routing and state tracking)
 * `Public/js/criminality.js`
 * `Public/js/deck.js`
 * `Public/js/economy.js`
@@ -195,99 +240,118 @@
 * `Public/js/ui.js`
 * `Public/js/utils.js`
 * `Public/js/wallet.js`
-* `Public/wasm_exec.js`
 
 ### 5. Root DIR
 
-## A. .go-files
+ ## A. .go-files
+ * `player_service.go`
+ * `resilience_utils.go`
+ * `achievement_service.go`
+ * `auction_service.go`
+ * `backend_types.go`
+ * `battle_service.go`
+ * `black_market_service.go`
+ * `bridge_service.go`
+ * `career.go`
+ * `club_service.go`
+ * `common_types.go`
+ * `courthouse_service.go`
+ * `economy_audit.go`
+ * `economy_bootstrap.go`
+ * `economy_persistence.go`
+ * `economy_processing.go`
+ * `economy_service.go`
+ * `economy_telemetry.go`
+ * `employment_service.go`
+ * `faucet_service.go`
+ * `handlers_admin.go`
+ * `handlers_criminality.go`
+ * `handlers_public.go`
+ * `handlers_rumor.go`
+ * `item_service.go`
+ * `loan_service.go`
+ * `lobby_manager.go`
+ * `main.go` (Deterministic Engine Source)
+ * `market_service.go`
+ * `narrative_service.go`
+ * `onboarding_service.go`
+ * `oracle_service.go`
+ * `player_service.go`
+ * `resilience_utils.go`
+ * `nautilus_dex_path.go`
+ * `redemption_gateway.go`
+ * `rate_limiter.go` (Pillar 1-C: Rate Limiting & DDoS Mitigation — token bucket + sliding window with per-wallet quota tiers)
+ * `server.go`
+ * `shop_registry.go`
+ * `tournament_manager.go`
 
-# A1. Server
-
-* `achievement_service.go`
-* `auction_service.go`
-* `battle_service.go`
-* `backend_types.go`
-* `black_market_service.go`
-* `bridge_service.go`
-* `career.go`
-* `club_service.go`
-* `common_types.go`
-* `courthouse_service.go`
-* `economy_processing.go`
-* `economy_service.go`
-* `employment_service.go`
-* `faucet_service.go`
-* `handlers_admin.go`
-* `handlers_criminality.go`
-* `handlers_public.go`
-* `handlers_rumor.go`
-* `item_service.go`
-* `loan_service.go`
-* `lobby_manager.go`
-* `narrative_service.go`
-* `market_service.go`
-* `onboarding_service.go`
-* `oracle_service.go`
-* `server.go`
-* `shop_registry.go`
-* `tournament_manager.go`
-
-# A2. Game-interaction
-
-* `main.go`
+# A1. Service Tests
+* `market_service_test.go`
+* `club_service_test.go`
 
 ## B. System-Root-system
 
 # B1. .go-doc
-
 * `go.mod`
 * `go.sum`
-* `jsconfig.json`
 
 # B2. .env
-
 * `.env.example`
 
 # B3. .gitignore
-
 * `.gitignore`
 
 # B4. .gitattributes
-
 * `.gitattributes`
 
 # B5. AI_exclude
-
 * `ai_exclude`
 
-# B6. .yaml
+# B6. Environment
+* `.env.example`
 
+# B6. .yaml
 * `deploy-wasm.yml`
 
 # B7. Docker-file
-
 * `Dockerfile`
 * `.dockerignore`
 * `entrypoint.sh`
 
 # B8. System Configs (.json)
-
 * `render.yaml`
 * `networks.json`
 * `package-lock.json`
 * `package.json`
+* `jsconfig.json`
+* `LICENSE` (Root)
+* `README.md`
 
 # B9. server-bin
-
 * `server-bin`
 * `season.json` 
 
 # B10. License
 * `LICENSE`
 
-# C. root_documents 
+## C. Development-production-build
+* `Development-production-build/Markdown_developer_volume/development_plan.md`
+* `Development-production-build/Markdown_developer_volume/Devsum.md`
+* `Development-production-build/Markdown_developer_volume/Game_expansion_plan.md`
+* `Development-production-build/Markdown_developer_volume/LICENSE`
+* `Development-production-build/Markdown_developer_volume/Project overview.md`
+* `Development-production-build/Markdown_developer_volume/What_is_this_repository.md`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/Archived_completed_plans/First-critic-update/High_level_critic.md`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/second-critic-update/Console.MD`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/second-critic-update/Economic-Stability-Analysis-Mechanics of Value and Anti-Whale Dynamics in the Virtualbabes Arena.md`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/second-critic-update/Ledger_Verification_Plan.md`
+* `Development-production-build/Markdown_developer_volume/Plans-&-goals/second-critic-update/Telemetry.md`
+* `Development-production-build/NFT-Seduction-Console/LICENSE`
 
+# C. root_documents 
 * `README.md`
 * `User_manual.md`
 * `Devsum.md`
 * `development_plan.md`
+* `Telemetry.md`
+* `What_is_this_repository.md`

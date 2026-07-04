@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -15,6 +15,85 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
 )
 
+// handleSpectatorWager processes spectator bets on ongoing matches.
+// PILLAR 2: Industrial Loop (Spectator Siphon).
+func (l *Lobby) handleSpectatorWager(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		SpectatorWallet string `json:"spectator_wallet"`
+		MatchID         string `json:"match_id"` // This should be the P1ID of the match
+		BetOnWallet     string `json:"bet_on_wallet"`
+		WagerMicro      uint64 `json:"wager_micro"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.SpectatorWallet == "" || req.MatchID == "" || req.BetOnWallet == "" || req.WagerMicro == 0 {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	spectatorWallet := strings.ToLower(req.SpectatorWallet)
+	betOnWallet := strings.ToLower(req.BetOnWallet)
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	// 1. Validate Spectator's Balance
+	if l.playerBalances[spectatorWallet] < req.WagerMicro {
+		http.Error(w, "Insufficient rewards for wager", http.StatusPaymentRequired)
+		return
+	}
+
+	// 2. Find the Match and Validate Participants
+	match, ok := l.matches[req.MatchID] // MatchState is keyed by P1ID
+	if !ok {
+		http.Error(w, "Match not found or no longer active", http.StatusNotFound)
+		return
+	}
+
+	// Ensure the match is still active and not finished
+	if match.IsFinished {
+		http.Error(w, "Cannot place wager on a finished match", http.StatusForbidden)
+		return
+	}
+
+	// Ensure the spectator is actually spectating this match
+	isSpectator := false
+	for _, sID := range match.Spectators {
+		if sWallet, ok := l.wallets[sID]; ok && strings.EqualFold(sWallet, spectatorWallet) {
+			isSpectator = true
+			break
+		}
+	}
+	if !isSpectator {
+		http.Error(w, "You are not spectating this match", http.StatusForbidden)
+		return
+	}
+	// PILLAR 2: Fair Play Enforcement. Prevent players from betting on their own matches.
+	if strings.EqualFold(match.P1Wallet, spectatorWallet) || strings.EqualFold(match.P2Wallet, spectatorWallet) {
+		http.Error(w, "You cannot place a wager on your own match.", http.StatusForbidden)
+		return
+	}
+
+	// Ensure betOnWallet is a valid participant in the match
+	if !strings.EqualFold(match.P1Wallet, betOnWallet) && !strings.EqualFold(match.P2Wallet, betOnWallet) {
+		http.Error(w, "Invalid player to bet on", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Deduct Wager from Spectator and Add to Match Pool
+	l.playerBalances[spectatorWallet] -= req.WagerMicro
+	match.WagersMicro += req.WagerMicro
+
+	// 4. Log the event
+	l.logAdminAuditLocked("SPECTATOR_WAGER", spectatorWallet, fmt.Sprintf("Match: %s, BetOn: %s, Amount: %d micro-VBV", req.MatchID, betOnWallet, req.WagerMicro))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Wager placed successfully"})
+}
+
 func (l *Lobby) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	type entry struct {
 		Wins             int       `json:"wins"`
@@ -24,6 +103,8 @@ func (l *Lobby) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 		BestRating       string    `json:"best_rating"`
 		BanExpires       time.Time `json:"ban_expires"`
 		Wallet           string    `json:"wallet"`
+		TotalDonated     uint64    `json:"total_donated"`
+		ReparationsReceivedCount int `json:"reparations_received_count"`
 	}
 	var list []entry
 	l.mutex.RLock()
@@ -32,6 +113,8 @@ func (l *Lobby) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 			Wins: stats.Wins, DNFs: stats.DNFs, DisconnectStreak: stats.DisconnectStreak,
 			Reputation: stats.Reputation, BestRating: stats.BestRating,
 			BanExpires: stats.BanExpires, Wallet: w,
+			TotalDonated: stats.TotalDonated,
+			ReparationsReceivedCount: stats.ReparationsReceivedCount,
 		})
 	}
 	l.mutex.RUnlock()
@@ -76,12 +159,13 @@ func (l *Lobby) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	balance := l.faucetBalance
 	clientsCount := len(l.clients)
+	nodeReport := l.getHealthReportLocked()
 	l.mutex.RUnlock()
 
 	isHealthy := true
 	var errs []string
 
-	// 1. Verify RPC Connectivity (Cycle through all available nodes)
+	// 1. Verify RPC Connectivity (Cycle through all available nodes with LlamaRPC failover)
 	rpcResponded := false
 	if ok && len(voiConfig.NodeURLs) > 0 {
 		for _, url := range voiConfig.NodeURLs {
@@ -105,27 +189,100 @@ func (l *Lobby) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Verify Faucet Liquidity (Gas Check)
-	// The Arena requires at least 1.0 VOI/VBV in the vault to function correctly.
 	if balance < 1.0 {
 		isHealthy = false
 		errs = append(errs, "low_liquidity")
 	}
 
 	status := struct {
-		Status      string   `json:"status"`
-		Connections int      `json:"connections"`
-		Vault       float64  `json:"vault_balance"`
-		Errors      []string `json:"errors,omitempty"`
-	}{Status: "ok", Connections: clientsCount, Vault: balance}
+		Status      string            `json:"status"`
+		Connections int               `json:"connections"`
+		Vault       float64           `json:"vault_balance"`
+		Nodes       []NodeHealthReport `json:"nodes,omitempty"`
+		Errors      []string          `json:"errors,omitempty"`
+	}{Status: "ok", Connections: clientsCount, Vault: balance, Nodes: nodeReport}
 
 	if !isHealthy {
 		status.Status = "unhealthy"
 		status.Errors = errs
-		w.WriteHeader(http.StatusServiceUnavailable) // Return 503 so Render triggers a restart
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(status)
+}
+
+// getHealthReportLocked returns the node health report. Must be called under l.mutex.RLock.
+func (l *Lobby) getHealthReportLocked() []NodeHealthReport {
+	if l.ledgerClient == nil {
+		return nil
+	}
+	return l.ledgerClient.GetHealthReport()
+}
+
+// handleLiveEndpoint provides the /live Kubernetes-compatible liveliness probe.
+// This endpoint always returns 200 as long as the process is running, allowing
+// Kubernetes/Render to detect if the server process is alive regardless of external dependencies.
+func (l *Lobby) handleLiveEndpoint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":    "alive",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"uptime":    time.Since(l.seasonStart).Round(time.Second).String(),
+	})
+}
+
+// handleReadyEndpoint provides the /ready Kubernetes-compatible readiness probe.
+// This endpoint returns 200 only when all critical dependencies are operational,
+// including RPC connectivity and faucet liquidity.
+func (l *Lobby) handleReadyEndpoint(w http.ResponseWriter, r *http.Request) {
+	l.mutex.RLock()
+	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
+	balance := l.faucetBalance
+	nodeReport := l.getHealthReportLocked()
+	l.mutex.RUnlock()
+
+	isReady := true
+	var notReady []string
+
+	// Check RPC connectivity
+	if !ok || len(voiConfig.NodeURLs) == 0 {
+		isReady = false
+		notReady = append(notReady, "voi_config_missing")
+	} else {
+		for _, url := range voiConfig.NodeURLs {
+			client, _ := algod.MakeClient(url, "")
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			err := client.HealthCheck().Do(ctx)
+			cancel()
+			if err == nil {
+				break
+			}
+			notReady = append(notReady, fmt.Sprintf("node_down:%s", url))
+			isReady = false
+		}
+	}
+
+	// Check faucet liquidity
+	if balance < 1.0 {
+		isReady = false
+		notReady = append(notReady, "low_liquidity")
+	}
+
+	statusCode := http.StatusOK
+	if !isReady {
+		statusCode = http.StatusServiceUnavailable
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      map[string]bool{"ready": isReady},
+		"nodes":       nodeReport,
+		"vault_balance": balance,
+		"not_ready":   notReady,
+	})
 }
 
 func (l *Lobby) handleCardStats(w http.ResponseWriter, r *http.Request) {

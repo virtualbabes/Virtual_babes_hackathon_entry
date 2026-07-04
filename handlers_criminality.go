@@ -1,14 +1,57 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var ErrAttackerAlreadyHoldsHostage = errors.New("you already have an active kidnapping operation against this target")
+
+// RegisterKidnap validates and records a new hostage event in the registry.
+// PILLAR 3: Multi-Slot Attacker Isolation.
+func (vr *VictimRegistry) RegisterKidnap(victim string, attacker string, assetID uint64, ransom uint64) error {
+	if vr == nil {
+		return errors.New("victim registry not initialized")
+	}
+
+	vr.Mu.Lock()
+	defer vr.Mu.Unlock()
+
+	// Ensure the victim entry exists in the top-level map
+	if vr.ActiveKidnaps == nil {
+		vr.ActiveKidnaps = make(map[string]map[string]HostageSituation)
+	}
+	if _, exists := vr.ActiveKidnaps[victim]; !exists {
+		vr.ActiveKidnaps[victim] = make(map[string]HostageSituation)
+	}
+
+	// Check if this SPECIFIC attacker already occupies a slot against this victim
+	now := time.Now().Unix()
+	if existingSituation, exists := vr.ActiveKidnaps[victim][attacker]; exists {
+		if now < existingSituation.ExpirationTime {
+			return ErrAttackerAlreadyHoldsHostage
+		}
+		// Clean up expired situation
+		delete(vr.ActiveKidnaps[victim], attacker)
+	}
+
+	// Register the new high-stakes capture
+	vr.ActiveKidnaps[victim][attacker] = HostageSituation{
+		AttackerAddress: attacker,
+		AssetID:         assetID,
+		RansomAmount:    ransom,
+		ExpirationTime:  time.Now().Add(48 * time.Hour).Unix(),
+	}
+
+	return nil
+}
 
 // KidnapData represents the parameters for initiating a Kidnap Gambit.
 type KidnapData struct {
@@ -40,13 +83,6 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	l.ensurePlayerStatsMapsInitialized(victimWallet)
 	victimStats, victimExists := l.leaderboard[victimWallet]
 	if !victimExists {
-		return
-	}
-
-	// PILLAR 3: Strategic Balance.
-	// Prevent kidnapping if the victim already has an active hostage situation.
-	if len(victimStats.HeldHostageCards) > 0 {
-		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Kidnap Failed: Target already has an active hostage situation."}`)})
 		return
 	}
 
@@ -84,6 +120,15 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 
 	targetCardID := cardToKidnap.ID
 
+	// PILLAR 3: Multi-Slot Attacker Isolation.
+	// Register the kidnap attempt. This will fail if the attacker already holds a hostage from this victim.
+	// This logic replaces the previous "one active crisis per victim" rule which was vulnerable to self-kidnapping.
+	if err := l.victimRegistry.RegisterKidnap(victimWallet, perpWallet, uint64(targetCardID), data.RansomAmount); err != nil {
+		msg := fmt.Sprintf(`{"text":"❌ Kidnap Failed: %v"}`, err)
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(msg)})
+		return
+	}
+
 	// Remove the card from the victim's inventory
 	cardKey := fmt.Sprintf("CARD-%d", targetCardID)
 	victimStats.Inventory[cardKey]--
@@ -105,6 +150,97 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 		perpStats.KidnappedCards = make(map[int]string)
 	}
 	perpStats.KidnappedCards[targetCardID] = victimWallet
+
+	// Career XP: Kidnapper (Underworld #3) gains XP per successful hostage capture
+	l.TrackCareerXP(perpWallet, "Kidnapper", 80)
+
+	// P2-A: Rival Pair — Kidnapper ↔ Bounty Hunter / Forensic Analyst / Warden (antagonistic)
+	if perpStats.CareerXP != nil && victimStats.CareerXP != nil {
+		rxp, pair, isRival := EvaluateCrossCareerXP("Kidnapper", victimStats.JobRole, 80, perpStats, victimStats)
+		if isRival && rxp > 80 {
+			l.TrackCareerXP(perpWallet, "Kidnapper", rxp-80)
+			_ = pair // Suppress unused warning if needed
+		}
+	}
+
+	// P2-A: Rival Pair — Warden (Justice D3) gains XP monitoring kidnapping events
+	l.TrackCareerXP(perpWallet, "Warden", 25)
+
+	// Underworld #6 Racketeer — earns XP extorting protection money per kidnapping
+	l.TrackCareerXP(perpWallet, "Racketeer", 40)
+
+	// P2-A: Rival Pair — Smuggler ↔ Sector Peacekeeper (antagonistic)
+	if perpStats.CareerXP != nil {
+		rxp3, _, _ := EvaluateCrossCareerXP("Smuggler", victimStats.JobRole, 30, perpStats, victimStats)
+		if rxp3 > 30 {
+			l.TrackCareerXP(perpWallet, "Smuggler", rxp3-30)
+		}
+	}
+
+	// Justice D5 Forensic Analyst — forensic trace reward at detection time
+	if l.leaderboard != nil {
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "Forensic Analyst" {
+				l.TrackCareerXP(statsWallet, "Forensic Analyst", 60)
+			}
+		}
+	}
+
+	// Justice D3 Warden — monitors all hostage activity across the sector
+	if l.leaderboard != nil {
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "Warden" {
+				l.TrackCareerXP(statsWallet, "Warden", 25)
+			}
+		}
+	}
+
+	// Justice D6 Sector Peacekeeper — maintains sector order during criminal events
+	if l.leaderboard != nil {
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "Sector Peacekeeper" {
+				l.TrackCareerXP(statsWallet, "Sector Peacekeeper", 20)
+			}
+		}
+	}
+
+	// Track this as an active kidnapping for Hostage Host progression tracking
+	if perpStats.ActiveHostageCount == 0 {
+		// First hostage — Hostage Host career milestone
+		l.TrackCareerXP(perpWallet, "Hostage Host", 50)
+	}
+	perpStats.ActiveHostageCount++
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-005).
+	// Objective: Successfully execute a Kidnap Gambit.
+	if perpStats.ActiveUnderworldContractID == "CONTRACT-005" {
+		const rewardMicro = 3000 * 1000000
+		l.playerBalances[perpWallet] += rewardMicro
+		perpStats.ActiveUnderworldContractID = ""
+		l.logAdminAuditLocked("CONTRACT_COMPLETED", perpWallet, "ID: CONTRACT-005, Payout: 3000.00")
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> High-value ransom secured. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0))})
+		l.applyDynamicScalingLocked()
+	}
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-010).
+	// Objective: Successfully execute a Kidnap Gambit against a Regional Governor's favorite card.
+	if perpStats.ActiveUnderworldContractID == "CONTRACT-010" &&
+		l.clubService.IsClubRegionalLocked(l, targetClub) &&
+		victimStats.FavoriteCardID == targetCardID {
+		const rewardMicro = 5000 * 1000000
+		l.playerBalances[perpWallet] += rewardMicro
+		perpStats.ActiveUnderworldContractID = ""
+		l.logAdminAuditLocked("CONTRACT_COMPLETED", perpWallet, "ID: CONTRACT-010, Payout: 5000.00")
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Governor's favorite card secured. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+		})
+		l.applyDynamicScalingLocked()
+	}
+
 	l.leaderboard[perpWallet] = perpStats
 
 	// Track Expiration for Insurance Recovery (48 Hours)
@@ -178,11 +314,20 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	l.ensurePlayerStatsMapsInitialized(victimWallet)
 	l.ensurePlayerStatsMapsInitialized(data.PerpWallet)
 
-	// INDUSTRIAL LOOP: Gross ransom returns to the general Faucet pool.
-	// Use integer math with rounding to the nearest micro-unit to prevent dust leaks.
+	// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+	// Shift liabilities: Victim -> Perp (80%) + Faucet (20% Laundering Tax).
 	arenaFeeMicro := (data.RansomAmount*20 + 50) / 100
 	perpShareMicro := data.RansomAmount - arenaFeeMicro
 	l.playerBalances[data.PerpWallet] += perpShareMicro
+
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 1.0, ClubShare: 0.0, GovernanceShare: 0.0}
+		// PILLAR 2: Forensic Visibility. Use global sector context for ransom taxes.
+		_ = l.tokenSinkRouter.RouteCriminalTax("sector_all", arenaFeeMicro, matrix, 0, "")
+
+		// Sync float balance with authoritative micro-unit total
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	}
 
 	// PILLAR 3: Financial Proof.
 	// Record successful ransom on-chain for the immutable audit trail.
@@ -213,6 +358,16 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	// Remove from tracking
 	delete(l.activeKidnappings, data.CardID)
 
+	// PILLAR 3: Modular Authority. Clear the record from the multi-slot registry.
+	l.victimRegistry.Mu.Lock()
+	if attackers, exists := l.victimRegistry.ActiveKidnaps[victimWallet]; exists {
+		delete(attackers, data.PerpWallet)
+		if len(attackers) == 0 {
+			delete(l.victimRegistry.ActiveKidnaps, victimWallet)
+		}
+	}
+	l.victimRegistry.Mu.Unlock()
+
 	l.logAdminAuditLocked("RANSOM_PAID", victimWallet, fmt.Sprintf("Paid %d to %s for Card #%d (Fee: %d)", data.RansomAmount, data.PerpWallet, data.CardID, arenaFeeMicro))
 
 	// Dispatch on-chain log for financial verification
@@ -225,6 +380,22 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 	perpClientID := l.getClientIDFromWalletLocked(data.PerpWallet)
 	if perpClientID != "" {
 		l.sendToClientLocked(perpClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>RANSOM RECEIVED:</b> %s paid %.2f $VBV for card release (Net: %.2f $VBV after Arena fees)."}`, victimWallet, float64(data.RansomAmount)/1000000.0, float64(perpShareMicro)/1000000.0))})
+	}
+
+	// Justice D3 Warden — earns XP monitoring financial flows during releases
+	for statsWallet := range l.leaderboard {
+		ws := l.leaderboard[statsWallet]
+		if ws.JobRole == "Warden" && statsWallet != victimWallet && statsWallet != data.PerpWallet {
+			l.TrackCareerXP(statsWallet, "Warden", 15)
+		}
+	}
+
+	// Justice D5 Forensic Analyst — traces financial patterns during ransom events
+	for statsWallet := range l.leaderboard {
+		ws := l.leaderboard[statsWallet]
+		if ws.JobRole == "Forensic Analyst" && statsWallet != victimWallet && statsWallet != data.PerpWallet {
+			l.TrackCareerXP(statsWallet, "Forensic Analyst", 45)
+		}
 	}
 
 	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"✅ <b>CARD RECLAIMED:</b> Your asset has been returned to your inventory."}`)})
@@ -289,7 +460,33 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 
 	delete(l.activeKidnappings, data.CardID)
 
+	// PILLAR 3: Modular Authority. Clear the record from the multi-slot registry.
+	l.victimRegistry.Mu.Lock()
+	if attackers, exists := l.victimRegistry.ActiveKidnaps[victimWallet]; exists {
+		delete(attackers, perpWallet)
+		if len(attackers) == 0 {
+			delete(l.victimRegistry.ActiveKidnaps, victimWallet)
+		}
+	}
+	l.victimRegistry.Mu.Unlock()
+
 	l.logAdminAuditLocked("HOSTAGE_RELEASED", perpWallet, fmt.Sprintf("Card #%d voluntarily released to %s", data.CardID, victimWallet))
+
+	// Justice D3 Warden — monitors all hostage releases across the sector
+	for statsWallet := range l.leaderboard {
+		ws := l.leaderboard[statsWallet]
+		if ws.JobRole == "Warden" && statsWallet != perpWallet && statsWallet != victimWallet {
+			l.TrackCareerXP(statsWallet, "Warden", 20)
+		}
+	}
+
+	// Justice D6 Sector Peacekeeper — maintains order during criminal resolutions
+	for statsWallet := range l.leaderboard {
+		ws := l.leaderboard[statsWallet]
+		if ws.JobRole == "Sector Peacekeeper" && statsWallet != perpWallet && statsWallet != victimWallet {
+			l.TrackCareerXP(statsWallet, "Sector Peacekeeper", 15)
+		}
+	}
 
 	if vCID := l.getClientIDFromWalletLocked(victimWallet); vCID != "" {
 		l.sendToClientLocked(vCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"✅ <b>HOSTAGE RELEASED:</b> Card #%d has been returned by the kidnapper."}`, data.CardID))})
@@ -376,11 +573,23 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 		return
 	}
 
-	// Distribute bail proceeds to the jailing club's treasury
-	// PILLAR 2: Precision Hardening. Use micro-unit math for treasury addition.
-	treasuryMicro := uint64(club.Treasury*1000000 + 0.5) // Convert to micro-units
-	newTreasuryMicro := treasuryMicro + bailAmountMicro
-	club.Treasury = float64(newTreasuryMicro) / 1000000.0
+	// PILLAR 2: Industrial Loop (Token-Sink Router migration).
+	// 1. Physically increment the vault total to reflect the confirmed on-chain inflow.
+	l.faucetBalanceMicro += bailAmountMicro
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	l.applyDynamicScalingLocked() // PILLAR 2: Synchronize scaling with physical inflow
+
+	// 2. Redistribute the proceeds: 100% to the jailing club's treasury liability.
+	if l.tokenSinkRouter != nil {
+		matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 1.0, GovernanceShare: 0.0}
+		numericID, _ := strconv.ParseUint(strings.TrimPrefix(club.ID, "CLUB-"), 10, 64)
+		_ = l.tokenSinkRouter.RouteCriminalTax("BAIL_PAYMENT", bailAmountMicro, matrix, numericID, "")
+
+		// PILLAR 2: UI Parity Sync. 
+		if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+			club.Treasury = float64(node.TreasuryBalance) / 1000000.0
+		}
+	}
 
 	club.LastActivity = time.Now() // Revenue counts as activity
 
@@ -393,6 +602,21 @@ func (l *Lobby) handleBailCard(env *Envelope) {
 		playerStats.Inventory = make(map[string]int)
 	}
 	playerStats.Inventory[fmt.Sprintf("CARD-%d", data.CardID)]++
+
+	// PILLAR 3: Justice Mission Completion (MISSION-002)
+	// Facilitate Legal Rehabilitation: Process a Bail payment for any card currently held in custody.
+	if playerStats.ActiveJusticeMissionID == "MISSION-002" {
+		const rewardMicro = 500 * 1000000
+		l.playerBalances[playerWallet] += rewardMicro
+		playerStats.ActiveJusticeMissionID = ""
+		l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", playerWallet, "ID: MISSION-002, Payout: 500.00")
+		l.sendToClientLocked(env.FromID, Envelope{
+			Type:    "admin_notification",
+			Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Legal rehabilitation facilitated. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+		})
+		l.applyDynamicScalingLocked() // PILLAR 2: Synchronize scaling with new virtual liability
+	}
+
 	playerStats.Reputation = l.CalculateReputation(playerStats)
 	l.leaderboard[playerWallet] = playerStats
 
@@ -478,6 +702,16 @@ func (l *Lobby) processInsuranceRecovery() {
 
 		delete(l.activeKidnappings, cardID)
 
+		// PILLAR 3: Multi-Slot Cleanup. Ensure the registry is purged on automated recovery.
+		l.victimRegistry.Mu.Lock()
+		if attackers, exists := l.victimRegistry.ActiveKidnaps[state.VictimWallet]; exists {
+			delete(attackers, state.PerpWallet)
+			if len(attackers) == 0 {
+				delete(l.victimRegistry.ActiveKidnaps, state.VictimWallet)
+			}
+		}
+		l.victimRegistry.Mu.Unlock()
+
 		l.logAdminAuditLocked("INSURANCE_RECOVERY", state.VictimWallet, fmt.Sprintf("Card #%d automatically returned from %s", cardID, state.PerpWallet))
 
 		// Dispatch on-chain log for immutable verification
@@ -493,8 +727,126 @@ func (l *Lobby) processInsuranceRecovery() {
 		if pCID := l.getClientIDFromWalletLocked(state.PerpWallet); pCID != "" {
 			l.sendToClientLocked(pCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>HOSTAGE ESCAPED:</b> Card #%d has returned to its owner via Insurance Recovery."}`, cardID))})
 		}
+
+		// Justice careers earn XP monitoring insurance recovery events
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "Warden" && statsWallet != state.VictimWallet && statsWallet != state.PerpWallet {
+				l.TrackCareerXP(statsWallet, "Warden", 10)
+			}
+			if ws.JobRole == "Forensic Analyst" && statsWallet != state.VictimWallet && statsWallet != state.PerpWallet {
+				l.TrackCareerXP(statsWallet, "Forensic Analyst", 30)
+			}
+		}
 	}
 
 	// Broadcast update to refresh UI lists
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+/**
+ * HandleAOSRaid allows a tactical Justice team to recover cards from a Hostage Host.
+ * PILLAR 3: Team-based Rivalry Mechanics.
+ */
+func (l *Lobby) HandleAOSRaid(env *Envelope) {
+	var data struct {
+		TargetHostWallet string `json:"target_wallet"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	if stats.JobRole != "Armed-Offender-Squad" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: AOS Raid protocol requires the 'Armed-Offender-Squad' role."}`)})
+		return
+	}
+
+	// Deployment Fee: 1,500 $VBV (Paid to System)
+	const deploymentFee = 1500 * 1000000
+	if l.playerBalances[wallet] < deploymentFee {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Raid Failed: Insufficient rewards for tactical deployment (1,500 $VBV required)."}`)})
+		return
+	}
+
+	targetWallet := strings.ToLower(data.TargetHostWallet)
+	targetStats, exists := l.leaderboard[targetWallet]
+	if !exists || len(targetStats.KidnappedCards) == 0 {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Raid Failed: No active hostage signals detected at target location."}`)})
+		return
+	}
+
+	// PILLAR 1: Team Synergy. Success scales with connected club members.
+	teamSize := 1
+	var participants []string
+	participants = append(participants, wallet)
+	for _, client := range l.clients {
+		cw, ok := l.wallets[client.id]
+		if ok && cw != wallet && l.leaderboard[cw].EmployerClubID == stats.EmployerClubID {
+			teamSize++
+			participants = append(participants, cw)
+			if teamSize >= 4 { break }
+		}
+	}
+
+	l.playerBalances[wallet] -= deploymentFee
+	l.faucetBalanceMicro += deploymentFee
+
+	// Success Chance: 40% base + 10% per teammate (Max 70%)
+	successChance := 0.40 + (float64(teamSize-1) * 0.10)
+	if rand.Float64() < successChance {
+		// PILLAR 3: Raid Insurance Check.
+		// If target has active insurance, block the success and consume the claim.
+		if targetStats.RaidInsuranceClaimsRemaining > 0 && time.Now().Before(targetStats.RaidInsuranceExpiresAt) {
+			targetStats.RaidInsuranceClaimsRemaining--
+			l.leaderboard[targetWallet] = targetStats
+
+			l.logAdminAuditLocked("RAID_INSURANCE_CONSUMED", wallet, fmt.Sprintf("Target: %s", targetWallet))
+			l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"🎯 <b>RAID INTERCEPTED:</b> Tactical strike blocked by active Raid Insurance protocol."}`)})
+
+			if tCID := l.getClientIDFromWalletLocked(targetWallet); tCID != "" {
+				l.sendToClientLocked(tCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"🛡️ <b>INSURANCE TRIGGERED:</b> A successful AOS Raid was blocked. One claim consumed."}`)})
+			}
+			return
+		}
+
+		// SUCCESS: Recover a random card
+		var targetCardID int
+		for cid := range targetStats.KidnappedCards { targetCardID = cid; break } // Select first entry
+
+		victimWallet := targetStats.KidnappedCards[targetCardID]
+		delete(targetStats.KidnappedCards, targetCardID)
+		l.leaderboard[targetWallet] = targetStats
+
+		vStats := l.leaderboard[victimWallet]
+		delete(vStats.HeldHostageCards, targetCardID)
+		vStats.Inventory[fmt.Sprintf("CARD-%d", targetCardID)]++
+		l.leaderboard[victimWallet] = vStats
+		delete(l.activeKidnappings, targetCardID)
+
+		// Reward: 5,000 $VBV split among team
+		rewardSplit := (5000 * 1000000) / uint64(len(participants))
+		for _, pw := range participants {
+			l.playerBalances[pw] += rewardSplit
+			if cid := l.getClientIDFromWalletLocked(pw); cid != "" {
+				l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🎯 <b>RAID SUCCESS:</b> Card #%d recovered! Your share: %.2f $VBV."}`, targetCardID, float64(rewardSplit)/1000000.0))})
+			}
+			// Career XP: AOS Leader gains XP per successful raid (scaled by team size)
+			l.TrackCareerXP(pw, "AOS Leader", 60+teamSize*10)
+		}
+		l.logAdminAuditLocked("AOS_RAID_SUCCESS", wallet, fmt.Sprintf("Host: %s, Card: %d, Team: %d", targetWallet, targetCardID, teamSize))
+	} else {
+		// FAILURE: Penalty
+		stats.WantedLevel += 10
+		stats.Reputation = l.CalculateReputation(stats)
+		l.leaderboard[wallet] = stats
+		l.logAdminAuditLocked("AOS_RAID_FAILED", wallet, fmt.Sprintf("Initiator: %s, Target: %s", wallet, targetWallet))
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"💀 <b>RAID FAILED:</b> Tactical team intercepted. Your signature has been flagged."}`)})
+	}
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }

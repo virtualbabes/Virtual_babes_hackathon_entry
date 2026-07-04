@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -6,12 +6,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
-// startSalaryDispenser runs a daily ticker to pay salaries from Club Treasuries.
-func (l *Lobby) startSalaryDispenser() {
+// CareerService manages the automated distribution of salaries to club employees.
+// PILLAR 5: Stateless Service Design.
+type CareerService struct{}
+
+// StartSalaryDispenser runs a daily ticker to pay salaries from Club Treasuries.
+func (s *CareerService) StartSalaryDispenser(l *Lobby) {
 	salaryTicker := time.NewTicker(24 * time.Hour) // Daily payment cycle
 	defer salaryTicker.Stop()
 
@@ -24,29 +30,50 @@ func (l *Lobby) startSalaryDispenser() {
 			if stats.JobRole != "" && stats.EmployerClubID != "" && stats.Salary > 0 {
 				if time.Since(stats.LastSalaryPayment) >= 24*time.Hour {
 					club, exists := l.clubs[stats.EmployerClubID]
-					if exists && club.Treasury >= float64(stats.Salary)/1000000.0 {
-						// Industrial Loop: Gross salary deducted from Club Treasury
-						club.Treasury -= float64(stats.Salary) / 1000000.0
+					// PILLAR 2: Integer Supremacy. Use TreasuryMicro for authoritative checks.
+					if exists && club.TreasuryMicro >= stats.Salary {
+						// Industrial Loop: Gross salary deducted from Club Treasury micro-unit reservoir.
+						club.TreasuryMicro -= stats.Salary
 						club.LastActivity = time.Now()
 
+						// PILLAR 1: Corporate Tax Logic.
+						// Deduct 2% from high-salary contracts (>= 500 $VBV) to fund the Global Faucet.
+						corpTaxMicro := uint64(0)
+						if stats.Salary >= 500*1000000 {
+							corpTaxMicro = uint64(float64(stats.Salary)*0.02 + 0.5)
+							l.CorporateTaxTotal += corpTaxMicro
+							l.CorporateTaxCount++
+
+							// PILLAR 3: Lawyer-Commissioner Influence.
+							// If a 'Regulatory Bypass Permit' is active for the club, reduce corporate tax by 50%.
+							if expiry, exists := club.BuffExpirations["REGULATORY_BYPASS"]; exists && time.Now().Before(expiry) {
+								corpTaxMicro = (corpTaxMicro * 50) / 100
+								l.logAdminAuditLocked("REGULATORY_BYPASS_APPLIED", club.ID, fmt.Sprintf("Corporate tax reduced by 50%% for %s", club.Name))
+							}
+
+							l.achievementService.CheckTaxMilestoneAchievementLocked(l)
+						}
+
 						// Outlaw Tax Logic: garnish earnings based on infamy
-						taxRate := 0.0
+						outlawTaxRate := 0.0
 						if stats.WantedLevel >= 5 {
-							taxRate = float64(stats.WantedLevel) * 0.02
-							if taxRate > 0.40 {
-								taxRate = 0.40
+							outlawTaxRate = float64(stats.WantedLevel) * 0.02
+							if outlawTaxRate > 0.40 {
+								outlawTaxRate = 0.40
 							}
 						}
 
 						// PILLAR 1: Precision Rounding for the Industrial Loop.
-						taxAmountMicro := uint64(float64(stats.Salary)*taxRate + 0.5)
-						netSalaryMicro := stats.Salary - taxAmountMicro
+						outlawTaxMicro := uint64(float64(stats.Salary)*outlawTaxRate + 0.5)
+						totalTaxMicro := corpTaxMicro + outlawTaxMicro
+						netSalaryMicro := stats.Salary - totalTaxMicro
 
 						l.playerBalances[wallet] += netSalaryMicro
 
-						// PILLAR 2: Ledger Integrity.
-						// Physical balance remains unchanged. Scaling is recalculated
-						// based on the shift between virtual liability categories.
+						// PILLAR 2: Ledger Integrity (Industrial Loop).
+						// Reroute taxes to the Faucet pool to fund dynamic rewards.
+						l.faucetBalanceMicro += totalTaxMicro
+						l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
 
 						stats.LastSalaryPayment = time.Now()
 
@@ -55,8 +82,11 @@ func (l *Lobby) startSalaryDispenser() {
 						stats.Reputation = l.CalculateReputation(stats)
 						l.leaderboard[wallet] = stats
 
-						l.logAdminAuditLocked("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Net: %.2f, Tax: %.2f", club.Name, float64(netSalaryMicro)/1000000.0, float64(taxAmountMicro)/1000000.0))
-						notification := fmt.Sprintf(`{"text":"💰 <b>SALARY PAID:</b> You received %.2f $VBV from %s! (Outlaw Tax: %.2f $VBV)"}`, float64(netSalaryMicro)/1000000.0, club.Name, float64(taxAmountMicro)/1000000.0)
+						l.logAdminAuditLocked("SALARY_PAID", wallet, fmt.Sprintf("Club: %s, Net: %.2f, CorpTax: %.2f, OutlawTax: %.2f",
+							club.Name, float64(netSalaryMicro)/1000000.0, float64(corpTaxMicro)/1000000.0, float64(outlawTaxMicro)/1000000.0))
+
+						notification := fmt.Sprintf(`{"text":"💰 <b>SALARY PAID:</b> You received %.2f $VBV from %s! (Taxes: %.2f $VBV)"}`,
+							float64(netSalaryMicro)/1000000.0, club.Name, float64(totalTaxMicro)/1000000.0)
 						l.sendToClientLocked(l.getClientIDFromWalletLocked(wallet), Envelope{Type: "admin_notification", Payload: json.RawMessage(notification)})
 						anyPaid = true
 					} else {

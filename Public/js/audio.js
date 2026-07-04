@@ -11,6 +11,21 @@ let audioCtx = null;
 let sfxGainNode = null;
 let musicGainNode = null;
 let currentMutationSoundscapeSource = null;
+
+// PILLAR 6: Phase-Based Track Mapping
+export const MUSIC_PHASE_MAP = {
+    "DISCONNECTED": "Not_connected_ambient",
+    "Setup": "Unbuilt_deck_ambient",
+    "Lobby": "ambient_menu_music_2",
+    "TournamentLobby": "Tournament_game_ambient",
+    "Active_Casual": "2_player_ambient_1",
+    "Active_Quick": "quick_play_ambient_1",
+    "Active_Tournament": "Tournament_game_ambient_2",
+    "Finished": "ambient_menu_music_4"
+};
+
+let currentMusicGain = null;
+let isMusicTransitioning = false;
 let currentMutationInsuranceHumSource = null;
 let currentDistrictStabilizerThrumSource = null;
 const bufferCache = new Map(); // url -> Promise<AudioBuffer>
@@ -321,6 +336,22 @@ export function playBattleStartSFX() {
 }
 
 /**
+ * Plays a high-pitched static discharge for cloak disruption events.
+ * PILLAR 3: Criminality & Intelligence Feedback.
+ */
+export function playCloakDisruptorSFX() {
+    playSFX('High-pitched_static_discharge.mp3');
+}
+
+/**
+ * Plays a successful mutation chain reaction for procedure completion.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function playMutationSuccessSFX() {
+    playSFX('Chain_reaction.mp3');
+}
+
+/**
  * Plays the low-frequency industrial background for the Mutation Foundry.
  * PILLAR 6: Specialized Gene-Editing Feedback.
  */
@@ -519,27 +550,57 @@ export function playChallengeDeclinedSFX() {
 let currentMusicSource = null;
 
 /**
- * Plays a background music track using the high-performance gain node.
+ * transitionMusic handles seamless cross-fading between ambient tracks.
+ * PILLAR 6: Phase-Based Atmosphere.
  */
-export async function playMusic(path) {
-    if (musicVolume <= 0 || masterVolume <= 0) return;
+export async function transitionMusic(trackName) {
+    if (musicVolume <= 0 || masterVolume <= 0 || isMusicTransitioning) return;
+    
+    const currentTrack = localStorage.getItem('currentMusicTrack');
+    if (currentTrack === trackName) return;
+
+    isMusicTransitioning = true;
 
     if (!audioCtx) initAudioContext();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch(e) { return; }
+    }
 
+    const path = trackName.includes('.') ? trackName : `${trackName}.mp3`;
     const buffer = await getSFXBuffer(path);
     if (!buffer || !audioCtx) return;
 
-    if (currentMusicSource) {
-        try { currentMusicSource.stop(); } catch (e) {}
+    const fadeTime = 1.5; // 1.5s linear cross-fade
+    const now = audioCtx.currentTime;
+
+    // 1. Fade out current track if active
+    if (currentMusicSource && currentMusicGain) {
+        const oldGain = currentMusicGain;
+        const oldSource = currentMusicSource;
+        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+        oldGain.gain.linearRampToValueAtTime(0, now + fadeTime);
+        
+        setTimeout(() => {
+            try { oldSource.stop(); oldSource.disconnect(); oldGain.disconnect(); } catch(e) {}
+        }, fadeTime * 1000);
     }
+
+    // 2. Start new track with fade in
+    const newGain = audioCtx.createGain();
+    newGain.gain.setValueAtTime(0, now);
+    newGain.gain.linearRampToValueAtTime(musicVolume * masterVolume, now + fadeTime);
+    newGain.connect(audioCtx.destination); // Connect to master destination
 
     currentMusicSource = audioCtx.createBufferSource();
     currentMusicSource.buffer = buffer;
     currentMusicSource.loop = true;
-    currentMusicSource.connect(musicGainNode);
-    currentMusicSource.start(0);
-    console.log(`[AUDIO] Track Active: ${path}`);
+    currentMusicSource.connect(newGain);
+    currentMusicSource.start(now);
+
+    currentMusicGain = newGain;
+    localStorage.setItem('currentMusicTrack', trackName);
+    isMusicTransitioning = false;
+    console.log(`[AUDIO] Transitioned to: ${trackName}`);
 }
 
 /**
@@ -566,12 +627,13 @@ window.playSabotageReparationSFX = playSabotageReparationSFX;
 window.playStaffTrainingSFX = playStaffTrainingSFX;
 window.playEcosystemAlertSFX = playEcosystemAlertSFX;
 window.playMutationSuccessSFX = playMutationSuccessSFX;
+window.playCloakDisruptorSFX = playCloakDisruptorSFX;
 window.playBattleStartSFX = playBattleStartSFX;
 window.playChallengeWaitSFX = playChallengeWaitSFX;
 window.stopChallengeWaitSFX = stopChallengeWaitSFX;
 window.playChallengeAcceptedSFX = playChallengeAcceptedSFX;
 window.playChallengeDeclinedSFX = playChallengeDeclinedSFX;
-window.playMusic = playMusic;
+window.transitionMusic = transitionMusic;
 window.playMutationSoundscape = playMutationSoundscape;
 window.playMutationInsuranceHum = playMutationInsuranceHum;
 window.stopMutationInsuranceHum = stopMutationInsuranceHum;

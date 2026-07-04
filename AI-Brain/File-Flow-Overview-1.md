@@ -1,237 +1,92 @@
- ### Snapshot:
- * `JS sends a move to the Backend.`
-* `Backend validates the move and calculates captures.`
-* `Backend broadcasts the result to all clients.`
-* `JS receives the result and feeds it into the WASM Engine.`
-* `WASM Engine updates the local state.`
-* `JS calls syncUI, and the SCSS/CSS layer triggers a .flip-capture`
-* `animation with particle sparks.`
+## [AUTHORITATIVE CORE: END-GAME ARCHITECTURE] 
 
- ## high-level overview of how the .go, .js, .scss, .css, .html, and Dockerfile files work together to create the Virtualbabes Arena application.
+### 📑 DOCUMENT STATUS: AUTHORITATIVE BLUEPRINT (V2.1)
+This document serves as the supreme architectural reference. All logic implementations and file flows must align with the topology defined herein. 
+*   **Last Updated:** 23/06/2026
+*   **Pending Tasks:** Consult `ToDo.md`
+*   **Phase 2 Career Wiring Complete:** Underworld #3-10 + Justice D1-D6 XP triggers verified; Justice D2-TaxAuditor resolution bonus pending
+*   **Implementation History:** Search `A.I_memory.md`
 
-High-Level Synergy: Virtualbabes Arena Architecture
-The Virtualbabes Arena is designed as a blockchain-integrated platform where real-time multiplayer gaming meets decentralized economics. This requires a robust interplay between server-side logic, client-side game engine, and a dynamic user interface, all deployed efficiently.
+---
 
-Backend (Go - .go files in Root DIR/A1. Server):
+## 📑 CANONICAL INDEX
+1. Tactical Synchronization Snapshot
+2. Synergy Architecture
+3. Client-Side Interaction Flow
+4. Authoritative Core Topology
+5. UI File System Flow
+6. SCSS Architecture
+7. Operational Integrity: File Registry
+8. Core Economic Sequences
+9. Future Cross-Platform Console Expansion Map
 
-Purpose: This is the authoritative core of the application. It manages all server-side logic, real-time communication, and interaction with the blockchain.
-Key Files: server.go acts as the central hub, handling WebSocket connections (Public/js/network.js connects here), HTTP APIs, rate-limiting, and client concurrency. Other .go files (like lobby_manager.go, battle_service.go, economy_service.go, tournament_manager.go, oracle_service.go, etc.) decompose the backend into domain-specific services.
-Functionality:
-Game State Management: The server maintains real-time in-memory game state for matches, lobbies, and tournaments.
-Blockchain Interaction: oracle_service.go and others use indexers to read authenticated data and receipts directly from blockchain networks (Voi, Algorand). This is crucial for verifying transactions (e.g., tournament buy-ins), fetching NFT metadata, and reconstructing critical game state (leaderboards, match history) without relying on a traditional database.
-Real-time Communication: Uses WebSockets to broadcast updates (e.g., lobby changes, chat messages, match events) to connected clients.
-Security: Implements the "Switchboard Pattern" for secure faucet payouts (server-side signing) and client-side nonce proofs for verification.
-Business Logic: Orchestrates matchmaking, tournament progression, economic services (faucet, loans, auctions), criminality, and social layers.
-Game Engine (Go WASM - Root DIR/A2. Game-interaction/main.go compiled to Public/main.wasm):
+---
 
-Purpose: This Go code, compiled to WebAssembly (main.wasm), runs directly in the user's browser. It provides the core game rules, AI logic, and deterministic calculations.
-Key Files: main.go (Go source) compiles to Public/main.wasm and Public/wasm_exec.js.
-Functionality:
-Deterministic Gameplay: Encapsulates the core game logic (Triple Triad-inspired rules like "Same," "Plus," "Combo"), AI move calculations, and deck building heuristics.
-Client-Side Computation: Allows complex game logic to run efficiently in the browser, ensuring tamper-proof calculations and reducing server load for immediate feedback.
-JS Bridge: Exposes functions (like window.GetGameState, window.PlaceCard, window.SetAvatar, window.syncUI) that the frontend JavaScript (app.js) can call to interact with the game engine.
-Frontend (JavaScript, SCSS, CSS, HTML - Public directory):
+## 1. Tactical Synchronization Snapshot
+* `JS sends a move to the Backend via WebSocket.`
+* `Backend validates the move, increments the Match SequenceID, and computes a BoardStateHash.`
+* `Backend calculates Factional Combat Boosts (+10%) based on Signature Alignment (Justice vs Outlaw).`
+* `Backend constructs an AuthoritativeFrame (Move + Sequence + Hash) and commits to sh.HistoricalFrames.`
+* `Backend broadcasts the AuthoritativeFrame JSON to all match participants and spectators (handled in lobby_manager.go).`
+* `JS feeds the frame into window.SyncMove (Go WASM).`
+* `WASM Engine predicts UI changes instantly (Optimistic UI) based on local calculations.`
+* `WASM Engine verifies Sequence continuity and StateHash parity; if a mismatch is found, it triggers Replay Recovery.`
+* `WASM Engine updates local state, triggers checkCaptures, and calls window.syncUI("combat") automatically.`
+* `The SCSS layer triggers a .flip-capture animation; if a Factional Boost is active, the card displays a pulsing neon cyan (Justice) or green (Underworld) glow.`
+* `If server audit fails, UI smoothly rolls back to reflect authoritative state.`
 
-Purpose: Provides the interactive user interface, handles client-side logic, communicates with the backend, and renders the game.
-Key Files:
-Public/index.html: The single-page application entry point. It loads the compiled main.wasm (via wasm_exec.js), the main app.js, and the compiled styles.css. It defines the base structure of the UI.
-Public/app.js: The central client-side orchestrator. It initializes the WASM engine, establishes WebSocket connections, integrates WalletConnect (Public/js/wallet.js), manages UI state, and calls functions from the WASM engine and other modular JavaScript files. It contains the primary syncUI function that updates the entire user interface based on the GetGameState() from WASM.
-Public/js/*.js (e.g., game.js, ui.js, network.js, wallet.js, deck.js, economy.js, criminality.js, admin.js, leaderboard.js, utils.js, audio.js, particles.js): These are modular JavaScript files that break down specific functionalities. They interact with app.js, the WASM engine, and the backend WebSockets to provide features like game logic, UI rendering, network communication, wallet interactions, deck management, economic transactions, criminal actions, admin controls, leaderboards, utility functions, audio, and visual effects.
-Public/collective-intelligence.js: This specific JS file generates NPC taunts based on player playstyle, which is then rendered by app.js using renderChatMessage.
-Public/src/scss/*.scss: These SCSS files (e.g., _neon-glass.scss, _dashboard.scss, _variables.scss, _criminality.scss, _territory.scss) define the "neon-glass" aesthetic. They are pre-processed into Public/styles.css.
-Public/styles.css: The compiled stylesheet applied to index.html, dynamically styling elements rendered by JavaScript.
-Deployment (Dockerfile - Root DIR/B7. Docker-file/Dockerfile):
+## 2. High-Level Overview: Synergy Architecture
+The Virtualbabes Arena is a production-hardened social economic simulation. It utilizes a Dual-Target build strategy to enforce bit-perfect parity between the Go Backend and the Deterministic WASM Game Engine. 
+**Note:** All paths below are relative to the project root.
 
-Purpose: To package the entire application (Go backend, WASM game engine, frontend assets) into a portable, self-contained unit for consistent deployment.
-Functionality: The Dockerfile specifies how to build the application image. This typically involves:
-Building the Go backend (server.go and related services).
-Compiling main.go to main.wasm.
-Copying the compiled WASM files and all frontend assets (HTML, JS, CSS, images, audio) into the Docker image.
-Defining the entry point to run the Go backend server, which then serves the static frontend assets.
-How they Synergize:
-Real-time Loop: The Go backend (server) broadcasts game state updates over WebSockets. Public/js/network.js receives these. Public/app.js's handleServerMessage processes them, potentially calling functions in the Go WASM engine (main.wasm) to update the client-side game state. The syncUI function in app.js then reads this updated WASM state and re-renders the index.html (styled by styles.css/.scss) accordingly.
-User Interaction: A user action (e.g., clickGrid in game.js) calls a WASM function (window.PlaceCard). If successful and in multiplayer, game.js sends a message back to the Go backend via network.js WebSocket, completing the loop.
-Data Persistence: While the Go backend manages a live in-memory representation, actual persistent storage for critical game data (like tournament results, player reputations, NFT ownership) is offloaded to blockchain indexers. The Go services (oracle_service.go, economy_service.go) query these indexers, and the results are then communicated to the frontend. Public/js/utils.js (e.g., resolveEnvoiName) handles client-side caching and resolution of some blockchain data.
-Deployment: The Dockerfile bundles all these disparate components (Go executable, WASM binary, JS, HTML, CSS) into a single artifact, ensuring that the entire application stack can be deployed reliably and consistently in any Docker-compatible environment.
-This overview paints a broad picture. To provide you with a more detailed module hierarchy flow document, I need to focus on specific sections.
+### 2.1 Backend Topology (Go - `./*.go`)
+*   **authoritative Core**: `./server.go` initializes the event loop and management kernels.
+*   **Service Delegation**: Specialized logic is isolated in `./battle_service.go`, `./club_service.go`, `./faucet_service.go`, and `./onboarding_service.go`.
+ *   **Economic Integrity (Pillar 2 - Complete)**: `./economy_service.go` (core engine), `./economy_bootstrap.go` (blockchain reconstruction), `./economy_processing.go` (TokenSinkRouter + AMM payouts + RevenueSplitMatrix), `./economy_persistence.go` (JSON snapshots → blockchain notes), `./economy_audit.go` (anti-whale intercept + drift detection), `./economy_telemetry.go` (Prometheus metrics :9090).
+*   **Replay Resilience**: `./lobby_manager.go` coordinates with `./backend_types.go` to manage match sequencing and connection quarantine.
+*   **Economy Persistence Layer**: `./economy_bootstrap.go` (state bootstrapping) and `./economy_persistence.go` (atomic snapshots).
+*   **Shop Registry**: `./shop_registry.go` provides the canonical item catalog for all district shops.
+*   **Public Handlers**: `./handlers_public.go` serves public-facing data endpoints for unauthenticated queries.
+*   **Rival Engine**: `./rival_career_engine.go` drives NPC career progression; `./rivalry_handlers.go` exposes rivalry state via HTTP/WebSocket.
+*   **DEX Integration**: `./nautilus_dex_path.go` defines Nautilus DEX routing for cross-chain liquidity swaps.
+*   **Game Layers**: Supports the emerging **Underworld vs. Justice Hegemony** through expanded roles and specialized economic interactions.
+*   **Resiliency Layer**: `./resilience_utils.go` provides load-balanced RPC cluster management.
 
-From the AI-Brain/DIR.md document, which of these main groups would you like me to analyze in more detail regarding its internal structure and how it flows with other parts of the system?
+### 2.2 Game Engine (Go WASM - `./main.go`)
+*   **Deterministic Logic**: Core rules and AI evaluation execute in `./Public/main.wasm`.
+*   **Resilience Kernel**: Implements the `ClientReplayEngine` and `RedirectManager` for frame catch-up and interaction locking.
+*   **IPC Bridge**: `./bridge_service.go` defines the explicit IPC (Inter-Process Communication) translation registry between Go WASM and Browser JavaScript (Pillar 4).
+*   **Card Archetypes**: Supports new **Justice Cards** and **Underworld Cards** with specialized combat mechanics.
+### 2.3 Frontend Orchestration (JS/SCSS - `./Public/`)
+*   **Modular Authority**: `./Public/app.js` delegates UI rendering to specialized modules in `./Public/js/`.
+*   **Visual Fidelity**: `./Public/styles.css` is pre-processed from the atomic SCSS structure in `./Public/src/scss/`.
 
-4. Public-js-Scripts
-5. Root DIR/A. .go-files (or specify A1. Server or A2. Game-interaction)
-5. Root DIR/B. System-Root-system (for configuration and deployment files)
-3. Public Visuals (if you'd like to understand the asset integration flow, though less about module hierarchy)
-2. Public Audio Asset Files (similar to visuals)
+## 3. Detailed Client-Side Interaction Flow
 
-
-## Public-Js-Detail
-Public-js-Scripts directory contains the entire client-side application logic for the Virtualbabes Arena. It's designed as a modular Single-Page Application (SPA) that interacts with a Go WebAssembly (WASM) game engine for core logic and a Go backend server via WebSockets and HTTP APIs for real-time updates and blockchain interactions.
-
-Here's a detailed breakdown of the module hierarchy and interaction flow:
-
-Module Hierarchy and Interaction Flow
-The core principle is that Public/app.js acts as the central orchestrator, initializing the Go WASM engine and WebSocket connection, and then coordinating updates across various specialized JavaScript modules.
-
-1. Public/app.js - The Central Orchestrator
-Purpose: This is the main client-side application entry point. It's responsible for:
-Loading and initializing the Go WASM game engine (main.wasm).
-Establishing and managing the WebSocket connection to the Go backend.
-**Client Beacon Recovery**: Immediately primes the WASM engine with the last known "Push" state from the server via `localStorage` for a "warm start" experience.
-Initializing WalletConnect for blockchain interactions.
-Orchestrating UI updates by calling its syncUI function, which reads state from the WASM engine and updates various DOM elements.
-Exposing global functions to the window object for inline HTML event handlers.
-Key Imports: Almost all other JS modules are imported here to centralize their functionality. This includes collectiveIntelligence, CONFIG, initWebSocket, handleServerMessage, showToast, initWalletConnect, fetchLeaderboard, toggleMatchmakingQueue, openDeckManager, openShopsOverlay, openCourthouse, setMasterVolume, initParticleSystem, getCachedEnvoiName, etc.
-Key Exports: None directly, but it exposes many functions globally to window (e.g., window.syncUI, window.handleWalletAction, window.openDeckManager) for index.html to call.
-Interaction Flow:
-Initialization: On window.onload, it loads main.wasm (via wasm_exec.js), sets up the Go WASM engine, configures CONFIG.API_BASE and CONFIG.ASSET_URL within WASM, then calls initWebSocket (from network.js) and initWalletConnect (from wallet.js).
-UI Loop (syncUI): This is the heart of the frontend. It frequently calls window.GetGameState() (from WASM) to retrieve the current application state. Based on this state, it then:
-Determines which UI overlays to show/hide (hideAllOverlays).
-Updates player information, scores, and game board.
-Refreshes dashboards (rewards, faucet, latency).
-Triggers updates in other modules (e.g., updateAdminRewardList, renderRumorBoard).
-WASM Bridge: Directly calls functions exposed by the Go WASM engine (e.g., window.GetGameState, window.SetAvatar, window.PlaceCard, window.SetMaintenanceState, window.SetTestingMode, window.SetMusicVolume).
-Backend Communication: Delegates sending WebSocket messages to network.js (e.g., register_wallet, join_queue, move).
-Module Coordination: Calls functions from other imported modules to perform specific tasks (e.g., fetchLeaderboard, renderDeckManager, openHeistPlanningOverlay).
-2. Public/wasm_exec.js - Go WASM Runtime
-Purpose: This is the standard Go WebAssembly glue code. It provides the necessary JavaScript environment for main.wasm to run in the browser, handling memory, system calls, and the bridge between Go and JavaScript.
-Key Imports: None (it's a standalone script).
-Key Exports: The Go class, which app.js instantiates.
-Interaction Flow: Loaded by index.html, it enables app.js to load and execute main.wasm. All direct calls between JavaScript and the Go WASM engine (e.g., window.GetGameState()) are facilitated by this script.
-3. Public/js/config.js - Global Configuration
-Purpose: Defines static and dynamically updated global configuration constants (backend URLs, asset IDs, WalletConnect project ID, blockchain chain IDs).
-Key Imports: None.
-Key Exports: CONFIG object.
-Interaction Flow: Imported by almost all other JS modules that need configuration data. network.js dynamically updates CONFIG.VAULT_ADDRESS, CONFIG.VBV_ASSET_ID, CONFIG.AVOI_ASSET_ID based on server messages.
-4. Public/js/network.js - WebSocket Communication
-Purpose: Manages the WebSocket connection to the Go backend. It handles incoming server messages, dispatches them to appropriate client-side handlers, and manages connection/reconnection logic.
-Key Imports: CONFIG, showToast, setTransactionStatus, updateWalletUI, handleTournamentUI, updatePlayerList, updateMarketTicker, handleMaintenanceUI, updateAdminNetworkUI, updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer, setLastLobbyPlayers, setMyPlayerIndex, setCurrentOpponentId, setSpectatorMatchState, renderChatMessage, saveMatchResult, setMatchHistorySaved.
-Key Exports: socket, myClientId, nonceResolver, initWebSocket, sendPing, handleServerMessage.
-Interaction Flow:
-Connection: app.js calls initWebSocket to establish the connection.
-Message Dispatch: handleServerMessage is the central dispatcher for server messages. It uses a switch statement to route messages (e.g., lobby_update, move, chat, identity, rewards_update) to specific handler functions in other modules (e.g., updatePlayerList in game.js, handleTournamentUI in leaderboard.js).
-WASM Updates: Many server messages trigger calls to WASM functions (e.g., window.SyncFullProfile, window.SyncRules, window.SyncMove).
-UI Batching: Uses requestBatchedSync to optimize syncUI calls, preventing UI thrashing.
-5. Public/js/wallet.js - Wallet Management
-Purpose: Handles all client-side wallet interactions: connecting, disconnecting, signing transactions, and WalletConnect integration.
-Key Imports: CONFIG, showToast, setTransactionStatus, hideAllOverlays, showMainGameContainer, getNetworkConfig, socket, setNonceResolver, fetchUserNFTs.
-Key Exports: userAddress, isVerified, linkedWallets, walletProvider, signClient, wcModal (and their setters), initWalletConnect, handleWalletAction, connectWith, disconnectUserWallet, updateWalletUI.
-Interaction Flow:
-Initialization: app.js calls initWalletConnect.
-Connection: connectWith handles various wallet providers (Nautilus, Kibisis, WalletConnect), obtains the user's address, and calls window.connectWallet (WASM).
-Authentication: Used by admin.js for admin panel authentication and by criminality.js/leaderboard.js for signing blockchain transactions.
-Backend Communication: Sends register_wallet and link_wallet_request messages via network.js's socket.
-6. Public/js/ui.js - General UI Rendering & Feedback
-Purpose: Provides generic UI functions like displaying toasts, transaction statuses, managing overlays, and rendering common UI elements (e.g., card HTML, tooltips).
-Key Imports: CONFIG, myClientId, currentLatency, userAddress, myPlayerIndex, currentOpponentId, masterVolume, updateAdminRewardList, updateActiveRumors, startSeasonTimer, getAssetSymbol.
-Key Exports: tooltipEl, maintenanceTicker, showToast, setTransactionStatus, hideAllOverlays, showMainGameContainer, highlightStartButton, handleMaintenanceUI, showTournamentTransition, updateDynamicArenaFloor, renderCardHTML, movePowerTooltip, hidePowerTooltip, showQuickCastMenu, handleLocalBanUI, showMatchPreview, shareTournamentVictory, openSettingsOverlay, closeSettingsOverlay.
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for state, window.SetMaintenanceState, window.GetLevelLabelForDisplay, window.PlaySound (via global exposure).
-DOM Manipulation: Directly manipulates the DOM to update text, show/hide elements, and apply styles.
-Timers: Manages countdown timers for maintenance and local bans.
-7. Public/js/game.js - Core Game Logic
-Purpose: Implements client-side game logic for active matches, matchmaking, chat, and challenge handling. It's the primary interface for user interaction with the WASM game engine.
-Key Imports: CONFIG, socket, myClientId, showToast, hideAllOverlays, showMatchPreview, renderCardHTML, collectiveIntelligence, userAddress, getCachedEnvoiName, resolveEnvoiName.
-Key Exports: activeCardId, myPlayerIndex, lastLobbyPlayers (and their setters), buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, clickGrid, calculateDeckRating, showPowerTooltip, etc.
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for game state. Calls window.SetInMatchmakingQueue, window.SetPhase, window.SetLocalPlayerIndex, window.SyncOpponentProfile, window.SyncOpponentDeck, window.StartMatch, window.ResetGame, window.SetBoardState, window.ForceActive, window.PlaceCard, window.ApplyArtifactToBoard, window.PlaySelectSound, window.syncUI (via global exposure).
-Backend Communication: Sends join_queue, leave_queue, chat, challenge (invite, accept, decline, sync_back), report_gloat, spectate, move, use_item messages via network.js's socket.
-UI Updates: Updates player lists, chat display, match history, and manages tooltips.
-8. Public/js/deck.js - Deck & Avatar Management
-Purpose: Manages the player's card inventory, deck building, avatar selection, and avatar cropping/upload.
-Key Imports: CONFIG, socket, showToast, renderCardHTML, userAddress, linkedWallets, getNetworkConfig, calculateDeckRating, activeCardId.
-Key Exports: userNFTs, currentAvatarUrl, cropState, isCropInitialized (and their setters), openDeckManager, closeDeckManager, renderDeckManager, renderAvatarGrid, applyAvatarFilters, selectAvatar, setupCropEvents.
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for current deck/inventory. Calls window.selectCard, window.RemoveFromDeck, window.AddToDeck, window.SelectDeck, window.SetAvatar to modify WASM game state. Triggers window.syncUI() (via global exposure).
-Backend API Calls: refreshInventory fetches NFT data from indexers (via fetch) for the user's primary and linked wallets.
-Backend Communication: closeDeckManager sends update_rating message. setupCropEvents sends register_avatar message via network.js's socket.
-UI Rendering: Populates inventory/deck displays and the avatar selection grid. Handles interactive image cropping.
-9. Public/js/economy.js - Economic Features
-Purpose: Manages client-side logic for shops, black market, portfolio view, and share trading.
-Key Imports: CONFIG, socket, showToast, hideAllOverlays, userAddress, walletProvider, signClient, getCachedEnvoiName, getNetworkConfig, resolveEnvoiName, globalClubs, lastLobbyPlayers, syncUI.
-Key Exports: tradeShares, openBlackMarket. (Many other functions are exposed globally by app.js after being imported here).
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for player stats and game state. Calls window.syncUI() (via global exposure).
-Backend API Calls: Fetches data from /api/black-market, /api/auctions, and sends POST requests for buyBlackMarketItem, promptBid, submitConsignment, submitClubFoundry.
-Blockchain Interaction: submitClubFoundry constructs and signs Algorand/Voi transactions.
-Backend Communication: Sends trade_shares, purchase_item, create_club messages via network.js's socket.
-UI Rendering: Dynamically creates and appends various economic overlays.
-10. Public/js/criminality.js - Criminality Features
-Purpose: Manages client-side logic and UI for features like the Courthouse, Heists, Kidnapping, Bounty Board, and Rumor Mill.
-Key Imports: CONFIG, socket, myClientId, showToast, hideAllOverlays, userAddress, walletProvider, signClient, getCachedEnvoiName, getNetworkConfig, globalClubs, lastLobbyPlayers, myPlayerIndex, setCurrentOpponentId, setMyPlayerIndex, syncUI.
-Key Exports: rumorTimers, activeRumors, updateActiveRumors, openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openTrophyView, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, handleHeistResult, openKidnapSelectionOverlay, executeKidnap, showKidnapOverlay, payRansom, releaseHostage, startRecoveryTimer.
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for player stats and game state. Calls window.syncUI() (via global exposure).
-Backend API Calls: submitCourthouseFine makes a POST request to /api/courthouse/reset.
-Blockchain Interaction: submitCourthouseFine and initiateBail construct and sign Algorand/Voi transactions.
-Backend Communication: Sends bail_card, use_item, heist, kidnap_request, pay_ransom, release_hostage, spread_rumor messages via network.js's socket.
-UI Rendering: Dynamically creates and appends various criminality overlays and updates timers.
-11. Public/js/admin.js - Admin Panel
-Purpose: Provides client-side functionality for the admin control panel, including fetching logs, managing networks, rewards, bans, and system settings.
-Key Imports: CONFIG, socket, setNonceResolver, showToast, setTransactionStatus, userAddress, walletProvider, signClient, linkedWallets, getAssetSymbol, getNetworkConfig, fetchLeaderboard.
-Key Exports: availableNetworks, globalClubs, adminFocusNetwork, ignoredReporters (and their setters), getAdminHeaders, ignoreReporter, fetchAdminLogs, adminRefillVault, updateAdminRewardList, adminAddReward, adminRemoveReward, adminAddNetwork, adminBroadcast, adminUpdateRules, adminBanWallet, adminAvatarBan, adminBanWalletFromLog, adminUpdatePowerScaling, adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, adminLogTicker, startAdminLogPolling, fetchLastAdminAction, updateAdminNetworkUI, onAdminNetworkSelectChange.
-Interaction Flow:
-Authentication: getAdminHeaders requests a nonce from the backend via WebSocket, then signs it with the user's wallet for HTTP header authentication.
-Backend API Calls: Most admin functions make fetch requests to /api/admin/* endpoints on the Go backend.
-WASM Interaction: adminToggleDevMode calls window.SetTestingMode.
-UI Updates: Provides feedback via showToast and setTransactionStatus, and updates admin-specific UI elements.
-12. Public/js/leaderboard.js - Leaderboard & Tournaments
-Purpose: Manages client-side logic for displaying leaderboards, tournament history, and current tournament status.
-Key Imports: CONFIG, socket, showToast, showTournamentTransition, tooltipEl, userAddress, walletProvider, signClient, getCachedEnvoiName, resolveEnvoiName, getNetworkConfig.
-Key Exports: totalTournaments, lastTournamentData, seasonEnd (and their setters), fetchLeaderboard, startSeasonTimer, switchHofTab, toggleTournamentDetails, registerForTournament, openTournamentBracket, closeTournamentBracket.
-Interaction Flow:
-WASM Interaction: Calls window.GetGameState() for state. Calls window.SetPhase() and window.syncUI() (via global exposure).
-Backend API Calls: Fetches data from /api/leaderboard, /api/tournament/history, /api/season/history. registerForTournament makes a POST request to /api/tournament/register after a blockchain transaction.
-Blockchain Interaction: registerForTournament constructs and signs Algorand/Voi transactions.
-UI Rendering: Populates leaderboard lists, tournament history, and manages pagination/timers.
-13. Public/js/audio.js - Audio Controls
-Purpose: Manages global audio settings (master, music, SFX volumes) and provides functions to toggle mute states.
-Key Imports: ../app.js (syncUI - now exposed globally).
-Key Exports: masterVolume, musicVolume, sfxVolume (and their setters).
-Interaction Flow:
-Local Storage: Loads initial volume settings.
-WASM Interaction: Calls window.SetMasterVolume, window.SetMusicVolume, window.SetSfxVolume to update the WASM engine.
-UI Updates: Triggers syncUI (via global exposure) to reflect changes.
-14. Public/js/particles.js - Particle System
-Purpose: Manages the canvas-based particle system for visual effects (e.g., card capture sparks).
-Key Imports: None.
-Key Exports: initParticleSystem, animateParticles, triggerCaptureParticles, particles, particleCanvas, particleCtx, particleAnimationId.
-Interaction Flow:
-Initialization: app.js calls initParticleSystem on load.
-Animation Loop: animateParticles is called via requestAnimationFrame.
-WASM Interaction: window.PlayCaptureEffect (exposed by WASM) calls triggerCaptureParticles to create particles.
-15. Public/js/utils.js - Utility Functions
-Purpose: Provides general utility functions for caching and resolving blockchain-related data (asset symbols, Envoi names) and network configurations.
-Key Imports: CONFIG, socket, userAddress.
-Key Exports: assetCache, envoiCache, getAssetSymbol, resolveAssetSymbol, getCachedEnvoiName, resolveEnvoiName, getNetworkConfig.
-Interaction Flow:
-Caching: Maintains assetCache and envoiCache to reduce API calls.
-Backend API Calls: Makes fetch requests to backend API endpoints (e.g., /api/asset-symbol, /api/envoi-name) for data.
-Used by: Many other modules to display human-readable names for assets and wallets.
-
-## 2A. Public-js-mermaidmap
+### 3.1 Public-JS Mermaid Map
 graph TD
     subgraph Browser Environment
-        HTML[Public/index.html] --> AppJS(Public/app.js)
-        AppJS -- Loads & Runs --> WASM_EXEC[Public/wasm_exec.js]
-        WASM_EXEC -- Provides Runtime --> WASM_ENGINE(Public/main.wasm - Go WASM Engine)
+        HTML(./Public/index.html) --> AppJS(./Public/app.js)
+        AppJS -- Loads & Runs --> WASM_EXEC(./Public/wasm_exec.js)
+        WASM_EXEC -- Provides Runtime --> WASM_ENGINE(./Public/main.wasm - Go WASM Engine)
     end
 
     subgraph Client-Side JavaScript Modules
-        AppJS -- Imports & Coordinates --> Config(Public/js/config.js)
-        AppJS -- Imports & Coordinates --> Network(Public/js/network.js)
-        AppJS -- Imports & Coordinates --> Wallet(Public/js/wallet.js)
-        AppJS -- Imports & Coordinates --> UI(Public/js/ui.js)
-        AppJS -- Imports & Coordinates --> Game(Public/js/game.js)
-        AppJS -- Imports & Coordinates --> Deck(Public/js/deck.js)
-        AppJS -- Imports & Coordinates --> Economy(Public/js/economy.js)
-        AppJS -- Imports & Coordinates --> Criminality(Public/js/criminality.js)
-        AppJS -- Imports & Coordinates --> Admin(Public/js/admin.js)
-        AppJS -- Imports & Coordinates --> Leaderboard(Public/js/leaderboard.js)
-        AppJS -- Imports & Coordinates --> Audio(Public/js/audio.js)
-        AppJS -- Imports & Coordinates --> Particles(Public/js/particles.js)
-        AppJS -- Imports & Coordinates --> Utils(Public/js/utils.js)
+        AppJS -- Coordinates --> Config(./Public/js/config.js)
+        AppJS -- Coordinates --> Network(./Public/js/network.js)
+        AppJS -- Coordinates --> Wallet(./Public/js/wallet.js)
+        AppJS -- Coordinates --> UI(./Public/js/ui.js)
+        AppJS -- Coordinates --> Game(./Public/js/game.js)
+        AppJS -- Coordinates --> Deck(./Public/js/deck.js)
+        AppJS -- Coordinates --> Economy(./Public/js/economy.js)
+        AppJS -- Coordinates --> Criminality(./Public/js/criminality.js)
+        AppJS -- Coordinates --> Admin(./Public/js/admin.js)
+        AppJS -- Coordinates --> Leaderboard(./Public/js/leaderboard.js)
+        AppJS -- Coordinates --> Audio(./Public/js/audio.js)
+        AppJS -- Coordinates --> Particles(./Public/js/particles.js)
+        AppJS -- Coordinates --> Utils(./Public/js/utils.js)
         AppJS -- Beacon Push/Pull --> Storage[(LocalStorage)]
-        AppJS -- Imports & Coordinates --> CollectiveAI(Public/collective-intelligence.js)
+        AppJS -- Coordinates --> CollectiveAI(./Public/collective-intelligence.js)
 
         Game -- Triggers Taunt --> CollectiveAI
         UI -- Render Taunt --> CollectiveAI
@@ -281,386 +136,116 @@ graph TD
         Backend(Go Backend Server)
     end
 
+    subgraph WASM Interface
+        BRIDGE_W(./bridge_service.go)
+    end
+
+    subgraph WASM Replay Kernel
+        REPLAY(ClientReplayEngine)
+        REPLAY -- Frame Gap --> REDIRECT(RedirectManager)
+        REDIRECT -- Freeze UI --> UI
+    end
+
     AppJS -- Primes Engine --> WASM_ENGINE
-    WASM_ENGINE -- Calls JS functions (window.syncUI, window.PlaySound) --> AppJS
-    WASM_ENGINE -- Calls JS functions (window.triggerCaptureParticles) --> Particles
-    AppJS -- Calls WASM functions (window.GetGameState, window.SetAvatar) --> WASM_ENGINE
+    AppJS -- Calls Hook --> BRIDGE_W
+    BRIDGE_W -- Invokes Logic --> WASM_ENGINE
+
+    WASM_ENGINE -- window.syncUI --> AppJS
+    WASM_ENGINE -- triggerCaptureParticles --> Particles
+    AppJS -- window.GetGameState --> WASM_ENGINE
+    
+    Network -- Auth Frame --> REPLAY
+    REPLAY -- Catch-up Move --> WASM_ENGINE
 
     Network -- WebSocket --> Backend
     Admin -- HTTP API --> Backend
-    Economy -- HTTP API --> Backend
-    Criminality -- HTTP API --> Backend
-    Leaderboard -- HTTP API --> Backend
-    Deck -- HTTP API --> Backend
-    Utils -- HTTP API --> Backend
-    Wallet -- HTTP API (onboarding) --> Backend
 
-## 3 Go-File-system-flow
-A1. Server and A2. Game-interaction sections of your project.
-
-A1. Server (.go files)
-The A1. Server directory contains the backend services that collectively manage the game's state, logic, and interactions with the blockchain. server.go acts as the entry point, delegating responsibilities to lobby_manager.go, which then orchestrates various specialized service files.
-
-Here's a detailed analysis:
-
-server.go
-
-Hierarchy: Core/Entry Point.
-Purpose: Initializes the entire server, sets up WebSocket and HTTP routes, loads configurations (like network settings and persistent card cache), and starts the main lobby event loop. It's the central orchestrator for incoming client requests.
-Flow:
-main() function initializes Lobby via newLobby().
-Starts lobby.run() in a goroutine.
-Registers HTTP handlers for various API endpoints (e.g., /ws, /api/leaderboard, /api/tournament/register, admin routes).
-Serves static files from the ./Public directory.
-Synergy: It's the foundation upon which the entire backend operates, connecting the client-side (via WebSockets and HTTP) to the server-side logic and services.
-lobby_manager.go
-
-Hierarchy: Core/State Manager.
-Purpose: Manages the central state of the game lobby, including connected clients, active matches, matchmaking queues, player statistics (leaderboard), clubs, loans, auctions, and rumors. It handles client registration/unregistration and broadcasts global updates. It also contains periodic cleanup and processing routines.
-Flow:
-Receives client connections (l.register) and disconnections (l.unregister).
-Processes all incoming WebSocket messages (l.broadcast) by delegating to l.handleGameProtocol().
-Runs periodic tickers (cleanupNonces, processMatchmaking, checkVaultBalanceOnChain, processAuctions, processLoans, processRumors, processPlaystyleDecay, processMojoDecay, processInsuranceRecovery, processLeaseExpirations, observeGlobalSentiments, archiveSeason, refreshRegionalRoles, broadcastHealthReport, savePersistentCardCache, saveRegisteredTxIDs, saveLinkedWallets).
-Calls various service functions (e.g., l.updateLeaderboard, l.incrementDNF, l.sendToClient, l.logAdminAudit).
-Synergy: It's the heart of the real-time game world, maintaining consistency across all connected clients and coordinating interactions between different game systems. It ensures that all game state changes are reflected globally and persistently where needed.
-common_types.go
-
-Hierarchy: Utility/Data Structures.
-Purpose: Defines all shared data structures (structs) used across the entire application, including Client, Lobby, PlayerStats, MatchState, NetworkConfig, TournamentState, Club, Loan, Auction, Rumor, KidnapState, LinkedWallet, WalletLinkInfo, ServerCard, Envelope, MoveData, UseItemData, BailCardData, NonceData, RateBucket, HoldingBonus, FaceplateStats, PlaystyleTendencies, CapturedCardInfo, MatchHistory, TournamentMatch, TournamentSummary, MetadataAttribute, ARC72Metadata.
-Flow: Primarily provides definitions; does not contain active logic.
-Synergy: Essential for maintaining data consistency and type safety across all Go files, both backend services and the WASM game engine. It acts as the common language for data exchange.
-achievement_service.go
-
-Hierarchy: Service.
-Purpose: Manages the unlocking and notification of player achievements.
-Flow:
-unlockAchievement() and unlockAchievementLocked() are called by other services (e.g., battle_service.go, courthouse_service.go, club_service.go) when a player meets achievement criteria.
-Updates PlayerStats.Achievements.
-Calls l.logAdminAuditLocked() to record the event.
-Sends admin_notification messages to the client(s) and broadcasts a lobby_update.
-Synergy: Adds a meta-game layer, rewarding players for specific actions and contributing to their social standing (Reputation).
-auction_service.go
-
-Hierarchy: Service.
-Purpose: Manages the Art Gallery (auction system), allowing players to list item bundles for sale, place bids, and handles auction settlement.
-Flow:
-handleGetAuctions() responds to HTTP requests for active auctions.
-handleCreateAuction() processes requests to list items, verifies nonce, escrows items from seller's inventory, and creates a new Auction entry.
-handlePlaceBid() processes bid requests, verifies nonce, deducts bid from bidder, refunds previous bidder, updates auction state, and adjusts l.faucetBalance.
-processAuctions() (called by lobby_manager.go ticker) checks for expired auctions and settles them (transferring items/funds).
-Uses l.ResolveEnvoiName() for display names.
-Synergy: Creates a player-driven marketplace for unique item bundles, contributing to the high-finance layer of the game's economy.
-battle_service.go
-
-Hierarchy: Service.
-Purpose: Implements the core game combat logic, including server-side power calculation, capture mechanics (Same, Plus, Combo), win verification, and post-match processing (jailing, item buff expiration).
-Flow:
-getEffectiveServerPower() calculates a card's power, accounting for player stats (Wanted Level, Cunning, Nurturing), card stats (Fatigue, Loyalty, Mood), Faceplate bonuses (Mojo/Cunning), and active item buffs.
-serverCheckCaptures() simulates card captures on the server, returning flipped cards and their details.
-verifyWinner() determines the match outcome, handles Sudden Death, applies bounty rewards, processes item buff expirations, and triggers jailing rules (processFallenPenaltyJailLocked, processPrisonerRuleLocked).
-initiateSuddenDeath() shuffles and redistributes cards for tie-breakers.
-finalizeMatchResultLocked() updates player leaderboards and triggers tournament result processing.
-calculateDeckRating() and isBetterRating() are used for leaderboard metrics.
-Synergy: Ensures fair and authoritative gameplay, preventing client-side cheating by re-validating all moves and outcomes on the server. It directly impacts player progression and economic consequences.
-black_market_service.go
-
-Hierarchy: Service.
-Purpose: Manages the Black Market, where liquidated collateral from defaulted loans can be bought and sold by high-infamy players.
-Flow:
-handleGetBlackMarket() returns available liquidated loans, gated by player's Cunning and Wanted Level.
-handleSellMarketTokens() allows players to convert MarketTokens (received from defaulted loans) into $VBV, applying a "scavenger tax."
-handleBuyBlackMarket() allows players to purchase liquidated bundles, deducting $VBV, adding items to inventory, increasing Wanted Level, and returning proceeds to the faucet.
-Synergy: Creates a high-risk, high-reward secondary market, adding depth to the criminality and high-finance layers, and contributing to the Industrial Loop.
-bridge_service.go
-
-Hierarchy: Placeholder.
-Purpose: Reserved for future multi-chain bridge services.
-Flow: Currently empty. Onboarding logic moved to onboarding_service.go.
-Synergy: Future expansion for broader blockchain interoperability.
-career.go
-
-Hierarchy: Service.
-Purpose: Manages the daily salary dispenser for club employees.
-Flow:
-startSalaryDispenser() runs a daily ticker.
-Iterates through players, checks if they are employed, if their club has sufficient treasury, and if 24 hours have passed since the last payment.
-Deducts salary from club treasury, adds to player rewards, and updates LastSalaryPayment.
-Logs audit events and notifies employees.
-Synergy: Reinforces the Industrial/Trust layer by automating employment benefits and creating a consistent economic flow for club members.
-club_service.go
-
-Hierarchy: Service.
-Purpose: Manages club creation, joining, territory acquisition, and heist mechanics.
-Flow:
-handleHeist() processes player heist attempts, calculates success chance (based on Cunning, Security Level, Traps), distributes loot (with "Fence Fee" to faucet), increases Wanted Level, and handles jailing if a Guard Dog is present.
-handleCreateClub() processes requests to found a new club, verifies payment, and initializes club state.
-handleJoinClub() processes requests to join a club, verifies payment, adds member, and contributes to club treasury.
-handlePurchaseTerritory() processes requests to acquire new territories, verifies payment, and updates club territories.
-handleRestockInventory() allows authorized staff to restock club shop items, deducting from treasury.
-distributeCourthouseFineToClubsLocked() distributes fines to clubs and governors.
-handleCreateLease() allows members to list cards for rent.
-handleTakeLease() allows members to rent cards, handling payment distribution.
-processLeaseExpirations() (called by lobby_manager.go ticker) returns expired leased cards.
-Synergy: Central to the Industrial/Trust and Criminality layers, enabling player organizations, economic influence, and high-stakes criminal activities.
-courthouse_service.go
-
-Hierarchy: Service.
-Purpose: Allows players to reset their Wanted Level by paying a $VBV fine.
-Flow:
-handleCourthouseReset() processes requests, calculates fine based on Wanted Level, verifies payment via verifyBuyInTransaction().
-Resets WantedLevel to 0, adds half the fine to l.faucetBalance, and distributes the other half to clubs via l.distributeCourthouseFineToClubsLocked().
-Triggers achievement unlock (REHABILITATED).
-Synergy: Provides a mechanism for players to manage their infamy, contributing to the Industrial Loop by redistributing fines to clubs.
-economy_processing.go
-
-Hierarchy: Service.
-Purpose: Handles temporal economic processes like loan defaults and collateral liquidation.
-Flow:
-processLoans() (called by lobby_manager.go ticker) checks for defaulted loans.
-If a loan defaults, it changes its status, calculates MarketTokens for the borrower, updates their Reputation, adds the loan to l.blackMarket, and removes it from active loans.
-Synergy: Automates the consequences of financial risk, feeding into the Black Market and influencing player reputation.
-economy_service.go
-
-Hierarchy: Service.
-Purpose: Manages the overall economic health of the arena, including dynamic reward scaling, season metadata persistence, and on-chain transaction notes.
-Flow:
-applyDynamicScaling() and applyDynamicScalingLocked() adjust reward amounts based on l.faucetBalance relative to l.maxFaucetCapacity.
-saveSeasonMetadataLocked() persists season start, number, and initial rewards to season.json.
-sendNoteTx() sends generic note transactions to the blockchain (used for tournament summaries, season archives).
-recordWinOnChain() and recordDNFOnChain() log match outcomes on-chain.
-logWinAudit() records detailed win audit logs.
-CalculateReputation() computes a player's social standing based on various factors (wins, DNFs, wanted level, achievements, playstyle, employment, cosmetics).
-Synergy: Central to maintaining a balanced and transparent in-game economy, ensuring rewards are sustainable and player progression is meaningful.
-employment_service.go
-
-Hierarchy: Service.
-Purpose: Manages player employment within clubs, including hiring and setting salaries.
-Flow:
-handleHirePlayer() processes requests from club owners to hire players, updates PlayerStats.JobRole and PlayerStats.EmployerClubID, and updates Club.Staff.
-handleSetSalary() allows club owners to set salaries for employees, updating PlayerStats.Salary.
-Notifies employees of their new roles/salaries.
-Synergy: Deepens the Industrial/Trust layer by formalizing player roles within clubs and establishing economic relationships.
-faucet_service.go
-
-Hierarchy: Service.
-Purpose: Securely handles reward payouts to players using the "Switchboard Pattern" (server-side signing with client-side nonce verification).
-Flow:
-handleReward() receives payout requests, applies rate limiting, verifies client score against l.matchHistory, verifies client signature (EVM or Algorand) against a nonce.
-verifyVoiPayoutOptIn() checks if the recipient is opted into the VBV asset.
-dispatchReward() constructs and sends atomic Algorand application calls for all active reward assets, applying reputation bonuses, and handling skipped assets due to opt-in or insufficient vault balance.
-Updates l.faucetBalance and triggers l.applyDynamicScalingLocked().
-logWinAudit() records detailed payout information.
-Synergy: Critical for the game's economy, ensuring secure and verifiable distribution of rewards while protecting the faucet's private keys.
-handlers_admin.go
-
-Hierarchy: Handler/Admin.
-Purpose: Provides administrative functionalities through HTTP endpoints, protected by signature-based authentication.
-Flow:
-checkAdminAuth() and verifyAdminSignature() authenticate admin requests using multi-chain signatures (EVM or Algorand) against a nonce.
-logAdminAudit() records all admin actions.
-broadcastToAdmins() sends messages to connected admin clients.
-Handles various admin actions: handleRefillVault, handleUpdateRules, handleAdminAddReward, handleAdminRemoveReward, handleSetActiveNetwork, handleAddNetwork, handleUpdatePowerScaling, handleSystemMessage, handleBanPlayer, handleGloatBan, handleAvatarBan, handleResetStats, handleUpdateBaseReward, handleMaintenanceMode, handleUpdateRewardAsset, handleStartTournament, handleOpenRegistration, handleSimulateTournament, handleGetAdminLogs.
-Synergy: Essential for game management, balancing, and moderation, ensuring the platform can be maintained and adapted by authorized personnel.
-handlers_criminality.go
-
-Hierarchy: Handler/Criminality.
-Purpose: Manages criminal actions like kidnapping gambits, ransom payments, and bailing jailed cards.
-Flow:
-handleKidnapRequest() processes requests to kidnap a card (favorite or rarest), removes it from victim's inventory, adds to perp's KidnappedCards and victim's HeldHostageCards, and sets an expiration for InsuranceRecovery.
-handlePayRansom() processes ransom payments, verifies funds, deducts from victim, distributes to perp (with "Laundering Tax" to faucet), returns card to victim, and removes from tracking.
-handleReleaseHostage() allows a kidnapper to voluntarily release a card.
-handleBailCard() allows players to pay a fine to release a jailed card, verifying payment and distributing to the jailing club.
-processInsuranceRecovery() (called by lobby_manager.go ticker) automatically returns expired kidnapped cards.
-Synergy: Drives the high-stakes criminality layer, creating dynamic player interactions and economic consequences.
-handlers_public.go
-
-Hierarchy: Handler/Public API.
-Purpose: Provides public-facing HTTP endpoints for game statistics and information, accessible by external services or non-authenticated clients.
-Flow:
-handleLeaderboard() returns sorted player statistics.
-handlePublicStatus() provides general server status (faucet balance, active matches, maintenance mode).
-handleHealthCheck() returns a simple "ok" status.
-handleCardStats() and handleGetCardDetails() retrieve verified NFT metadata using l.getVerifiedCards().
-handleReSyncStats() triggers a manual blockchain sync for player stats.
-Synergy: Enables transparency and external integration, allowing the game's status and player achievements to be showcased outside the application.
-handlers_rumor.go
-
-Hierarchy: Handler/Rumor System.
-Purpose: Manages the spreading of rumors about players, influencing their market value.
-Flow:
-handleSpreadRumor() processes requests to spread a rumor, deducts cost from spreader's rewards, updates RumorCount, creates a Rumor object with an expiration, and broadcasts the update.
-processRumors() (called by lobby_manager.go ticker) removes expired rumors.
-Synergy: Introduces market manipulation mechanics, adding depth to the high-finance layer and social interactions.
-item_service.go
-
-Hierarchy: Service.
-Purpose: Centralizes the logic for applying item effects, both in-match and persistent.
-Flow:
-applyItemEffect() is called by lobby_manager.go:handleGameProtocol (specifically the use_item case).
-Applies effects based on item.ClubType:
-Vitality items (e.g., stamina_stim, loyalty_pledge) modify ServerCard stats (Fatigue, Loyalty) and l.persistentCardCache.
-Elemental/Tactical items (e.g., mood_catalyst, grounded_shield, rule_breaker, intel_report) modify MatchState.ActiveItemBuffs and potentially MatchState.Rules.
-Hardware items (e.g., tripwire, sentry_turret, guard_dog) are deployed as Club.ActiveBuffs with expirations.
-Updates PlayerStats.Playstyle.PreferredItems.
-Synergy: Provides a modular way to manage the diverse effects of in-game items, integrating them into combat, club defense, and player progression.
-loan_service.go
-
-Hierarchy: Service.
-Purpose: Manages the Second-Hand Store (loan system), allowing players to take collateralized loans and repay them.
-Flow:
-handleGetLoans() returns active loans, optionally filtered by borrower.
-handleTakeLoan() processes loan requests, verifies nonce, checks faucet liquidity, escrows collateral from player's inventory, creates a Loan object, deducts principal from l.faucetBalance, and adds to player's rewards.
-handleRepayLoan() processes loan repayments, verifies payment transaction, adds repayment (principal + interest) to l.faucetBalance, returns collateral to player, and deletes the loan.
-Uses l.ResolveEnvoiName() for display names.
-Synergy: Introduces a credit market, enabling players to manage their liquidity at the risk of losing collateral, feeding into the Black Market.
-market_service.go
-
-Hierarchy: Service.
-Purpose: Manages the Entity Market (share trading) and observes global player sentiments.
-Flow:
-handleTradeShares() processes buy/sell requests for player/NPC shares, calculates price based on player stats (Wins, Reputation, Rumors), deducts/adds $VBV from player rewards, and adjusts l.faucetBalance (Industrial Loop).
-observeGlobalSentiments() (called by lobby_manager.go ticker) aggregates player playstyle data (Aggressiveness, Risk Tolerance, Preferred Rules) to identify meta-trends.
-generateNPCCommentary() provides narrative hooks based on player style and global sentiments.
-Synergy: Creates a dynamic, player-driven stock market and enhances narrative immersion through AI-driven commentary.
-onboarding_service.go
-
-Hierarchy: Service.
-Purpose: Provides a Sybil-protected "Starter Pack" to Algorand users to bridge them to Voi.
-Flow:
-handleVoiOnboarding() processes onboarding requests, checks l.SybilSyncComplete, uses a per-wallet lock and global semaphore to prevent abuse.
-Checks l.onboardedWallets for historical claims.
-Checks if the recipient already has native VOI.
-Atomically decrements l.faucetBalance.
-Dispatches a grouped transaction (1 VOI + 1 VBV) to the recipient.
-Marks the wallet as onboarded in l.onboardedWallets.
-Synergy: Facilitates new player adoption by providing initial resources while implementing robust Sybil protection.
-oracle_service.go
-
-Hierarchy: Service/Blockchain Interaction.
-Purpose: Acts as the primary interface for reading authenticated data from various blockchain indexers and nodes, caching NFT metadata, and reconstructing game state.
-Flow: getVerifiedCards() utilizes a `MetadataDispatcher` to automatically identify and route discovery for ARC-72, ARC-19, and ARC-69 standards, ensuring broad asset compatibility on Voi and Algorand.
-syncStatsFromBlockchain() and refreshGlobalLeaderboard() reconstruct player wins/DNFs from on-chain transfer metadata.
-loadOnboardedWalletsFromIndexer() reconstructs historical Sybil protection state by scanning for past onboarding transactions.
-ResolveEnvoiName() resolves wallet addresses to human-readable names (e.g., .voi names) using a local cache.
-verifyBuyInTransaction() verifies payment transactions on Voi (ARC-200) or Algorand (ASA).
-checkVaultBalanceOnChain() and checkNativeVaultBalanceOnChain() synchronize internal faucet balances with on-chain pools.
-savePersistentCardCache() persists the card cache to disk.
-handleSeasonHistory() fetches archived seasonal standings from the blockchain.
-handleReSyncStats() triggers a manual sync for a specific wallet.
-mapChainToNetworkName() translates chain codes.
-checkAssetOptIn() verifies if a wallet is opted into a specific asset.
-Synergy: Crucial for the game's decentralized nature, ensuring that all critical game data is verifiable on-chain and that the server's internal state remains synchronized with the blockchain. It also enables cross-chain NFT integration.
-shop_registry.go
-
-Hierarchy: Data/Configuration.
-Purpose: Defines the static registry of all purchasable shop items, including their properties like price, club type, description, and heist modifiers.
-Flow: GlobalShopRegistry is a global map accessed by services like item_service.go and club_service.go.
-Synergy: Provides a centralized and consistent source of truth for all in-game items, enabling various game mechanics to interact with them.
-tournament_manager.go
-
-Hierarchy: Service.
-Purpose: Manages the lifecycle of automated tournaments, from registration to finalization and on-chain archiving.
-Flow:
-handleTournamentRegister() processes player registrations, verifies eligibility (elite status or buy-in payment), and adds participants.
-handleTournamentHistory() fetches archived tournament summaries from the blockchain.
-processTournamentResult() updates match winners, checks for round completion, and triggers advanceTournamentRound().
-advanceTournamentRound() progresses the tournament bracket, creating new matches or finalizing the tournament.
-determineTop5() identifies the top-ranked players based on bracket progression.
-finalizeTournament() calculates payouts, dispatches multi-asset rewards via dispatchTournamentRewards(), and records the tournament summary on-chain via recordTournamentOnChain().
-dispatchTournamentRewards() constructs and sends atomic Algorand application calls for tournament payouts, applying granular opt-in checks.
-broadcastTournamentState() sends real-time updates to clients.
-isWalletRegistered() checks if a wallet is already registered.
-Synergy: Drives competitive gameplay, creates high-stakes events, and ensures transparent, verifiable results through blockchain archiving.
-A2. Game-interaction (main.go)
-main.go
-Hierarchy: Client-side Game Engine (WASM).
-Purpose: Implements the core game logic that runs in the browser via WebAssembly. This includes the game board, card mechanics, AI decision-making, player state, and UI synchronization. It exposes functions to JavaScript for interaction.
-Flow:
-Initializes the Game (Engine) struct, which holds the entire client-side game state.
-registerFunctions() exposes Go functions to the JavaScript global scope (e.g., connectWallet, PlaceCard, GetGameState, SyncTournament).
-connectWallet(), disconnectWallet(), toggleNetwork(), SetAvatar(), SendReward() handle basic client-side wallet and identity management.
-ToggleRule(), SelectDeck(), RemoveFromDeck(), AddToDeck(), SetPlayerReady(), AutoBuildDeck() manage deck building and lobby readiness.
-SyncPlayerStats(), SyncFullProfile(), SyncPortfolio(), SyncPlaystyle(), SyncOpponentProfile(), SyncOpponentDeck(), SyncOpponentWanted(), SyncVaultBalance(), SyncRewards(), SyncRules(), SyncServerLoad(), SyncLatency(), SyncTournament() receive state updates from the backend.
-StartMatch(), PlaceCard(), PerformAIMove(), checkCaptures(), flipCard(), simulateCaptures(), simulateCapturesOnBoard(), calculateMaxPlayerPotential(), checkWinCondition(), initiateSuddenDeath() implement the core battle logic.
-GetGameState() provides a snapshot of the client-side state to JavaScript for UI rendering.
-SetPhase(), SetTestingMode(), SetHardMode(), SetAdminState(), SetMaintenanceState(), SetLocalPlayerIndex() allow JavaScript to control game engine settings.
-UpdateAmbientMusic(), PlayAmbient(), StopAmbient(), PlaySound(), SetMasterVolume(), SetMusicVolume(), SetSfxVolume(), SetAssetBase(), SetApiBase() manage audio and asset loading.
-GetTierInfo(), GetLevelLabelForDisplay(), calculateDeckRating(), isBetterRating(), calculateLoadColor(), GetServerLoadColor(), ToggleLeaderboard(), GetTournamentArchiveBadge() provide UI-specific data.
-ImportARC72Card() fetches card details from the backend.
-ApplyArtifactToBoard() applies item effects to cards on the board.
-Synergy: Provides the client-side game engine, ensuring deterministic and responsive gameplay. It offloads complex calculations from the server, reduces latency, and allows for rich interactive experiences directly in the browser, while still relying on the backend for authoritative state synchronization and blockchain interactions.
-
-## 4. Go Backend-mermaidmap
+## 4. Authoritative Core Topology (Go - `./*.go`)
 graph TD
     subgraph Entry & Routing
-        SVR(server.go)
-        ONBOARD(onboarding_service.go)
+        SVR(./server.go)
+        ONBOARD(./onboarding_service.go)
     end
 
     subgraph Core Orchestration
-        LOBBY(lobby_manager.go)
-        TYPES(common_types.go)
-        REG(shop_registry.go)
+        LOBBY(./lobby_manager.go) %% The Mutex Gate
+        TYPES(./common_types.go)
+        REG(./shop_registry.go)
+        BOOT(./economy_bootstrap.go)
+        RESIL(./resilience_utils.go)
+    end
+
+    subgraph Reconciliation & Metrics
+        AUDIT(./economy_audit.go)
+        TELEM(./economy_telemetry.go)
+        ROUTER_P(./economy_processing.go)
     end
 
     subgraph Battle Systems
-        BATTLE(battle_service.go)
-        ITEM(item_service.go)
-        ACHIEVE(achievement_service.go)
+        BATTLE(./battle_service.go) %% Authoritative PvP Validation
+        ITEM(./item_service.go)
+        PLAYER_S(./player_service.go)
+        ACHIEVE(./achievement_service.go)
     end
 
     subgraph Industrial Economy
-        ECON_S(economy_service.go)
-        FAUCET(faucet_service.go)
-        MARKET(market_service.go)
-        AUCTION(auction_service.go)
-        LOAN(loan_service.go)
-        CAREER(career.go)
-        BLACK(black_market_service.go)
+        ECON_S(./economy_service.go)
+        FAUCET(./faucet_service.go)
+        MARKET(./market_service.go)
+        AUCTION(./auction_service.go)
+        LOAN(./loan_service.go) %% Collateralized Debt Market
+        CAREER(./career.go)
+        BLACK(./black_market_service.go)
     end
 
     subgraph Criminality & Social
-        CLUB(club_service.go)
-        CRIM(handlers_criminality.go)
-        RUMOR(handlers_rumor.go)
-        COURT(courthouse_service.go)
-        EMPLOY(employment_service.go)
-        NARRATIVE(narrative_service.go)
+        CLUB(./club_service.go)
+        CRIM(./handlers_criminality.go)
+        RUMOR(./handlers_rumor.go)
+        COURT(./courthouse_service.go)
+        EMPLOY(./employment_service.go) %% Staffing & Salaries
+        NARRATIVE(./narrative_service.go)
     end
 
     subgraph Infrastructure
-        ORACLE(oracle_service.go)
-        ADMIN(handlers_admin.go)
-        TOURN(tournament_manager.go)
-    end
-
-    subgraph Client Determinism
-        WASM(main.go - WASM)
+        ORACLE(./oracle_service.go)
+        ADMIN(./handlers_admin.go)
+        TOURN(./tournament_manager.go)
     end
 
     SVR -- Initializes --> LOBBY
-    SVR -- Payout API --> ONBOARD
+    SVR -- Payout API --> ONBOARD %% Sybil-Protected Bridge
     SVR -- Admin API --> ADMIN
     SVR -- Faucet API --> FAUCET
+
+    SVR -- Hydrate --> BOOT
+    BOOT -- Restore --> LOBBY
+    LOBBY -- Game Loop --> BATTLE
+    LOBBY -- Node Failover --> RESIL
+    LOBBY -- Tournament Loop --> TOURN
+    LOBBY -- WS Protocol --> CLUB
+    LOBBY -- WS Protocol --> CRIM
+    LOBBY -- Item Effects --> ITEM
+    LOBBY -- Market Liquidation --> BLACK
+    LOBBY -- Salary Dispenser --> CAREER
+    LOBBY -- Behavioral Narrative --> NARRATIVE
+
+    LOBBY -- Track --> ROUTER_P
+    ROUTER_P -- Invariant --> AUDIT
+    AUDIT -- Scrape --> TELEM
+
+    BATTLE -- AuthoritativeFrame Sync --> WASM_ENGINE
+    BATTLE -- SCAR Persistence --> TYPES
+    BATTLE -- Effective Stats --> PLAYER_S
     
-    LOBBY -- State Loop --> BATTLE
-    LOBBY -- State Loop --> TOURN
-    LOBBY -- WS Switchboard --> CLUB
-    LOBBY -- WS Switchboard --> CRIM
-    LOBBY -- Intelligence --> ITEM
-    LOBBY -- Liquidation --> BLACK
-    LOBBY -- Salaries --> CAREER
-    LOBBY -- Commentary --> NARRATIVE
-    
-    BATTLE -- Deterministic Sync --> WASM
-    BATTLE -- Power Penalties --> TYPES
-    
-    BLACK -- Stock Payouts --> MARKET
+    BLACK -- Fencing Payouts --> MARKET
     ECON_S -- Dynamic Scaling --> FAUCET
+    ROUTER_P -- Atomic Routing --> LOBBY
+
     FAUCET -- Signature Auth --> ORACLE
     
-    CLUB -- Revenue --> ECON_S
-    CLUB -- Hiring --> EMPLOY
+    CLUB -- Revenue --> ECON_P
+    CLUB -- Staffing --> EMPLOY
     CRIM -- Fines --> COURT
     COURT -- Redistribution --> CLUB
     
@@ -671,6 +256,35 @@ graph TD
     ADMIN -- Asset Recovery --> CLUB
     ADMIN -- Community Monitoring --> LOBBY
     MARKET -- Context --> NARRATIVE
+    CRIM -- Underworld Contracts --> BLACK
+
+    %% New Game Layers Integration (Architectural Flow)
+    CRIM -- Underworld Roles --> BLACK
+    CRIM -- Bounty Hunting --> ADMIN
+    ITEM -- Specialized Gear --> CRIM
+    ITEM -- Specialized Gear --> ADMIN
+    ECON_S -- Commission Setting --> ADMIN
+    COURT -- Judicial Authority --> ADMIN
+    FAUCET -- Recruitment Funds --> ADMIN
+    PLAYER_S -- Defensive Buffs --> BATTLE
+
+## 7. Redundant & Protected Files
+
+### Redundant Artifacts
+The following entries in `./AI-Brain/DIR.md` are metadata artifacts and do not represent physical files:
+*   `distribution validation`: Notes regarding `./club_service_test.go`.
+*   `stress tests`: Notes regarding `./market_service_test.go`.
+*   `A: Single_player_Fanfare_Characters` (and other Headers): Organizational markers.
+
+### Protected Placeholders
+These files may appear orphaned but are required for future architectural phases:
+*   `./bridge_service.go`: **WASM IPC Bridge (Active — Complete)**. Full WASM-to-Browser translation registry with 85 registered hooks (`js.Global().Set`), connects Go WASM to browser JS, exports: connectWallet, GetGameState, PlaceCard, SyncFullProfile. No longer empty — migrated from placeholder status per Docbase-Analysis.md code audit.
+*   `./isPerishable` flag: **Phase 5 - Consumable Mechanics**. A logical hook within organization revenue splits.
+
+### Standard Configurations
+*   `./jsconfig.json`: Required for JS Module path resolution in the IDE.
+*   `./.gitattributes`: Enforces LF line endings for cross-platform Dual-Target build stability.
+*   `./render.yaml`: Authoritative blueprint for persistent volume mounting on the hosting provider.
 
 
 ## 5. UI-File-sys-Flow
@@ -908,94 +522,284 @@ graph TD
         VAR --> THEME
 
         subgraph "Base Layer"
-            BASE[base/_reset.scss<br/>base/_typography.scss]
+            BASE(./Public/src/scss/base/_reset.scss<br/>./Public/src/scss/base/_typography.scss)
         end
 
         subgraph "Thematic Mixins"
-            THEME[themes/_neon-glass.scss]
+            THEME(./Public/src/scss/themes/_neon-glass.scss)
         end
 
         subgraph "Component Layer"
-            COMP[components/_buttons.scss<br/>components/_cards.scss<br/>components/_overlays.scss]
+            COMP(./Public/src/scss/components/_buttons.scss<br/>./Public/src/scss/components/_cards.scss<br/>./Public/src/scss/components/_overlays.scss)
         end
 
         subgraph "Feature Specifics"
-            FEAT[features/_criminality.scss<br/>features/_economy.scss<br/>features/_shops.scss<br/>features/_social.scss<br/>features/_territory.scss]
+            FEAT(./Public/src/scss/features/_criminality.scss<br/>./Public/src/scss/features/_economy.scss<br/>./Public/src/scss/features/_shops.scss<br/>./Public/src/scss/features/_social.scss<br/>./Public/src/scss/features/_territory.scss)
         end
 
         subgraph "Structural Layouts"
-            LAY[layouts/_dashboard.scss<br/>layouts/_main-layout.scss]
+            LAY(./Public/src/scss/layouts/_dashboard.scss<br/>./Public/src/scss/layouts/_main-layout.scss)
         end
 
         subgraph "Utilities & Anim"
-            UTIL[utilities/_animations.scss<br/>utilities/_spacing.scss]
+            UTIL(./Public/src/scss/utilities/_animations.scss<br/>./Public/src/scss/utilities/_spacing.scss)
         end
 
-        THEME -.->|@include neon-glass-panel| COMP
-        THEME -.->|@include neon-glass-panel| FEAT
-        THEME -.->|@include neon-glass-panel| LAY
+        THEME -.->|@mixin neon-glass-panel| COMP
+        THEME -.->|@mixin neon-glass-panel| FEAT
+        THEME -.->|@mixin neon-glass-panel| LAY
     end
 
     %% Aggregation
-    BASE --> MAIN[main.scss]
+    BASE --> MAIN(./Public/src/scss/main.scss)
     COMP --> MAIN
     FEAT --> MAIN
     LAY --> MAIN
     THEME --> MAIN
     UTIL --> MAIN
 
-    subgraph "Build Process"
-        MAIN -- "Sass Compiler" --> CSS[styles.css]
-        MAIN -- "Generates" --> MAP[styles.css.map]
-    end
+    MAIN -- "Sass Compiler" --> CSS(./Public/styles.css)
 
-    subgraph "Browser Execution"
-        HTML[index.html] -- "Links" --> CSS
-        CSS -- "References for Debugging" --> MAP
-        MAP -- "Maps back to" --> MAIN
-    end
+## 6. Detailed Backend Service Topology
+The backend utilizes an **Authoritative Core with Stateless Service Delegation** model:
 
-    %% Styling individual nodes for clarity
-    style MAIN fill:#00ffff,stroke:#333,stroke-width:2px,color:#000
-    style CSS fill:#ff00ff,stroke:#333,stroke-width:2px,color:#fff
-    style HTML fill:#ffff00,stroke:#333,stroke-width:2px,color:#000
-    style MAP fill:#888,stroke-dasharray: 5 5
+*   **Switchboard**: `./server.go` / `./Public/js/network.js`.
+*   **Persistence**: `./economy_bootstrap.go` (Recovery) and `./economy_persistence.go` (Snapshots).
+*   **Orchestration**: `./lobby_manager.go` (The Mutex Gate).
+*   **Specialized Systems**:
+    *   `./battle_service.go`: Authoritative combat validation.
+    *   `./club_service.go`: Organizational management.
+    *   `./economy_processing.go`: The **Token-Sink Router** (Atomic Fee Redistribution).
+    *   `./economy_audit.go`: The **Reconciliation Kernel**.
+    *   `./economy_telemetry.go`: The **Prometheus Exporter**.
+*   **Isomorphic Bridge**: `./common_types.go` (Shared Data) and `./backend_types.go` (Server Containers).
 
+## 7. Operational Integrity: File Registry
 
-# Dependencies (_variables.scss): Every partial relies on the variables defined here for the "Neon-Glass" color palette and spacing scales.
-Thematic Integration (_neon-glass.scss): This file contains the neon-glass-panel mixin, which is applied across components, features, and layouts to ensure consistent glassmorphism and neon borders.
-Aggregation (main.scss): This acts as the manifest, importing all modular partials in a specific order (Variables > Base > Components > Features > Layouts > Utilities).
-The Artifacts:
-styles.css: The optimized, flat file actually used by the browser.
-styles.css.map: A JSON file that allows browser developer tools to show you exactly which .scss file and line number a style comes from, even though it's viewing the compiled .css.
-The Consumer (index.html): Links the compiled CSS in the <head>, which then styles the dynamic elements rendered by the JavaScript orchestrators (app.js, ui.js).
+### 7.1 Redundant Artifacts
+| Entry | Status | Reason |
+| :--- | :--- | :--- |
+| `distribution validation` | Metadata | Notes regarding `./club_service_test.go` logic. |
+| `stress tests` | Metadata | Notes regarding `./market_service_test.go` logic. |
+| `A: Single_player_Fanfare_Characters` | Metadata | Header artifact in `./AI-Brain/DIR.md`. |
 
- ## 6. Detailed Backend Service Topology
- 
- The backend utilizes an **Authoritative Core with Service Delegation** model:
- 
- *   **The Switchboard (server.go / network.js)**: Manages raw WebSocket frames and routes them to the protocol handler.
- *   **The Orchestrator (lobby_manager.go)**: Holds the master `Lobby` mutex and manages the main event loop. It delegates business logic to specialized services while holding the lock to ensure atomic state transitions.
- *   **Specialized Services**:
-     *   `battle_service.go`: Authoritative PvP validation and jailing logic.
-     *   `club_service.go`: Organization management and the "Industrial Loop" (Heists/Leases).
-     *   `economy_service.go`: Dynamic Scaling and Reputation modeling.
-     *   `oracle_service.go`: High-availability blockchain discovery (ARC-72/19/69) and state reconstruction.
- *   **The Data Bridge (common_types.go)**: Pure data-only shared schema (Clubs, MatchHistory, Stats) ensuring identical mathematical interpretation between Go Server and WASM.
- *   **The State Container (backend_types.go)**: Server-only structures (Lobby, Client) utilizing `//go:build !js || !wasm` to prevent network-heavy dependencies (like WebSockets) from leaking into the WASM build.
- 
- ### Sequence: Market Volatility & Rumors
- 1. `criminality.js` triggers `spreadRumor` via WebSocket.
- 2. `handlers_rumor.go` validates the 500 $VBV fee and acquires the `Lobby` lock.
- 3. Spreader's `RumorCount` increments and reputation is recalculated.
- 4. Target entity's reputation is recalculated to force a price update in `market_service.go`.
- 5. `market_service.go` applies the `rumor.Strength` multiplier during `trade_shares` requests.
- 6. `processRumors` in `lobby_manager.go` eventually clears the multiplier and resets standings.
+### 7.2 Strategic Kernels
+| File / Placeholder | Role | Reason |
+| :--- | :--- | :--- |
+| `./bridge_service.go` | Integration | Authoritative IPC Registry for WASM (Pillar 4). |
+| `./season.json` | Fallback | Local state root backup if blockchain reconstruction fails. |
+| `./jsconfig.json` | Config | Required for JS Module path resolution in the IDE. |
+| `./render.yaml` | Config | Authoritative blueprint for persistent volume mounting. |
+| `redemption_gateway.go` | Integration | Active Entitlement Gateway for Phase 4 Console Expansion. |
+| `./Dockerfile` | Deployment | Containerization blueprint for production build. |
+| `./entrypoint.sh` | Deployment | Container startup script (env injection, health checks). |
+| `./.dockerignore` | Deployment | Excludes artifacts from Docker build context. |
+| `./deploy-wasm.yml` | CI/CD | WASM rebuild & deploy pipeline configuration. |
+| `./networks.json` | Config | Network endpoint registry (chain RPCs, testnet/mainnet). |
+| `./.env.example` | Config | Environment variable template for local/production setup. |
+| `./ai_exclude` | DevTool | File patterns excluded from AI indexing/exploration. |
 
- ### Sequence: Economic Settlement
- 1. `lobby_manager.go` ticker triggers `processAuctions` in `auction_service.go`.
- 2. Service identifies an expired auction and acquires the `Lobby` lock.
- 3. `auction_service.go` settles the virtual ledger (`playerBalances`).
- 4. Service calls `applyDynamicScalingLocked` in `economy_service.go` to re-balance the Arena's reward ratio.
- 5. `auction_service.go` calls `sendNoteTx` in `oracle_service.go` to archive the settlement on-chain.
- 6. `lobby_manager.go` broadcasts the updated state to all clients.
+## 8. Core Economic Sequences
+
+### 8.1 Observability & Integrity
+1. `./economy_service.go` triggers a tax event via the **Token-Sink Router**.
+2. `./economy_processing.go` calculates atomic splits.
+3. `./economy_audit.go` performs an invariant check (**Inflow == Outflow + Remainder**).
+4. Discrepancies raise a security exception and block the transaction.
+5. Vetted data is forwarded to `./economy_telemetry.go` for Prometheus scraping (9090).
+
+### 8.2 Market Volatility
+1. `./Public/js/criminality.js` triggers `spreadRumor` via WebSocket.
+2. `./handlers_rumor.go` validates the fee and acquires the `Lobby` lock.
+3. Reputation is recalculated for the target, forcing a price update in `./market_service.go`.
+4. `./market_service.go` applies the rumor strength to the AMM bonding curve.
+5. `./lobby_manager.go` eventually clears the effect via the `processRumors` loop.
+
+<!-- ========================================================================= -->
+<!--                    [UNIMPLEMENTED CONSOLE EXPANSION SPEC]                  -->
+<!-- ========================================================================= -->
+
+## 9. Future Cross-Platform Console Expansion Map (Store-Mirrored DLC Model)
+This module outlines the architectural blueprints for the upcoming console deployment phase. To satisfy platform policies, the console runtime is **strictly NON-crypto active**.
+
+### 9.1 The Entitlement & Redemption Pipeline
+Console players redeem **earned Arena Vouchers** for in-game DLC. The console store UI functions exclusively as a display/presentation layer for entitlements granted by the Go Backend.
+
+[ Console Hardware Client ]
+│
+▼ (1. Redemption Event: Voucher → DLC Blueprint)
+[ redemption_gateway.go ]
+│
+├──► [ 2. Backend Entitlement Validation ]
+│    ├── Check ArenaVoucher Balance
+│    └── Verify Product Entitlement with Manufacturer API (Xbox/PSN)
+│
+▼ (3. Deterministic Settlement)
+[ economy_processing.go / economy_audit.go ]
+│
+├───► [ 4A. Browser Creator Payout ] ──► Increments $VBV (Liability Shift)
+├───► [ 4B. Vault Reconciliation ] ────► Physical VBV returns to Faucet
+└───► [ 4C. Voucher Deduction ] ───────► Decrements ArenaVouchers
+│
+▼ (5. Final Entitlement Grant)
+[ Console Store API ] ──► Marks DLC as "Purchased/Unlocked" (0.00 Price)
+
+### 9.2 Browser Players as DLC Suppliers
+1. **Minting**: Creator mints a non-crypto asset blueprint on the Voi Network.
+2. **Registration**: Server indexes the blueprint and mirrors it to the Console Hub.
+3. **Market Buy**: When a console player redeems vouchers, the server executes a market-buy of $VBV via the **Nautilus DEX Path** (Placeholder: Future specialized service) to pay the creator.
+
+### 9.3 Cross-Platform Operational Directives
+1. **Compliance Invariant**: The console store UI must never display a fiat price for items redeemable via vouchers. Items are marked as "Redeemable with Arena Vouchers."
+2. **Non-Crypto Client**: Consoles are prohibited from blockchain interaction. All cryptographic signing and DEX swaps are performed by the **Admin Node**.
+3. **State Isolation**: Consoles operate exclusively via `api/v1/`. Direct interaction with `./bridge_service.go` is prohibited.
+4. **Deterministic Timelocks**: If an asset is leased, `./loan_service.go` maintains a server-side ticker. Upon expiry, the backend broadcasts an invalidation packet to lock the local DLC profile.
+5. **Liquidity Preservation (USDC Siphon)**: The excessive accumulation sub-routine monitors faucet liquidity thresholds via `./economy_telemetry.go`. If optimal reserves are achieved, the siphon extracts a strict, predetermined maintenance cut from the incoming transaction payload directly into the Admin USDC operational ledger before routing liquidity onto Nautilus DEX pools.
+
+### 9.4 Combat Sync Loop: Cross-Platform Parity
+
+**Scenario: Console Player (CP) defeats Browser Player (BP)**
+1. [ Authoritative Core ] identifies CP as Winner.
+2. [ BP Wallet ] → Virtual Deduction (-X VBV) → [ Global Faucet ].
+3. [ CP Profile ] → Virtual Increment (+X Arena Vouchers) → [ Server State ].
+4. [ CP Hardware ] receives `update_vouchers` WebSocket frame; DLC becomes "Redeemable."
+
+**Scenario: Browser Player (BP) defeats Console Player (CP)**
+1. [ CP Profile ] → Virtual Deduction (-X Arena Credits) → [ Server State ].
+2. [ Global Faucet ] → Virtual Increment (+X VBV) → [ BP Wallet ].
+3. [ BP Wallet ] can now "Dispatch" those winnings on-chain via browser.
+
+### 9.5 Authoritative Service Lifecycle
+graph LR
+    Init[INIT: BOOT & Hydrate] --> Run[RUN: Active Event Loop]
+    Run --> Snap[SNAPSHOT: Blockchain Archival]
+    Snap --> Run
+    Run --> SIG[SIGTERM: Integrity Audit]
+    SIG --> Exit[EXIT: Final Snapshot]
+
+### 9.6 Non-Custodial Automated Settlement (End-Game)
+1. Player provides an ARC-200 spend allowance via `./Public/js/wallet.js`.
+2. `./oracle_service.go` verifies the allowance via the Indexer registry.
+3. Background workers in `./loan_service.go` or `./auction_service.go` detect settlement triggers (Expiry/Win).
+4. Specialized services execute `pullApprovedTokens` via the Go SDK `transferFrom` protocol.
+5. `./economy_audit.go` captures the inflow and synchronizes the virtual liability ledger.
+
+### 9.7 Multi-Chain Asset Lifecycle (End-Game)
+1. `./onboarding_service.go` acts as the primary entry gate for external liquidity (Algorand Bridge).
+2. Cross-chain discovery triggers metadata ingestion via the `./oracle_service.go` `MetadataDispatcher`.
+3. `./lobby_manager.go` dispatches compressed `VBT_STATE_SNAPSHOT` notes to ensure archival parity.
+4. The Arena Vault executes authenticated payouts across supported networks using the Switchboard Pattern.
+
+## 10. Game Layers: Underworld vs. Justice Hegemony (Architectural View)
+This section outlines how the Arena's core services are leveraged and expanded to support the specialized career paths and dynamic conflict between the Underworld and Justice factions.
+
+### 10.1 Underworld Layer (Criminal Operations)
+*   **`./black_market_service.go`**: Expanded to support "Fence" role (selling illicit goods) and "Underworld Boss" PvE encounters (exclusive item/card drops).
+*   **`./handlers_criminality.go`**: Core logic for "Kidnapper" (enhanced hostage events), "Hostage Host" (team-based asset hoarding), and "Launderer" (Wanted Level reduction for a fee).
+    *   **Career XP Triggers:** Kidnapper (+80 XP + raid bonus), Hostage Host (+50 XP first capture), Racketeer (+40 XP extortion), Smuggler (conditional transfer XP)
+*   **`./market_service.go`**: Implements **Dutch Auction** logic for liquidated assets and **Dividend Freezes** for Tax Auditors.
+*   **`./item_service.go`**: Implements "Arc-Net-Spy" (inventory/match history reveal) and "Signal Dampeners" (Ghost Protocol stealth buffs).
+*   **`./narrative_service.go`**: Leveraged by "Gossip" role for enhanced rumor propagation and "Arc-Net Operative" for intelligence gathering.
+*   **`./player_service.go`**: Calculates "Smuggler" bypass mechanics and "Heist Planner" success buffs.
+    *   **Career XP Triggers:** Heist Planner (rivalry-based via EvaluateCrossCareerXP)
+*   **`./economy_service.go`**: Manages "Lawyer-Commissioner" (illicit commission rates) and "Underworld Contracts" (new Faucet sinks).
+    *   **Career XP Triggers:** Lawyer-Commissioner (+30 XP on release in courthouse_service.go)
+*   **`./counterfeit_service.go`** (new): Created for Counterfeiter career with TrackCareerXP hooks.
+    *   **Career XP Triggers:** Counterfeiter (per note production)
+
+### 10.2 Justice Layer (Arena Law Enforcement)
+*   **`./handlers_criminality.go`**: Core logic for "Bounty Hunter" (tracking high-Wanted targets) and "Armed-Offender-Squad (AOS)" (team-based recovery missions).
+    *   **Career XP Triggers:** Bounty Hunter (+60 + targetWanted/5 per capture in battle_service.go:660), AOS Leader (+60 + teamSize×10 per raid)
+*   **`./item_service.go`**: Implements "Truth Serum" (buff/debuff reveal) and "Reputation Shield" (penalty mitigation).
+*   **`./handlers_admin.go`**: Provides the "Justice Tier Bounty Center Dashboard" (enhanced tracking, mission dispatch) and "Reputation Enforcement" (player flagging).
+*   **`./courthouse_service.go`**: Expanded for "Judge" (rehabilitation fees, court ownership) and "Warden" (bail rates, prisoner management).
+    *   **Career XP Triggers:** Warden (+40 capture + 25 detection + 15 ransom + 20 release), Tax Auditor (+15 fine processing — resolution bonus pending)
+*   **`./economy_processing.go`**: Implements **Corporate Bailouts** (5,000 $VBV stimulus) and **Administrative USDC Siphons**.
+*   **`./faucet_service.go`**: Manages "Justice Recruitment Packs" and "Bounty Hunter Licenses" (new Faucet sinks).
+*   **`./economy_service.go`**: Manages "Justice Commissioner" (pro-social commission rates) and "Tax Auditor" (shadow funds recovery).
+    *   **Career XP Triggers:** Justice Commissioner (rivalry-based via EvaluateCrossCareerXP), Tax Auditor (+15 processing — resolution bonus 30-80 pending)
+*   **`./player_service.go`**: Calculates "Sector Peacekeeper" defensive buffs.
+    *   **Career XP Triggers:** Sector Peacekeeper (+20 kidnap + 15 release + 15 detection)
+*   **`./achievement_service.go`**: Tracks progression for "Bounty Hunter Mastery" and "Courthouse Advocate" achievements.
+*   **`./black_market_service.go`**: Provides "Underworld Contracts" for criminal players.
+
+### 10.3 Cross-Layer Career Engine
+*   **`./rival_career_engine.go`**: Authority on career XP evaluation via `EvaluateCrossCareerXP`. All Justice D7-D10 careers use rivalry pairs for XP:
+    *   Intel-Agent ↔ Arc-Net Operative (ally intel sharing)
+    *   Justice Recruiter ↔ Mutation Log Auditor (ally mutation data)
+    *   Justice Commissioner ↔ Tax Auditor (synergy override alliance)
+*   **`./rivalry_handlers.go`**: Exposes rivalry state via HTTP/WebSocket.
+*   **`./shop_registry.go`**: Contains item definitions for all career types including D7-D10 specialized gear.
+
+### 10.4 Cross-Layer Interactions & UI
+*   **`./Public/js/criminality.js`**: Orchestrates UI for Bounty Board, Heist Planning, Kidnap Selection, and new Justice/Underworld dashboards.
+*   **`./Public/js/economy.js`**: Manages Black Market, Art Gallery, and new specialized shops for Justice/Underworld items.
+*   **`./Public/js/ui.js`**: Renders specialized card archetypes (Justice/Underworld Cards), item overlays, and dynamic UI feedback for faction-specific events.
+*   **`./Public/src/scss/`**: Provides distinct visual themes (e.g., neon-cyan for Justice, error-red for Underworld) for faction-aligned UI elements, cards, and dashboards.
+*   **`./main.go` (WASM)**: Ensures deterministic combat logic for "Fallen Cards vs. Justice Cards" battles, applying faction-specific power bonuses and penalties.
+
+### 10.3 Cross-Layer Interactions & UI
+*   **`./Public/js/criminality.js`**: Orchestrates UI for Bounty Board, Heist Planning, Kidnap Selection, and new Justice/Underworld dashboards.
+*   **`./Public/js/economy.js`**: Manages Black Market, Art Gallery, and new specialized shops for Justice/Underworld items.
+*   **`./Public/js/ui.js`**: Renders specialized card archetypes (Justice/Underworld Cards), item overlays, and dynamic UI feedback for faction-specific events.
+*   **`./Public/src/scss/`**: Provides distinct visual themes (e.g., neon-cyan for Justice, error-red for Underworld) for faction-aligned UI elements, cards, and dashboards.
+*   **`./main.go` (WASM)**: Ensures deterministic combat logic for "Fallen Cards vs. Justice Cards" battles, applying faction-specific power bonuses and penalties.
+
+## 11. Service Wiring Matrix (Verification Snapshot — 2026-06-25)
+
+### 11.1 Instantiation Status (Lobby Struct Fields)
+
+The following services are instantiated in `newLobby()`:
+
+| # | Service | Type | File | Status |
+|---|---------|------|------|--------|
+| 1 | ClubService | `*ClubService` | `club_service.go` | ✅ Wired (HTTP routes via dispatch, WS paths) |
+| 2 | CareerService | `*CareerService` | `career.go` | ✅ Background-only (`StartSalaryDispenser`) |
+| 3 | CourthouseService | `*CourthouseService` | `courthouse_service.go` | ✅ Wired (HTTP reset route) |
+| 4 | OnboardingService | `*OnboardingService` | `onboarding_service.go` | ✅ Wired (HTTP `/api/bridge/onboard`) |
+| 5 | AchievementService | `*AchievementService` | `achievement_service.go` | ✅ Wired (HTTP GET/POST/UNLOCK routes) |
+| 6 | OracleService | `*OracleService` | `oracle_service.go` | ℹ️ Helper only (dependency injection, no direct HTTP routes) |
+| 7 | TournamentService | `*TournamentService` | `tournament_manager.go` | ✅ Wired (HTTP register/history/admin/start) |
+| 8 | LoanService | `*LoanService` | `loan_service.go` | ✅ Wired (HTTP TAKE/REPAY/list routes) |
+| 9 | AuctionService | `*AuctionService` | `auction_service.go` | ✅ Wired (HTTP GET/POST routes + game loop `ProcessAuctions`) |
+| 10 | BlackMarketService | `*BlackMarketService` | `black_market_service.go` | ✅ Wired (5+ HTTP routes) |
+| 11 | PlayerService | — | `player_service.go` | ✅ Helper methods on Lobby, used throughout |
+| 12 | NarrativeService | `*NarrativeService` | `narrative_service.go` | ⚠️ ORPHANED (no HTTP routes, no WS dispatchers) |
+| 13 | NautilusDEXPathService | `*NautilusDEXPathService` | `nautilus_dex_path.go` | ⚠️ PLACEHOLDER (comment: "PILLAR 2: Console Creator Payouts") |
+| 14 | JusticeService | `*JusticeService` | `justice_service.go` | ℹ️ Partially wired (`/api/justice/missions` route exists) |
+
+### 11.2 Career Engine (Not instantiated in Lobby)
+
+| Service | File | Status |
+|---------|------|--------|
+| RivalCareerEngine | `rival_career_engine.go` | ✅ Authority on career XP evaluation, rivalry pairs wired |
+| CounterfeitService | `counterfeit_service.go` | ⚠️ Fully orphaned (313 lines: `HandleGenerateCounterfeit`, `HandleDetectCounterfeit`, `SeizeCounterfeitNoteLocked`, `CleanupExpiredCounterfeits`; zero callers) |
+
+### 11.3 Employment Layer (Methods on Lobby, not a service struct)
+
+| Method | File | WS Dispatch | Status |
+|--------|------|-------------|--------|
+| `handleHirePlayer` | `employment_service.go:14` | ✅ `"hire_player"` case in lobby_manager.go | ✅ Partially wired |
+| `handleSetSalary` | `employment_service.go:88` | ❌ No WS dispatch found | ⚠️ ORPHANED (method exists, zero callers) |
+| `HandleLaunderCapital` | `employment_service.go:154` | ✅ `"launder_capital"` case in lobby_manager.go | ✅ Partially wired |
+
+### 11.4 Wiring Summary
+
+| Status | Count | Services |
+|--------|-------|----------|
+| ✅ Active & Wired | 8 | ClubService, CareerService (bg), CourthouseService, OnboardingService, AchievementService, TournamentService, LoanService, AuctionService, BlackMarketService |
+| ℹ️ Helper/Utility | 2 | OracleService, PlayerService |
+| ⚠️ Partially Wired | 1 | EmploymentLayer (hire_player/launder_capital yes; set_salary no), JusticeService (only missions) |
+| ⚠️ Orphaned | 2 | NarrativeService (708 lines), CounterfeitService (313 lines) |
+| ℹ️ Placeholder | 1 | NautilusDEXPathService |
+
+### 11.5 Recommended Actions
+
+1. **CounterfeitService**: Wire `HandleGenerateCounterfeit` and `HandleDetectCounterfeit` to HTTP routes in `server.go`, or document as planned/deprecated.
+2. **handleSetSalary**: Add `"set_salary"` case to lobby_manager.go WS dispatch, or remove method.
+3. **NarrativeService**: Audit if it should be wired, migrated to career engine, or documented as completed/deprecated.
+4. **JusticeService**: Verify endpoint coverage per documented Justice D1-D10 careers.
+
+---
+
+> **NOTE**: Duplicate content removed (lines 723-768 originally repeated sections 9.2-9.7 with incorrect numbering). Clean end of file at line 690.

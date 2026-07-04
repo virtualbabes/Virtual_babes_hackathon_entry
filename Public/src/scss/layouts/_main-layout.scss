@@ -242,3 +242,32 @@
     -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
     backdrop-filter: blur(calc(var(--glass-blur) * 1.5));
 }
+
+// PILLAR 3: Faction-Aware Mission HUD
+// High-visibility widget for Justice and Underworld objectives.
+#mission-hud-container {
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+    
+    .mission-hud {
+        @include neon-glass-panel;
+        padding: $spacing-xs $spacing-sm;
+        border-width: 2px;
+        border-style: solid;
+        display: flex;
+        align-items: center;
+        gap: $spacing-sm;
+        background: rgba($color-bg-dark, 0.7);
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        
+        &.pulse {
+            animation: mission-hud-pulse 2s infinite ease-in-out;
+        }
+    }
+}
+
+@keyframes mission-hud-pulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(0,0,0,0.5); border-color: var(--mission-color); }
+    50% { box-shadow: 0 0 15px rgba(var(--mission-color), 0.7), 0 0 25px rgba(var(--mission-color), 0.4); border-color: var(--mission-color); }
+}

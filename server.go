@@ -3,11 +3,14 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -25,12 +28,43 @@ func (l *Lobby) getDataPath(filename string) string {
 	return filepath.Join(l.DataDir, filename)
 }
 
+// corsMiddleware returns a middleware that enforces strict CORS for production domains.
+func corsMiddleware() func(http.Handler) http.Handler {
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	allowAll := allowedOrigins == "" || strings.TrimSpace(strings.ToLower(allowedOrigins)) == "*"
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if allowAll {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			} else {
+				origin := r.Header.Get("Origin")
+				for _, o := range strings.Split(allowedOrigins, ",") {
+					o = strings.TrimSpace(o)
+					if o == origin {
+						w.Header().Set("Access-Control-Allow-Origin", origin)
+						w.Header().Set("Vary", "Origin")
+						break
+					}
+				}
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		allowed := os.Getenv("ALLOWED_ORIGINS")
-		if allowed == "" || allowed == "*" {
+		if allowed == "" || strings.TrimSpace(strings.ToLower(allowed)) == "*" {
 			return true // Permissive in dev or if explicitly wildcarded
 		}
 		origin := r.Header.Get("Origin")
@@ -46,6 +80,9 @@ var upgrader = websocket.Upgrader{
 
 // newLobby creates and returns a new Lobby instance, initializing all shared state.
 func newLobby() (*Lobby, error) {
+	startBoot := time.Now()
+	ctx := context.Background()
+
 	seasonStart := time.Now()
 	seasonNum := 1
 
@@ -71,8 +108,26 @@ func newLobby() (*Lobby, error) {
 		processingRewards:       make(map[string]time.Time),
 		processingOnboarding:    make(map[string]time.Time),
 		processingRegistrations: make(map[string]time.Time),
-		activeKidnappings:       make(map[int]KidnapState),
+		activeKidnappings:       make(map[int]KidnapState), // Legacy
+		victimRegistry:          &VictimRegistry{ActiveKidnaps: make(map[string]map[string]HostageSituation)},
+		verificationHook:        NewVerificationHook(),
 		availableNetworks:       make(map[string]NetworkConfig),
+		clubService:             &ClubService{},
+		careerService:           &CareerService{},
+		courthouseService:       &CourthouseService{},
+		onboardingService:       &OnboardingService{},
+		achievementService:      &AchievementService{},
+		oracleService:           &OracleService{},
+		tournamentService:       &TournamentService{},
+		loanService:             &LoanService{},
+		auctionService:          &AuctionService{},
+		blackMarketService:      &BlackMarketService{},
+		narrativeService:        &NarrativeService{},
+		nautilusDEXPathService:  &NautilusDEXPathService{}, // PILLAR 2: Console Creator Payouts
+		playerService:           &PlayerService{},
+		justiceService:          &JusticeService{}, // PILLAR 7: Justice Hegemony Path
+		matchHandshakers:        make(map[string]*SyncHandshaker),
+
 		linkedWallets:           make(map[string]WalletLinkInfo),
 		loans:                   make(map[string]*Loan),
 		rumors:                  make(map[string]*Rumor),
@@ -85,6 +140,7 @@ func newLobby() (*Lobby, error) {
 		unregister:              make(chan *Client),
 		broadcast:               make(chan []byte),
 		onboardedWallets:        make(map[string]bool),   // Initialize the new map
+		fencedListings:          make(map[string]FenceListing), // P2-B3: Fenced Goods Marketplace
 		onboardingSemaphore:     make(chan struct{}, 5),  // Limit concurrent bridge operations
 		oracleSemaphore:         make(chan struct{}, 10), // Limit concurrent indexer queries
 		envoiCache:              make(map[string]string),
@@ -96,6 +152,7 @@ func newLobby() (*Lobby, error) {
 		DataDir:                 os.Getenv("DATA_DIR"), // Persistent volume path
 		maxFaucetCapacity:       10000.0,
 		adminFocusNetwork:       "Voi Mainnet",
+		maintenancePriority:     "info",
 	}
 
 	// Initialize reward configuration
@@ -106,6 +163,73 @@ func newLobby() (*Lobby, error) {
 	l.avoiAssetID = os.Getenv("AVOI_ASSET_ID")
 	l.initialRewards[l.rewardAssetID] = l.initialBaseReward
 
+	// PILLAR 2: Economic Engine Initialization
+	l.tokenSinkRouter = NewTokenSinkRouter(&l.faucetBalanceMicro, &l.AdminMaintenancePool)
+
+	// PILLAR 2: Authoritative Map Linking.
+	// Ensure the Lobby and the Router share the same AMM memory space 
+	// so that trades are correctly captured in authoritative snapshots.
+	l.marketNodes = l.tokenSinkRouter.MarketNodes
+
+	// PILLAR 2: Siphon Alert Wiring.
+	// Connect the economic router's siphon hook to the admin broadcast system
+	// to enable real-time infrastructure funding alerts.
+	l.tokenSinkRouter.SiphonNotifier = l.broadcastToAdmins
+
+	l.payoutScheduler = NewPayoutScheduler(l.tokenSinkRouter, l, 24*time.Hour) // Daily Governor payouts
+
+	// PILLAR 2: Authoritative State Reconstruction (Local Disk Fallback).
+	// Hydrate the economic router with organizational treasuries and AMM reserves before
+	// initiating the deeper blockchain-native reconstruction sequence.
+	bootstrap := NewBootstrapEngine(l.tokenSinkRouter, l.DataDir)
+	diskRecovered, err := bootstrap.BootstrapAuthoritativeState()
+	if err != nil {
+		log.Printf("[BOOTSTRAP WARNING] Local state recovery failed: %v. Engine will rely on ledger synchronization.\n", err)
+	}
+
+	// PILLAR 4: Periodic Economic Persistence.
+	// Initialize the background worker to snapshot the Token-Sink router every 15 minutes.
+	persistenceWorker := NewPersistenceSyncWorker(l.tokenSinkRouter, l.DataDir, 15*time.Minute)
+	persistenceWorker.StartSyncDaemon(ctx)
+
+	// PILLAR 4: Telemetry Initialization
+	l.telemetry = NewTelemetryLogger("9090")
+	l.telemetry.StartTelemetryServer(ctx)
+
+	// PILLAR 4: Observability Wiring (Kernel setup).
+	// Note: Baseline reserve logging moved to end of boot sequence to prevent double-counting.
+	if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+		l.tokenSinkRouter.Audit.Telemetry = l.telemetry
+	}
+
+	// PILLAR 4: Resiliency Initialization
+	l.gracePeriodMatrix = l.NewGracePeriodMatrix(60*time.Second, func(wallet string) {
+		l.handleAuthoritativeForfeit(wallet)
+	})
+
+	// PILLAR 1-C: Rate Limiting Initialization.
+	// Parse ADMIN_WALLETS env var into a slice for admin bypass.
+	adminWalletsRaw := os.Getenv("ADMIN_WALLETS")
+	var adminWalletList []string
+	if adminWalletsRaw != "" {
+		for _, w := range strings.Split(adminWalletsRaw, ",") {
+			w = strings.TrimSpace(strings.ToLower(w))
+			if w != "" {
+				adminWalletList = append(adminWalletList, w)
+			}
+		}
+	}
+	l.rateLimiter = NewRateLimiterService(l, adminWalletList)
+	go l.rateLimiter.CleanupStaleEntries(5 * time.Minute)
+
+	// PILLAR 2: Counterfeiter Rate Limiting — Initialize the per-wallet map.
+	l.counterfeitRateLimit = make(map[string]*TokenBucket)
+
+	// Task 3103: Auto-assign per-wallet tiers for known economic/admin wallets.
+	for _, w := range adminWalletList {
+		l.rateLimiter.SetWalletQuota(w, "admin")
+	}
+
 	l.seasonStart = seasonStart
 	l.seasonNumber = seasonNum
 
@@ -113,12 +237,143 @@ func newLobby() (*Lobby, error) {
 	l.loadRegisteredTxIDs()
 	l.loadLinkedWallets()
 	l.loadLeaderboard()                    // Reconstruct Playstyles before sync
-	l.loadEconomyState()                   // Reconstruct Virtual Balances
-	go l.loadOnboardedWalletsFromIndexer() // Reconstruct Sybil protection state
+	chainRecovered := l.loadEconomyState() // Reconstruct Virtual Balances
+	go l.oracleService.LoadOnboardedWalletsFromIndexer(l) // Reconstruct Sybil protection state
+
+	// PILLAR 4: Resilient Ledger Client Initialization (Voi Mainnet)
+	if voiCfg, ok := l.availableNetworks["Voi Mainnet"]; ok {
+		lb, err := NewLoadBalancedClient(voiCfg.NodeURLs)
+		if err == nil {
+			l.ledgerClient = lb
+			l.ledgerClient.SetProductionMode(true) // Hardened: 329 max rate limits, 5s sync lag, 15m cooldown
+			go l.ledgerClient.RunHealthMonitor(ctx)
+
+			// Parse Voi asset/app IDs from configuration
+			if voiCfg.AssetID != "" {
+				voiAppID, parseErr := strconv.ParseUint(voiCfg.AppID, 10, 64)
+				if parseErr == nil {
+					l.multiChainRouter.VoiAssetID = voiAppID
+				}
+			}
+		}
+	}
+
+	// PILLAR-A: Ethereum Multi-Chain Client Initialization (trust anchor for ETH-based settlement)
+	if ethNodes, ok := l.availableNetworks["Ethereum Mainnet"]; ok && len(ethNodes.NodeURLs) > 0 {
+		log.Println("[MultiChain] Initializing Ethereum trust anchor...")
+
+		// Extract node URLs with https:// prefix if missing
+		var ethUrls []string
+		for _, u := range ethNodes.NodeURLs {
+			if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+				u = "https://" + u
+			}
+			ethUrls = append(ethUrls, u)
+		}
+
+		if len(ethUrls) > 0 {
+			l.ethClient = NewEthereumClient(ctx, ethUrls)
+			if l.ethClient != nil && l.ethClient.IsHealthy() {
+				log.Printf("[MultiChain] Ethereum trust anchor healthy (vault: %s)\n", l.ethClient.GetVaultAddress())
+			} else if l.ethClient != nil {
+				log.Println("[MultiChain] WARNING: Ethereum client created but not healthy")
+			} else {
+				log.Println("[MultiChain] ERROR: Ethereum client initialization failed — NFT settlements will be unavailable")
+			}
+		}
+	}
+
+	// PILLAR-B: Algorand Mainnet Client Initialization
+	if algoCfg, ok := l.availableNetworks["Algorand Mainnet"]; ok && len(algoCfg.NodeURLs) > 0 {
+		bestClient, err := algod.MakeClient(algoCfg.NodeURLs[0], "")
+		if err == nil {
+			l.algorandMainnetClient = bestClient
+
+			// Start health monitoring for Algorand Mainnet node
+			go func() {
+				ticker := time.NewTicker(30 * time.Second)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+						nodeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						status, err := bestClient.Status().Do(nodeCtx)
+						cancel()
+						if err == nil && status.LastRound > 0 {
+							fmt.Printf("[MultiChain] Algorand Mainnet healthy (block: %d)\n", status.LastRound)
+						} else if err != nil {
+							fmt.Printf("[MultiChain] Algorand Mainnet health check failed: %v\n", err)
+						}
+					}
+				}
+			}()
+
+			// Wire multi-chain router with Ethereum trust anchor + Algorand Mainnet
+			if l.ethClient != nil && l.ethClient.IsHealthy() {
+				log.Println("[MultiChain] Ethereum trust anchor confirmed — wiring into MultiChainRouter")
+			} else if l.ethClient != nil {
+				log.Println("[MultiChain] WARNING: Ethereum client exists but not healthy — MultiChainRouter will skip ETH layer")
+			}
+
+			if l.multiChainRouter == nil {
+				l.multiChainRouter = NewMultiChainRouter(l.ledgerClient, bestClient, l.ethClient)
+			} else {
+				l.multiChainRouter.AlgorandMainnet = bestClient
+			}
+
+			// Parse Algorand Mainnet asset/app IDs from configuration
+			if algoCfg.AssetID != "" && algoCfg.AppID != "" {
+				algoAssetID, parseErr := strconv.ParseUint(algoCfg.AssetID, 10, 64)
+				if parseErr == nil {
+					l.multiChainRouter.AlgorandMainnetAsset = algoCfg.AssetID
+				}
+				algoAppID, parseErr := strconv.ParseUint(algoCfg.AppID, 10, 64)
+				if parseErr == nil {
+					l.multiChainRouter.AlgorandAppID = algoAppID
+					fmt.Printf("[MultiChain] Algorand Mainnet wired (app_id: %d)\n", algoAppID)
+				}
+			} else {
+				fmt.Println("[MultiChain] Algorand Mainnet wired (ARC-200 mode disabled — pure ALGO transfers only)")
+			}
+
+			fmt.Printf("[MultiChain] Algorand Mainnet initialized from: %s\n", algoCfg.NodeURLs[0])
+		} else {
+			fmt.Printf("[MultiChain] Failed to initialize Algorand Mainnet client: %v\n", err)
+		}
+	}
+
 	go l.loadRegistrationsFromIndexer()    // Reconstruct tournament registration state
 
+	// PILLAR 3: Continuous Verification.
+	// Initialize the session watchdog to monitor player eligibility.
+	l.StartWatchdogEngine(ctx)
+
+	// Start the governor payout daemon
+	l.payoutScheduler.StartPayoutEngine(ctx)
+
+	// Start the salary dispenser daemon
+	go l.careerService.StartSalaryDispenser(l)
+
 	// PILLAR 6: Blockchain Persistence. Load persistent card cache from blockchain snapshots.
-	l.loadPersistentCardCache()
+	l.oracleService.LoadPersistentCardCache(l)
+
+	// PILLAR 2: Authoritative Baseline.
+	// Log the starting reserves as vetted input ONLY if no previous state was found.
+	// This prevents double-counting reserves that are already accounted for in recovered audit counters.
+	if !diskRecovered && !chainRecovered {
+		if l.tokenSinkRouter != nil && l.tokenSinkRouter.Audit != nil {
+			// Synchronize physical balance from chain before baseline logging
+			l.oracleService.CheckVaultBalanceOnChain(l)
+			
+			log.Printf("[ECONOMY] Genesis boot detected. Logging initial reserves for audit: %d micro-VBV\n", l.faucetBalanceMicro)
+			l.tokenSinkRouter.Audit.LogInitialReserves(l.faucetBalanceMicro)
+		}
+	}
+
+	// Record bootstrap metrics after hydration completes
+	l.telemetry.RecordBootstrapMetrics(startBoot, true)
 
 	return l, nil
 }
@@ -222,46 +477,6 @@ func (l *Lobby) saveNetworkConfigs() {
 	os.WriteFile("networks.json", data, 0644)
 }
 
-// distributeTournamentKickback handles the 1-5% payout to clubs based on member tournament fees.
-// Ensures only players who were members at the time of tournament registration qualify.
-func (l *Lobby) distributeTournamentKickback(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	l.distributeTournamentKickbackLocked(playerWallet, feeMicro, registrationTime, network)
-}
-
-// distributeTournamentKickbackLocked handles the kickback payout assuming the mutex is already held.
-func (l *Lobby) distributeTournamentKickbackLocked(playerWallet string, feeMicro uint64, registrationTime time.Time, network string) {
-	// PILLAR 3: Dynamic Precision Recovery.
-	divisor := 1000000.0 // Default fallback
-	if cfg, ok := l.availableNetworks[network+" Mainnet"]; ok && cfg.PowerDivisor > 0 {
-		divisor = cfg.PowerDivisor
-	}
-
-	for _, club := range l.clubs {
-		joinedAt, isMember := club.Members[strings.ToLower(playerWallet)]
-
-		// Verify the player was a member at the time of tournament registration
-		if isMember && joinedAt.Before(registrationTime) {
-			// Base 1% kickback, scales with Club Mojo up to 5%
-			rate := 0.01 + (float64(club.Mojo)/1000.0)*0.04
-			if rate > 0.05 {
-				rate = 0.05
-			}
-
-			kickback := (float64(feeMicro) / divisor) * rate
-			club.Treasury += kickback
-			club.LastActivity = time.Now()
-
-			log.Printf("[REVENUE] Club %s received %.2f $VBV kickback from member %s registration (Rate: %.1f%%)\n",
-				club.Name, kickback, playerWallet, rate*100)
-
-			// A player can only benefit one club's treasury per registration
-			return
-		}
-	}
-}
-
 // serveWs upgrades HTTP connections to WebSockets and registers clients in the Lobby.
 func serveWs(lobby *Lobby, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -340,99 +555,183 @@ func main() {
 	// Start the main event loop (Defined in lobby_manager.go)
 	go lobby.run()
 
-	// --- ROUTING ---
+	// PILLAR 4: Zero-Downtime Deployment & Graceful Shutdown.
+	// Intercept SIGTERM (Render/Linux) and Interrupt (Local) to commit final state.
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		sig := <-sigChan
+		fmt.Printf("\n [SYSTEM] Signal %v received. Sealing Arena state...\n", sig)
 
-	// WebSocket Entry Point
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		// PILLAR 4: Shutdown Mutex Guard.
+		// Harden the exit sequence by awaiting the Lobby mutex before triggering snapshots.
+		// This ensures we don't attempt to archival while a high-load write is in progress.
+		lobby.mutex.Lock()
+		fmt.Println(" [SYSTEM] Mutex acquired. Initiating graceful archival...")
+		lobby.mutex.Unlock()
+
+		// Trigger the centralized Graceful Shutdown sequence (includes Integrity Audit)
+		lobby.executeGracefulShutdown()
+	}()
+
+	// --- ROUTING ---
+	mux := http.NewServeMux()
+
+	// WebSocket Entry Point (CheckOrigin handles WS CORS — no rate limit for WS handshakes)
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(lobby, w, r)
 	})
 
-	http.HandleFunc("/api/leaderboard", lobby.handleLeaderboard)
-	http.HandleFunc("/api/reward", lobby.handleReward) // Now in faucet_service.go
-	http.HandleFunc("/api/status", lobby.handlePublicStatus)
-	http.HandleFunc("/api/matches/active", lobby.handleActiveMatches)
-	http.HandleFunc("/api/health", lobby.handleHealthCheck)
-	http.HandleFunc("/api/card-stats", lobby.handleCardStats)
-	http.HandleFunc("/api/card-details", lobby.handleGetCardDetails)
-	http.HandleFunc("/api/report-player", lobby.handlePlayerReport)
-	http.HandleFunc("/api/re-sync-stats", lobby.handleReSyncStats)
-	http.HandleFunc("/api/season/history", lobby.handleSeasonHistory)
-	http.HandleFunc("/api/courthouse/reset", lobby.handleCourthouseReset)
+	// --- RATE-LIMITED ROUTING TIER ---
+	// Apply per-wallet rate limiting middleware to all API routes.
+	// Middleware chain: CORS → Rate Limit → Handler
+	// Tier mapping (from ratelimiter.go):
+	//   economy-tight   (3 req/min)  → high-risk payouts (reward, wager, loans, black-market)
+	//   core-economy    (5 req/min)  → leaderboard, career, faction shop
+	//   standard        (10 req/min) → card-stats, auctions, marketplace
+	//   wallet-default  (30 req/min) → status, re-sync, admin controls
+	//   achievement     (15 req/min) → trophy/achievement endpoints
+	//   underworld      (8 req/min)  → underworld contracts, justice missions
+	//   default         (20 req/min) → anything unmatched
 
-	// Art Gallery / Auctions
-	http.HandleFunc("/api/auctions", lobby.handleGetAuctions)
-	http.HandleFunc("/api/auctions/create", lobby.handleCreateAuction)
-	http.HandleFunc("/api/auctions/bid", lobby.handlePlaceBid)
+	mux.HandleFunc("/api/reward", lobby.rateLimiter.WithRateLimit(lobby.handleReward, "economy-tight"))
+	mux.HandleFunc("/api/match/wager", lobby.rateLimiter.WithRateLimit(lobby.handleSpectatorWager, "economy-tight"))
+	mux.HandleFunc("/api/loans/take", lobby.rateLimiter.WithRateLimit(lobby.loanService.HandleTakeLoan, "economy-tight"))
+	mux.HandleFunc("/api/loans/repay", lobby.rateLimiter.WithRateLimit(lobby.loanService.HandleRepayLoan, "economy-tight"))
+	mux.HandleFunc("/api/black-market/sell-tokens", lobby.rateLimiter.WithRateLimit(lobby.blackMarketService.HandleSellMarketTokens, "economy-tight"))
 
-	// Second-Hand Store / Loans
-	http.HandleFunc("/api/loans", lobby.handleGetLoans)
-	http.HandleFunc("/api/loans/take", lobby.handleTakeLoan)
-	http.HandleFunc("/api/loans/repay", lobby.handleRepayLoan)
+	mux.HandleFunc("/api/leaderboard", lobby.rateLimiter.WithRateLimit(lobby.handleLeaderboard, "core-economy"))
+	mux.HandleFunc("/api/career/progress", lobby.rateLimiter.WithRateLimit(lobby.HandleGetCareerProgress, "core-economy"))
+	mux.HandleFunc("/api/faction/shop/", func(next http.HandlerFunc) http.HandlerFunc {
+		return lobby.rateLimiter.WithRateLimit(next, "core-economy")
+	}(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/buy") {
+			lobby.HandleBuyFactionItem(w, r)
+		} else {
+			lobby.HandleGetFactionShop(w, r)
+		}
+	}))
 
-	// Underworld / Black Market
-	http.HandleFunc("/api/black-market", lobby.handleGetBlackMarket)
-	http.HandleFunc("/api/black-market/buy", lobby.handleBuyBlackMarket)
-	http.HandleFunc("/api/black-market/sell-tokens", lobby.handleSellMarketTokens)
+	mux.HandleFunc("/api/card-stats", lobby.rateLimiter.WithRateLimit(lobby.handleCardStats, "standard"))
+	mux.HandleFunc("/api/card-details", lobby.rateLimiter.WithRateLimit(lobby.handleGetCardDetails, "standard"))
+	mux.HandleFunc("/api/auctions", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.auctionService.HandleGetAuctions(lobby, w, r)
+		case http.MethodPost:
+			lobby.auctionService.HandleCreateAuction(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
 
-	// Onboarding (Handlers defined in onboarding_service.go)
-	http.HandleFunc("/api/bridge/onboard", lobby.handleVoiOnboarding)
+	mux.HandleFunc("/api/achievements", lobby.rateLimiter.WithRateLimit(lobby.handleGetAchievements, "achievement"))
+	mux.HandleFunc("/api/achievement-stats", lobby.rateLimiter.WithRateLimit(lobby.handleGetAchievementStats, "achievement"))
+	mux.HandleFunc("/api/achievement/unlock", lobby.rateLimiter.WithRateLimit(lobby.handleUnlockAchievement, "achievement"))
 
-	// Tournament Management (Handlers defined in tournament_manager.go)
-	http.HandleFunc("/api/tournament/register", lobby.handleTournamentRegister)
-	http.HandleFunc("/api/tournament/history", lobby.handleTournamentHistory)
+	mux.HandleFunc("/api/underworld/contracts", lobby.rateLimiter.WithRateLimit(lobby.blackMarketService.HandleGetUnderworldContracts, "underworld"))
+	mux.HandleFunc("/api/justice/missions", lobby.rateLimiter.WithRateLimit(lobby.HandleGetJusticeMissions, "underworld"))
 
-	// Admin Controls (Handlers defined in handlers_admin.go)
-	http.HandleFunc("/api/refill-vault", lobby.handleRefillVault)
-	http.HandleFunc("/api/update-rules", lobby.handleUpdateRules)
-	http.HandleFunc("/api/system-message", lobby.handleSystemMessage)
-	http.HandleFunc("/api/ban-player", lobby.handleBanPlayer)
-	http.HandleFunc("/api/reset-stats", lobby.handleResetStats)
-	http.HandleFunc("/api/maintenance-mode", lobby.handleMaintenanceMode)
-	http.HandleFunc("/api/reward/add", lobby.handleAdminAddReward)
-	http.HandleFunc("/api/reward/remove", lobby.handleAdminRemoveReward)
-	http.HandleFunc("/api/reward/update-base", lobby.handleUpdateBaseReward)
-	http.HandleFunc("/api/reward/update-asset", lobby.handleUpdateRewardAsset)
-	http.HandleFunc("/api/admin/network/add", lobby.handleAddNetwork)
-	http.HandleFunc("/api/admin/set-admin-focus-network", lobby.handleSetActiveNetwork)
-	http.HandleFunc("/api/admin/update-power", lobby.handleUpdatePowerScaling)
-	http.HandleFunc("/api/admin/logs", lobby.handleGetAdminLogs)
-	http.HandleFunc("/api/admin/export-logs", lobby.handleExportAuditLog)
-	http.HandleFunc("/api/admin/simulate-tournament", lobby.handleSimulateTournament)
-	http.HandleFunc("/api/admin/season-rollover", lobby.handleSeasonRollover)
-	http.HandleFunc("/api/admin/gloat-ban", lobby.handleGloatBan)
-	http.HandleFunc("/api/admin/avatar-ban", lobby.handleAvatarBan)
-	http.HandleFunc("/api/admin/start-tournament", lobby.handleStartTournament)
-	http.HandleFunc("/api/admin/open-registration", lobby.handleOpenRegistration)
-	http.HandleFunc("/api/admin/asset-forfeiture", lobby.handleAssetForfeiture)
-	http.HandleFunc("/api/admin/force-payout", lobby.handleForcePayout)
-	http.HandleFunc("/api/admin/simulate-mojo-decay", lobby.handleSimulateMojoDecay)
-	http.HandleFunc("/api/admin/ledger-audit", lobby.handleLedgerAudit)
+	mux.HandleFunc("/api/report-player", lobby.rateLimiter.WithRateLimit(lobby.handlePlayerReport, "default"))
+	mux.HandleFunc("/api/re-sync-stats", lobby.rateLimiter.WithRateLimit(lobby.handleReSyncStats, "wallet-default"))
+	mux.HandleFunc("/api/season/history", lobby.rateLimiter.WithRateLimit(lobby.handleSeasonHistory, "wallet-default"))
+
+	// Tournament routes — standard rate for registration, wallet-default for history
+	mux.HandleFunc("/api/tournament/register", lobby.rateLimiter.WithRateLimit(lobby.tournamentService.HandleTournamentRegister, "standard"))
+	mux.HandleFunc("/api/tournament/history", lobby.rateLimiter.WithRateLimit(lobby.tournamentService.HandleTournamentHistory, "wallet-default"))
+
+	// Admin controls — wallet-default (higher budget for admin operations)
+	mux.HandleFunc("/api/refill-vault", lobby.rateLimiter.WithRateLimit(lobby.handleRefillVault, "wallet-default"))
+	mux.HandleFunc("/api/update-rules", lobby.rateLimiter.WithRateLimit(lobby.handleUpdateRules, "wallet-default"))
+	mux.HandleFunc("/api/system-message", lobby.rateLimiter.WithRateLimit(lobby.handleSystemMessage, "wallet-default"))
+	mux.HandleFunc("/api/ban-player", lobby.rateLimiter.WithRateLimit(lobby.handleBanPlayer, "wallet-default"))
+	mux.HandleFunc("/api/reset-stats", lobby.rateLimiter.WithRateLimit(lobby.handleResetStats, "wallet-default"))
+	mux.HandleFunc("/api/maintenance-mode", lobby.rateLimiter.WithRateLimit(lobby.handleMaintenanceMode, "wallet-default"))
+	mux.HandleFunc("/api/reward/add", lobby.rateLimiter.WithRateLimit(lobby.handleAdminAddReward, "wallet-default"))
+	mux.HandleFunc("/api/reward/remove", lobby.rateLimiter.WithRateLimit(lobby.handleAdminRemoveReward, "wallet-default"))
+	mux.HandleFunc("/api/reward/update-base", lobby.rateLimiter.WithRateLimit(lobby.handleUpdateBaseReward, "wallet-default"))
+	mux.HandleFunc("/api/reward/update-asset", lobby.rateLimiter.WithRateLimit(lobby.handleUpdateRewardAsset, "wallet-default"))
+	mux.HandleFunc("/api/admin/network/add", lobby.rateLimiter.WithRateLimit(lobby.handleAddNetwork, "wallet-default"))
+	mux.HandleFunc("/api/admin/set-admin-focus-network", lobby.rateLimiter.WithRateLimit(lobby.handleSetActiveNetwork, "wallet-default"))
+	mux.HandleFunc("/api/admin/update-power", lobby.rateLimiter.WithRateLimit(lobby.handleUpdatePowerScaling, "wallet-default"))
+	mux.HandleFunc("/api/admin/logs", lobby.rateLimiter.WithRateLimit(lobby.handleGetAdminLogs, "wallet-default"))
+	mux.HandleFunc("/api/admin/export-logs", lobby.rateLimiter.WithRateLimit(lobby.handleExportAuditLog, "wallet-default"))
+	mux.HandleFunc("/api/admin/simulate-tournament", lobby.rateLimiter.WithRateLimit(lobby.handleSimulateTournament, "wallet-default"))
+	mux.HandleFunc("/api/admin/season-rollover", lobby.rateLimiter.WithRateLimit(lobby.handleSeasonRollover, "wallet-default"))
+	mux.HandleFunc("/api/admin/sanity-check", lobby.rateLimiter.WithRateLimit(lobby.handleSystemSanityCheck, "wallet-default"))
+	mux.HandleFunc("/api/admin/emergency-shutdown", lobby.rateLimiter.WithRateLimit(lobby.handleEmergencyShutdown, "wallet-default"))
+	mux.HandleFunc("/api/admin/simulate-mutation-failure", lobby.rateLimiter.WithRateLimit(lobby.handleSimulateMutationFailure, "wallet-default"))
+	mux.HandleFunc("/api/admin/simulate-mutation-success", lobby.rateLimiter.WithRateLimit(lobby.handleSimulateMutationSuccess, "wallet-default"))
+	mux.HandleFunc("/api/admin/simulate-load", lobby.rateLimiter.WithRateLimit(lobby.handleSimulateLoad, "wallet-default"))
+	mux.HandleFunc("/api/admin/gloat-ban", lobby.rateLimiter.WithRateLimit(lobby.handleGloatBan, "wallet-default"))
+	mux.HandleFunc("/api/admin/avatar-ban", lobby.rateLimiter.WithRateLimit(lobby.handleAvatarBan, "wallet-default"))
+	mux.HandleFunc("/api/admin/commission-audit", lobby.rateLimiter.WithRateLimit(lobby.handleCommissionAudit, "wallet-default"))
+	mux.HandleFunc("/api/admin/dlc-registry", lobby.rateLimiter.WithRateLimit(lobby.handleAdminGetDLCRegistry, "wallet-default"))
+	mux.HandleFunc("/api/admin/dlc-registry/update", lobby.rateLimiter.WithRateLimit(lobby.handleAdminUpdateDLCRegistry, "wallet-default"))
+	mux.HandleFunc("/api/admin/dlc-registry/restock", lobby.rateLimiter.WithRateLimit(lobby.handleAdminRestockDLC, "wallet-default"))
+	mux.HandleFunc("/api/admin/mutation-audit", lobby.rateLimiter.WithRateLimit(lobby.handleMutationAudit, "wallet-default"))
+	mux.HandleFunc("/api/admin/district-tax-audit", lobby.rateLimiter.WithRateLimit(lobby.handleDistrictTaxAudit, "wallet-default"))
+	mux.HandleFunc("/api/v1/redemption_gateway", lobby.rateLimiter.WithRateLimit(lobby.handleRedemptionGateway, "wallet-default"))
+	mux.HandleFunc("/api/admin/tax-audit", lobby.rateLimiter.WithRateLimit(lobby.handleTaxAudit, "wallet-default"))
+	mux.HandleFunc("/api/admin/start-tournament", lobby.rateLimiter.WithRateLimit(lobby.handleStartTournament, "wallet-default"))
+	mux.HandleFunc("/api/admin/open-registration", lobby.rateLimiter.WithRateLimit(lobby.handleOpenRegistration, "wallet-default"))
+	mux.HandleFunc("/api/admin/asset-forfeiture", lobby.rateLimiter.WithRateLimit(lobby.handleAssetForfeiture, "wallet-default"))
+	mux.HandleFunc("/api/admin/force-payout", lobby.rateLimiter.WithRateLimit(lobby.handleForcePayout, "wallet-default"))
+	mux.HandleFunc("/api/admin/simulate-mojo-decay", lobby.rateLimiter.WithRateLimit(lobby.handleSimulateMojoDecay, "wallet-default"))
+	mux.HandleFunc("/api/admin/ledger-audit", lobby.rateLimiter.WithRateLimit(lobby.handleLedgerAudit, "wallet-default"))
+
+	// Rivalry system — standard rate
+	mux.HandleFunc("/api/rivalry/request", lobby.rateLimiter.WithRateLimit(lobby.HandleRivalryRequest, "standard"))
+	mux.HandleFunc("/api/rivalry/action", lobby.rateLimiter.WithRateLimit(lobby.HandleRivalryAction, "standard"))
+	mux.HandleFunc("/api/rivalry/state", lobby.rateLimiter.WithRateLimit(lobby.HandleGetRivalryState, "standard"))
+
+	// Courthouse reset — wallet-default (occasional admin use)
+	mux.HandleFunc("/api/courthouse/reset", lobby.rateLimiter.WithRateLimit(lobby.courthouseService.HandleCourthouseReset, "wallet-default"))
+
+	// Loan list endpoint — standard (read-heavy but low-risk)
+	mux.HandleFunc("/api/loans", lobby.rateLimiter.WithRateLimit(lobby.loanService.HandleGetLoans, "standard"))
+
+	// Black market buy — economy-tight (sensitive trade)
+	mux.HandleFunc("/api/black-market/buy", lobby.rateLimiter.WithRateLimit(lobby.blackMarketService.HandleBuyBlackMarket, "economy-tight"))
+
+	// P2-B3: Fenced Goods Marketplace routes
+	mux.HandleFunc("/api/black-market/fence-goods", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.blackMarketService.HandleGetFencedGoods(lobby, w, r)
+		case http.MethodPost:
+			lobby.blackMarketService.HandleListFenceGoods(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/black-market/buy-stolen", lobby.rateLimiter.WithRateLimit(lobby.blackMarketService.HandleBuyFencedGood, "economy-tight"))
+
+	// Onboarding — economy-tight (sensitive wallet operation)
+	mux.HandleFunc("/api/bridge/onboard", lobby.rateLimiter.WithRateLimit(lobby.onboardingService.HandleVoiOnboarding, "economy-tight"))
 
 	// Static Asset Serving (WASM and UI)
 	fs := http.FileServer(http.Dir("./Public"))
-	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers for local development if needed
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Security: Prevent WASM caching for rapid development cycles
 		if r.URL.Path == "/main.wasm" {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		}
 		fs.ServeHTTP(w, r)
-	}))
+	})
 
-	// Server Startup
+	// Wrap all routes with the production-grade CORS middleware.
+	fmt.Println("-------------------------------------------------")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8088"
 	}
-
-	fmt.Println("-------------------------------------------------")
 	fmt.Printf(" VOICONOMY ARENA SERVER ONLINE: PORT %s\n", port)
 	fmt.Println(" WebSocket Switchboard & API Ready               ")
+	fmt.Println(" Rate Limiter Active: 7-tier wallet-based system  ")
 	fmt.Println("-------------------------------------------------")
 
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, corsMiddleware()(mux)); err != nil {
 		log.Fatalf("[FATAL] Server startup failed: %v", err)
 	}
-}

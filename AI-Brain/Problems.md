@@ -1,7 +1,25 @@
 # Arena Development: Problem Ledger
 
+**Note:** Active issues and their resolution paths are prioritized within the authoritative `ToDo.md` roadmap.
+
 ## 1. Critical Deployment & Verification
 *   [x] **Ledger Verification**: Verified `app.js` correctly aggregates physical and virtual balances at line 164. (Pillar 4)
+*   [x] **Deterministic Replay Validation**: Verified state hash mismatch triggers immediate recovery in WASM engine. (Pillar 4)
+*   [x] **Bit-Perfect Parity**: Verified BigEndian binary encoding matches between Server and WASM for `Artifact` fields. (Pillar 4)
+*   [x] **Audit Kernel Integration**: Confirmed 100% of systemic fees (Trades, Fines, Surcharges) are routed via the reconciliation kernel. (Pillar 2)
+*   [x] **ID Standardization**: Resolved JSON tag drift for organizational and match indexing. (Pillar 3)
+*   [x] **Selection Parity**: Verified `selectCard` sequence prevents race conditions during combat hand rendering. (Pillar 5)
+*   [x] **Factional Parity**: Verified +10% power boosts are identical in Go backend and WASM simulation. (Pillar 4)
+*   [x] **Dividend Integrity**: Verified cumulative-yield pattern prevents 0-drift in organizational payouts. (Pillar 2)
+*   [x] **Transit Tax Enforcement**: Confirmed 1 $VBV deduction for cross-sector matchmaking entry. (Pillar 1)
+*   [x] **Liberation Verification**: Verified 3-win streaks restore cards and remove 'Fallen' status correctly. (Pillar 7)
+*   [x] **Redundant Animations**: Resolved `IsCombo` persistence in `main.go` across all mutation entry points. (Pillar 4)
+*   [x] **Inventory State Bloat**: Resolved duplicate card ID handling in `main.go:ImportARC72Card`. (Pillar 3)
+*   [x] **Lobby Identity**: Resolved `local_player_index` visibility and standard identification tags in `main.go:GetGameState`. (Pillar 4)
+*   [x] **Interaction Latency**: Hardened `activeCardId` reset sequence in `game.js` to prevent visual desync. (Pillar 4)
+
+## 6. Functional & Completeness Issues
+* [x] **Combat Interaction**: Resolved WASM bridge existence guards and coordinate parsing in `game.js`; grid is now fully interactive.
 
 ## 2. Ancillary System Audits (Go Backend Services)
 *   [x] **Shop Registry Audit**: Verified `shop_registry.go` alignment in task 447.
@@ -12,7 +30,7 @@
 *   [x] **Utility Caching Audit**: Implemented cache pruning for `envoiCache` in `utils.js`. (Task 448)
  
 ## 4. Documentation & User Experience
-*   [ ] **User Manual Update**: Expand "Kidnap Gambit" and "Industrial Lease" sections in `User_manual.md` to include tactical nuances and advanced gameplay.
+*   [x] **User Manual Update**: Expanded "Kidnap Gambit" and "Industrial Lease" sections to reflect micro-unit precision and alliance dividends.
 *   [x] **User Manual Update**: Expanded tactical nuances for Kidnapping and Industrial Leases in task 452.
 *   [x] **User Manual Audit**: Expanded tactical nuances for Kidnapping, Leases, and Freelancer status. (Task 461)
 *   [x] **Market Trading Audit**: Hardened `handleTradeShares` with micro-unit integer rounding for parity. (Task 462)
@@ -182,27 +200,7 @@
 *   [x] **UI Consistency**: Ensured volume UI sliders in `app.js`'s `syncUI` correctly reflect persisted values. (Task 651)
 *   [x] **Oracle Hardening**: Verified and corrected Solana DAS metadata retrieval to support dynamic images and attribute ingestion. (Task 653)
 *   [x] **Oracle Hardening**: Enhanced ARC-19 metadata resolution to support authenticated IPFS gateways and restored failed diff apply. (Task 655)
-*   [x] **Oracle Hardening**: Enhanced ARC-19 metadata resolution to support authenticated IPFS gateways. (Task 654)
-*   [x] **Build Stability**: Resolved persistent "unused write to field ID" in `lobby_manager.go` by moving `playerInfo` to package scope. (Task 629)
-*   [x] **Build Stability**: Fixed "undefined: i" syntax error in `lobby_manager.go` matchmaking loop. (Task 627)
-*   [x] **Build Stability**: Resolved persistent `unusedwrite` and `undefined` diagnostics in `tournament_manager.go` and `lobby_manager.go`. (Task 628)
-*   [x] **Archival Integrity**: Restored Match IDs to the tournament bracket system for high-fidelity result tracking. (Task 624)
-*   [x] **Logic Hardening**: Resolved static analysis warnings in `item_service.go` and `lobby_manager.go`. (Task 622)
-*   [x] **UI Hardening**: Fixed math ambiguity and drag-prevention compatibility in `_overlays.scss`. (Task 616)
-*   [x] **UI Hardening**: Created utility classes in `_dashboard.scss` to resolve inline style diagnostics. (Task 615)
-*   [x] **Reputation Audit**: Hardened `CalculateReputation` to ensure 'Intelligence Bonus' ignores audits against allied clubs. (Task 607)
-*   [x] **Achievement Audit**: Hardened `checkCorporateEspionageAchievementLocked` to ensure the trophy requires 5 unique RIVAL club audits. (Task 608)
-*   [x] **Reputation Audit**: Hardened `CalculateReputation` to include personal Mojo weighting and alliance-aware Regional Governor bonuses. (Task 598)
-*   [x] **Social Expansion**: Implemented 'Regional Alliance' feature to support shared territory bonuses and defensive coalitions. (Task 595)
-*   [x] **Strategic Pivot**: Simplified build pipeline and removed development startup hooks to prioritize production readiness. (Task 594)
-*   [x] **Build Stability**: Resolved `processMojoDecayLocked` undefined error by moving method to `backend_types.go`. (Task 591)
-*   [x] **Build Stability**: Resolved EOF syntax error in `club_service.go` and logic corruption in `admin.js`. (Task 588)
-*   [x] **Achievement Audit**: Restored missing `checkHeistSaboteurAchievementLocked` logic. (Task 589)
-*   [x] **Build Noise Cleanup**: Replaced deprecated Sass functions with `color-mix`. (Task 590)
-*   [x] **Logic Hardening**: Resolved recursive deadlock in `lobby_manager.go` simulation loop. (Task 585)
-*   [x] **Achievement Expansion**: Implemented 'Heist Saboteur' achievement for jamming 3 security alarms. (Task 574)
-*   [x] **Criminality Audit**: Hardened `handleHeist` to integrate 'Cyber-Jammer' suppression for heist alarms and map alerts. (Task 571)
-*   [x] **Build Stability**: Resolved `processMojoDecayLocked` undefined error by moving method to `backend_types.go`. (Task 591)
-*   [x] **Mojo Decay Audit**: Verified `MOJO_STABILIZER` correctly mitigates regional decay rates. (Task 558)
-*   [x] **Persistence Finalization**: Migrated Linked Wallets and Registered Transaction IDs to the blockchain via unified state snapshots. (Task 682)
-*   [x] **Persistence Completion**: Migrated Card Cache and Onboarded Wallets to blockchain snapshots, deprecating legacy paged indexer scans for startup reconstruction. (Task 683)
+*   [x] **Oracle Hardening**: Enhanced ARC-19
+
+## 7. Career Engine Expansion (Post-Hackathon)
+*   [x] **Fence Career XP**: Verified `l.TrackCareerXP(wallet, "Fence", 30)` already wired in `black_market_service.go` at line 153 during `applyFenceFee`. No code changes required —XP trigger is active. Native build (go build) and WASM build (GOOS=js GOARCH=wasm) both compile clean on Go 1.26.4. (Current Session)

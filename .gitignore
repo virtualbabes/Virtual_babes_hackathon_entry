@@ -1,0 +1,22 @@
+# AI Agent & Extension Metadata
+.continue/
+.hermes/
+.idx/
+config.yaml
+config.json
+ai_exclude
+.clinerules
+# Local Persistence & State (Pillar 5)
+# Authoritative state is reconstructed from blockchain notes.
+data/
+DATA_DIR/
+*.log
+admin_audit.log
+season.json
+
+# Local Build Binaries (Dual-Target Synergy)
+# Binaries should be generated locally to ensure environment compatibility.
+server-bin
+Public/main.wasm
+node_modules/
+.env

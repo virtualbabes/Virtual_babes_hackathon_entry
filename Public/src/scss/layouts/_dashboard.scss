@@ -166,6 +166,33 @@
         border-left: 3px solid $color-error-red;
         color: $color-error-red;
     }
+
+    // PILLAR 5: Consistent Padding for Specialized Chat Messages.
+    // Centrally managed themes for economic enforcement events.
+    &.stagnation-fee {
+        padding: $spacing-xs $spacing-sm;
+        margin-top: $spacing-xs;
+        color: $color-warning-orange;
+        text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        border-left: 3px solid $color-warning-orange;
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    &.ghost-reclaim {
+        padding: $spacing-xs $spacing-sm;
+        margin-top: $spacing-xs;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 10px rgba(0, 242, 254, 0.6), 0 0 20px rgba(0, 242, 254, 0.3);
+        border-left: 3px solid $color-neon-cyan;
+        background: linear-gradient(90deg, rgba(0, 242, 254, 0.1), transparent);
+        animation: ethereal-pulse 3s ease-in-out infinite;
+    }
+}
+
+@keyframes ethereal-pulse {
+    0% { text-shadow: 0 0 8px rgba(0, 242, 254, 0.4); opacity: 0.85; }
+    50% { text-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 0 0 25px rgba(0, 242, 254, 0.4); opacity: 1; }
+    100% { text-shadow: 0 0 8px rgba(0, 242, 254, 0.4); opacity: 0.85; }
 }
 
 .chat-input-area {

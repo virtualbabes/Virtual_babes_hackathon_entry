@@ -53,6 +53,58 @@
     }
 }
 
+// Justice Tracking Grid Utilities
+.bg-dark-overlay {
+    background: rgba($color-bg-dark, 0.6); // Deep enough for high-contrast text overlays (WCAG Compliant)
+    border: 1px solid $glass-border-color;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.border-bottom-glass {
+    border-bottom: 1px solid rgba($color-text-main, 0.1);
+    
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+// PILLAR 4: Faction-Specific UI Overrides
+// Justice Path (Law Enforcement)
+#social-tab-justice {
+    &.active {
+        background: rgba($color-neon-cyan, 0.2);
+        border-color: $color-neon-cyan;
+        color: $color-neon-cyan;
+        box-shadow: 0 0 15px rgba($color-neon-cyan, 0.5);
+    }
+}
+
+.social-panel .border-neon-cyan {
+    background: linear-gradient(145deg, rgba($color-bg-dark, 0.9), rgba($color-medium-grey, 0.9)), 
+                radial-gradient(circle at center, rgba($color-neon-cyan, 0.1) 0%, transparent 70%);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 15px rgba($color-neon-cyan, 0.15);
+    transition: border-color $transition-base, box-shadow $transition-base;
+}
+
+// Underworld Path (Criminality)
+#social-tab-underworld {
+    &.active {
+        background: rgba($color-error-red, 0.2);
+        border-color: $color-error-red;
+        color: $color-error-red;
+        box-shadow: 0 0 15px rgba($color-error-red, 0.5);
+    }
+}
+
+.social-panel .border-error {
+    background: linear-gradient(145deg, rgba($color-bg-dark, 0.9), rgba($color-medium-grey, 0.9)), 
+                radial-gradient(circle at center, rgba($color-error-red, 0.1) 0%, transparent 70%);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), inset 0 0 15px rgba($color-error-red, 0.15);
+    transition: border-color $transition-base, box-shadow $transition-base;
+    animation: underworld-panel-pulse 4s infinite ease-in-out;
+}
+
 // Achievement Badges (Trophies)
 .achievement-system {
     margin-bottom: $spacing-xl;

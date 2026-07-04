@@ -978,3 +978,90 @@
     position: fixed;
     z-index: $z-index-modal;
 }
+
+// PILLAR 3: Underworld Contract Completion Flourish
+// Specialized styling to distinguish mission success from standard audits.
+.contract-completed-flourish {
+    border-color: $color-neon-green !important;
+    background: linear-gradient(145deg, rgba($color-bg-dark, 0.9), rgba($color-dark-grey, 0.9)), 
+                radial-gradient(circle at center, rgba($color-neon-green, 0.1) 0%, transparent 70%);
+    box-shadow: 0 0 25px rgba($color-neon-green, 0.4), inset 0 0 15px rgba($color-neon-green, 0.15);
+    animation: contract-success-pulse 4s infinite ease-in-out;
+
+    b {
+        color: $color-gold !important;
+        text-shadow: 0 0 12px rgba($color-gold, 0.5);
+    }
+}
+
+@keyframes contract-success-pulse {
+    0%, 100% { box-shadow: 0 0 15px rgba($color-neon-green, 0.2); border-color: rgba($color-neon-green, 0.4); }
+    50% { box-shadow: 0 0 35px rgba($color-neon-green, 0.6); border-color: $color-neon-green; }
+}
+
+// PILLAR 3: Justice Priority Target Highlight
+// Specialized styling for high-infamy targets in the Justice tracking grid.
+.priority-target-row {
+    border-color: $color-neon-cyan !important;
+    background: rgba($color-neon-cyan, 0.1) !important;
+    box-shadow: 0 0 20px rgba($color-neon-cyan, 0.4), inset 0 0 15px rgba($color-neon-cyan, 0.1);
+    animation: priority-target-glow 3s infinite ease-in-out;
+
+    .text-error {
+        color: $color-neon-cyan !important;
+        text-shadow: 0 0 10px rgba($color-neon-cyan, 0.5);
+    }
+}
+
+@keyframes priority-target-glow {
+    0%, 100% { box-shadow: 0 0 15px rgba($color-neon-cyan, 0.2); border-color: rgba($color-neon-cyan, 0.4); }
+    50% { box-shadow: 0 0 35px rgba($color-neon-cyan, 0.7); border-color: $color-neon-cyan; }
+}
+
+// PILLAR 3: Flag Signature Button Strobe
+// High-intensity tactical feedback for Justice Terminal enforcement actions.
+.btn-flag-signature {
+    transition: all 0.1s ease-in-out;
+    &:hover {
+        animation: cyan-strobe 0.1s infinite ease-in-out !important;
+        background-color: rgba($color-neon-cyan, 0.2) !important;
+        border-color: white !important;
+        color: white !important;
+    }
+}
+
+@keyframes cyan-strobe {
+    0%, 100% { box-shadow: 0 0 5px $color-neon-cyan; filter: brightness(1); }
+    50% { box-shadow: 0 0 25px $color-neon-cyan, 0 0 45px $color-neon-cyan; filter: brightness(2.5); }
+}
+
+// PILLAR 3: License Status Banner High-Intensity Alarm
+#license-status-banner {
+    &.expired {
+        border-color: $color-error-red !important;
+        background: rgba($color-error-red, 0.15) !important;
+        animation: license-alarm 1s infinite ease-in-out;
+    }
+}
+
+@keyframes license-alarm {
+    0%, 100% { border-color: rgba($color-error-red, 0.2); box-shadow: none; }
+    50% { border-color: $color-error-red; box-shadow: 0 0 25px $color-error-red, inset 0 0 10px $color-error-red; }
+}
+
+// PILLAR 3: Flag Signature Button Strobe
+// High-intensity tactical feedback for Justice Terminal enforcement actions.
+.btn-flag-signature {
+    transition: all 0.1s ease-in-out;
+    &:hover {
+        animation: cyan-strobe 0.1s infinite ease-in-out !important;
+        background-color: rgba($color-neon-cyan, 0.2) !important;
+        border-color: white !important;
+        color: white !important;
+    }
+}
+
+@keyframes cyan-strobe {
+    0%, 100% { box-shadow: 0 0 5px $color-neon-cyan; filter: brightness(1); }
+    50% { box-shadow: 0 0 25px $color-neon-cyan, 0 0 45px $color-neon-cyan; filter: brightness(2.5); }
+}

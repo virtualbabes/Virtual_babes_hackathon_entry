@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -10,9 +10,13 @@ import (
 	"strings"
 )
 
-// handleCourthouseReset allows players to pay a $VBV fine to reset their Wanted Level.
+// CourthouseService encapsulates logic for legal systems and infamy management.
+// PILLAR 5: Stateless Service Design.
+type CourthouseService struct{}
+
+// HandleCourthouseReset allows players to pay a $VBV fine to reset their Wanted Level.
 // The fine is calculated as 100 $VBV per Wanted Level point.
-func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
+func (s *CourthouseService) HandleCourthouseReset(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -70,25 +74,23 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Career XP: Tax Auditor (Justice D2) gains XP on fine payment processing
+	l.TrackCareerXP(targetWallet, "Tax Auditor", 15)
+	
 	// Update Player Stats and Vault balance
 	l.mutex.Lock()
 	stats.WantedLevel = 0
 	l.leaderboard[targetWallet] = stats
 
-	// PILLAR 2: Precision Redistribution.
-	// Pass the micro-unit amount to ensure the Industrial Loop remains mathematically sealed.
-	if len(l.clubs) > 0 {
-		l.faucetBalance += (costBase / 2.0)                         // Half returns to Faucet
-		l.distributeCourthouseFineMicroToClubsLocked(costMicro / 2) // Half to Clubs
-	} else {
-		// Industrial Loop fallback: Faucet absorbs the full fine if no clubs exist
-		l.faucetBalance += costBase
-	}
+	// PILLAR 2: Industrial Loop.
+	// Delegate redistribution to the specialized service to ensure Mojo and Taxes 
+	// are handled atomically within the reconciliation kernel.
+	l.clubService.DistributeCourthouseFineMicroToClubsLocked(l, costMicro)
 
 	l.logAdminAuditLocked("COURTHOUSE_RESET", targetWallet, fmt.Sprintf("Paid %.2f $VBV fine", costBase))
 	l.mutex.Unlock()
 
-	go l.unlockAchievement(targetWallet, "REHABILITATED")
+	go l.achievementService.UnlockAchievement(l, targetWallet, "REHABILITATED")
 
 	// Update all clients with the new social standing
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
@@ -100,4 +102,39 @@ func (l *Lobby) handleCourthouseReset(w http.ResponseWriter, r *http.Request) {
 		"new_wanted_level": 0,
 		"fine_paid":        costBase,
 	})
+}
+
+/**
+ * ApplyLegalPardonLocked executes the 50% Wanted Level reduction logic.
+ * PILLAR 3: Justice Layer.
+ */
+func (s *CourthouseService) ApplyLegalPardonLocked(l *Lobby, judgeWallet, targetWallet string, item ShopItem) error {
+	// Career XP: Lawyer-Commissioner (Underworld #5) gains XP on legal pardon execution
+	l.TrackCareerXP(judgeWallet, "Lawyer-Commissioner", 30)
+	tStats, exists := l.leaderboard[targetWallet]
+	if !exists {
+		return fmt.Errorf("target signature not found in sector")
+	}
+
+	if tStats.WantedLevel <= 0 {
+		return fmt.Errorf("target has no active infamy to pardon")
+	}
+
+	reduction := tStats.WantedLevel / 2
+	if reduction < 1 { reduction = 1 }
+	tStats.WantedLevel -= reduction
+	tStats.Reputation = l.CalculateReputation(tStats)
+	l.leaderboard[targetWallet] = tStats
+
+	// PILLAR 1: Infrastructure Prestige. Gain Mojo for the organization.
+	jStats := l.leaderboard[judgeWallet]
+	if jStats.EmployerClubID != "" {
+		if club, ok := l.clubs[jStats.EmployerClubID]; ok {
+			club.Mojo += item.MojoBonus
+			l.achievementService.CheckMojoSurgeAchievementLocked(l, club.ID)
+		}
+	}
+
+	l.logAdminAuditLocked("LEGAL_PARDON_USED", judgeWallet, fmt.Sprintf("Target: %s, Reduced: %d", targetWallet, reduction))
+	return nil
 }

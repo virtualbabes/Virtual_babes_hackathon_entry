@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -59,7 +59,7 @@ func (l *Lobby) handleHirePlayer(env *Envelope) {
 	stats.Reputation = l.CalculateReputation(stats)
 
 	// Grant career achievement
-	l.unlockAchievementLocked(targetWallet, "CAREER_START")
+	l.achievementService.UnlockAchievementLocked(l, targetWallet, "CAREER_START")
 
 	l.leaderboard[targetWallet] = stats
 
@@ -132,7 +132,7 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 	// PILLAR 1: High-Finance Integration.
 	// If the contract is high-value (>= 500 $VBV), grant the EXECUTIVE_PAY achievement.
 	if data.SalaryAmount >= 500.0 {
-		l.unlockAchievementLocked(targetWallet, "EXECUTIVE_PAY")
+		l.achievementService.UnlockAchievementLocked(l, targetWallet, "EXECUTIVE_PAY")
 	}
 
 	l.logAdminAuditLocked("SET_SALARY", targetWallet, fmt.Sprintf("Club: %s (%s), Amount: %.2f $VBV", club.Name, club.ID, data.SalaryAmount))
@@ -145,4 +145,45 @@ func (l *Lobby) handleSetSalary(env *Envelope) {
 
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 	log.Printf("[EMPLOYMENT] Salary for %s set to %.2f $VBV by %s.\n", targetWallet, data.SalaryAmount, ownerWallet)
+}
+
+/**
+ * HandleLaunderCapital allows a 'Launderer' to process hot capital to reduce infamy.
+ * PILLAR 7: Underworld Career expansion.
+ */
+func (l *Lobby) HandleLaunderCapital(env *Envelope) {
+	var data struct {
+		FeeMicro uint64 `json:"fee_micro"`
+	}
+	if err := json.Unmarshal(env.Payload, &data); err != nil {
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	wallet, ok := l.wallets[env.FromID]
+	if !ok { return }
+	stats := l.leaderboard[wallet]
+
+	if stats.JobRole != "Launderer" {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: Requires 'Launderer' career path."}`)})
+		return
+	}
+
+	// Standard Laundering Fee: 1,000 $VBV
+	const requiredFee = 1000 * 1000000
+	if l.playerBalances[wallet] < requiredFee {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Insufficient rewards for laundering protocol."}`)})
+		return
+	}
+
+	l.playerBalances[wallet] -= requiredFee
+	stats.WantedLevel -= 3
+	if stats.WantedLevel < 0 { stats.WantedLevel = 0 }
+	stats.Reputation = l.CalculateReputation(stats)
+	l.leaderboard[wallet] = stats
+
+	l.logAdminAuditLocked("CAPITAL_LAUNDERED", wallet, "Reduced Wanted Level by 3.")
+	l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"🧼 <b>LAUNDERING SUCCESS:</b> Wanted Level reduced by 3. Capital processed."}`)})
+	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
 }

@@ -35,6 +35,7 @@ export const setPendingQuickCastId = (id) => { pendingQuickCastId = id; };
 export function buildEmptyBoard() {
     const boardContainer = document.getElementById("board-container");
     boardContainer.innerHTML = "";
+    spectatorMatchState = null; // PILLAR 5: Clear spectator state on game reset.
     for(let i=0; i<9; i++) {
         const slot = document.createElement("div");
         slot.className = "grid-slot";
@@ -101,12 +102,15 @@ export function updatePlayerList(players) {
         li.className = "player-item";
         const isMe = p.id === myClientId;
         
+        // PILLAR 3: Factional Icon Identification.
+        const factionIcon = p.faction === "JUSTICE" ? "⚖️ " : (p.faction === "UNDERWORLD" ? "💀 " : "");
+
         const targetBanned = p.ban_expires && new Date(p.ban_expires) > Date.now();
         const isDisabled = !isMe && (iAmBanned || targetBanned);
         const adminBadge = p.is_admin ? `<span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.8em; margin-left: 5px;">[ADMIN]</span>` : '';
         const btnTitle = targetBanned ? "Player Banned" : (iAmBanned ? "You are Banned" : "Challenge");
 
-        li.innerHTML = `<span>${p.id} ${isMe ? '(You)' : ''} ${adminBadge}</span>
+        li.innerHTML = `<span>${factionIcon}${p.id} ${isMe ? '(You)' : ''} ${adminBadge}</span>
                         <div style="display: flex; gap: 5px;">
                             ${!isMe ? `<button class="outline" style="padding: 5px 10px; font-size: 10px;" ${isDisabled ? 'disabled' : ''} title="${btnTitle}" onclick="sendChallenge('${p.id}')">Challenge</button>` : ''}
                             ${!isMe ? `<button class="outline" style="padding: 5px 10px; font-size: 10px; border-color: var(--neon-purple); color: var(--neon-purple);" onclick="sendSpectate('${p.id}')">Watch</button>` : ''}
@@ -143,6 +147,10 @@ export function renderChatMessage(sender, text) {
     
     const isNpcTaunt = (sender === "SERVER" || sender === "SYSTEM") && text.includes('"');
     if (sender === "SERVER" || sender === "SYSTEM") msgDiv.classList.add("system");
+
+    // PILLAR 5: Visual Feedback. Apply specialized themes for economic enforcement events.
+    if (text.includes("STAGNATION FEE")) msgDiv.classList.add("stagnation-fee");
+    if (text.includes("GHOST RECLAIM")) msgDiv.classList.add("ghost-reclaim");
 
     if (isNpcTaunt) {
         msgDiv.innerHTML = `<b>${sender}:</b> <span class="typewriter-content"></span>`;
@@ -203,7 +211,8 @@ export async function renderMatchHistory() {
             timestamp: new Date(m.timestamp).toLocaleString(),
             tournamentId: m.tournament_id,
             matchId: m.match_id,
-            receiptTxId: m.receipt_txid // Sync with authoritative common_types.go JSON tag
+            receiptTxId: m.receipt_txid, // Sync with authoritative common_types.go JSON tag
+            bounty_reward_micro: m.bounty_reward_micro || 0
         }));
     } else {
         // Fallback to local storage for guest sessions or non-indexed wins
@@ -237,7 +246,9 @@ export async function renderMatchHistory() {
             verificationTag = `<span class="receipt-verify-badge" title="Blockchain Receipt: ${entry.receiptTxId}" style="color: var(--neon-green); margin-left: 5px; font-weight: bold; cursor: help;">✓</span>`;
         }
 
-        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}${verificationTag}</span> vs ${opponentDisplay}${tourneyTag} <br/> 
+        const bountyHtml = entry.bounty_reward_micro > 0 ? ` | <span class="text-gold" style="font-size: 0.85em;">🎯 +${(entry.bounty_reward_micro / 1000000).toFixed(2)} Bounty</span>` : '';
+
+        div.innerHTML = `<span style="color: ${color}; font-weight: bold;">${label}${verificationTag}</span> vs ${opponentDisplay}${tourneyTag}${bountyHtml} <br/> 
                          <small style="opacity: 0.7;">${entry.scores[0]}-${entry.scores[1]} | ${entry.timestamp}</small>`;
         display.appendChild(div);
     });
@@ -275,7 +286,8 @@ export function acceptChallenge() {
             deck: state.deck.map(c => c.id),
             avatar: state.avatar_url,
             gloat: state.gloat_message,
-            rules: state.rules
+            rules: state.rules,
+            faceplate: state.equipped_faceplate // PILLAR 4: Exchange cosmetics
         }
     };
 
@@ -344,8 +356,13 @@ export function proceedToWarRoom() {
     
     document.getElementById("match-preview-overlay").classList.add("hidden");
     window.ResetGame();
-    window.SetBoardState(spectatorMatchState);
+    
+    // PILLAR 4: Replay Resilience & Board Integrity.
+    // Transition engine to 'Active' phase BEFORE loading the snapshot state.
+    // ForceActive() clears the board; loading the authoritative state must follow 
+    // to ensure Resonance/Synergy levels are calculated from valid grid data.
     window.ForceActive();
+    window.SetBoardState(spectatorMatchState);
     window.syncUI("all"); // Assuming syncUI is still global or imported
 }
 
@@ -362,7 +379,8 @@ export function sendChallenge(targetId) {
             action: "invite",
             avatar: state.avatar_url || "",
             gloat: state.gloat_message || "",
-            deck: state.deck.map(c => c.id)
+            deck: state.deck.map(c => c.id),
+            faceplate: state.equipped_faceplate || "" // PILLAR 4: Exchange cosmetics
         }
     };
 
@@ -375,6 +393,34 @@ export function triggerToggleNetwork() {
     window.toggleNetwork();
     window.syncUI(); // Assuming syncUI is still global or imported
 }
+
+/**
+ * refreshIdentity allows a player to pay 100 $VBV to update their handle and bio.
+ * PILLAR 2: Economic Sink (Section 11).
+ */
+window.refreshIdentity = () => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 100) {
+        showToast("❌ Insufficient rewards for identity refresh (100 $VBV required).", "error");
+        return;
+    }
+
+    const newHandle = prompt("Enter new Handle (Public Signature):", state.id);
+    if (!newHandle) return;
+    const newBio = prompt("Enter new Bio (Sector Metadata):", "Arena combatant.");
+    if (newBio === null) return;
+
+    if (!confirm(`💸 DEPLOY IDENTITY REFRESH?\n\nCost: 100 $VBV\nNew Handle: ${newHandle}\n\nProceed?`)) return;
+
+    showToast("🆔 Dispatching identity refresh to sector network...", "info");
+    socket.send(JSON.stringify({
+        type: "refresh_identity",
+        payload: {
+            handle: newHandle,
+            bio: newBio
+        }
+    }));
+};
 
 export function selectCard(id) {
     // PILLAR 2: Integer Supremacy. Ensure the ID is numeric to prevent 
@@ -466,15 +512,31 @@ export function rejoinActiveMatch() {
 
     console.log(`[MATCH] Rejoining active engagement: ${state.match_id || 'PvP'}`);
 
-    // PILLAR 4: Replay Resilience.
-    if (state.replay_state === "SYNCHRONIZED") {
-        // Already synchronized via beacon hydration. Signal completion to thaw UI.
-        console.log("[MATCH] Engine reporting SYNCHRONIZED. Finalizing recovery.");
-        if (window.CompleteRecovery) window.CompleteRecovery();
-    } else {
-        // Trigger the catch-up request to the backend for missing frames
-        import('./network.js').then(m => m.requestMatchSync());
+    // PILLAR 6: Beacon Integrity Check.
+    // Fetch the raw beacon from storage to verify the cryptographic baseline.
+    // This ensures that the re-hydrated WASM state accurately matches the authoritative 
+    // server outcome at the time of the last local save.
+    const cachedBeacon = localStorage.getItem("vbabes_state_beacon");
+    if (cachedBeacon) {
+        try {
+            const beacon = JSON.parse(cachedBeacon);
+            const engineHash = state.last_verified_state_hash;
+            const authoritativeHash = beacon.profile.last_verified_state_hash;
+
+            if (engineHash && authoritativeHash && engineHash !== authoritativeHash) {
+                console.warn("[MATCH] Cryptographic drift detected at save-point. Forcing recovery cycle.");
+                if (window.InitiateRecovery) {
+                    window.InitiateRecovery();
+                    return; // InitiateRecovery triggers requestMatchSync internally
+                }
+            }
+        } catch (e) { console.error("[MATCH] Beacon verification failed.", e); }
     }
+
+    // PILLAR 4: Catch-up Synchronization.
+    // Always request missing frames from the server to bridge the gap while offline.
+    // Doing this silently (without InitiateRecovery) if hashes match prevents UI flicker.
+    import('./network.js').then(m => m.requestMatchSync());
 
     // PILLAR 4: UI Continuity.
     // Force a full UI sync to transition to the combat arena immediately.
@@ -731,4 +793,113 @@ window.clickGrid = clickGrid;
 window.executeQuickCast = executeQuickCast;
 window.showPowerTooltip = showPowerTooltip;
 window.buildEmptyBoard = buildEmptyBoard;
+
+/**
+ * openSpectatorWagerOverlay allows a spectator to place a wager on a match.
+ * PILLAR 2: Industrial Loop (Spectator Siphon).
+ */
+export function openSpectatorWagerOverlay(matchID, p1Wallet, p2Wallet) {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "spectator-wager-overlay";
+    overlay.className = "overlay";
+
+    const p1Name = getCachedEnvoiName(p1Wallet);
+    const p2Name = getCachedEnvoiName(p2Wallet);
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-450 border-neon-cyan">
+            <div class="market-header">
+                <span class="market-title">SPECTATOR WAGER</span>
+                <div class="access-level">MATCH: ${matchID.substring(0, 8)}...</div>
+            </div>
+            <div class="p-20 text-center">
+                <p class="opacity-7 mb-20 font-size-0-85em">
+                    Place your $VBV wager on the outcome of this match. A <b>2% House Cut</b> applies to all payouts.
+                </p>
+                <div class="flex-col gap-10 mb-20">
+                    <div class="flex-row justify-center gap-10">
+                        <label class="flex-row align-center glass-panel p-10 m-0 flex-1 pointer">
+                            <input type="radio" name="bet-on-player" value="${p1Wallet}" class="mr-10">
+                            <span class="text-neon-cyan font-bold">${p1Name}</span>
+                        </label>
+                        <label class="flex-row align-center glass-panel p-10 m-0 flex-1 pointer">
+                            <input type="radio" name="bet-on-player" value="${p2Wallet}" class="mr-10">
+                            <span class="text-neon-cyan font-bold">${p2Name}</span>
+                        </label>
+                    </div>
+                    <input type="number" id="wager-amount-input" class="glass-input w-full text-center font-size-1-5em" placeholder="0.00 $VBV" step="1" min="1" oninput="window.updatePotentialPayout()">
+                </div>
+                
+                <div class="flex-row justify-between align-center mb-15 p-10 bg-dark-overlay rounded">
+                    <span class="font-bold letter-spacing-1">POTENTIAL PAYOUT</span>
+                    <b id="potential-payout-display" class="text-neon-green font-size-1-5em" style="text-shadow: 0 0 10px var(--neon-green);">0.00 $VBV</b>
+                </div>
+
+                <div class="flex-row gap-10">
+                    <button class="outline w-full" onclick="document.getElementById('spectator-wager-overlay').remove()">CANCEL</button>
+                    <button class="w-full bg-neon-green text-dark font-bold" onclick="submitSpectatorWager('${matchID}')">PLACE WAGER</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    // Initial payout calculation
+    window.updatePotentialPayout = () => {
+        const wagerInput = document.getElementById("wager-amount-input");
+        const payoutDisplay = document.getElementById("potential-payout-display");
+        const wager = parseFloat(wagerInput.value);
+        if (isNaN(wager) || wager <= 0) {
+            payoutDisplay.innerText = "0.00 $VBV";
+            return;
+        }
+        // 2% House Cut
+        const potentialPayout = wager * (1 - 0.02);
+        payoutDisplay.innerText = `${potentialPayout.toFixed(2)} $VBV`;
+    };
+    window.updatePotentialPayout(); // Call once on load
+}
+
+/**
+ * submitSpectatorWager sends the wager request to the backend.
+ */
+export async function submitSpectatorWager(matchID) {
+    const wagerInput = document.getElementById("wager-amount-input");
+    const betOnPlayerRadio = document.querySelector('input[name="bet-on-player"]:checked');
+
+    if (!userAddress) return showToast("❌ Connect wallet first.", "error");
+    if (!betOnPlayerRadio) return showToast("❌ Select a player to bet on.", "error");
+    
+    const wagerAmount = parseFloat(wagerInput.value);
+    if (isNaN(wagerAmount) || wagerAmount <= 0) return showToast("❌ Enter a valid wager amount.", "error");
+
+    const state = window.GetGameState();
+    if (state.virtual_balance < wagerAmount) return showToast("❌ Insufficient rewards for wager.", "error");
+
+    showToast(`💰 Placing ${wagerAmount.toFixed(2)} $VBV wager...`, "info");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/match/wager`, {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                spectator_wallet: userAddress,
+                match_id: matchID,
+                bet_on_wallet: betOnPlayerRadio.value,
+                wager_micro: Math.round(wagerAmount * 1000000) // Convert to micro-units
+            })
+        });
+
+        if (response.ok) {
+            showToast("✅ Wager placed successfully!", "success");
+            document.getElementById("spectator-wager-overlay")?.remove();
+            if (window.syncUI) window.syncUI("all"); // Refresh UI to reflect balance change
+        } else {
+            const err = await response.text();
+            showToast(`❌ Wager Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast(`❌ Network Error: ${err.message}`, "error");
+    }
+}
 window.rejoinActiveMatch = rejoinActiveMatch;
