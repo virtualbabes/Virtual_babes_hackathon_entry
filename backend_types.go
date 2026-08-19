@@ -133,6 +133,82 @@ type VictimRegistry struct {
 	ActiveKidnaps map[string]map[string]HostageSituation `json:"active_kidnaps"`
 }
 
+// CyberInterceptEvent represents a cyber-interception opportunity detected by Intel-Agent.
+// PILLAR 13: Justice Hegemony — Intel-Agent combat hooks base type.
+type CyberInterceptEvent struct {
+	EventID        string    `json:"event_id"`         // UUID v4 unique identifier
+	SourceWallet   string    `json:"source_wallet"`    // Originating wallet (suspect signal source)
+	TargetWallet   string    `json:"target_wallet"`    // Intercept target wallet
+	SignalStrength int       `json:"signal_strength"`  // 1-100 signal quality score
+	DecryptBonus   float64   `json:"decrypt_bonus"`    // Multiplier from Intel-Agent career tier
+	CreatedAt      time.Time `json:"created_at"`       // Event creation timestamp
+	ExpiresAt      time.Time `json:"expires_at"`       // TTL (e.g., 30 minutes)
+	Intercepted    bool      `json:"intercepted"`      // Whether successfully intercepted by Intel-Agent
+}
+
+// RaidEvidence represents forensic data collected during a criminal raid or cyber-intercept.
+// PILLAR 13: Justice Hegemony — Forensic Analyst combat hooks base type.
+type RaidEvidence struct {
+	EvidenceID   string    `json:"evidence_id"`      // UUID v4 unique identifier
+	SourceWallet string    `json:"source_wallet"`    // Collector wallet (ForensicAnalyst)
+	TargetWallet string    `json:"target_wallet"`    // Suspect target wallet
+	CrimeType    string    `json:"crime_type"`       // e.g., "KIDNAP", "LAUNDERING", "COUNTERFEIT"
+	Confidence   float64   `json:"confidence"`       // 0.0-1.0 confidence score (evidence accuracy)
+	CollectedAt  time.Time `json:"collected_at"`     // Collection timestamp
+	Expired      bool      `json:"expired"`          // Whether evidence has degraded beyond use
+}
+
+// SeasonEventPhase represents the lifecycle stage of a seasonal event.
+type SeasonEventPhase string
+
+const (
+	SeasonAnnouncement Phase = "ANNOUNCEMENT" // Event announced, players can register
+	SeasonActive       Phase = "ACTIVE"        // Event is live with multiplier effects
+	SeasonResolution   Phase = "RESOLUTION"    // Event ended, computing payouts
+	SeasonTreasuryPayout  Phase = "TREASURY_PAYOUT" // Rewards distributed to participants
+)
+
+// SeasonEventType defines the category of seasonal event.
+type SeasonEventType string
+
+const (
+	SeasonHarvestFest  SeasonEventType = "HARVEST_FEST"   // Resource gathering multiplier week
+	SeasonShadowAuction SeasonEventType = "SHADOW_AUCTION" // Criminality rewards doubled
+	SeasonTerritoryWar SeasonEventType = "TERRITORY_WAR"   // Club territory bonuses ×2
+	SeasonCryptoRaid   SeasonEventType = "CRYPTO_RAID"     // Bounty capture XP bonus week
+	SeasonDiamondWeek  SeasonEventType = "DIAMOND_WEEK"    // All rewards +50% for Diamond+ reputation players
+)
+
+// SeasonEvent represents a seasonal event managed by the Industrial Loop.
+// PILLAR 1: Sacred Industrial Loop — Event-driven value circulation per vision lines 107-159.
+type SeasonEvent struct {
+	EventID         string          `json:"event_id"`           // UUID v4 unique identifier
+	Type            SeasonEventType `json:"type"`               // Category of event
+	Title           string          `json:"title"`              // Display title (e.g., "Harvest Fest 2026-Q3")
+	Description     string          `json:"description"`        // Event lore and mechanics description
+	StartTime       time.Time       `json:"start_time"`         // Announcement start timestamp
+	EndTime         time.Time       `json:"end_time"`           // Resolution trigger timestamp
+	Multiplier       float64        `json:"multiplier"`         // Base reward multiplier (e.g., 1.5 = +50%)
+	TreasuryBudget   uint64         `json:"treasury_budget_micro"` // Treasury allocation in micro-VBV
+	ActiveParticipants map[string]time.Time `json:"-"`            // Key: wallet -> registration time (not serialized)
+	Status          SeasonEventPhase `json:"status"`           // Current lifecycle phase
+	CreatedBy       string          `json:"created_by"`         // Admin wallet that created event
+}
+
+// SeasonRewardPool tracks treasury allocation for a seasonal event.
+type SeasonRewardPool struct {
+	TotalAllocated uint64            `json:"total_allocated_micro"` // Treasury budget in micro-VBV
+	Distributed    uint64            `json:"distributed_micro"`     // Amount already paid out
+	PerParticipant map[string]uint64 `json:"-"`                     // Key: wallet -> reward amount (not serialized)
+}
+
+// SeasonalEventEngine manages the lifecycle of seasonal events.
+type SeasonalEventEngine struct {
+	Mu              sync.RWMutex               `json:"-"`
+	ActiveEvents    map[string]*SeasonEvent     // Key: EventID -> *SeasonEvent
+	CurrentRewardPool map[string]*SeasonRewardPool // Key: EventID -> *SeasonRewardPool
+}
+
 // NonceData stores the nonce value and its creation time for expiration logic.
 type NonceData struct {
 	Value     string
@@ -198,7 +274,16 @@ type Lobby struct {
 	nautilusDEXPathService   *NautilusDEXPathService      // PILLAR 2: Console Creator Payouts
 	playerService            *PlayerService               // PILLAR 5: Player attribute logic
 	justiceService           *JusticeService              // PILLAR 7: Justice Hegemony Path
+	justiceHandlers          *JusticeHandlers             // PILLAR 7: HTTP presentation layer for Justice Dashboard
+	entityInvestmentService  *EntityInvestmentService     // PILLAR 2 / Phase 7-A: Entity Investment Layer (Player-to-Player Share Allocation)
+	evidencePool             *EvidencePool                // PILLAR 13: Forensic evidence pool for Raid events
+	seasonEngine             *SeasonalEventEngine         // PILLAR 1: Seasonal event lifecycle management (Industrial Loop)
+	creatorStore             *CreatorStore                // PILLAR 7-C: Creator storefront and royalty system
+	aiEngine                 *AICitizenEngine             // PILLAR 7-D: AI Autonomous Economy (citizen lifecycle)
+	contractEngine           *ContractEngine              // PILLAR 3: Underworld Contracts dynamic engine
 	rateLimiter              *RateLimiterService          // PILLAR 1-C: Rate Limiting & DDoS Mitigation
+	playerDirectInvestments  map[string]map[string]uint64 // Key: wallet -> map[entity_id]amountMicro (P7-A Entity Investment Layer)
+	dividendTracker          *EntityDividendTracker       // P7-A: Per-entity dividend distribution state tracking
 	fencedListings           map[string]FenceListing      // P2-B3: Fenced Goods Marketplace listings
 	fencedListingsMu         sync.RWMutex                 // Protects fencedListings map
 	counterfeitRateLimit     map[string]*TokenBucket      // Per-wallet counterfeit operation rate limiting

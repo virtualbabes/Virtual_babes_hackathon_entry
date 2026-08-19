@@ -271,6 +271,9 @@ func (node *EntityMarketNode) CalculateDynamicRumorFee() uint64 {
 
 // handleTradeShares allows players to trade equity in entities.
 func (l *Lobby) handleTradeShares(env *Envelope) {
+	// PILLAR 7-A/Task 7002: Entity dividend pool seeding from AMM trades.
+	// When shares are bought, route a portion of the protocol fee into the entity's DividendPoolMicro.
+	const tradeDividendRate = 0.15 // 15% of buy-side fees seed entity dividends (Task 7002)
 	var data struct {
 		EntityID string  `json:"entity_id"` // This can be ClientID or Wallet Address
 		Action   string  `json:"action"`
@@ -396,12 +399,24 @@ func (l *Lobby) handleTradeShares(env *Envelope) {
 		totalValueMicro = uint64(float64(totalValueMicro) * rumorMultiplier)
 
 		feeMicro := uint64(0)
+		var netToReserveMicro uint64
+		
 		if !isExempt {
 			// PILLAR 2: Industrial Loop (Protocol Fee).
 			// Extract a 1% exchange fee from all trades to fund the Faucet and Regional Governors.
 			feeMicro = uint64(float64(totalValueMicro)*0.01 + 0.5)
+
+			// PILLAR 7-A/Task 7002: Route portion of protocol fee as entity dividend seed revenue.
+			dividendSeed := uint64(float64(feeMicro) * tradeDividendRate)
+			
+			if l.tokenSinkRouter != nil && dividendSeed > 0 {
+				l.tokenSinkRouter.RouteEntityDividend(targetWallet, dividendSeed, "SHARE_TRADE_BUY")
+			}
+
+			netToReserveMicro = totalValueMicro - feeMicro // net after full fee (dividend seed already deducted from fee)
+		} else {
+			netToReserveMicro = totalValueMicro
 		}
-		netToReserveMicro := totalValueMicro - feeMicro
 
 		if l.playerBalances[wallet] >= totalValueMicro {
 			l.playerBalances[wallet] -= totalValueMicro

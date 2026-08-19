@@ -11,12 +11,16 @@
     "server:build": "node -e \"const {spawnSync}=require('child_process'); const env=Object.assign({}, process.env); delete env.GOOS; delete env.GOARCH; env.CGO_ENABLED='0'; const r=spawnSync('go',['build','-ldflags=-w -s','-o','server-bin','.'],{stdio:'inherit',env}); if (r.error || r.status!==0) process.exit(r.status||1);\"",
     "clean": "node -e \"const fs=require('fs'); ['Public/main.wasm', 'Public/wasm_exec.js', 'Public/styles.css', 'server-bin'].forEach(f => { try { fs.rmSync(f, { force: true }); console.log('Removed: ' + f); } catch (e) { if (e.code !== 'ENOENT') console.error('Error removing ' + f + ': ' + e.message); } });\"",
     "build": "npm run clean && npm run wasm:init && npm run wasm:build && npm run sass:build && npm run server:build",
-    "start": "go run ."
+    "start": "go run .",
+    "dev": "start"
   },
   "keywords": [],
   "author": "slapkarnts",
   "license": "Proprietary",
   "devDependencies": {
-    "sass": "^1.85.0"
+    "sass": "^1.102.0"
+  },
+  "dependencies": {
+    "immutable": "^5.1.9"
   }
 }

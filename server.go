@@ -125,7 +125,10 @@ func newLobby() (*Lobby, error) {
 		narrativeService:        &NarrativeService{},
 		nautilusDEXPathService:  &NautilusDEXPathService{}, // PILLAR 2: Console Creator Payouts
 		playerService:           &PlayerService{},
-		justiceService:          &JusticeService{}, // PILLAR 7: Justice Hegemony Path
+		justiceService:          &JusticeService{},   // PILLAR 7: Justice Hegemony Path
+		justiceHandlers:         &JusticeHandlers{service: nil, playerSvc: &PlayerService{}}, // PILLAR 7: HTTP presentation layer (initialized below)
+		evidencePool:            &EvidencePool{ActiveRecords: make(map[string]*RaidEvidence), CollectorMap: make(map[string][]string)}, // PILLAR 13: Forensic evidence pool
+		contractEngine:          NewContractEngine(),                                                                                     // PILLAR 3: Underworld Contracts dynamic engine
 		matchHandshakers:        make(map[string]*SyncHandshaker),
 
 		linkedWallets:           make(map[string]WalletLinkInfo),
@@ -219,11 +222,38 @@ func newLobby() (*Lobby, error) {
 			}
 		}
 	}
-	l.rateLimiter = NewRateLimiterService(l, adminWalletList)
-	go l.rateLimiter.CleanupStaleEntries(5 * time.Minute)
+l.rateLimiter = NewRateLimiterService(l, adminWalletList)
+go l.rateLimiter.CleanupStaleEntries(5 * time.Minute)
 
-	// PILLAR 2: Counterfeiter Rate Limiting — Initialize the per-wallet map.
+// PILLAR 13: $VBV-Sustained Liquidity Sampling Daemon (24h window for tier gating)
+go l.StartLiquiditySamplingDaemon(ctx)
+
+// PILLAR 2: Counterfeiter Rate Limiting — Initialize the per-wallet map.
 	l.counterfeitRateLimit = make(map[string]*TokenBucket)
+
+	// PILLAR 7-C: Creator Storefront initialization
+	l.creatorStore = NewCreatorStore()
+
+	// PILLAR 7-D: AI Autonomous Economy — AICitizenEngine initialization
+	l.aiEngine = NewAICitizenEngine()
+
+	// Initialize justiceHandlers with reference to the economy service (set after bootstrap)
+	if l.justiceService != nil && l.playerService != nil {
+		l.justiceHandlers.service = l.justiceService
+	}
+
+	// PILLAR 1: Seasonal Event Engine — Industrial Loop event lifecycle management (P7-B Task 7101)
+	l.seasonEngine = &SeasonalEventEngine{
+		ActiveEvents:      make(map[string]*SeasonEvent),
+		CurrentRewardPool: make(map[string]*SeasonRewardPool),
+	}
+
+	// PILLAR 2 / Phase 7-A: Entity Investment Layer initialization
+	l.entityInvestmentService = NewEntityInvestmentService()
+	l.dividendTracker = &EntityDividendTracker{
+		EntityPools:      make(map[string]*uint64),
+		LastDistribution: make(map[string]time.Time),
+	}
 
 	// Task 3103: Auto-assign per-wallet tiers for known economic/admin wallets.
 	for _, w := range adminWalletList {
@@ -469,12 +499,95 @@ func (l *Lobby) loadNetworkConfigs() {
 	l.mutex.Unlock()
 }
 
+// StartLiquiditySamplingDaemon runs a 24h ticker that samples each player's $VBV balance.
+// PILLAR 13: Collects sustained balance history for tier gating validation.
+// Runs every 24 hours to capture point-in-time balance across the player base.
+func (l *Lobby) StartLiquiditySamplingDaemon(ctx context.Context) {
+ticker := time.NewTicker(24 * time.Hour)
+defer ticker.Stop()
+
+log.Println("[PILLAR 13] $VBV-Sustained Liquidity Sampling Daemon started (24h window)")
+
+for {
+select {
+case <-ctx.Done():
+log.Println("[PILLAR 13] Liquidity sampling daemon shutting down")
+return
+case <-ticker.C:
+l.CollectLiquiditySamples()
+}
+}
+}
+
+// CollectLiquiditySamples iterates all active players and samples their current VBV balance.
+// PILLAR 13: Deterministic sampling — each player's CareerXP receives the micro-balance snapshot.
+func (l *Lobby) CollectLiquiditySamples() {
+l.mutex.Lock()
+defer l.mutex.Unlock()
+
+now := time.Now()
+sampledCount := 0
+
+for wallet, stats := range l.leaderboard {
+// Initialize CareerXP if needed
+if stats.CareerXP == nil {
+stats.CareerXP = &CareerXP{
+RoleXP:           make(map[string]uint64),
+LiquiditySamples: []uint64{},
+}
+l.leaderboard[wallet] = stats
+}
+
+// Convert balance to micro-units (assuming VBVBalance is already in display units)
+microBalance := uint64(float64(stats.VBVBalance) * 1_000_000)
+
+// Append sample to sliding window (keep last 14 samples for 2-week history)
+stats.CareerXP.LiquiditySamples = append(stats.CareerXP.LiquiditySamples, microBalance)
+if len(stats.CareerXP.LiquiditySamples) > 14 {
+stats.CareerXP.LiquiditySamples = stats.CareerXP.LiquiditySamples[len(stats.CareerXP.LiquiditySamples)-14:]
+}
+
+// Compute and store average sustained balance
+if len(stats.CareerXP.LiquiditySamples) > 0 {
+sum := uint64(0)
+for _, sample := range stats.CareerXP.LiquiditySamples {
+sum += sample
+}
+	stats.CareerXP.AvgSustainedMicro = sum / uint64(len(stats.CareerXP.LiquiditySamples))
+}
+
+// PILLAR 13: Demotion grace period check — wire CheckCareerTierGate into liquidity sampling flow
+if stats.CareerXP != nil && len(stats.CareerXP.LiquiditySamples) > 0 {
+	// Evaluate against Apprentice tier (minimum gate for any career progression)
+	gatePass, currentTier, requiredMicro, isDemotionWarning := stats.CareerXP.CheckCareerTierGate(VBVTierApprentice)
+
+	if isDemotionWarning && !stats.CareerXP.DemotionWarningAt.IsZero() {
+		// Grace period expired — broadcast demotion warning to client
+		walletLower := strings.ToLower(wallet)
+		for cid, lwb := range l.clientWallets {
+			if lwb == walletLower || cid != "" {
+				l.sendToClientLocked(cid, Envelope{Type: "career_tier_demoted", Payload: json.RawMessage(fmt.Sprintf(`{"wallet":"%s","currentTier":%d,"requiredMicro":%d}` , wallet, currentTier, requiredMicro))})
+			}
+		}
+	} else if !gatePass && stats.CareerXP.DemotionWarningAt.IsZero() {
+		// First time falling below threshold — issue 7-day warning
+		stats.CareerXP.DemotionWarningAt = now
+		l.leaderboard[wallet] = stats
+	}
+
+l.leaderboard[wallet] = stats
+sampledCount++
+}
+
+log.Printf("[PILLAR 13] Liquidity sampling complete at %s: %d players sampled\n", now.Format("2006-01-02 15:04:05"), sampledCount)
+}
+
 // saveNetworkConfigs persists the current network configurations to disk.
 func (l *Lobby) saveNetworkConfigs() {
-	l.mutex.RLock()
-	data, _ := json.MarshalIndent(l.availableNetworks, "", "  ")
-	l.mutex.RUnlock()
-	os.WriteFile("networks.json", data, 0644)
+l.mutex.RLock()
+data, _ := json.MarshalIndent(l.availableNetworks, "", "  ")
+l.mutex.RUnlock()
+os.WriteFile("networks.json", data, 0644)
 }
 
 // serveWs upgrades HTTP connections to WebSockets and registers clients in the Lobby.
@@ -630,7 +743,30 @@ func main() {
 	mux.HandleFunc("/api/achievement/unlock", lobby.rateLimiter.WithRateLimit(lobby.handleUnlockAchievement, "achievement"))
 
 	mux.HandleFunc("/api/underworld/contracts", lobby.rateLimiter.WithRateLimit(lobby.blackMarketService.HandleGetUnderworldContracts, "underworld"))
-	mux.HandleFunc("/api/justice/missions", lobby.rateLimiter.WithRateLimit(lobby.HandleGetJusticeMissions, "underworld"))
+	// ========================================================================
+	// PILLAR 7: Justice Hegemony Dashboard — HTTP API Routes (KEY 3.5)
+	// ========================================================================
+	mux.HandleFunc("/api/justice/dashboard", lobby.rateLimiter.WithRateLimit(lobby.HandleGetJusticeDashboard, "underworld"))
+	mux.HandleFunc("/api/justice/use-truth-serum", lobby.rateLimiter.WithRateLimit(lobby.handleUseTruthSerum, "economy-tight"))
+	mux.HandleFunc("/api/justice/capture-bounty", lobby.rateLimiter.WithRateLimit(lobby.HandleCaptureBounty, "underworld"))
+	// Alias bounty-board to dashboard for frontend compatibility
+	mux.HandleFunc("/api/justice/bounty-board", lobby.rateLimiter.WithRateLimit(lobby.HandleGetJusticeDashboard, "underworld"))
+
+	// P2-A: Justice card award + reputation shield endpoints (WS events: justice_card_awarded, shield_active)
+	mux.HandleFunc("/api/justice/award-card", lobby.rateLimiter.WithRateLimit(lobby.handleAwardJusticeCard, "economy-tight"))
+	mux.HandleFunc("/api/justice/use-rep-shield", lobby.rateLimiter.WithRateLimit(lobby.handleApplyRepShield, "economy-tight"))
+
+	// PILLAR 13: Intel-Agent cyber-intercept endpoint (WS event: cyber_intercept_event)
+	mux.HandleFunc("/api/criminality/cyber-intercept", lobby.rateLimiter.WithRateLimit(lobby.handleCyberInterceptWrapper, "underworld"))
+
+	// ========================================================================
+	// PILLAR 13 / UNDERWORLD CONTRACTS — Dynamic Contract Engine routes (KEY 3.5)
+	// ========================================================================
+	mux.HandleFunc("/api/contracts/list", lobby.rateLimiter.WithRateLimit(lobby.handleGetAvailableContracts, "underworld"))
+	mux.HandleFunc("/api/contracts/assign", lobby.rateLimiter.WithRateLimit(lobby.handleAssignContract, "economy-tight"))
+
+	// END OF UNDERWORLD CONTRACTS routes
+	// ========================================================================
 
 	mux.HandleFunc("/api/report-player", lobby.rateLimiter.WithRateLimit(lobby.handlePlayerReport, "default"))
 	mux.HandleFunc("/api/re-sync-stats", lobby.rateLimiter.WithRateLimit(lobby.handleReSyncStats, "wallet-default"))
@@ -711,6 +847,536 @@ func main() {
 	// Onboarding — economy-tight (sensitive wallet operation)
 	mux.HandleFunc("/api/bridge/onboard", lobby.rateLimiter.WithRateLimit(lobby.onboardingService.HandleVoiOnboarding, "economy-tight"))
 
+	// ========================================================================
+	// PILLAR 2: Entity Investment Layer — Player-to-Player Share Allocation + Dividend Distribution (Task 7001)
+	// ========================================================================
+	mux.HandleFunc("/api/invest/entity", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.entityInvestmentService.HandleDirectInvest(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/claim/dividends", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.entityInvestmentService.HandleClaimDividend(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/invest/portfolio", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.entityInvestmentService.HandleGetPortfolio(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/invest/dividends/history", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.entityInvestmentService.HandleDividendHistory(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	// ========================================================================
+	// PILLAR-1 / Task 7102: Seasonal Event Engine — HTTP routes for event lifecycle management (P7-B Industrial Loop)
+	// ========================================================================
+	mux.HandleFunc("/api/season/events", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.seasonEngine.HandleListSeasonEvents(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/season/events/join", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.seasonEngine.HandleJoinSeasonEvent(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/season/events/reward", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.seasonEngine.HandleClaimSeasonReward(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/season/status", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			lobby.seasonEngine.HandleSeasonStatus(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/season/admin/create-event", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.seasonEngine.HandleAdminCreateEvent(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "wallet-default"))
+
+	mux.HandleFunc("/api/season/admin/end-event", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.seasonEngine.HandleAdminEndEvent(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "wallet-default"))
+
+	mux.HandleFunc("/api/season/admin/update-reward-pool", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			lobby.seasonEngine.HandleAdminUpdateRewardPool(lobby, w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "wallet-default"))
+
+	// ========================================================================
+	// PILLAR 7-C: Creator Storefront — HTTP routes for creator economy (P7-C Vision Lines 412-476)
+	// ========================================================================
+	mux.HandleFunc("/api/creator/store/products", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			category := r.URL.Query().Get("category")
+			creatorWallet := r.URL.Query().Get("creator_wallet")
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			products := cs.ListProducts(category, creatorWallet)
+			json.NewEncoder(w).Encode(products)
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			var req struct {
+				ProductID      string   `json:"product_id"`
+				Name           string   `json:"name"`
+				Description    string   `json:"description"`
+				Category       string   `json:"category"` // asset, dlc, service, cosmetic
+				PriceMicroVBV  uint64   `json:"price_micro_vbv"`
+				Tags           []string `json:"tags,omitempty"`
+				DLCLinks       []string `json:"dlc_links,omitempty"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			err := cs.CreateProduct(req.ProductID, wallet, req.Name, req.Description, req.Category, req.PriceMicroVBV, req.Tags, req.DLCLinks)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]string{"status": "product created"})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/creator/store/product/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		productID := ""
+		if len(parts) >= 5 {
+			productID = parts[4] // /api/creator/store/product/{id}
+		}
+		switch r.Method {
+		case http.MethodGet:
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			product, err := cs.GetProduct(productID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(product)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/creator/store/purchase/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		productID := ""
+		if len(parts) >= 5 {
+			productID = parts[4]
+		}
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			tx, err := cs.PurchaseProduct(productID, wallet)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			json.NewEncoder(w).Encode(tx)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/creator/store/profile/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		walletAddr := ""
+		if len(parts) >= 5 {
+			walletAddr = parts[4] // /api/creator/store/profile/{wallet}
+		}
+		switch r.Method {
+		case http.MethodGet:
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			profile, err := cs.GetCreatorProfile(walletAddr)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(profile)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/creator/store/rate/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			var req struct {
+				ProductID string `json:"product_id"`
+				Rating    uint64 `json:"rating"` // 1-5 scale
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			err := cs.RateProduct(req.ProductID, wallet, req.Rating)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]string{"status": "rating submitted"})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/creator/store/royalty-history", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			productID := r.URL.Query().Get("product_id")
+			creatorWallet := r.URL.Query().Get("creator_wallet")
+			limitStr := r.URL.Query().Get("limit")
+			limit := 50
+			if limitStr != "" {
+				if lim, err := strconv.Atoi(limitStr); err == nil && lim > 0 && lim <= 100 {
+					limit = lim
+				}
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			history := cs.GetRoyaltyHistory(productID, creatorWallet, limit)
+			json.NewEncoder(w).Encode(history)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/creator/store/deactivate/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		productID := ""
+		if len(parts) >= 5 {
+			productID = parts[4]
+		}
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			err := cs.DeactivateProduct(productID, wallet)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"status": "product deactivated"})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/creator/store/reactivate/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(r.URL.Path, "/")
+		productID := ""
+		if len(parts) >= 5 {
+			productID = parts[4]
+		}
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+			err := cs.ReactivateProduct(productID, wallet)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"status": "product activated"})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	// ============================================================================
+	// PILLAR 7-D: AI Autonomous Economy — HTTP routes for citizen lifecycle (Task 7301)
+	// ===========================================================================
+
+	mux.HandleFunc("/api/ai/citizens/spawn", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			citizen, err := lobby.aiEngine.SpawnAI(lobby)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to spawn AI: %v", err), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": true,
+				"data": map[string]interface{}{
+					"wallet":   citizen.Wallet,
+					"name":     citizen.Name,
+					"career":   citizen.Career,
+					"tier":     citizen.Tier,
+					"treasury": citizen.Treasury,
+				},
+			})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/ai/citizens/stats", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			stats := lobby.aiEngine.GetAIStats()
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": true,
+				"data":    stats,
+			})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	mux.HandleFunc("/api/ai/citizens/business/spawn", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+			err := lobby.aiEngine.SpawnBusiness(wallet)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Failed to spawn business: %v", err), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"status": "business spawned"})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy-tight"))
+
+	mux.HandleFunc("/api/ai/citizens/list", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			citizens := lobby.aiEngine.GetAllCitizens()
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": true,
+				"data":    citizens,
+			})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "standard"))
+
+	// Player secondary-sale with automatic creator royalty calculation + economy routing.
+	// ============================================================================
+
+	mux.HandleFunc("/api/creator/store/resell", lobby.rateLimiter.WithRateLimit(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			wallet := extractWalletFromRequest(r)
+			if wallet == "" {
+				http.Error(w, "wallet required", http.StatusBadRequest)
+				return
+			}
+
+			var req struct {
+				ProductID          string `json:"product_id"`
+				SalePriceMicroVBV  uint64 `json:"sale_price_micro_vbv"`
+				BuyerWallet        string `json:"buyer_wallet"` // wallet of the buyer (not sender)
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+
+			cs := lobby.getCreatorStore()
+			if cs == nil {
+				http.Error(w, "creator store not initialized", http.StatusServiceUnavailable)
+				return
+			}
+
+			// Validate product exists and get creator wallet for ownership check
+			product, err := cs.GetProduct(req.ProductID)
+			if err != nil || product.CreatorWallet == "" {
+				http.Error(w, "product not found or invalid", http.StatusBadRequest)
+				return
+			}
+
+			// Validate sale price is positive (uint64 ensures non-negative; check > 0)
+			if req.SalePriceMicroVBV == 0 {
+				http.Error(w, "sale price must be greater than zero", http.StatusBadRequest)
+				return
+			}
+
+			// Process secondary sale — calculates 10% royalty to creator automatically
+			tx, err := cs.ProcessSecondarySale(req.ProductID, req.BuyerWallet, wallet, req.SalePriceMicroVBV)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			// Route economy-wide revenue split with CreatorRoyalty field set for secondary-sale context.
+			// This seeds the royalty tracking in TokenSinkRouter audit trail (actual creator wallet routing
+			// is handled by ProcessSecondarySale above). The 10% royalty amount flows to creator automatically.
+			if lobby.tokenSinkRouter != nil {
+				matrix := RevenueSplitMatrix{
+					FaucetShare:     0.5, // 50% to faucet (standard sink)
+					ClubShare:       0.3, // 30% to club treasury
+					GovernanceShare: 0.2, // 20% to governor/district
+					CreatorRoyalty:  DefaultRoyaltyRate, // 10% creator royalty on secondary sale
+				}
+				if err := lobby.tokenSinkRouter.RouteCriminalTax(
+					"CREATOR_SECONDARY_SALE",
+					req.SalePriceMicroVBV,
+					matrix,
+					0,   // no specific club (economy-wide routing)
+					"",  // no specific district
+				); err != nil {
+					log.Printf("[ROYALTY_ROUTE] WARNING: economy split failed for secondary sale %s: %v", tx.ID, err)
+					// Non-fatal — royalty already credited to creator via ProcessSecondarySale above
+				}
+			}
+
+			// WS broadcast to all connected clients for real-time royalty tracking + frontend sync.
+			payload := fmt.Sprintf(`{"product_id":"%s","creator_wallet":"%s","seller_wallet":"%s","amount_micro_vbv":%d,"royalty_paid_micro_vbv":%d,"timestamp":"%s"}`,
+				tx.ProductID, tx.CreatorWallet, tx.SellerWallet, tx.AmountMicroVBV, tx.RoyaltyPaidMicroVBV, tx.Timestamp.Format(time.RFC3339))
+
+			lobby.mutex.Lock()
+			if cid := lobby.getClientIDFromWalletLocked(wallet); cid != "" {
+				lobby.sendToClientLocked(cid, Envelope{Type: "creator_royalty_paid", Payload: json.RawMessage(payload)})
+			}
+			// Also broadcast to buyer for portfolio sync
+			if req.BuyerWallet != wallet && lobby.getClientIDFromWalletLocked(req.BuyerWallet) != "" {
+				bid := lobby.getClientIDFromWalletLocked(req.BuyerWallet)
+				lobby.sendToClientLocked(bid, Envelope{Type: "creator_royalty_paid", Payload: json.RawMessage(payload)})
+			}
+			// Broadcast to creator so they see royalty earned in real-time
+			if cid := lobby.getClientIDFromWalletLocked(tx.CreatorWallet); cid != "" {
+				lobby.sendToClientLocked(cid, Envelope{Type: "creator_royalty_received", Payload: json.RawMessage(payload)})
+			}
+			lobby.mutex.Unlock()
+
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status":                "secondary_sale_complete",
+				"royalty_transaction_id": tx.ID,
+				"creator_royalty_micro_vbv": tx.RoyaltyPaidMicroVBV,
+				"seller_net_proceeds":   req.SalePriceMicroVBV - tx.RoyaltyPaidMicroVBV,
+			})
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}, "economy_tight"))
+
 	// Static Asset Serving (WASM and UI)
 	fs := http.FileServer(http.Dir("./Public"))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -722,7 +1388,6 @@ func main() {
 	})
 
 	// Wrap all routes with the production-grade CORS middleware.
-	fmt.Println("-------------------------------------------------")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8088"
@@ -735,3 +1400,82 @@ func main() {
 	if err := http.ListenAndServe(":"+port, corsMiddleware()(mux)); err != nil {
 		log.Fatalf("[FATAL] Server startup failed: %v", err)
 	}
+}
+
+// ============================================================================
+// PILLAR 7: Justice Dashboard — Lobby wrapper methods (KEY 3.5)
+// These delegate to the JusticeHandlers instance stored on the Lobby struct.
+// ============================================================================
+
+func (l *Lobby) HandleGetJusticeDashboard(w http.ResponseWriter, r *http.Request) {
+	h := &JusticeHandlers{lobby: l}
+	h.handleGetDashboard(w, r)
+}
+
+func (l *Lobby) handleUseTruthSerum(w http.ResponseWriter, r *http.Request) {
+	h := &JusticeHandlers{lobby: l}
+	h.handleUseTruthSerum(w, r)
+}
+
+func (l *Lobby) HandleCaptureBounty(w http.ResponseWriter, r *http.Request) {
+	h := &JusticeHandlers{lobby: l}
+	h.handleCaptureBounty(w, r)
+}
+
+func (l *Lobby) handleAwardJusticeCard(w http.ResponseWriter, r *http.Request) {
+	h := &JusticeHandlers{lobby: l}
+	h.handleAwardJusticeCard(w, r)
+}
+
+func (l *Lobby) handleApplyRepShield(w http.ResponseWriter, r *http.Request) {
+	h := &JusticeHandlers{lobby: l}
+	h.handleApplyRepShield(w, r)
+}
+
+// PILLAR 13: Intel-Agent Cyber-Intercept — Lobby wrapper method (KEY 3.5)
+// ============================================================================
+
+// getCreatorStore returns the CreatorStore instance on the Lobby.
+func (l *Lobby) getCreatorStore() *CreatorStore {
+	return l.creatorStore
+}
+
+func (l *Lobby) handleCyberInterceptWrapper(w http.ResponseWriter, r *http.Request) {
+	l.handleCyberIntercept(w, r)
+}
+
+// Underworld Contracts — Lobby wrapper methods (KEY 3.5)
+
+func (l *Lobby) handleGetAvailableContracts(w http.ResponseWriter, r *http.Request) {
+	wallet := extractWalletFromRequest(r)
+	if wallet == "" {
+		http.Error(w, "wallet required", http.StatusBadRequest)
+		return
+	}
+	contracts := l.contractEngine.HandleGetAvailableContracts(l, wallet)
+	json.NewEncoder(w).Encode(contracts)
+}
+
+func (l *Lobby) handleAssignContract(w http.ResponseWriter, r *http.Request) {
+	wallet := extractWalletFromRequest(r)
+	if wallet == "" {
+		http.Error(w, "wallet required", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		TemplateID string `json:"template_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	contract, err := l.contractEngine.HandleAssignContract(l, wallet, req.TemplateID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	json.NewEncoder(w).Encode(contract)
+}
+

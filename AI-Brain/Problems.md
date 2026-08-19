@@ -204,3 +204,6 @@
 
 ## 7. Career Engine Expansion (Post-Hackathon)
 *   [x] **Fence Career XP**: Verified `l.TrackCareerXP(wallet, "Fence", 30)` already wired in `black_market_service.go` at line 153 during `applyFenceFee`. No code changes required —XP trigger is active. Native build (go build) and WASM build (GOOS=js GOARCH=wasm) both compile clean on Go 1.26.4. (Current Session)
+
+## 8. Justice Dashboard Backend Fixes
+*   [x] **Dead Code Orphan `l.justin`**: Removed dead code orphan `l.justin` in `justice_handlers.go:74`. Replaced with proper nil check comment pattern consistent with other handlers. Build verified clean (`go build ./...`, exit code 0). (Current Session)

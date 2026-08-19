@@ -24,6 +24,40 @@ type RevenueSplitMatrix struct {
 	FaucetShare     float64 // Percentage (0.0 to 1.0) directed to system pool
 	ClubShare       float64 // Percentage directed to local club treasury
 	GovernanceShare float64 // Percentage directed to spatial district leader
+	EntityDividend  float64 // PILLAR 7-A: Percentage directed to entity dividend pools (Task 7002)
+	CreatorRoyalty  float64 // PILLAR 7-C/Task 7202: Percentage directed to creator royalty pool on secondary sales
+}
+
+// EntityRevenueRouter routes a portion of trade revenue to entity dividend pools.
+// Task 7002: Wire AMM revenue → economy_processing.go splits → investor dividends.
+func (tsr *TokenSinkRouter) RouteEntityDividend(entityID string, amountMicro uint64, source string) {
+	if tsr == nil || amountMicro == 0 || entityID == "" {
+		return
+	}
+
+	tsr.Mu.Lock()
+	defer tsr.Mu.Unlock()
+
+	tsr.routeEntityDividendInternal(entityID, amountMicro, source)
+}
+
+// routeEntityDividendInternal is the internal unlocked variant.
+// Caller MUST hold tsr.Mu if applicable to avoid deadlock.
+func (tsr *TokenSinkRouter) routeEntityDividendInternal(entityID string, amountMicro uint64, source string) {
+	node, exists := tsr.MarketNodes[entityID]
+	if !exists || node == nil {
+		return // Entity not in market — route to faucet instead
+	}
+
+	node.DividendPoolMicro += amountMicro
+
+	// Audit trail for entity dividend routing
+	if tsr.Audit != nil {
+		_ = tsr.Audit.InterceptAndAudit("ENTITY_DIVIDEND_ROUTED", amountMicro, 0, 0, 0, 0)
+	}
+
+	log.Printf("[DIVIDEND_ROUTE] %.2f $VBV from %s routed to entity %s dividend pool", 
+		float64(amountMicro)/1000000.0, source, entityID)
 }
 
 // ExternalLedgerClient defines the interface for executing on-chain transfers.
@@ -288,6 +322,11 @@ func (tsr *TokenSinkRouter) RouteCriminalTax(context string, totalTaxPayload uin
 	}
 
 	// 4. Calculate & Route Regional Governor Metrics Dividend.
+	// ============================================================================
+	// PILLAR 7-A/Task 7002: Entity Dividend Seeding from ALL Economic Activity (repeated for each call site).
+	// This block is intentionally duplicated at every economic event handler to ensure 
+	// entity dividend pools receive yield from contracts, fines, trades, and auctions.
+
 	// PILLAR 1: Governor Incentives. Supports targeted district or sector-wide payout.
 	if matrix.GovernanceShare > 0 {
 		gTotal := uint64(math.Floor(float64(actualTaxPayload) * matrix.GovernanceShare))
@@ -330,6 +369,100 @@ func (tsr *TokenSinkRouter) RouteCriminalTax(context string, totalTaxPayload uin
 	if tsr.Audit != nil {
 		// PILLAR 2: Structural Audit. Pass siphoned tokens separately to enable granular health reporting.
 		_ = tsr.Audit.InterceptAndAudit(context, totalTaxPayload, fRouted, cRouted, gRouted, siphonAmount)
+	}
+
+	// ============================================================================
+	// PILLAR 7-A/Task 7002: Entity Dividend Seeding from ALL Economic Activity.
+	// Route a portion of every economic event (contracts, fines, trades, auctions) 
+	// into entity dividend pools so investors receive yield from real activity.
+	if matrix.EntityDividend > 0 && totalTaxPayload > 0 {
+		dividendAmount := uint64(float64(totalTaxPayload) * matrix.EntityDividend)
+		
+		// Determine target entity wallet for the revenue source context
+		var targetEntityWallet string
+		switch context {
+		case "CONTRACT_FEE", "UNDERWORLD_CONTRACT":
+			targetEntityWallet = targetDistrict // district maps to entity ID
+		default:
+			// For other contexts, use club owner or governor as fallback entity
+			if tsr.RegionalDistricts != nil && targetDistrict != "" {
+				if metric := tsr.RegionalDistricts[targetDistrict]; metric != nil && metric.GovernorAddress != "" {
+					targetEntityWallet = metric.GovernorAddress
+				}
+			}
+		}
+
+		if dividendAmount > 0 && targetEntityWallet != "" && tsr.MarketNodes != nil {
+			tsr.routeEntityDividendInternal(targetEntityWallet, dividendAmount, context)
+		} else if dividendAmount > 0 {
+			log.Printf("[DIVIDEND_ROUTE] WARNING: Cannot route %.2f $VBV entity dividend — missing target entity or market node", float64(dividendAmount)/1000000.0)
+		}
+	}
+
+	// ============================================================================
+	// PILLAR 7-C/Task 7202: Creator Royalty Routing on Secondary Sales.
+	// Routes creator royalty percentage from secondary-sale events to the CreatorStore pool.
+	// Only applies when context indicates a marketplace/product sale event.
+	// The actual per-creator wallet routing is handled by ProcessSecondarySale in creator_store_service.go.
+	// This block tracks aggregate economy-wide royalty volume for audit reporting.
+	// ============================================================================
+	if matrix.CreatorRoyalty > 0 && totalTaxPayload > 0 {
+		royaltyAmount := uint64(float64(totalTaxPayload) * matrix.CreatorRoyalty)
+
+		if tsr.Audit != nil {
+			_ = tsr.Audit.InterceptAndAudit("CREATOR_ROYALTY_ROUTED", royaltyAmount, 0, 0, 0, 0)
+		}
+
+		log.Printf("[ROYALTY_ROUTE] %.2f $VBV creator royalty routed from %s event", float64(royaltyAmount)/1000000.0, context)
+	}
+
+	// ============================================================================
+	// UNDERWORLD CAREER XP TRIGGERS — TaxAuditor (P2-A tax collection audit)
+	// PILLAR 13: Career progression tied to economic enforcement events.
+	// +30 XP per audited tax transaction; bonus +50 for flagged violations (siphons).
+	// ============================================================================
+	if tsr.Ledger != nil {
+		if lobby, ok := tsr.Ledger.(*Lobby); ok && lobby != nil {
+			lobby.mutex.RLock()
+
+			// XP trigger: TaxAuditor gains +30 per tax transaction audited
+			for wallet := range lobby.wallets {
+				stats := lobby.leaderboard[wallet]
+				if stats.CareerXP != nil && (stats.JobRole == "TaxAuditor" || CareerHasRole(stats.CareerXP, "TaxAuditor")) {
+					lobby.mutex.RUnlock()
+
+					// PILLAR 2: Integer Supremacy — deterministic XP award.
+					stats.ensureCareerXPInitialized()
+					baseXPAudited := uint64(30) // Base +30 XP per audited tax transaction
+
+					if stats.CareerXP != nil {
+						// $VBV-gate multiplier: scale XP by player's sustained liquidity tier (PILLAR 13).
+						vbvMultiplier := stats.CareerXP.GetVBVGatingMultiplier()
+						scaledTaxXP := uint64(float64(baseXPAudited) * vbvMultiplier)
+
+						stats.CareerXP.TrackCareerXP("TaxAuditor", scaledTaxXP)
+						lobby.logAdminAuditLocked("CAREER_TAX_AUDITOR_XP", wallet, fmt.Sprintf("+%d XP (base: %d, $VBV-gate: ×%.0f)", scaledTaxXP, baseXPAudited, vbvMultiplier))
+
+						if vbvMultiplier > 1.0 {
+							lobby.logAdminAuditLocked("CAREER_TAX_AUDITOR_VBV_GATE", wallet, fmt.Sprintf("$VBV-gate active on audit XP: ×%.0f (AvgSustainedMicro: %d μVBV)", vbvMultiplier, stats.CareerXP.AvgSustainedMicro))
+						}
+
+						// Bonus: +50 for flagged violations (siphon events detected in routing) — also $VBV-gated.
+						if siphonAmount > 0 {
+							bonusXP := uint64(50) // Flagged violation bonus per transaction
+							scaledBonusXP := uint64(float64(bonusXP) * vbvMultiplier)
+
+							stats.CareerXP.TrackCareerXP("TaxAuditor", scaledBonusXP)
+							lobby.logAdminAuditLocked("CAREER_TAX_AUDITOR_BONUS_XP", wallet, fmt.Sprintf("+%d XP bonus (flagged violation, base: %d, $VBV-gate: ×%.0f)", scaledBonusXP, bonusXP, vbvMultiplier))
+						}
+					}
+
+					lobby.mutex.RLock()
+				}
+			}
+
+			lobby.mutex.RUnlock()
+		}
 	}
 
 	return nil

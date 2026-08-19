@@ -9,6 +9,7 @@ node_modules/
 .env
 *.log
 test_data/
+.clineignore
 
 # Git & Tooling
 .git/

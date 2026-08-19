@@ -177,9 +177,19 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 			}
 		}
 		fameBonus = math.Min(0.60, fameBonus)
-		scaledXP := spreaderStats.CareerXP.computeScaledXP(baseGossipXP, loyaltyBonus, fameBonus)
+
+		// $VBV-gated multiplier: scale XP by player's sustained liquidity tier (PILLAR 13).
+		vbvMultiplier := spreaderStats.CareerXP.GetVBVGatingMultiplier()
+		scaledXP := uint64(float64(spreaderStats.CareerXP.computeScaledXP(baseGossipXP, loyaltyBonus, fameBonus)) * vbvMultiplier)
+
+		l.logAdminAuditLocked("CAREER_GOSSIP_XP", spreaderWallet, fmt.Sprintf("+%d XP (base: %d, loyalty: %.2f, fame: %.2f, $VBV-gate: ×%.0f)", scaledXP, baseGossipXP, loyaltyBonus, fameBonus, vbvMultiplier))
 		l.TrackCareerXP(spreaderWallet, "Gossip", scaledXP)
+
+		if vbvMultiplier > 1.0 {
+			l.logAdminAuditLocked("CAREER_GOSSIP_VBV_GATE", spreaderWallet, fmt.Sprintf("$VBV-gate active: ×%.0f (AvgSustainedMicro: %d μVBV)", vbvMultiplier, spreaderStats.CareerXP.AvgSustainedMicro))
+		}
 	} else {
+		l.logAdminAuditLocked("CAREER_GOSSIP_XP_NO_CAREER", spreaderWallet, fmt.Sprintf("+%d XP (no career state)", baseGossipXP))
 		l.TrackCareerXP(spreaderWallet, "Gossip", baseGossipXP)
 	}
 

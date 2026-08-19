@@ -76,7 +76,23 @@ func (s *CourthouseService) HandleCourthouseReset(l *Lobby, w http.ResponseWrite
 
 	// Career XP: Tax Auditor (Justice D2) gains XP on fine payment processing
 	l.TrackCareerXP(targetWallet, "Tax Auditor", 15)
-	
+
+	// PILLAR 8 Task 5002: TaxAuditor↔JusticeCommissioner rival pair hook — EvaluateCrossCareerXP at courthouse resolution point #1
+	if l.leaderboard[targetWallet] != nil && (l.leaderboard[targetWallet].JobRole == "TaxAuditor" || CareerHasRole(l.leaderboard[targetWallet].CareerXP, "TaxAuditor")) {
+		for oppWallet, oppStats := range l.leaderboard {
+			if oppWallet == targetWallet {
+				continue
+			}
+			if oppStats.CareerXP != nil && (oppStats.JobRole == "JusticeCommissioner" || CareerHasRole(oppStats.CareerXP, "JusticeCommissioner")) {
+				rivalXP, _, isRival := EvaluateCrossCareerXP("TaxAuditor", oppStats.JobRole, 15, l.leaderboard[targetWallet], oppStats)
+				if isRival && rivalXP > 15 {
+					l.TrackCareerXP(targetWallet, "Tax Auditor", int(rivalXP-15))
+					log.Printf("[COURTHOUSE] RIVAL_BONUS: TaxAuditor↔JusticeCommissioner — +%d XP bonus for %s (rival target: %s)", rivalXP-15, targetWallet, oppWallet)
+				}
+			}
+		}
+	}
+
 	// Update Player Stats and Vault balance
 	l.mutex.Lock()
 	stats.WantedLevel = 0
@@ -111,6 +127,19 @@ func (s *CourthouseService) HandleCourthouseReset(l *Lobby, w http.ResponseWrite
 func (s *CourthouseService) ApplyLegalPardonLocked(l *Lobby, judgeWallet, targetWallet string, item ShopItem) error {
 	// Career XP: Lawyer-Commissioner (Underworld #5) gains XP on legal pardon execution
 	l.TrackCareerXP(judgeWallet, "Lawyer-Commissioner", 30)
+
+	// PILLAR 8 Task 5002: TaxAuditor↔JusticeCommissioner rival pair hook — EvaluateCrossCareerXP at courthouse resolution point #2 (legal pardon)
+	if l.leaderboard[judgeWallet] != nil && (l.leaderboard[judgeWallet].JobRole == "TaxAuditor" || CareerHasRole(l.leaderboard[judgeWallet].CareerXP, "TaxAuditor")) {
+		tStatsPardon, existsP := l.leaderboard[targetWallet]
+		if existsP && tStatsPardon.CareerXP != nil && (tStatsPardon.JobRole == "JusticeCommissioner" || CareerHasRole(tStatsPardon.CareerXP, "JusticeCommissioner")) {
+			rivalXP, _, isRival := EvaluateCrossCareerXP("TaxAuditor", tStatsPardon.JobRole, 30, l.leaderboard[judgeWallet], &tStatsPardon)
+			if isRival && rivalXP > 30 {
+				l.TrackCareerXP(judgeWallet, "Tax Auditor", int(rivalXP-30))
+				log.Printf("[COURTHOUSE] RIVAL_BONUS: TaxAuditor↔JusticeCommissioner (pardon) — +%d XP bonus for %s vs JusticeCommissioner target %s", rivalXP-30, judgeWallet, targetWallet)
+			}
+		}
+	}
+
 	tStats, exists := l.leaderboard[targetWallet]
 	if !exists {
 		return fmt.Errorf("target signature not found in sector")

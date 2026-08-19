@@ -388,6 +388,75 @@ export function handleServerMessage(msg) {
         case "achievement_unlock":
             handleAchievementUnlock(msg.payload);
             break;
+        // Justice Dashboard WebSocket events
+        case "justice_card_awarded":
+            if (window.onJusticeCardAwarded) window.onJusticeCardAwarded(msg.payload);
+            showToast(`⚖️ <b>JUSTICE CARD AWARDED:</b><br>${msg.payload.card_type || msg.payload.type} (+${msg.payload.power_bonus || 0}% bonus)`, "success", 5000);
+            break;
+        case "truth_serum_applied":
+            if (window.onTruthSerumApplied) window.onTruthSerumApplied(msg.payload);
+            showToast(`🧪 <b>TRUTH SERUM:</b><br>Target ${msg.payload.targetWallet || 'unknown'} revealed for ${msg.payload.duration || 30}s`, "info", 4000);
+            break;
+        case "shield_active":
+            if (window.onShieldActive) window.onShieldActive(msg.payload);
+            showToast(`🛡️ <b>SHIELD:</b><br>${msg.payload.remaining}/${msg.payload.capacity} remaining`, "info", 3000);
+            break;
+        case "dashboard_refresh":
+            if (window.onDashboardRefresh) window.onDashboardRefresh();
+            break;
+        case "bounty_updated":
+            if (window.onBountyUpdated) window.onBountyUpdated(msg.payload);
+            showToast(`🎯 <b>BOUNTY UPDATED:</b><br>${msg.payload.targetWallet || 'target'} — Wanted: ${msg.payload.wantedLevel}, Reward: ${(msg.reward || 0).toLocaleString()}`, "success", 4000);
+            break;
+        // PILLAR 3: Underworld Contract WS events
+        case "underworld_contract_assigned":
+            if (window.onContractAssigned) window.onContractAssigned(msg.payload);
+            showToast(`💀 <b>CONTRACT ASSIGNED:</b><br>${msg.payload.contract_title || msg.payload.id} — Reward: ${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV`, "warning", 6000);
+            break;
+        case "underworld_contract_completed":
+            if (window.onContractCompleted) window.onContractCompleted(msg.payload);
+            showToast(`✅ <b>CONTRACT COMPLETED:</b><br>${msg.payload.contract_title || msg.payload.id} — Earned ${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV + ${msg.payload.xp_awarded || 0} CareerXP`, "success", 6000);
+            break;
+        // Seasonal Event WS events (P7-B Task 7103)
+        case "seasonal_event_joined":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventJoined) {
+                window.SeasonalEvents.onEventJoined(msg.payload);
+            }
+            showToast(`🎯 <b>EVENT JOINED:</b><br>${msg.payload.event_title || msg.payload.event_id}`, "success", 4000);
+            break;
+        case "seasonal_event_created":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventCreated) {
+                window.SeasonalEvents.onEventCreated(msg.payload);
+            }
+            showToast(`🌸 <b>NEW SEASONAL EVENT:</b><br>${msg.payload.title || msg.payload.event_id}`, "info", 5000);
+            break;
+        case "seasonal_event_reward":
+            if (window.SeasonalEvents && window.SeasonalEvents.onRewardReceived) {
+                window.SeasonalEvents.onRewardReceived(msg.payload);
+            }
+            showToast(`🎁 <b>REWARD CLAIMED:</b><br>+${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV`, "success", 4000);
+            break;
+        case "seasonal_event_pool_updated":
+            if (window.SeasonalEvents && window.SeasonalEvents.onPoolUpdated) {
+                window.SeasonalEvents.onPoolUpdated(msg.payload);
+            }
+            requestBatchedSync("all"); // Refresh event cards with new budget amounts
+            break;
+        case "seasonal_event_expired":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventExpired) {
+                window.SeasonalEvents.onEventExpired(msg.payload);
+            }
+            showToast(`⏰ <b>EVENT ENDED:</b><br>${msg.payload.title || msg.payload.event_id}`, "info", 3000);
+            requestBatchedSync("all"); // Refresh to remove expired event from grid
+            break;
+        case "seasonal_event_activated":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventActivated) {
+                window.SeasonalEvents.onEventActivated(msg.payload);
+            }
+            showToast(`⭐ <b>EVENT ACTIVE:</b><br>${msg.payload.title || msg.payload.event_id} — Join now!`, "success", 5000);
+            requestBatchedSync("all"); // Refresh to show newly active event
+            break;
+
     }
 }
 

@@ -15,7 +15,7 @@ type PlayerService struct{}
 // PILLAR 3: Identity & Modular Authority.
 func (s *PlayerService) GetHegemonyPath(role string) string {
 	switch role {
-	case "Intel-Agent", "Bounty Hunter", "Armed-Offender-Squad", "Justice Recruiter", "Justice Commissioner", "Judge", "Warden", "Forensic Analyst", "Tax Auditor", "Sector Peacekeeper":
+	case "Intel-Agent", "Bounty Hunter", "AOS Leader", "Justice Recruiter", "Justice Commissioner", "Judge", "Warden", "Forensic Analyst", "Tax Auditor", "Sector Peacekeeper":
 		return "JUSTICE"
 	case "Gossip", "Fence", "Kidnapper", "Hostage Host", "Lawyer-Commissioner", "Underworld Boss", "Arc-Net Operative", "Smuggler", "Heist Planner", "Launderer":
 		return "UNDERWORLD"

@@ -210,7 +210,8 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 			pPower := getEffectiveServerPower(l, match, placedCard, n.placedPowerIdx, gridIndex)
 			nPower := getEffectiveServerPower(l, match, neighbor, n.neighborPowerIdx, nbIdx)
 
-			// PILLAR 3: Factional Power Scaling (Section 12.A & 12.B)
+	// PILLAR 3: Factional Power Scaling (Section 12.A & 12.B)
+			vsOutlaw := oppWanted >= 15 // Compute before applying bonuses for GetPowerBonus
 			if attackerFaction == "JUSTICE" {
 				// Justice Boost: vs Fallen cards or Outlaws (Wanted >= 15)
 				if neighbor.Fallen || oppWanted >= 15 {
@@ -220,6 +221,15 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 				// Underworld Boost: vs Justice aligned players or Clean signatures (Wanted <= 2)
 				if oppFaction == "JUSTICE" || oppWanted <= 2 {
 					pPower = (pPower * 110) / 100
+				}
+			}
+
+			// PILLAR 3: Justice Card Power Bonus Integration — cumulative per-card bonus vs outlaws
+			if l.Justice != nil && attackerFaction == "JUSTICE" {
+				powerBonus := l.Justice.GetPowerBonus(pID, vsOutlaw)
+				if powerBonus > 0 {
+					l.logAdminAuditLocked("JUSTICE_POWER_BONUS_APPLIED", pID, fmt.Sprintf("+%d power bonus (vs outlaw: %v)", powerBonus, vsOutlaw))
+					pPower += int(powerBonus)
 				}
 			}
 
@@ -330,7 +340,7 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 				cPower := getEffectiveServerPower(l, match, currCard, 0, currIdx)
 				nPower := getEffectiveServerPower(l, match, neighbor, 0, nbIdx)
 
-				// PILLAR 3: Factional Power Scaling in Combo
+		// PILLAR 3: Factional Power Scaling in Combo
 				if attackerFaction == "JUSTICE" {
 					if neighbor.Fallen || oppWanted >= 15 {
 						cPower = (cPower * 110) / 100
@@ -341,7 +351,16 @@ func (l *Lobby) serverCheckCaptures(match *MatchState, gridIndex int, pIdx int) 
 					}
 				}
 
-				if neighbor.Owner != pIdx && cPower > nPower {
+			// PILLAR 3: Justice Card Power Bonus Integration in combo — cumulative per-card bonus vs outlaws
+			if l.Justice != nil && attackerFaction == "JUSTICE" {
+				powerBonus := l.Justice.GetPowerBonus(pID, oppWanted >= 15)
+				if powerBonus > 0 {
+					l.logAdminAuditLocked("JUSTICE_POWER_BONUS_COMBO", pID, fmt.Sprintf("+%d combo power bonus (vs outlaw: %v)", powerBonus, oppWanted >= 15))
+					cPower += int(powerBonus)
+				}
+			}
+
+			if neighbor.Owner != pIdx && cPower > nPower {
 
 					// Fallen Penalty Rule: Captured cards lose 20 Artifact power
 					if match.Rules["Fallen_penalty"] {
@@ -655,16 +674,24 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		if hunterWallet != "" {
 			l.achievementService.CheckBountyHunterAchievementLocked(l, hunterWallet, history.Opponent, targetWanted)
 
-			// CAREER D1: Bounty Hunter — Track XP per bounty capture
+			// CAREER D1: Bounty Hunter — Track XP per bounty capture (standardized via TrackCareerXP)
 			l.ensurePlayerStatsMapsInitialized(hunterWallet)
 			stats := l.leaderboard[hunterWallet]
 			baseXP := 60 + (targetWanted / 5)
-			stats.CareerXP["Bounty Hunter"] += baseXP
 
-			// Career progression milestones (D1: 4 tiers)
+			// $VBV-gated multiplier: scale XP by player's sustained liquidity tier.
+			vbvMultiplier := stats.CareerXP.GetVBVGatingMultiplier()
+			if vbvMultiplier > 1.0 {
+				l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_VBV_MULTIPLIER", hunterWallet, fmt.Sprintf("$VBV-gated XP multiplier: %.2fx (sustained liquidity tier)", vbvMultiplier))
+			}
+			scaledXP := uint64(float64(baseXP) * vbvMultiplier)
+
+			stats.CareerXP.TrackCareerXP("Bounty Hunter", scaledXP)
+
+			// Career progression milestones (D1: 4 tiers — standardized to RoleXP pattern)
 			level := stats.CareerLevel["Bounty Hunter"] + 1
 			const xpPerLevel = 300
-			for stats.CareerXP["Bounty Hunter"] >= level*xpPerLevel && level <= 4 {
+			for stats.CareerXP.RoleXP["Bounty Hunter"] >= level*xpPerLevel && level <= CareerTierBoss {
 				stats.CareerLevel["Bounty Hunter"] = level
 				if cid := l.getClientIDFromWalletLocked(hunterWallet); cid != "" {
 					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>BOUNTY HUNTER PROMOTION:</b> Reached level %d!"}`, level))})
@@ -673,34 +700,38 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 			}
 
 			l.leaderboard[hunterWallet] = stats
-			l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_XP", hunterWallet, fmt.Sprintf("+%d XP (target wanted: %d)", baseXP, targetWanted))
+			l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_XP", hunterWallet, fmt.Sprintf("+%d scaled XP (%.2fx multiplier) from +%d base XP (target wanted: %d)", scaledXP, vbvMultiplier, baseXP, targetWanted))
 
-			// P2-D1 Mechanic Hook: Bounty Hunter tracking speed bonus applied to capture range
+			// P2-D1 Mechanic Hook: Bounty Hunter tracking speed bonus (tier-based) — GetBountyTrackingBonus returns multiplier from $VBV-gate tier
 			if stats.CareerXP != nil {
-				trackingBonus := stats.CareerXP.GetBountyTrackingBonus()
+				trackingBonus := float64(1 + getTierFor(stats.CareerXP, "Bounty Hunter")) // Tier-based tracking speed bonus (tier 0 = ×1 minimum)
 				if trackingBonus > 1.0 {
 					l.logAdminAuditLocked("CAREER_BOunTY_HUNTER_TRACKING_BONUS", hunterWallet, fmt.Sprintf("Tracking speed multiplier: %.2f (tier bonus)", trackingBonus))
-					if cid := l.getClientIDFromLocked(hunterWallet); cid != "" {
+				if cid := l.getClientIDFromWalletLocked(hunterWallet); cid != "" {
 						l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🎯 <b>BOUNTY HUNTER TRACKING BONUS:</b> %dx tracking speed!"}`, trackingBonus))})
 					}
 				}
 			}
 
-			// P2-A: Rival Pair hook — Bounty Hunter vs Criminal defenders
-			if rivalXP, pair, isRival := EvaluateCrossCareerXP("Bounty Hunter", stats.JobRole, baseXP, &stats, l.leaderboard[match.P2Wallet]); isRival {
-				stats.CareerXP["Bounty Hunter"] += rivalXP - baseXP
-				l.logAdminAuditLocked("RIVAL_BOunTY_HUNTER_XP", hunterWallet, fmt.Sprintf("+%d bonus XP (rival pair: %s)", pair))
+			// P2-A: Rival Pair hook — Bounty Hunter vs Criminal defenders (standardized via ComputeScaledXP for Task 4301).
+			if rivalXP, pair, isRival := EvaluateCrossCareerXP("Bounty Hunter", stats.JobRole, scaledXP, &stats, l.leaderboard[match.P2Wallet]); isRival {
+				rivalBonus := uint64(int(scaledXP) - int(rivalXP))
+				if rivalBonus > 0 && pair != "" {
+					scaledRBonus := stats.CareerXP.ComputeScaledXP(rivalBonus, "Bounty Hunter")
+					stats.CareerXP.TrackCareerXP("Bounty Hunter", scaledRBonus)
+					l.logAdminAuditLocked("RIVAL_BOUNTY_HUNTER_XP", hunterWallet, fmt.Sprintf("+%d bonus XP (rival pair: %s)", rivalBonus))
+				}
 			}
 
-			// P2-E1: Bounty Hunter ↔ Kidnapper (enemy pair) — TrackRivalInteraction caller
-			// When bounty hunter captures a card belonging to a player with Kidnapper career, grant rival XP
+			// P2-G1: Bounty Hunter ↔ Kidnapper (enemy pair) — EvaluateCrossCareerXP hook (standardized via ComputeScaledXP for Task 4301).
 			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
 				p2Stats := l.leaderboard[match.P2Wallet]
 				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "Kidnapper" || CareerHasRole(p2Stats.CareerXP, "Kidnapper")) {
-					rivalXPDelta, rivalName, _ := TrackRivalInteraction("BountyHunter", "Kidnapper", baseXP, &stats, p2Stats)
-					if rivalXPDelta > 0 {
-						stats.CareerXP["Bounty Hunter"] += rivalXPDelta
-						l.logAdminAuditLocked("RIVAL_BOUNTY_HUNTER_KIDNAPPER", hunterWallet, fmt.Sprintf("Tracking bonus +%d XP (rival: %s)", rivalXPDelta, rivalName))
+					rivalXP, _, isRival := EvaluateCrossCareerXP("Bounty Hunter", p2Stats.JobRole, scaledXP, &stats, p2Stats)
+					if isRival && int(rivalXP) > int(scaledXP) {
+						scaledEnemyBonus := stats.CareerXP.ComputeScaledXP(uint64(int(rivalXP)-int(scaledXP)), "Bounty Hunter")
+						stats.CareerXP.TrackCareerXP("Bounty Hunter", scaledEnemyBonus)
+						l.logAdminAuditLocked("RIVAL_BOUNTY_HUNTER_KIDNAPPER", hunterWallet, fmt.Sprintf("+%d XP enemy bonus (Kidnapper: %s)", rivalXP-baseXP, p2Stats.JobRole))
 					}
 				}
 			}
@@ -728,15 +759,17 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				baseHPXP := uint64(40)
 				cardBonusXP := uint64(len(match.CapturedCards)) * 12
 				hpXP := baseHPXP + cardBonusXP
-				wStats.CareerXP.TrackCareerXP("Heist Planner", hpXP)
+				scaledHpXP := wStats.CareerXP.ComputeScaledXP(hpXP, "Heist Planner")
+				wStats.CareerXP.TrackCareerXP("Heist Planner", scaledHpXP)
 
-				// Evaluate cross-career rival pair: Heist Planner ↔ Warden (hostile)
+				// Evaluate cross-career rival pair: Heist Planner ↔ Warden (hostile). Task 4301.
 				if rivalXP, _, isRival := EvaluateCrossCareerXP("Heist Planner", wStats.JobRole, hpXP, &wStats, nil); isRival {
 					rivalTarget := "Warden"
 					if wStats.JobRole == "Warden" {
 						rivalTarget = wStats.JobRole
 					}
-					wStats.CareerXP.TrackCareerXP("Heist Planner", rivalXP-hpXP)
+					scaledRBonus := wStats.CareerXP.ComputeScaledXP(rivalXP-hpXP, "Heist Planner")
+					wStats.CareerXP.TrackCareerXP("Heist Planner", scaledRBonus)
 					l.logAdminAuditLocked("RIVAL_HEIST_PLANNER_XP", winnerWallet, fmt.Sprintf("+%d bonus XP (rival pair: %s↔%s)", rivalXP-hpXP, "Heist Planner", rivalTarget))
 				}
 
@@ -748,10 +781,7 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 						}
 						l.ensurePlayerStatsMapsInitialized(otherWallet)
 						otherStats := l.leaderboard[otherWallet]
-						if otherStats.JobRole == "Kidnapper" && (wStats.JobRole == "Heist Planner" || CareerHasRole(wStats.CareerXP, "Heist Planner")) {
-							synergyXP := uint64(15)
-							wStats.CareerXP.TrackCareerXP("Heist Planner", synergyXP)
-							otherStats.CareerXP.TrackCareerXP("Kidnapper", synergyXP)
+										otherStats.CareerXP.TrackCareerXP("Kidnapper", synergyXP)
 							l.logAdminAuditLocked("SYNERGY_HEIST_KIDNAP", winnerWallet, fmt.Sprintf("+%d XP team bonus (Kidnapper: %s)", synergyXP, otherWallet))
 							l.leaderboard[otherWallet] = otherStats
 						}
@@ -794,7 +824,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 			if wStats.JobRole == "Hostage Host" || CareerHasRole(wStats.CareerXP, "Hostage Host") {
 				hostageXP := uint64(len(match.CapturedCards)) * 40
 				if hostageXP > 0 {
-					wStats.CareerXP.TrackCareerXP("Hostage Host", hostageXP)
+					scaledHHXP := wStats.CareerXP.ComputeScaledXP(hostageXP, "Hostage Host")
+					wStats.CareerXP.TrackCareerXP("Hostage Host", scaledHHXP)
 					l.logAdminAuditLocked("CAREER_HOSTAGE_HOST_XP", winnerWallet, fmt.Sprintf("+%d XP (captured cards held: %d)", hostageXP, len(match.CapturedCards)))
 
 					// Check for Hostage Host promotion milestone (4 tiers: Hoarder → Collector → Curator → Archivist)
@@ -813,7 +844,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 			// Underworld Career #5: Lawyer-Commissioner — XP per match (legal oversight bonus)
 			if wStats.JobRole == "Lawyer-Commissioner" || CareerHasRole(wStats.CareerXP, "Lawyer-Commissioner") {
 				baseLC := uint64(25)
-				wStats.CareerXP.TrackCareerXP("Lawyer-Commissioner", baseLC)
+				scaledLCScaled := wStats.CareerXP.ComputeScaledXP(baseLC, "Lawyer-Commissioner")
+				wStats.CareerXP.TrackCareerXP("Lawyer-Commissioner", scaledLCScaled)
 
 				// Check for Lawyer-Commissioner promotion milestone (4 tiers: Associate → Partner → Senior → Commissioner)
 				level := wStats.CareerLevel["Lawyer-Commissioner"] + 1
@@ -833,9 +865,21 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 			if wStats.JobRole == "Arc-Net Operative" || CareerHasRole(wStats.CareerXP, "Arc-Net Operative") {
 				cyberDeployBonus := uint64(len(match.CapturedCards)) * 20
 				baseANXP := uint64(20) + cyberDeployBonus
-				wStats.CareerXP.TrackCareerXP("Arc-Net Operative", baseANXP)
+				scaledANXP := wStats.CareerXP.ComputeScaledXP(baseANXP, "Arc-Net Operative")
+				wStats.CareerXP.TrackCareerXP("Arc-Net Operative", scaledANXP)
 
-				// Check for Arc-Net Operative promotion milestone (4 tiers: Novice → Analyst → Operative → Director)
+			// P2-F: Enemy pair reversal — Intel-Agent ↔ Arc-Net Operative (ENEMY, cross-career XP evaluation)
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && CareerHasRole(p2Stats.CareerXP, "Intel-Agent") {
+					_, rivalName, _ := EvaluateCrossCareerXP("Int.Agent", "Arc-Net Operative", baseANXP, &wStats, p2Stats)
+					if rivalName != "" {
+						l.logAdminAuditLocked("RIVAL_INTEL_AGENT_ARCNET_OPERANTE", winnerWallet, fmt.Sprintf("cross-career XP evaluation (rival: %s)", rivalName))
+					}
+				}
+			}
+
+				// Check for Arc-Net Operante promotion milestone (4 tiers: Novice → Analyst → Operative → Director)
 				level := wStats.CareerLevel["Arc-Net Operative"] + 1
 				const anXPPerLevel = 320
 				for wStats.CareerXP.RoleXP["Arc-Net Operative"] >= level*anXPPerLevel && level <= CareerTierBoss {
@@ -859,7 +903,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 					l.logAdminAuditLocked("CAREER_SMUGGLER_TRANSIT_TAX", winnerWallet, fmt.Sprintf("+%d XP, transit tax exemption: %.0f%% (tier bonus)", baseSMXP, taxExemption*100))
 				}
 
-				wStats.CareerXP.TrackCareerXP("Smuggler", baseSMXP)
+				scaledSMP := wStats.CareerXP.ComputeScaledXP(baseSMXP, "Smuggler")
+				wStats.CareerXP.TrackCareerXP("Smuggler", scaledSMP)
 
 				// Check for Smuggler promotion milestone (4 tiers: Runner → Transporter → Captain → Consortium)
 				level := wStats.CareerLevel["Smuggler"] + 1
@@ -884,7 +929,19 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 					wagerCleanXP = 5
 				}
 				totalLA := baseLA + wagerCleanXP
-				wStats.CareerXP.TrackCareerXP("Launderer", totalLA)
+				scaledLAP := wStats.CareerXP.ComputeScaledXP(totalLA, "Launderer")
+				wStats.CareerXP.TrackCareerXP("Launderer", scaledLAP)
+
+			// P2-F: Enemy pair reversal — Tax Auditor ↔ Launderer (ENEMY, cross-career XP evaluation)
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "TaxAuditor" || CareerHasRole(p2Stats.CareerXP, "TaxAuditor")) {
+					_, rivalName, _ := EvaluateCrossCareerXP("TaxAuditor", "Launderer", totalLA, &wStats, p2Stats)
+					if rivalName != "" {
+						l.logAdminAuditLocked("RIVAL_TAX_AUDITOR_LAUNDERER", winnerWallet, fmt.Sprintf("cross-career XP evaluation (rival: %s)", rivalName))
+					}
+				}
+			}
 
 				// Check for Launderer promotion milestone (4 tiers: Cleaner → Processor → Director → Shadow Bank)
 				level := wStats.CareerLevel["Launderer"] + 1
@@ -931,7 +988,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 			if wStats.JobRole == "Warden" || CareerHasRole(wStats.CareerXP, "Warden") {
 				captureXP := uint64(len(match.CapturedCards)) * 25
 				if captureXP > 0 {
-					wStats.CareerXP.TrackCareerXP("Warden", captureXP)
+					scaledWP := wStats.CareerXP.ComputeScaledXP(captureXP, "Warden")
+					wStats.CareerXP.TrackCareerXP("Warden", scaledWP)
 
 					// P2-D3 Mechanic Hook: Warden detention duration multiplier applied to captures
 					detentionBonus := wStats.CareerXP.GetWardenDetentionBonus()
@@ -951,7 +1009,8 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				baseAOSXP := uint64(80)
 				ratioBonus := uint64(float64(len(match.CapturedCards)) * 20.0)
 				aosXP := baseAOSXP + ratioBonus
-				wStats.CareerXP.TrackCareerXP("AOS Leader", aosXP)
+				scaledAOSP := wStats.CareerXP.ComputeScaledXP(aosXP, "AOS Leader")
+				wStats.CareerXP.TrackCareerXP("AOS Leader", scaledAOSP)
 
 				// Check for AOS promotion milestone
 				level := wStats.CareerLevel["AOS Leader"] + 1
@@ -967,7 +1026,7 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				l.logAdminAuditLocked("CAREER_AOS_XP", winnerWallet, fmt.Sprintf("+%d XP (captures: %d)", aosXP, len(match.CapturedCards)))
 			}
 
-			// ForensicAnalyst: XP per capture analysis (evidence gathering efficiency)
+			// ForensicAnalyst: XP per capture analysis (evidence gathering efficiency). Task 4301.
 			if wStats.JobRole == "ForensicAnalyst" || CareerHasRole(wStats.CareerXP, "ForensicAnalyst") {
 				baseFA := uint64(35)
 				evidenceBonus := uint64(len(match.CapturedCards)) * 18
@@ -977,6 +1036,9 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				evidenceAccuracy := wStats.CareerXP.GetEvidenceAccuracyBonus()
 				if evidenceAccuracy > 1.0 {
 					faXP = uint64(float64(faXP) * evidenceAccuracy)
+
+					// Task 4301: Scale with career tier after accuracy multiplier applied.
+					scaledFAP := wStats.CareerXP.ComputeScaledXP(faXP, "ForensicAnalyst")
 					l.logAdminAuditLocked("CAREER_FORENSIC_ANALYST_EVIDENCE_BONUS", winnerWallet, fmt.Sprintf("+%d XP (evidence accuracy: %.2fx multiplier)", faXP, evidenceAccuracy))
 				}
 				level := wStats.CareerLevel["ForensicAnalyst"] + 1
@@ -997,7 +1059,20 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				basePKXP := uint64(50)
 				pkBonusXP := uint64(len(match.CapturedCards)) * 15
 				pkXP := basePKXP + pkBonusXP
-				wStats.CareerXP.TrackCareerXP("Sector Peacekeeper", pkXP)
+				scaledPKP := wStats.CareerXP.ComputeScaledXP(pkXP, "Sector Peacekeeper")
+				wStats.CareerXP.TrackCareerXP("Sector Peacekeeper", scaledPKP)
+
+				// P2-G2: Enemy pair reversal — Sector Peacekeeper ↔ Smuggler (ENEMY, cross-career XP evaluation)
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "Smuggler" || CareerHasRole(p2Stats.CareerXP, "Smuggler")) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("Sector Peacekeeper", p2Stats.JobRole, pkXP, &wStats, p2Stats)
+					if isRival && rivalXP > pkXP {
+						wStats.CareerXP.TrackCareerXP("Sector Peacekeeper", uint64(rivalXP-pkXP))
+						l.logAdminAuditLocked("RIVAL_SECTOR_PEACEKEEPER_SMUGGLER", winnerWallet, fmt.Sprintf("+%d XP enemy bonus (Smuggler: %s)", rivalXP-pkXP, p2Stats.JobRole))
+					}
+				}
+			}
 
 				// Check for Sector Peacekeeper promotion milestone
 				level := wStats.CareerLevel["Sector Peacekeeper"] + 1
@@ -1010,89 +1085,276 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 					level++
 				}
 
-				l.logAdminAuditLocked("CAREER_SECTOR_PEACEKEEPER_XP", winnerWallet, fmt.Sprintf("+%d XP (captures: %d)", pkXP, len(match.CapturedCards)))
+			l.logAdminAuditLocked("CAREER_SECTOR_PEACEKEEPER_XP", winnerWallet, fmt.Sprintf("+%d XP (captures: %d)", pkXP, len(match.CapturedCards)))
+		}
+
+		// ============================================================================
+		// JUSTICE CAREERS D1-D6 — Active Hooks
+		// ============================================================================
+
+		// P2-D1: Bounty Hunter — XP per capture + scaling for high-Wanted targets. Task 4301.
+		if wStats.JobRole == "BountyHunter" || CareerHasRole(wStats.CareerXP, "BountyHunter") {
+			baseBH := uint64(50)
+			wantedBonus := uint64(match.TargetWanted/10) * 3
+			bhXP := baseBH + wantedBonus
+
+			// $VBV-gated multiplier applied via ComputeScaledXP
+			scaledBHP := wStats.CareerXP.ComputeScaledXP(bhXP, "BountyHunter")
+			wStats.CareerXP.TrackCareerXP("BountyHunter", scaledBHP)
+
+			// P2-A: Enemy pair hook — Bounty Hunter ↔ Kidnapper (ENEMY, tracking bonus at tier≥3)
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "Kidnapper" || CareerHasRole(p2Stats.CareerXP, "Kidnapper")) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("BountyHunter", p2Stats.JobRole, bhXP, &wStats, p2Stats)
+					if isRival && rivalXP > bhXP {
+						wStats.CareerXP.TrackCareerXP("BountyHunter", uint64(rivalXP-bhXP))
+						l.logAdminAuditLocked("RIVAL_BOUNTY_HUNTER_KIDNAPPER", winnerWallet, fmt.Sprintf("+%d XP enemy bonus (Kidnapper: %s)", rivalXP-bhXP, p2Stats.JobRole))
+					}
+				}
 			}
 
-			// ============================================================================
-			// JUSTICE CAREERS D7-D10 — Placeholder Hooks
-			// These are stub implementations ready for expansion.
-			// ============================================================================
+			// Tier-based tracking speed bonus display
+			tier := wStats.CareerXP.GetCareerTier("BountyHunter")
+			trackingBonus := float64(1 + tier)
+			if trackingBonus > 1.0 {
+				l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_TRACKING_SPEED", winnerWallet, fmt.Sprintf("+%d XP (tracking speed bonus: %.2fx)", bhXP, trackingBonus))
+			}
 
-			// D7: Circuit Judge — XP per match resolved (judicial oversight)
-			if wStats.JobRole == "Circuit Judge" || CareerHasRole(wStats.CareerXP, "Circuit Judge") {
-				baseJXP := uint64(45)
-				wStats.CareerXP.TrackCareerXP("Circuit Judge", baseJXP)
+			// Check for Bounty Hunter promotion milestone
+			level := wStats.CareerLevel["BountyHunter"] + 1
+			const bhXPPerLevel = 300
+			for wStats.CareerXP.RoleXP["BountyHunter"] >= level*bhXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["BountyHunter"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>BOUNTY HUNTER PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
 
-				// Check for Circuit Judge promotion milestone
-				level := wStats.CareerLevel["Circuit Judge"] + 1
-				const jXPPerLevel = 380
-				for wStats.CareerXP.RoleXP["Circuit Judge"] >= level*jXPPerLevel && level <= CareerTierBoss {
-					wStats.CareerLevel["Circuit Judge"] = level
-					if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
-						l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>CIRCUIT JUDGE PROMOTION:</b> Reached level %d!"}`, level))})
+			l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_XP", winnerWallet, fmt.Sprintf("+%d XP (base: %d, wanted bonus: %d)", bhXP, baseBH, wantedBonus))
+		}
+
+		// ============================================================================
+		// JUSTICE CAREERS D7-D10 — Active Hooks (Justice Recruiter, Intel-Agent, Forensic Analyst)
+		// ============================================================================
+
+		// PILLAR 13 Task 4501: Justice Recruiter — recruit justice-aligned players → +XP per recruit.
+		if wStats.JobRole == "JusticeRecruiter" || CareerHasRole(wStats.CareerXP, "JusticeRecruiter") {
+			baseJR := uint64(25) // base XP per match (recruitment activity bonus)
+
+			scaledJRP := wStats.CareerXP.ComputeScaledXP(baseJR, "JusticeRecruiter")
+			wStats.CareerXP.TrackCareerXP("JusticeRecruiter", scaledJRP)
+
+			// Ally pair hook: Justice Recruiter ↔ Mutation Log Auditor (ally pair — bonus at tier≥3).
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "MutationAuditor" || CareerHasRole(p2Stats.CareerXP, "MutationAuditor")) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("JusticeRecruiter", p2Stats.JobRole, scaledJRP, &wStats, p2Stats)
+					if isRival && rivalXP > 0 {
+						wStats.CareerXP.TrackCareerXP("JusticeRecruiter", uint64(rivalXP))
+						l.logAdminAuditLocked("ALLY_JUSTICE_RECRUITER_MUTATION_AUDITOR", winnerWallet, fmt.Sprintf("+%d XP ally bonus (Mutation Auditor: %s)", rivalXP, p2Stats.JobRole))
 					}
-					level++
 				}
 
-				l.logAdminAuditLocked("CAREER_CIRCUIT_JUDGE_XP", winnerWallet, fmt.Sprintf("+%d XP (match resolved)", baseJXP))
+				// PILLAR 13 Task 4501-B: Check if target recruited a justice-aligned player → recruitment bonus.
+				if IsJusticeAligned(p2Stats.JobRole) {
+					recruitBonus := uint64(float64(scaledJRP) * GetRecruitmentBonus())
+					wStats.CareerXP.TrackCareerXP("JusticeRecruiter", recruitBonus)
+					l.logAdminAuditLocked("JUSTICE_RECRUITER_ALIGNED_RECRUIT", winnerWallet, fmt.Sprintf("+%d XP (recruited justice-aligned: %s)", recruitBonus, p2Stats.JobRole))
+				}
 			}
 
-			// D8: Magistrate — XP per territory control (administrative jurisdiction)
-			if wStats.JobRole == "Magistrate" || CareerHasRole(wStats.CareerXP, "Magistrate") {
-				baseMXP := uint64(50)
-				wStats.CareerXP.TrackCareerXP("Magistrate", baseMXP)
+			tier := wStats.CareerXP.GetCareerTier("JusticeRecruiter")
+			l.logAdminAuditLocked("CAREER_JUSTICE_RECRUITER_XP", winnerWallet, fmt.Sprintf("+%d XP (tier: %d)", scaledJRP, tier))
+		}
 
-				// Check for Magistrate promotion milestone
-				level := wStats.CareerLevel["Magistrate"] + 1
-				const mXPPerLevel = 350
-				for wStats.CareerXP.RoleXP["Magistrate"] >= level*mXPPerLevel && level <= CareerTierBoss {
-					wStats.CareerLevel["Magistrate"] = level
-					if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
-						l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>MAGISTRATE PROMOTION:</b> Reached level %d!"}`, level))})
+		// PILLAR 13 Task 4502: Intel-Agent — cyber-intercept event on battle win.
+		if wStats.JobRole == "IntelAgent" || CareerHasRole(wStats.CareerXP, "IntelAgent") {
+			baseIA := uint64(55) // base XP per intercept opportunity
+
+			scaledIAP := wStats.CareerXP.ComputeScaledXP(baseIA, "IntelAgent")
+			wStats.CareerXP.TrackCareerXP("IntelAgent", scaledIAP)
+
+			tier := wStats.CareerXP.GetCareerTier("IntelAgent")
+			decryptMult := GetDecryptBonus(tier)
+
+			l.logAdminAuditLocked("INTEL_AGENT_CYBER_INTERCEPT", winnerWallet, fmt.Sprintf("+%d XP (decrypt bonus: %.2fx)", scaledIAP, decryptMult))
+
+			// PILLAR 13 Task 4502-C: Decrypt vision — Arc-Net Operative synergy.
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.CareerXP != nil && (p2Stats.JobRole == "ArcNetOperative" || CareerHasRole(p2Stats.CareerXP, "ArcNetOperative")) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("IntelAgent", p2Stats.JobRole, scaledIAP, &wStats, p2Stats)
+					if isRival && rivalXP > 0 {
+						wStats.CareerXP.TrackCareerXP("IntelAgent", uint64(rivalXP))
+						l.logAdminAuditLocked("ALLY_INTEL_AGENT_ARCNET_OPERATIVE", winnerWallet, fmt.Sprintf("+%d XP ally synergy (Arc-Net Operative: %s)", rivalXP, p2Stats.JobRole))
 					}
-					level++
+
+					// Arc-Net vision decryption bonus — shared visibility multiplier.
+					if decryptMult > 1.0 {
+						visionBonus := uint64(float64(scaledIAP) * (decryptMult - 1.0) / 2.0) // half of decrypted value as bonus
+						wStats.CareerXP.TrackCareerXP("IntelAgent", visionBonus)
+						l.logAdminAuditLocked("INTEL_AGENT_DECRYPT_VISION_BONUS", winnerWallet, fmt.Sprintf("+%d XP (vision decryption: %.2fx)", visionBonus, decryptMult))
+					}
 				}
 
-				l.logAdminAuditLocked("CAREER_MAGISTRATE_XP", winnerWallet, fmt.Sprintf("+%d XP (territory administered)", baseMXP))
+				// PILLAR 13 Task 4502-C-ENEMY: Intel-Agent ↔ Arc-Net Operative — track rival if enemy.
+				if !IsJusticeAligned(p2Stats.JobRole) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("IntelAgent", p2Stats.JobRole, scaledIAP, &wStats, p2Stats)
+					if isRival && rivalXP > 0 {
+						wStats.CareerXP.TrackCareerXP("IntelAgent", uint64(rivalXP))
+						l.logAdminAuditLocked("ENEMY_INTEL_AGENT_CYBER_INTERCEPT_BONUS", winnerWallet, fmt.Sprintf("+%d XP enemy intercept bonus (target: %s)", rivalXP, p2Stats.JobRole))
+					}
+				}
 			}
 
-			// D9: Compliance Auditor — XP per regulatory audit completion
-			if wStats.JobRole == "ComplianceAuditor" || CareerHasRole(wStats.CareerXP, "ComplianceAuditor") {
-				baseCA := uint64(40)
-				wStats.CareerXP.TrackCareerXP("ComplianceAuditor", baseCA)
+			// Check for Intel-Agent promotion milestone.
+			level := wStats.CareerLevel["IntelAgent"] + 1
+			const iaXPPerLevel = 340
+			for wStats.CareerXP.RoleXP["IntelAgent"] >= level*iaXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["IntelAgent"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>INTEL-AGENT PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
 
-				// Check for Compliance Auditor promotion milestone
-				level := wStats.CareerLevel["ComplianceAuditor"] + 1
-				const caXPPerLevel = 360
-				for wStats.CareerXP.RoleXP["ComplianceAuditor"] >= level*caXPPerLevel && level <= CareerTierBoss {
-					wStats.CareerLevel["ComplianceAuditor"] = level
-					if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
-						l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>COMPLIANCE AUDITOR PROMOTION:</b> Reached level %d!"}`, level))})
+			l.logAdminAuditLocked("CAREER_INTEL_AGENT_XP", winnerWallet, fmt.Sprintf("+%d XP (cyber-intercept)", scaledIAP))
+		}
+
+		// PILLAR 13 Task 4503: Forensic Analyst — evidence tracking on raid.
+		if wStats.JobRole == "ForensicAnalyst" || CareerHasRole(wStats.CareerXP, "ForensicAnalyst") {
+			baseFA := uint64(45) // base XP per forensic analysis
+
+			scaledFAP := wStats.CareerXP.ComputeScaledXP(baseFA, "ForensicAnalyst")
+			wStats.CareerXP.TrackCareerXP("ForensicAnalyst", scaledFAP)
+
+			tier := wStats.CareerXP.GetCareerTier("ForensicAnalyst")
+			evidenceMult := GetEvidenceAccuracyBonus(tier)
+
+			l.logAdminAuditLocked("FORENSIC_ANALYST_EVIDENCE_TRACKING", winnerWallet, fmt.Sprintf("+%d XP (evidence accuracy: %.2fx)", scaledFAP, evidenceMult))
+
+			// PILLAR 13 Task 4503-C: Forensic Analyst ↔ Gossip — enemy pair hook.
+			if match.P2Wallet != "" && l.leaderboard[match.P2Wallet] != nil {
+				p2Stats := l.leaderboard[match.P2Wallet]
+				if p2Stats.JobRole == "Gossip" || CareerHasRole(p2Stats.CareerXP, "Gossip") {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("ForensicAnalyst", p2Stats.JobRole, scaledFAP, &wStats, p2Stats)
+					if isRival && rivalXP > 0 {
+						wStats.CareerXP.TrackCareerXP("ForensicAnalyst", uint64(rivalXP))
+						l.logAdminAuditLocked("ENEMY_FORENSIC_ANALYST_GOSSIP_EVIDENCE_BONUS", winnerWallet, fmt.Sprintf("+%d XP evidence bonus (Gossip: %s)", rivalXP, p2Stats.JobRole))
+
+						// Double-clean effectiveness at Expert+ tier.
+						if evidenceMult > 1.0 {
+							evidenceBonus := uint64(float64(scaledFAP) * (evidenceMult - 1.0))
+							wStats.CareerXP.TrackCareerXP("ForensicAnalyst", evidenceBonus)
+							l.logAdminAuditLocked("FORENSIC_DOUBLE_CLEAN_BONUS", winnerWallet, fmt.Sprintf("+%d XP double-clean vs Gossip records", evidenceBonus))
+						}
 					}
-					level++
 				}
 
-				l.logAdminAuditLocked("CAREER_COMPLIANCE_AUDITOR_XP", winnerWallet, fmt.Sprintf("+%d XP (audit completed)", baseCA))
-			}
-
-			// D10: Ethics Overseer — XP per compliance verification
-			if wStats.JobRole == "EthicsOverseer" || CareerHasRole(wStats.CareerXP, "EthicsOverseer") {
-				baseEO := uint64(35)
-				wStats.CareerXP.TrackCareerXP("EthicsOverseer", baseEO)
-
-				// Check for Ethics Overseer promotion milestone
-				level := wStats.CareerLevel["EthicsOverseer"] + 1
-				const eoXPPerLevel = 340
-				for wStats.CareerXP.RoleXP["EthicsOverseer"] >= level*eoXPPerLevel && level <= CareerTierBoss {
-					wStats.CareerLevel["EthicsOverseer"] = level
-					if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
-						l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>ETHICS OVERSEER PROMOTION:</b> Reached level %d!"}`, level))})
+				// PILLAR 13 Task 4503-C-ENEMY: Forensic Analyst ↔ Smuggler — track rival if enemy.
+				if !IsJusticeAligned(p2Stats.JobRole) {
+					rivalXP, _, isRival := EvaluateCrossCareerXP("ForensicAnalyst", p2Stats.JobRole, scaledFAP, &wStats, p2Stats)
+					if isRival && rivalXP > 0 {
+						wStats.CareerXP.TrackCareerXP("ForensicAnalyst", uint64(rivalXP))
+						l.logAdminAuditLocked("ENEMY_FORENSIC_ANALYST_RIVAL_TRACKING", winnerWallet, fmt.Sprintf("+%d XP evidence tracking (target: %s)", rivalXP, p2Stats.JobRole))
 					}
-					level++
 				}
-
-				l.logAdminAuditLocked("CAREER_ETHICS_OVERSEER_XP", winnerWallet, fmt.Sprintf("+%d XP (ethics verified)", baseEO))
 			}
+
+			// Check for Forensic Analyst promotion milestone.
+			level := wStats.CareerLevel["ForensicAnalyst"] + 1
+			const faXPPerLevel = 360
+			for wStats.CareerXP.RoleXP["ForensicAnalyst"] >= level*faXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["ForensicAnalyst"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>FORENSIC ANALYST PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
+
+			l.logAdminAuditLocked("CAREER_FORENSIC_ANALYST_XP", winnerWallet, fmt.Sprintf("+%d XP (evidence tracked)", scaledFAP))
+		}
+
+		// D7: Judge — XP per match resolved (judicial oversight)
+		if wStats.JobRole == "Judge" || CareerHasRole(wStats.CareerXP, "Judge") {
+			baseJXP := uint64(45)
+			scaledJP := wStats.CareerXP.ComputeScaledXP(baseJXP, "Judge")
+			wStats.CareerXP.TrackCareerXP("Judge", scaledJP)
+
+			// Check for Judge promotion milestone
+			level := wStats.CareerLevel["Judge"] + 1
+			const jXPPerLevel = 380
+			for wStats.CareerXP.RoleXP["Judge"] >= level*jXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["Judge"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>JUDGE PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
+
+			l.logAdminAuditLocked("CAREER_JUDGE_XP", winnerWallet, fmt.Sprintf("+%d XP (match resolved)", baseJXP))
+		}
+
+		// D8: Judge — XP per territory control (administrative jurisdiction). Task 4301.
+		if wStats.JobRole == "Judge" || CareerHasRole(wStats.CareerXP, "Judge") {
+			baseMXP := uint64(50)
+			scaledMP := wStats.CareerXP.ComputeScaledXP(baseMXP, "Judge")
+			wStats.CareerXP.TrackCareerXP("Judge", scaledMP)
+
+			// Check for Judge promotion milestone
+			level := wStats.CareerLevel["Judge"] + 1
+			const mXPPerLevel = 350
+			for wStats.CareerXP.RoleXP["Judge"] >= level*mXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["Judge"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>JUDGE PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
+
+			l.logAdminAuditLocked("CAREER_JUDGE_XP", winnerWallet, fmt.Sprintf("+%d XP (territory administered)", baseMXP))
+		}
+
+		// D9: Compliance Auditor — XP per regulatory audit completion
+		if wStats.JobRole == "ComplianceAuditor" || CareerHasRole(wStats.CareerXP, "ComplianceAuditor") {
+			baseCA := uint64(40)
+			scaledCAP := wStats.CareerXP.ComputeScaledXP(baseCA, "ComplianceAuditor")
+			wStats.CareerXP.TrackCareerXP("ComplianceAuditor", scaledCAP)
+
+			// Check for Compliance Auditor promotion milestone
+			level := wStats.CareerLevel["ComplianceAuditor"] + 1
+			const caXPPerLevel = 360
+			for wStats.CareerXP.RoleXP["ComplianceAuditor"] >= level*caXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["ComplianceAuditor"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>COMPLIANCE AUDITOR PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
+
+			l.logAdminAuditLocked("CAREER_COMPLIANCE_AUDITOR_XP", winnerWallet, fmt.Sprintf("+%d XP (audit completed)", baseCA))
+		}
+
+		// D10: Ethics Overseer — XP per compliance verification
+		if wStats.JobRole == "EthicsOverseer" || CareerHasRole(wStats.CareerXP, "EthicsOverseer") {
+			baseEO := uint64(35)
+			scaledEOP := wStats.CareerXP.ComputeScaledXP(baseEO, "EthicsOverseer")
+			wStats.CareerXP.TrackCareerXP("EthicsOverseer", scaledEOP)
+
+			// Check for Ethics Overseer promotion milestone
+			level := wStats.CareerLevel["EthicsOverseer"] + 1
+			const eoXPPerLevel = 340
+			for wStats.CareerXP.RoleXP["EthicsOverseer"] >= level*eoXPPerLevel && level <= CareerTierBoss {
+				wStats.CareerLevel["EthicsOverseer"] = level
+				if cid := l.getClientIDFromWalletLocked(winnerWallet); cid != "" {
+					l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"⭐ <b>ETHICS OVERSEER PROMOTION:</b> Reached level %d!"}`, level))})
+				}
+				level++
+			}
+
+			l.logAdminAuditLocked("CAREER_ETHICS_OVERSEER_XP", winnerWallet, fmt.Sprintf("+%d XP (ethics verified)", baseEO))
 		}
 	}
 
@@ -1115,8 +1377,9 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 		if taxStats.CareerXP != nil {
 			// TaxAuditor: XP per patrol match (administrative enforcement presence)
 			if taxStats.JobRole == "TaxAuditor" || CareerHasRole(taxStats.CareerXP, "TaxAuditor") {
-				baseTA := uint64(30) // Base patrol XP
-				taxStats.CareerXP.TrackCareerXP("TaxAuditor", baseTA)
+				baseTA := uint64(30) // Base patrol XP. Task 4301.
+				scaledTAP := taxStats.CareerXP.ComputeScaledXP(baseTA, "TaxAuditor")
+				taxStats.CareerXP.TrackCareerXP("TaxAuditor", scaledTAP)
 
 				// Check for TaxAuditor promotion milestone (5 tiers: Junior → Auditor → Senior → Chief → Commissioner)
 				level := taxStats.CareerLevel["TaxAuditor"] + 1
@@ -1132,6 +1395,23 @@ func (l *Lobby) verifyWinner(match *MatchState) {
 				l.logAdminAuditLocked("CAREER_TAX_AUDITOR_XP", taxAuditorWallet, fmt.Sprintf("+%d XP (patrol match won)", baseTA))
 			}
 		}
+	}
+
+	// Determine winner wallet for liquidity sampling before money changes hands.
+	winnerWalletForSample := ""
+	if p1 != p2 {
+		winnerWalletForSample = match.P1Wallet
+		if p2 > p1 {
+			winnerWalletForSample = match.P2Wallet
+		}
+	} else if history.WinnerID != "" {
+		winnerWalletForSample = l.wallets[history.WinnerID]
+	}
+
+	// $VBV-Gate: Liquidity sampling — record micro-state before economic distribution.
+	// Ensures every battle XP event also samples ecosystem liquidity for $VBV-gate integrity.
+	if winnerWalletForSample != "" && l.UpdateLiquiditySample != nil {
+		l.UpdateLiquiditySample(winnerWalletForSample)
 	}
 
 	// PILLAR 1: Industrial Loop (Winning Side Distribution).

@@ -289,6 +289,10 @@ func (l *Lobby) run() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
+	// PILLAR 7-D: AI Autonomous Economy — Behavioral loop ticker (~60s per citizen cycle)
+	citizenBehaviorTicker := time.NewTicker(30 * time.Second)
+	defer citizenBehaviorTicker.Stop()
+
 	matchmakingTicker := time.NewTicker(5 * time.Second)
 	defer matchmakingTicker.Stop()
 	vaultCheckTicker := time.NewTicker(5 * time.Minute)
@@ -336,6 +340,11 @@ func (l *Lobby) run() {
 			go l.oracleService.SaveOnboardedWallets(l)
 			go l.saveLeaderboard()  // PILLAR 3: Persistent Behavioral Analysis
 			go l.saveEconomyState() // PILLAR 2: Persistent Virtual Ledger
+		case <-citizenBehaviorTicker.C:
+			if l.aiEngine != nil {
+				l.aiEngine.UpdateBehavioralLoop(l)
+			}
+
 		case <-vaultCheckTicker.C:
 			go l.oracleService.CheckVaultBalanceOnChain(l) // Monitor $VBV Reward Pool
 			go l.oracleService.CheckNativeVaultBalanceOnChain(l)

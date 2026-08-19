@@ -6,6 +6,8 @@ config.yaml
 config.json
 ai_exclude
 .clinerules
+.clineignore
+.dockerignore
 # Local Persistence & State (Pillar 5)
 # Authoritative state is reconstructed from blockchain notes.
 data/

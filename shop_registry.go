@@ -218,6 +218,23 @@ var GlobalShopRegistry = map[string]ShopItem{
 		RequiredRole: "Manager", RequiredMojo: 400,
 	},
 
+	// P2-D1: Bounty Hunter shop items (Justice Hegemony Path)
+	"bounty_license": {
+		ID: "bounty_license", Name: "Bounty License", Price: 50000, ClubType: "Justice",
+		Description: "Authorizes active bounty tracking on a target wallet. Recurring cost per session.", MojoBonus: 60,
+		RequiredRole: "Bounty Hunter", RequiredMojo: 200,
+	},
+	"tracker_drone": {
+		ID: "tracker_drone", Name: "Tracker Drone", Price: 500, ClubType: "Justice",
+		Description: "Deploys a tracking drone on target for 2 hours. Reveals location updates during this window.", MojoBonus: 40,
+		RequiredRole: "Bounty Hunter", RequiredMojo: 300,
+	},
+	"warrant_stamper": {
+		ID: "warrant_stamper", Name: "Warden Stamper", Price: 1000, ClubType: "Justice",
+		Description: "Instantly stamps a warrant on target — forces immediate justice audit. One-time use.", MojoBonus: 80,
+		RequiredRole: "Bounty Hunter", RequiredMojo: 500, IsMasterTier: true,
+	},
+
 	// P2-D7: Intel-Agent items
 	"intel_intercept_kit": {
 		ID: "intel_intercept_kit", Name: "Cyber-Intercept Kit", Price: 1500, ClubType: "Justice",
@@ -294,9 +311,19 @@ var GlobalShopRegistry = map[string]ShopItem{
 		Description: "Full-spectrum currency scanner for Warden. +30% counterfeit detection chance.", MojoBonus: 50,
 		RequiredRole: "Warden", RequiredMojo: 400,
 	},
-}
 
-// Hardware / Security
+	// Tax Auditor P2-D2 shop items (audit_warrant 800K, compliance_notice 300K)
+	"audit_warrant": {
+		ID: "audit_warrant", Name: "Audit Warrant", Price: 800000, ClubType: "Justice",
+		Description: "Authorizes deep-audit of target's hidden revenue. Reveals laundered funds at GetAuditPrecisionBonus tier multiplier.", MojoBonus: 75,
+		RequiredRole: "Tax Auditor", RequiredMojo: 400,
+	},
+	"compliance_notice": {
+		ID: "compliance_notice", Name: "Compliance Notice", Price: 300000, ClubType: "Justice",
+		Description: "Forces target organization to submit financial records for review. Unlocks compliance audit events.", MojoBonus: 50,
+		RequiredRole: "Tax Auditor", RequiredMojo: 250,
+	},
+}
 
 func init() {
 	DLCRegistry = make(map[string]DLCProduct) // Initialize the map

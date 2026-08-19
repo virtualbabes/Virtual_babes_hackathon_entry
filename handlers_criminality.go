@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -151,66 +152,71 @@ func (l *Lobby) handleKidnapRequest(env *Envelope) {
 	}
 	perpStats.KidnappedCards[targetCardID] = victimWallet
 
-	// Career XP: Kidnapper (Underworld #3) gains XP per successful hostage capture
-	l.TrackCareerXP(perpWallet, "Kidnapper", 80)
-
-	// P2-A: Rival Pair — Kidnapper ↔ Bounty Hunter / Forensic Analyst / Warden (antagonistic)
-	if perpStats.CareerXP != nil && victimStats.CareerXP != nil {
-		rxp, pair, isRival := EvaluateCrossCareerXP("Kidnapper", victimStats.JobRole, 80, perpStats, victimStats)
-		if isRival && rxp > 80 {
-			l.TrackCareerXP(perpWallet, "Kidnapper", rxp-80)
+		rxp, pair, isRival := EvaluateCrossCareerXP("Kidnapper", victimStats.JobRole, kidnapBase, perpStats, victimStats)
+		if isRival && rxp > int(kidnapBase) {
+			scaledRBonus := l.leaderboard[perpWallet].CareerXP.ComputeScaledXP(uint64(rxp-int(kidnapBase)), "Kidnapper")
+			l.TrackCareerXP(perpWallet, "Kidnapper", scaledRBonus)
 			_ = pair // Suppress unused warning if needed
 		}
 	}
 
-	// P2-A: Rival Pair — Warden (Justice D3) gains XP monitoring kidnapping events
-	l.TrackCareerXP(perpWallet, "Warden", 25)
+	// P2-A: Rival Pair — Warden (Justice D3) gains XP monitoring kidnapping events. Task 4301.
+	wardenBase := uint64(25)
+	scaledWPNP := l.leaderboard[perpWallet].CareerXP.ComputeScaledXP(wardenBase, "Warden")
+	l.TrackCareerXP(perpWallet, "Warden", scaledWPNP)
 
-	// Underworld #6 Racketeer — earns XP extorting protection money per kidnapping
-	l.TrackCareerXP(perpWallet, "Racketeer", 40)
+	// Underworld #6 Racketeer — earns XP extorting protection money per kidnapping. Task 4301.
+	rackBase := uint64(40)
+	scaledRacNP := l.leaderboard[perpWallet].CareerXP.ComputeScaledXP(rackBase, "Racketeer")
+	l.TrackCareerXP(perpWallet, "Racketeer", scaledRacNP)
 
-	// P2-A: Rival Pair — Smuggler ↔ Sector Peacekeeper (antagonistic)
+	// P2-A: Rival Pair — Smuggler ↔ Sector Peacekeeper (antagonistic). Task 4301.
 	if perpStats.CareerXP != nil {
 		rxp3, _, _ := EvaluateCrossCareerXP("Smuggler", victimStats.JobRole, 30, perpStats, victimStats)
 		if rxp3 > 30 {
-			l.TrackCareerXP(perpWallet, "Smuggler", rxp3-30)
+			scaledSMP := l.leaderboard[perpWallet].CareerXP.ComputeScaledXP(uint64(rxp3-30), "Smuggler")
+			l.TrackCareerXP(perpWallet, "Smuggler", scaledSMP)
 		}
 	}
 
-	// Justice D5 Forensic Analyst — forensic trace reward at detection time
+	// Justice D5 Forensic Analyst — forensic trace reward at detection time. Task 4301.
 	if l.leaderboard != nil {
 		for statsWallet := range l.leaderboard {
 			ws := l.leaderboard[statsWallet]
 			if ws.JobRole == "Forensic Analyst" {
-				l.TrackCareerXP(statsWallet, "Forensic Analyst", 60)
+				scaledFANP := ws.CareerXP.ComputeScaledXP(60, "Forensic Analyst")
+				l.TrackCareerXP(statsWallet, "Forensic Analyst", scaledFANP)
 			}
 		}
 	}
 
-	// Justice D3 Warden — monitors all hostage activity across the sector
+	// Justice D3 Warden — monitors all hostage activity across the sector. Task 4301.
 	if l.leaderboard != nil {
 		for statsWallet := range l.leaderboard {
 			ws := l.leaderboard[statsWallet]
-			if ws.JobRole == "Warden" {
-				l.TrackCareerXP(statsWallet, "Warden", 25)
+			if ws.JobRole == "Warden" && statsWallet != perpWallet { // Avoid double-counting with Warden line above
+				scaledWP2NP := ws.CareerXP.ComputeScaledXP(25, "Warden")
+				l.TrackCareerXP(statsWallet, "Warden", scaledWP2NP)
 			}
 		}
 	}
 
-	// Justice D6 Sector Peacekeeper — maintains sector order during criminal events
+	// Justice D6 Sector Peacekeeper — maintains sector order during criminal events. Task 4301.
 	if l.leaderboard != nil {
 		for statsWallet := range l.leaderboard {
 			ws := l.leaderboard[statsWallet]
-			if ws.JobRole == "Sector Peacekeeper" {
-				l.TrackCareerXP(statsWallet, "Sector Peacekeeper", 20)
+			if ws.JobRole == "Sector Peacekeeper" && statsWallet != perpWallet { // Avoid double-counting if perp is SPK
+				scaledSPKP := ws.CareerXP.ComputeScaledXP(20, "Sector Peacekeeper")
+				l.TrackCareerXP(statsWallet, "Sector Peacekeeper", scaledSPKP)
 			}
 		}
 	}
 
-	// Track this as an active kidnapping for Hostage Host progression tracking
+	// Track this as an active kidnapping for Hostage Host progression tracking. Task 4301.
 	if perpStats.ActiveHostageCount == 0 {
 		// First hostage — Hostage Host career milestone
-		l.TrackCareerXP(perpWallet, "Hostage Host", 50)
+		scaledHHNP := l.leaderboard[perpWallet].CareerXP.ComputeScaledXP(50, "Hostage Host")
+		l.TrackCareerXP(perpWallet, "Hostage Host", scaledHHNP)
 	}
 	perpStats.ActiveHostageCount++
 
@@ -382,19 +388,51 @@ func (l *Lobby) handlePayRansom(env *Envelope) {
 		l.sendToClientLocked(perpClientID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>RANSOM RECEIVED:</b> %s paid %.2f $VBV for card release (Net: %.2f $VBV after Arena fees)."}`, victimWallet, float64(data.RansomAmount)/1000000.0, float64(perpShareMicro)/1000000.0))})
 	}
 
-	// Justice D3 Warden — earns XP monitoring financial flows during releases
+	// Justice D3 Warden — earns XP monitoring financial flows during releases. Task 4301.
 	for statsWallet := range l.leaderboard {
 		ws := l.leaderboard[statsWallet]
 		if ws.JobRole == "Warden" && statsWallet != victimWallet && statsWallet != data.PerpWallet {
-			l.TrackCareerXP(statsWallet, "Warden", 15)
+			scaledWPNP2 := ws.CareerXP.ComputeScaledXP(15, "Warden")
+			l.TrackCareerXP(statsWallet, "Warden", scaledWPNP2)
 		}
 	}
 
-	// Justice D5 Forensic Analyst — traces financial patterns during ransom events
+	// Justice D5 Forensic Analyst — traces financial patterns during ransom events. Task 4301.
 	for statsWallet := range l.leaderboard {
 		ws := l.leaderboard[statsWallet]
 		if ws.JobRole == "Forensic Analyst" && statsWallet != victimWallet && statsWallet != data.PerpWallet {
-			l.TrackCareerXP(statsWallet, "Forensic Analyst", 45)
+			scaledFANP2 := ws.CareerXP.ComputeScaledXP(45, "Forensic Analyst")
+			l.TrackCareerXP(statsWallet, "Forensic Analyst", scaledFANP2)
+		}
+	}
+
+	// P2-E: Bounty Hunter ↔ Kidnapper — non-combat XP trigger for ransom payment resolution.
+	if perpStats.CareerXP != nil && (perpStats.JobRole == "Kidnapper" || CareerHasRole(perpStats.CareerXP, "Kidnapper")) {
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "BountyHunter" && statsWallet != perpWallet && statsWallet != victimWallet {
+				rivalXP, _, isRival := EvaluateCrossCareerXP("BountyHunter", perpStats.JobRole, data.RansomAmount/10, &ws, perpStats)
+				if isRival && rivalXP > 0 {
+					scaledRBonus := ws.CareerXP.ComputeScaledXP(uint64(rivalXP), "BountyHunter")
+					l.TrackCareerXP(statsWallet, "BountyHunter", scaledRBonus)
+					l.logAdminAuditLocked("CAREER_BOUNTY_HUNTER_KIDNAPPER_RANSOM", statsWallet, fmt.Sprintf("+%d XP (Kidnapper ransom resolution)", rivalXP))
+				}
+			}
+		}
+	}
+
+	// P2-E: Sector Peacekeeper ↔ Smuggler — non-combat XP trigger for hostage release monitoring.
+	if perpStats.CareerXP != nil && (perpStats.JobRole == "Smuggler" || CareerHasRole(perpStats.CareerXP, "Smuggler")) {
+		for statsWallet := range l.leaderboard {
+			ws := l.leaderboard[statsWallet]
+			if ws.JobRole == "SectorPeacekeeper" && statsWallet != perpWallet && statsWallet != victimWallet {
+				rivalXP2, _, isRival2 := EvaluateCrossCareerXP("SectorPeacekeeper", perpStats.JobRole, 30, &ws, perpStats)
+				if isRival2 && rivalXP2 > 30 {
+					scaledSPBonus := ws.CareerXP.ComputeScaledXP(uint64(rivalXP2-30), "SectorPeacekeeper")
+					l.TrackCareerXP(statsWallet, "SectorPeacekeeper", scaledSPBonus)
+					l.logAdminAuditLocked("CAREER_SECTOR_PEACEKEEPER_SMUGGLER_RANSOM", statsWallet, fmt.Sprintf("+%d XP (Smuggler ransom resolution)", rivalXP2-30))
+				}
+			}
 		}
 	}
 
@@ -472,19 +510,21 @@ func (l *Lobby) handleReleaseHostage(env *Envelope) {
 
 	l.logAdminAuditLocked("HOSTAGE_RELEASED", perpWallet, fmt.Sprintf("Card #%d voluntarily released to %s", data.CardID, victimWallet))
 
-	// Justice D3 Warden — monitors all hostage releases across the sector
+	// Justice D3 Warden — monitors all hostage releases across the sector. Task 4301.
 	for statsWallet := range l.leaderboard {
 		ws := l.leaderboard[statsWallet]
 		if ws.JobRole == "Warden" && statsWallet != perpWallet && statsWallet != victimWallet {
-			l.TrackCareerXP(statsWallet, "Warden", 20)
+			scaledWPNP3 := ws.CareerXP.ComputeScaledXP(20, "Warden")
+			l.TrackCareerXP(statsWallet, "Warden", scaledWPNP3)
 		}
 	}
 
-	// Justice D6 Sector Peacekeeper — maintains order during criminal resolutions
+	// Justice D6 Sector Peacekeeper — maintains order during criminal resolutions. Task 4301.
 	for statsWallet := range l.leaderboard {
 		ws := l.leaderboard[statsWallet]
 		if ws.JobRole == "Sector Peacekeeper" && statsWallet != perpWallet && statsWallet != victimWallet {
-			l.TrackCareerXP(statsWallet, "Sector Peacekeeper", 15)
+			scaledSPKP2 := ws.CareerXP.ComputeScaledXP(15, "Sector Peacekeeper")
+			l.TrackCareerXP(statsWallet, "Sector Peacekeeper", scaledSPKP2)
 		}
 	}
 
@@ -728,20 +768,198 @@ func (l *Lobby) processInsuranceRecovery() {
 			l.sendToClientLocked(pCID, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🚨 <b>HOSTAGE ESCAPED:</b> Card #%d has returned to its owner via Insurance Recovery."}`, cardID))})
 		}
 
-		// Justice careers earn XP monitoring insurance recovery events
+		// Justice careers earn XP monitoring insurance recovery events. Task 4301.
 		for statsWallet := range l.leaderboard {
 			ws := l.leaderboard[statsWallet]
 			if ws.JobRole == "Warden" && statsWallet != state.VictimWallet && statsWallet != state.PerpWallet {
-				l.TrackCareerXP(statsWallet, "Warden", 10)
+				scaledWPNP4 := ws.CareerXP.ComputeScaledXP(10, "Warden")
+				l.TrackCareerXP(statsWallet, "Warden", scaledWPNP4)
 			}
 			if ws.JobRole == "Forensic Analyst" && statsWallet != state.VictimWallet && statsWallet != state.PerpWallet {
-				l.TrackCareerXP(statsWallet, "Forensic Analyst", 30)
+				scaledFANP3 := ws.CareerXP.ComputeScaledXP(30, "Forensic Analyst")
+				l.TrackCareerXP(statsWallet, "Forensic Analyst", scaledFANP3)
 			}
 		}
 	}
 
 	// Broadcast update to refresh UI lists
 	go func() { l.broadcast <- l.getLobbyUpdateMsg() }()
+}
+
+// handleCyberIntercept processes an Intel-Agent cyber-intercept action on active signals.
+// Task 4502-B: Justice Hegemony — Intel-Agent combat hook handler.
+func (l *Lobby) handleCyberIntercept(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		EventID string `json:"event_id"` // Optional: existing event to intercept (empty = generate new)
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	walletAddr := ""
+	clientIDFromWallet := func(wallet string) string {
+		for id, c := range l.clients {
+			if cw, ok := l.wallets[id]; ok && cw == wallet {
+				return id
+			}
+		}
+		return ""
+	}
+
+	// Find the player's wallet from their client ID (passed via session or auth)
+	clientID := r.Header.Get("X-Client-ID")
+	if clientID != "" {
+		walletAddr, _ = l.wallets[clientID]
+	} else {
+		http.Error(w, "Missing X-Client-ID header", http.StatusUnauthorized)
+		return
+	}
+
+	stats, exists := l.leaderboard[walletAddr]
+	if !exists || stats.CareerXP == nil {
+		http.Error(w, "Player not found or no career data", http.StatusNotFound)
+		return
+	}
+
+	isIntelAgent := stats.JobRole == "Int.Agent" || CareerHasRole(stats.CareerXP, "Int.Agent")
+	if !isIntelAgent {
+		http.Error(w, "Access denied: Intel-Agent role required", http.StatusForbidden)
+		return
+	}
+
+	tier := stats.CareerXP.GetCareerTier("Int.Agent")
+	signalStrength := 30 + tier*10 // Base signal strength scales with tier (max 90 at Boss tier)
+	if signalStrength > 100 {
+		signalStrength = 100
+	}
+
+	var interceptEvent *CyberInterceptEvent
+
+	if req.EventID != "" && l.evidencePool != nil {
+		// Re-intercept an existing event
+		l.evidencePool.Mu.Lock()
+		existing, ok := l.evidencePool.ActiveRecords[req.EventID]
+		l.evidencePool.Mu.Unlock()
+		if !ok || existing.Intercepted {
+			http.Error(w, "Event not found or already intercepted", http.StatusBadRequest)
+			return
+		}
+		interceptEvent = &CyberInterceptEvent{
+			EventID:        req.EventID,
+			SourceWallet:   existing.SourceWallet,
+			TargetWallet:   walletAddr,
+			SignalStrength: signalStrength,
+			DecryptBonus:   stats.CareerXP.GetVBVGatingMultiplier(), // $VBV-gated decrypt bonus
+			CreatedAt:      existing.CreatedAt,
+			ExpiresAt:      time.Now().Add(30 * time.Minute), // Extend TTL on intercept attempt
+			Intercepted:    true,
+		}
+
+		l.evidencePool.Mu.Lock()
+		existing.Intercepted = true
+		l.evidencePool.Mu.Unlock()
+	} else {
+		// Generate a new cyber-intercept event (costs resources)
+		const interceptCost = 500 * 1000000 // 500 $VBV cost to scan for signals
+		if l.playerBalances[walletAddr] < interceptCost {
+			http.Error(w, "Insufficient funds: signal scanning costs 500 $VBV", http.StatusPaymentRequired)
+			return
+		}
+
+		l.playerBalances[walletAddr] -= interceptCost
+		l.faucetBalanceMicro += interceptCost // Cost goes to system faucet (deterministic sink)
+
+		newEventID := fmt.Sprintf("CYBER-%s-%d", walletAddr, time.Now().UnixNano())
+		interceptEvent = &CyberInterceptEvent{
+			EventID:        newEventID,
+			SourceWallet:   "", // Unknown suspect (signal detected but source obscured)
+			TargetWallet:   walletAddr,
+			SignalStrength: signalStrength + rand.Intn(15), // Add variance (+0-14 bonus)
+			DecryptBonus:   stats.CareerXP.GetVBVGatingMultiplier(),
+			CreatedAt:      time.Now(),
+			ExpiresAt:      time.Now().Add(30 * time.Minute),
+			Intercepted:    false,
+		}
+
+		l.evidencePool.Mu.Lock()
+		if l.evidencePool.ActiveRecords == nil {
+			l.evidencePool.ActiveRecords = make(map[string]*RaidEvidence)
+		}
+		l.evidencePool.ActiveRecords[newEventID] = &RaidEvidence{
+			EvidenceID:   newEventID,
+			SourceWallet: walletAddr, // Collector is the Intel-Agent who scanned
+			CrimeType:    "CYBER_INTERCEPT",
+			Confidence:   float64(signalStrength) / 100.0,
+			CollectedAt:  time.Now(),
+		}
+		if l.evidencePool.CollectorMap == nil {
+			l.evidencePool.CollectorMap = make(map[string][]string)
+		}
+		l.evidencePool.CollectorMap[walletAddr] = append(l.evidencePool.CollectorMap[walletAddr], newEventID)
+		l.evidencePool.Mu.Unlock()
+
+		l.logAdminAuditLocked("CYBER_INTERCEPT_EVENT_TRIGGERED", walletAddr, fmt.Sprintf("Signal strength: %d, tier: %d", signalStrength, tier))
+	}
+
+	// Apply Intel-Agent XP reward (base 50 + decrypt bonus)
+	baseXP := uint64(50)
+	if interceptEvent.DecryptBonus > 1.0 {
+		scaledBaseXP := uint64(float64(baseXP) * interceptEvent.DecryptBonus)
+		stats.CareerXP.TrackCareerXP("Int.Agent", scaledBaseXP)
+
+		l.logAdminAuditLocked("CYBER_INTERCEPT_XP_REWARD", walletAddr, fmt.Sprintf("+%d XP (base: %d, decrypt bonus: %.2f)", scaledBaseXP, baseXP, interceptEvent.DecryptBonus))
+	} else {
+		stats.CareerXP.TrackCareerXP("Int.Agent", baseXP)
+		l.logAdminAuditLocked("CYBER_INTERCEPT_XP_REWARD", walletAddr, fmt.Sprintf("+%d XP (base reward)", baseXP))
+	}
+
+	l.leaderboard[walletAddr] = stats
+
+	// Ally synergy: Intel-Agent + Arc-Net Operante share visibility bonus
+	for targetWallet, pStats := range l.leaderboard {
+		if targetWallet == walletAddr || pStats.CareerXP == nil {
+			continue
+		}
+		isArcNetOperative := pStats.JobRole == "Arc-Net Operative" || CareerHasRole(pStats.CareerXP, "Arc-Net Operative")
+		if isArcNetOperative && l.isJusticeAligned(walletAddr) { // Ally synergy check
+			rivalBonus, _, _ := EvaluateCrossCareerXP("Int.Agent", pStats.JobRole, baseXP, &stats, &pStats)
+			if rivalBonus > int(baseXP) {
+				pStats.CareerXP.TrackCareerXP("Arc-Net Operative", uint64(rivalBonus-int(baseXP)))
+				l.leaderboard[targetWallet] = pStats
+
+				// Shared visibility: Arc-Net gets half the decrypt bonus as XP
+				if interceptEvent.DecryptBonus > 1.0 {
+					sharingBonus := uint64(float64(baseXP) * interceptEvent.DecryptBonus * 0.5)
+					pStats.CareerXP.TrackCareerXP("Arc-Net Operative", sharingBonus)
+				}
+
+				l.logAdminAuditLocked("INTEL_ARCNET_VISIBILITY_SHARING", walletAddr, fmt.Sprintf("+%d XP shared with Arc-Net Operante: %s", rivalBonus-int(baseXP), targetWallet))
+			}
+		}
+	}
+
+	// Broadcast cyber-intercept event to affected parties via WebSocket
+	eventJSON := fmt.Sprintf(`{"event_id":"%s","signal_strength":%d,"decrypt_bonus":%.2f}`, interceptEvent.EventID, interceptEvent.SignalStrength, interceptEvent.DecryptBonus)
+	go func() { l.broadcast <- []byte(fmt.Sprintf(`{"type":"cyber_intercept_event","payload":{%s}}`, eventJSON)) }()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":        "success",
+		"event_id":      interceptEvent.EventID,
+		"signal_strength": interceptEvent.SignalStrength,
+		"decrypt_bonus":  interceptEvent.DecryptBonus,
+	})
+
+	l.logAdminAuditLocked("CYBER_INTERCEPT_COMPLETE", walletAddr, fmt.Sprintf("Event: %s, Signal: %d", interceptEvent.EventID, interceptEvent.SignalStrength))
 }
 
 /**
@@ -762,8 +980,8 @@ func (l *Lobby) HandleAOSRaid(env *Envelope) {
 	if !ok { return }
 	stats := l.leaderboard[wallet]
 
-	if stats.JobRole != "Armed-Offender-Squad" {
-		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: AOS Raid protocol requires the 'Armed-Offender-Squad' role."}`)})
+	if stats.JobRole != "AOS Leader" && !CareerHasRole(stats.CareerXP, "AOS Leader") {
+		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Access Denied: AOS Raid protocol requires the 'AOS Leader' role."}`)})
 		return
 	}
 
@@ -836,8 +1054,10 @@ func (l *Lobby) HandleAOSRaid(env *Envelope) {
 			if cid := l.getClientIDFromWalletLocked(pw); cid != "" {
 				l.sendToClientLocked(cid, Envelope{Type: "admin_notification", Payload: json.RawMessage(fmt.Sprintf(`{"text":"🎯 <b>RAID SUCCESS:</b> Card #%d recovered! Your share: %.2f $VBV."}`, targetCardID, float64(rewardSplit)/1000000.0))})
 			}
-			// Career XP: AOS Leader gains XP per successful raid (scaled by team size)
-			l.TrackCareerXP(pw, "AOS Leader", 60+teamSize*10)
+			// Career XP: AOS Leader gains XP per successful raid (scaled by team size). Task 4301.
+			aosBase := uint64(60 + teamSize*10)
+			scaledAOSP2 := l.leaderboard[pw].CareerXP.ComputeScaledXP(aosBase, "AOS Leader")
+			l.TrackCareerXP(pw, "AOS Leader", scaledAOSP2)
 		}
 		l.logAdminAuditLocked("AOS_RAID_SUCCESS", wallet, fmt.Sprintf("Host: %s, Card: %d, Team: %d", targetWallet, targetCardID, teamSize))
 	} else {

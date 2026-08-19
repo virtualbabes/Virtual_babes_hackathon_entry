@@ -172,8 +172,35 @@ func (bs *BlackMarketService) HandleSellToBlackMarket(l *Lobby, env *Envelope) {
 			}
 		}
 		fameBonus = math.Min(0.60, fameBonus)
-		scaledXP := stats.CareerXP.computeScaledXP(baseFenceXP, loyaltyBonus, fameBonus)
+
+		// $VBV-gated multiplier: scale XP by player's sustained liquidity tier (PILLAR 13).
+		vbvMultiplier := stats.CareerXP.GetVBVGatingMultiplier()
+		scaledXP := uint64(float64(stats.CareerXP.computeScaledXP(baseFenceXP, loyaltyBonus, fameBonus)) * vbvMultiplier)
+
+		l.logAdminAuditLocked("CAREER_FENCE_XP", wallet, fmt.Sprintf("+%d XP (base: %d, loyalty: %.2f, fame: %.2f, $VBV-gate: ×%.0f)", scaledXP, baseFenceXP, loyaltyBonus, fameBonus, vbvMultiplier))
 		l.TrackCareerXP(wallet, "Fence", scaledXP)
+
+		if vbvMultiplier > 1.0 {
+			l.logAdminAuditLocked("CAREER_FENCE_VBV_GATE", wallet, fmt.Sprintf("$VBV-gate active: ×%.0f (AvgSustainedMicro: %d μVBV)", vbvMultiplier, stats.CareerXP.AvgSustainedMicro))
+		}
+
+		// P2-F: Ally pair hook — Fence ↔ Launderer (ALLY, bonus at tier≥3)
+		if l.fencedListings != nil {
+			for p2Addr, p2Stats := range l.leaderboard {
+				if p2Addr == wallet || !CareerHasRole(p2Stats.CareerXP, "Launderer") {
+					continue
+				}
+				rivalXP, _, isRival := EvaluateCrossCareerXP("Fence", p2Stats.JobRole, scaledXP, stats, p2Stats)
+				if isRival && rivalXP > 0 {
+					l.TrackCareerXP(wallet, "Fence", uint64(rivalXP))
+					l.logAdminAuditLocked("CAREER_FENCE_LAUNDERER_ALLY_BONUS", wallet, fmt.Sprintf("+%d XP ally bonus (Launderer: %s)", rivalXP, p2Stats.JobRole))
+				}
+			}
+		}
+
+		if vbvMultiplier > 1.0 {
+			l.logAdminAuditLocked("CAREER_FENCE_VBV_GATE", wallet, fmt.Sprintf("$VBV-gate active: ×%.0f (AvgSustainedMicro: %d μVBV)", vbvMultiplier, stats.CareerXP.AvgSustainedMicro))
+		}
 	} else {
 		l.TrackCareerXP(wallet, "Fence", baseFenceXP)
 	}

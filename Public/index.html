@@ -245,18 +245,20 @@
                 </div>
 
                 <div id="hand-container" class="player-hand"></div>
-                
+
+                <!-- Action Bar: Core Game Controls -->
                 <div id="action-bar" class="flex-col gap-10 mt-20">
                     <button id="start-btn" onclick="window.StartMatch(); syncUI();" disabled>Start Battle</button>
                     <button id="deck-btn" class="outline" onclick="openDeckManager()">Deck Manager</button>
                     <button id="shops-btn" class="outline border-purple text-purple" onclick="openShopsOverlay()">District Shops</button>
                     <button id="map-btn" class="outline border-cyan text-cyan" onclick="openTerritoryMapOverlay()">World Map</button>
-                    <button id="hof-btn" class="outline border-gold text-gold" onclick="window.ToggleLeaderboard(); syncUI();">Hall of Fame</button>
-                    <button id="settings-btn" class="outline border-grey text-grey" onclick="openSettingsOverlay()">⚙️ Settings</button>
-                </div>
-
-                <div class="glass-panel p-15 mt-15">
-                    <h3 class="mb-10 font-small border-bottom-glass">Recent Battles</h3>
+                    <!-- Justice Dashboard + Entity Investments trigger buttons -->
+                    <button id="justice-btn" class="outline border-purple text-purple" onclick="window.openJusticeDashboard()">🏛️ Justice Dashboard</button>
+                    <button id="investments-btn" class="outline border-green text-neon-green" onclick="window.openInvestmentDashboard()">💼 Entity Investments</button>
+                    <!-- Seasonal Events trigger button -->
+                    <button id="seasonal-events-btn" class="outline border-gold text-yellow" onclick="toggleSeasonalEventsOverlay()">🌸 Seasonal Events</button>
+                    <!-- Creator Store trigger button (P7-C Task 7203) -->
+                    <button id="creator-store-btn" class="outline border-purple text-neon-purple" onclick="window.CreatorStoreModule.open()">🎨 Creator Store</button>
                     <div id="history-display" class="font-small scroll-y max-h-150"></div>
                 </div>
             </div>
@@ -525,11 +527,6 @@
                 <div id="inventory-grid" class="inventory-grid">
                     <!-- Cards will be rendered here with draggable=true -->
                 </div>
-            </div>
-
-            </div>
-
-            <!-- Right: Deck Composition -->
             <div class="column glass-panel flex-1 border-neon-cyan">
                 <h3>Current Deck (5 Cards)</h3>
                 <button onclick="window.AutoBuildDeck(); renderDeckManager();" class="w-full mb-10 bg-neon-purple">⚡ AUTO-BUILD BEST DECK</button>
@@ -854,6 +851,466 @@
         </div>
         <button class="outline" onclick="hideAllOverlays()">Close</button>
     </div>
+
+    <!-- Justice Dashboard Module (PILLAR 7: Justice Hegemony Path) -->
+    <script src="js/justice_dashboard.js"></script>
+
+    <!-- Entity Investment Dashboard (P7-A Task 7003) -->
+    <script src="js/investment_dashboard.js"></script>
+
+    <!-- Seasonal Events Module (P7-B Task 7103: Frontend integration) -->
+    <script src="js/seasonal_events.js"></script>
+
+    <!-- CreatorStore Module (P7-C Task 7203: Frontend integration) -->
+    <script src="js/creator_store.js"></script>
+
+    <!-- Investment Dashboard Panel Styles -->
+    <style>
+        /* ===== Investment Overlay Container ===== */
+        .investment-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(90vw, 1200px);
+            height: min(85vh, 900px);
+            z-index: 10000;
+            background: linear-gradient(135deg, rgba(10, 14, 26, 0.97), rgba(20, 28, 50, 0.95));
+            border: 1px solid var(--neon-cyan);
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), inset 0 0 60px rgba(0, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+        }
+
+        .investment-overlay .investment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            background: rgba(0, 255, 255, 0.05);
+        }
+
+        .investment-overlay .investment-header h2 {
+            margin: 0;
+            color: var(--neon-cyan);
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        .investment-overlay .close-btn {
+            background: transparent;
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 6px 14px;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            border-radius: 4px;
+        }
+
+        .investment-overlay .close-btn:hover {
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        /* ===== Four-Panel Body Layout ===== */
+        .investment-overlay .investment-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 12px;
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .invest-panel {
+            background: rgba(0, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .invest-panel h3 {
+            margin: 0 0 12px 0;
+            color: var(--neon-purple);
+            font-family: 'Rajdhani', sans-serif;
+            text-shadow: 0 0 8px rgba(169, 74, 233, 0.5);
+        }
+
+        /* ===== Panel 1: Yield Summary (Full Width) ===== */
+        .invest-panel-summary {
+            grid-column: 1 / -1;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+
+        .summary-label {
+            display: block;
+            font-size: 0.75em;
+            color: var(--neon-cyan);
+            opacity: 0.8;
+            margin-bottom: 4px;
+        }
+
+        .summary-value {
+            display: block;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2em;
+            color: var(--neon-green);
+            text-shadow: 0 0 6px rgba(57, 255, 20, 0.4);
+        }
+
+        .summary-value.profit {
+            color: var(--neon-green);
+        }
+
+        .summary-value.loss {
+            color: #ff3e3e;
+            text-shadow: 0 0 6px rgba(255, 62, 62, 0.4);
+        }
+
+        /* ===== Panel 2: Entity Marketplace (Grid) ===== */
+        .marketplace-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .entity-card {
+            background: rgba(169, 74, 233, 0.08);
+            border: 1px solid rgba(169, 74, 233, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .entity-card:hover {
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 8px rgba(169, 74, 233, 0.3);
+        }
+
+        .entity-name {
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--neon-cyan);
+            margin-bottom: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .entity-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+            font-size: 0.7em;
+            margin-bottom: 8px;
+        }
+
+        .valuation-badge,
+        .yield-badge {
+            background: rgba(57, 255, 20, 0.1);
+            color: var(--neon-green);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* ===== Invest Controls (Input + Button) ===== */
+        .invest-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .invest-input {
+            flex: 1;
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            padding: 4px 8px;
+            font-size: 0.7em;
+        }
+
+        .invest-btn {
+            background: rgba(0, 255, 255, 0.15);
+            border: none;
+            color: var(--neon-cyan);
+            padding: 4px 10px;
+            cursor: pointer;
+        }
+
+        .invest-btn:hover {
+            background: rgba(0, 255, 255, 0.3);
+        }
+
+        /* ===== Panel 3: Portfolio Holdings (Scrollable Table) ===== */
+        .portfolio-scroll {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .portfolio-row {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr;
+            gap: 6px;
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .portfolio-row:hover {
+            background: rgba(0, 255, 255, 0.03);
+        }
+
+        /* ===== Panel 4: Dividend Tracker (List) ===== */
+        .dividend-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .dividend-row {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr 1fr auto;
+            gap: 6px;
+            padding: 8px 4px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .dividend-row:hover {
+            background: rgba(57, 255, 20, 0.03);
+        }
+
+        .accrual-amount {
+            color: var(--neon-green);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* ===== Neon Button Utilities ===== */
+        .neon-button-cyan {
+            background: rgba(0, 255, 255, 0.15);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            cursor: pointer;
+        }
+
+        .neon-button-green {
+            background: rgba(57, 255, 20, 0.15);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            cursor: pointer;
+        }
+
+        .neon-button-cyan:hover { background: rgba(0, 255, 255, 0.3); }
+        .neon-button-green:hover { background: rgba(57, 255, 20, 0.3); }
+
+        /* ===== Empty State & Error States ===== */
+        .empty-state {
+            text-align: center;
+            padding: 24px;
+            color: var(--neon-cyan);
+            opacity: 0.6;
+        }
+
+        .empty-state.error {
+            color: #ff3e3e;
+        }
+
+        /* ===== Responsive Layout ===== */
+        @media (max-width: 768px) {
+            .investment-overlay .investment-body {
+                grid-template-columns: 1fr;
+            }
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .marketplace-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+        }
+
+        /* ===== Neon Glow Animations ===== */
+        @keyframes neonPulse {
+            from { box-shadow: 0 0 20px rgba(0, 255, 255, 0.3); }
+            to   { box-shadow: 0 0 40px rgba(0, 255, 255, 0.6); }
+        }
+
+        .investment-overlay.active {
+            animation: neonPulse 3s ease-in-out infinite;
+        }
+
+        /* ===== Seasonal Events Overlay Styles (P7-B Task 7103) ===== */
+        #seasonal-events-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(92vw, 1400px);
+            height: min(88vh, 950px);
+            z-index: 10001;
+            background: linear-gradient(135deg, rgba(10, 14, 26, 0.97), rgba(20, 28, 50, 0.95));
+            border: 1px solid var(--neon-cyan);
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), inset 0 0 60px rgba(0, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            display: none;
+            flex-direction: column;
+        }
+
+        #seasonal-events-overlay .neon-glass-panel.seasonal-panels {
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Panel grid layout */
+        #seasonal-events-overlay section.panel {
+            background: rgba(0, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        #seasonal-events-overlay section.panel h2,
+        #seasonal-events-overlay section.panel h3,
+        #seasonal-events-overlay section.panel h4 {
+            margin: 0 0 10px 0;
+            color: var(--neon-purple);
+            font-family: 'Rajdhani', sans-serif;
+            text-shadow: 0 0 8px rgba(169, 74, 233, 0.5);
+        }
+
+        /* Panel 1: Events Grid */
+        .panel-events { grid-column: 1 / -1; max-height: 200px; overflow-y: auto; }
+        .event-cards-grid { display: flex; gap: 10px; flex-wrap: wrap; padding-right: 8px; }
+
+        /* Event card styling */
+        .event-card {
+            background: rgba(169, 74, 233, 0.08);
+            border: 1px solid rgba(169, 74, 233, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            min-width: 250px;
+            flex: 1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .event-card:hover {
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 8px rgba(169, 74, 233, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .event-meta { display: flex; gap: 12px; margin-top: 8px; font-size: 0.75em; color: #90a4ae; }
+
+        /* Panel 2: Details */
+        .panel-details { grid-column: span 2; min-height: 150px; }
+        .stats-mini-grid { display: flex; gap: 16px; margin-top: 8px; }
+        .stat-mini { background: rgba(0, 255, 255, 0.05); padding: 8px 14px; border-radius: 4px; text-align: center; min-width: 100px; }
+        .stat-mini span { display: block; font-size: 0.7em; color: var(--neon-cyan); opacity: 0.7; margin-bottom: 4px; }
+        .stat-mini strong { font-family: 'Orbitron', sans-serif; color: #e0f7fa; }
+
+        /* Panel 3: Rewards */
+        .panel-rewards { grid-column: span 2; min-height: 180px; }
+        .participant-list { list-style: none; padding: 0; margin: 8px 0; max-height: 150px; overflow-y: auto; font-size: 0.8em; color: #b0bec5; }
+        .participant-list li { padding: 4px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+        /* Panel 4: Status */
+        .panel-status { grid-column: span 2; min-height: 60px; }
+
+        /* Admin panel styling */
+        .panel-admin { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; padding: 14px; background: rgba(255, 87, 34, 0.05); border-color: rgba(255, 87, 34, 0.3); }
+
+        /* Close button */
+        .close-overlay-btn { position: absolute; top: 10px; right: 16px; background: transparent; border: 1px solid var(--error-red); color: var(--error-red); padding: 4px 12px; cursor: pointer; font-family: 'Orbitron', sans-serif; }
+        .close-overlay-btn:hover { background: rgba(255, 62, 62, 0.1); }
+
+        /* Neon button variants for seasonal events */
+        .join-event-btn { margin-top: auto; width: 100%; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        .claim-reward-btn { margin-top: auto; width: 100%; background: rgba(255, 235, 59, 0.1); border-color: #ffeb3b; color: #ffeb3b; cursor: pointer; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        .claim-reward-btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: grayscale(50%); }
+
+        /* Responsive layout */
+        @media (max-width: 900px) {
+            #seasonal-events-overlay section.panel,
+            #seasonal-events-overlay .panel-details,
+            #seasonal-events-overlay .panel-rewards,
+            #seasonal-events-overlay .panel-status { grid-column: span 1; }
+        }
+
+        /* Neon pulse animation for overlay */
+        @keyframes seasonalPulse {
+            from { box-shadow: 0 0 25px rgba(0, 255, 255, 0.3); }
+            to   { box-shadow: 0 0 45px rgba(0, 255, 255, 0.6); }
+        }
+
+        #seasonal-events-overlay.active { animation: seasonalPulse 4s ease-in-out infinite; }
+
+        /* ============================================
+           P7-C CreatorStore Panel Styles (Neon-Glass)
+           ============================================ */
+
+        .creator-panels { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 8px; min-height: 500px; }
+
+        /* Panel layout for creator store */
+        #creator-store-overlay .panel-marketplace { grid-column: span 1; min-height: 400px; max-height: 520px; overflow-y: auto; }
+        #creator-store-overlay .panel-products { grid-column: span 1; min-height: 400px; max-height: 520px; overflow-y: auto; }
+        #creator-store-overlay .panel-mycreations { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+        #creator-store-overlay .panel-reviews { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+
+        /* Creator cards */
+        .creator-cards-grid { display: flex; flex-direction: column; gap: 12px; padding: 6px; }
+        .creator-card { background: rgba(75, 0, 130, 0.1); border: 1px solid rgba(169, 74, 233, 0.25); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s ease; }
+        .creator-card:hover { border-color: var(--neon-purple); box-shadow: 0 0 8px rgba(169, 74, 233, 0.3); transform: translateY(-2px); background: rgba(75, 0, 130, 0.18); }
+        .creator-card h3 { color: #e1bee7; margin: 0 0 6px 0; font-size: 1em; letter-spacing: 0.5px; }
+
+        /* Product cards (reused pattern) */
+        .product-cards-grid { display: flex; flex-direction: column; gap: 12px; padding: 6px; }
+        .product-card { background: rgba(0, 97, 106, 0.1); border: 1px solid rgba(0, 255, 255, 0.2); border-radius: 8px; padding: 14px; transition: all 0.2s ease; }
+        .product-card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 6px rgba(0, 255, 255, 0.25); transform: translateY(-1px); }
+        .product-card h3 { color: #80deea; margin: 0 0 6px 0; font-size: 0.95em; }
+        .product-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+
+        /* Product tags */
+        .product-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .tag { background: rgba(0, 255, 255, 0.1); border: 1px solid rgba(0, 255, 255, 0.3); color: #4dd0e1; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; }
+
+        /* Commission summary grid */
+        .commission-summary-grid { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+        .comm-item { background: rgba(255, 235, 59, 0.05); border: 1px solid rgba(255, 235, 59, 0.2); padding: 10px 16px; border-radius: 8px; min-width: 140px; text-align: center; }
+
+        /* Royalty history list */
+        .royalty-history-list { list-style: none; padding: 0; margin-top: 8px; font-size: 0.75em; color: #b0bec5; max-height: 120px; overflow-y: auto; }
+        .royalty-history-list li { padding: 4px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; gap: 16px; }
+
+        /* Responsive layout for creator store */
+        @media (max-width: 900px) {
+            #creator-store-overlay .panel-marketplace,
+            #creator-store-overlay .panel-products,
+            #creator-store-overlay .panel-mycreations,
+            #creator-store-overlay .panel-reviews { grid-column: span 1; max-height: none; }
+        }
+
+        /* Neon pulse animation for creator overlay */
+        @keyframes creatorPulse {
+            from { box-shadow: 0 0 25px rgba(75, 0, 130, 0.3); }
+            to   { box-shadow: 0 0 45px rgba(75, 0, 130, 0.6); }
+        }
+
+        #creator-store-overlay.active { animation: creatorPulse 4s ease-in-out infinite; }
+    </style>
 
     <!-- Main Application Logic -->
     <script src="app.js" type="module"></script>

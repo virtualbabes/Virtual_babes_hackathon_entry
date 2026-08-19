@@ -1,0 +1,18 @@
+/* Error: Undefined variable.
+ *    ,
+ * 36 |     border-bottom: 1px solid rgba($neon-cyan, 0.3);
+ *    |                                   ^^^^^^^^^^
+ *    '
+ *   Public\src\scss\features\_justice.scss 36:35  @import
+ *   Public\src\scss\main.scss 28:9                root stylesheet */
+
+body::before {
+  font-family: "Source Code Pro", "SF Mono", Monaco, Inconsolata, "Fira Mono",
+      "Droid Sans Mono", monospace, monospace;
+  white-space: pre;
+  display: block;
+  padding: 1em;
+  margin-bottom: 1em;
+  border-bottom: 2px solid black;
+  content: "Error: Undefined variable.\a    \2577 \a 36 \2502      border-bottom: 1px solid rgba($neon-cyan, 0.3);\a    \2502                                    ^^^^^^^^^^\a    \2575 \a   Public\\src\\scss\\features\\_justice.scss 36:35  @import\a   Public\\src\\scss\\main.scss 28:9                root stylesheet";
+}

@@ -1413,6 +1413,26 @@ window.flagPlayerForReview = flagPlayerForReview;
  * and renders them into the social hub.
  * PILLAR 3: Underworld Contracts Integration.
  */
+// Dynamic difficulty scaling for underworld contracts — $VBV-gated by player career tier
+let currentDifficultyMultiplier = 1.0;
+
+/**
+ * computeContractDifficultyRating returns a human-readable difficulty label based on scaled multiplier.
+ */
+function getDifficultyLabel(multiplier) {
+    if (multiplier <= 0.75) return "EASY";
+    if (multiplier <= 1.25) return "MODERATE";
+    if (multiplier <= 2.0) return "HARD";
+    return "ELITE";
+}
+
+function getDifficultyColor(multiplier) {
+    if (multiplier <= 0.75) return "text-neon-green";
+    if (multiplier <= 1.25) return "text-warning";
+    if (multiplier <= 2.0) return "text-error";
+    return "text-gold pulse";
+}
+
 async function fetchUnderworldContractsAndRender(container) {
     container.innerHTML = `
         <div class="glass-panel p-20 m-0 border-error">
@@ -1436,6 +1456,11 @@ async function fetchUnderworldContractsAndRender(container) {
 
         const state = window.GetGameState();
         const activeContractId = state.active_underworld_contract_id;
+
+        // Compute dynamic difficulty multiplier from player's $VBV-gated career tier + Cunning level
+        const vbvMultiplier = state.vbv_gating_multiplier || 1.0;
+        const cunningBonus = Math.min(0.5, (state.cunning || 0) / 200);
+        currentDifficultyMultiplier = Math.max(0.3, vbvMultiplier * (1 - cunningBonus));
 
         if (contracts.length === 0) {
             contractsListEl.innerHTML = `<div class="opacity-3 py-20 italic text-center">No active underworld contracts available.</div>`;
@@ -1476,9 +1501,18 @@ async function fetchUnderworldContractsAndRender(container) {
             const baseReward = contract.reward_micro / 1000000;
             const scaledReward = baseReward * currentRewardRatio;
 
+            // Compute difficulty rating for this contract based on player scaling
+            const diffLabel = getDifficultyLabel(currentDifficultyMultiplier);
+            const diffColor = getDifficultyColor(currentDifficultyMultiplier);
+
             return `
             <div class="glass-panel p-10 m-0 ${isActive ? 'border-neon-green' : 'border-warning'} flex-col gap-5">
                 ${badgeHtml}
+                <!-- PILLAR 3: Dynamic Difficulty Indicator -->
+                <div class="flex-row justify-between align-center mb-5">
+                    <span class="font-size-0-7em letter-spacing-1 ${diffColor}" style="text-shadow: 0 0 6px currentColor;">⚠️ DIFFICULTY: ${diffLabel}</span>
+                    ${currentRewardRatio < 1.0 ? `<small class="opacity-5 font-size-0-6em">Scaling ×${(1/currentDifficultyMultiplier).toFixed(2)}</small>` : ''}
+                </div>
                 <div class="flex-row justify-between align-center">
                     <b class="${isActive ? 'text-neon-green' : 'text-warning'}">${contract.title} ${isActive ? '<small class="ml-5 text-neon-green pulse">[ACTIVE]</small>' : ''}</b>
                     <div class="flex-col align-end">
@@ -1845,4 +1879,19 @@ window.reportPlayer = reportPlayer;
 window.releaseHostage = releaseHostage;
 window.flagPlayerForReview = flagPlayerForReview;
 window.initiateDeepScan = initiateDeepScan;
+// PILLAR 3: Underworld Contract WS event handlers — dispatched by network.js on server push
+export function handleContractAssigned(payload) {
+    showToast(`💀 <b>CONTRACT ASSIGNED:</b><br>${payload.contract_title || payload.id} — Reward: ${(payload.reward_micro / 1000000).toFixed(2)} $VBV`, "warning", 6000);
+    // Refresh the contracts list if social hub is visible
+    const container = document.getElementById("underworld-contracts-list");
+    if (container) fetchUnderworldContractsAndRender(container.parentElement?.parentElement || container);
+}
+
+export function handleContractCompleted(payload) {
+    showToast(`✅ <b>CONTRACT COMPLETED:</b><br>${payload.contract_title || payload.id} — Earned ${(payload.reward_micro / 1000000).toFixed(2)} $VBV + ${payload.xp_awarded || 0} CareerXP`, "success", 6000);
+    // Refresh the contracts list if social hub is visible
+    const container = document.getElementById("underworld-contracts-list");
+    if (container) fetchUnderworldContractsAndRender(container.parentElement?.parentElement || container);
+}
+
 window.freezeDividends = window.freezeDividends;
