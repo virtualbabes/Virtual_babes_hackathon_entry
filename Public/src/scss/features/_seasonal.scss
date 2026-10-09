@@ -1,0 +1,135 @@
+// Public\src\scss\features\_seasonal.scss
+// P7-B: Seasonal Events overlay styles (migrated from inline index.html <style>)
+
+/* ===== Seasonal Events Overlay Styles (P7-B Task 7103) ===== */
+#seasonal-events-overlay {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(92vw, 1400px);
+    height: min(88vh, 950px);
+    z-index: 10001;
+    background: linear-gradient(135deg, rgba(10, 14, 26, 0.97), rgba(20, 28, 50, 0.95));
+    border: 1px solid var(--neon-cyan);
+    border-radius: 12px;
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), inset 0 0 60px rgba(0, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+    flex-direction: column;
+}
+
+/* Seasonal sub-panel tabs */
+.seasonal-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(0, 255, 255, 0.03);
+}
+.seasonal-tab {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #9ca3af;
+    transition: all 0.2s;
+}
+.seasonal-tab:hover { border-color: #00f2fe; color: #e6e6e6; }
+.seasonal-tab.active { background: #00f2fe; border-color: #00f2fe; color: #0a0e17; }
+.seasonal-panel { width: 100%; }
+.seasonal-panel.hidden { display: none; }
+
+#seasonal-events-overlay .neon-glass-panel.seasonal-panels {
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Panel grid layout */
+#seasonal-events-overlay section.panel {
+    background: rgba(0, 255, 255, 0.03);
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+#seasonal-events-overlay section.panel h2,
+#seasonal-events-overlay section.panel h3,
+#seasonal-events-overlay section.panel h4 {
+    margin: 0 0 10px 0;
+    color: var(--neon-purple);
+    font-family: 'Rajdhani', sans-serif;
+    text-shadow: 0 0 8px rgba(169, 74, 233, 0.5);
+}
+
+/* Panel 1: Events Grid */
+.panel-events { grid-column: 1 / -1; max-height: 200px; overflow-y: auto; }
+.event-cards-grid { display: flex; gap: 10px; flex-wrap: wrap; padding-right: 8px; }
+
+/* Event card styling */
+.event-card {
+    background: rgba(169, 74, 233, 0.08);
+    border: 1px solid rgba(169, 74, 233, 0.3);
+    border-radius: 6px;
+    padding: 10px;
+    min-width: 250px;
+    flex: 1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.event-card:hover {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 8px rgba(169, 74, 233, 0.3);
+    transform: translateY(-2px);
+}
+
+.event-meta { display: flex; gap: 12px; margin-top: 8px; font-size: 0.75em; color: #90a4ae; }
+
+/* Panel 2: Details */
+.panel-details { grid-column: span 2; min-height: 150px; }
+.stats-mini-grid { display: flex; gap: 16px; margin-top: 8px; }
+.stat-mini { background: rgba(0, 255, 255, 0.05); padding: 8px 14px; border-radius: 4px; text-align: center; min-width: 100px; }
+.stat-mini span { display: block; font-size: 0.7em; color: var(--neon-cyan); opacity: 0.7; margin-bottom: 4px; }
+.stat-mini strong { font-family: 'Orbitron', sans-serif; color: #e0f7fa; }
+
+/* Panel 3: Rewards */
+.panel-rewards { grid-column: span 2; min-height: 180px; }
+.participant-list { list-style: none; padding: 0; margin: 8px 0; max-height: 150px; overflow-y: auto; font-size: 0.8em; color: #b0bec5; }
+.participant-list li { padding: 4px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+/* Panel 4: Status */
+.panel-status { grid-column: span 2; min-height: 60px; }
+
+/* Admin panel styling */
+.panel-admin { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; padding: 14px; background: rgba(255, 87, 34, 0.05); border-color: rgba(255, 87, 34, 0.3); }
+
+/* Close button */
+.close-overlay-btn { position: absolute; top: 10px; right: 16px; background: transparent; border: 1px solid var(--error-red); color: var(--error-red); padding: 4px 12px; cursor: pointer; font-family: 'Orbitron', sans-serif; }
+.close-overlay-btn:hover { background: rgba(255, 62, 62, 0.1); }
+
+/* Neon button variants for seasonal events */
+.join-event-btn { margin-top: auto; width: 100%; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+.claim-reward-btn { margin-top: auto; width: 100%; background: rgba(255, 235, 59, 0.1); border-color: #ffeb3b; color: #ffeb3b; cursor: pointer; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+.claim-reward-btn[disabled] { opacity: 0.4; cursor: not-allowed; filter: grayscale(50%); }
+
+/* Responsive layout */
+@media (max-width: 900px) {
+    #seasonal-events-overlay section.panel,
+    #seasonal-events-overlay .panel-details,
+    #seasonal-events-overlay .panel-rewards,
+    #seasonal-events-overlay .panel-status { grid-column: span 1; }
+}
+
+/* Neon pulse animation for overlay */
+@keyframes seasonalPulse {
+    from { box-shadow: 0 0 25px rgba(0, 255, 255, 0.3); }
+    to   { box-shadow: 0 0 45px rgba(0, 255, 255, 0.6); }
+}
+
+#seasonal-events-overlay.active { animation: seasonalPulse 4s ease-in-out infinite; }

@@ -1,0 +1,136 @@
+/* === Report History === */
+.report-history-container { padding: 8px 0; }
+
+.report-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.1), rgba(96, 125, 139, 0.05));
+    border: 1px solid rgba(158, 158, 158, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.report-header-icon { font-size: 32px; }
+
+.report-header-info { flex: 1; }
+
+.report-stats { display: flex; gap: 12px; }
+
+.report-stat {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.report-stat-num { display: block; font-size: 16px; font-weight: 700; color: #e5e7eb; }
+
+.report-stat-label { font-size: 9px; color: #90a4ae; }
+
+/* New report form */
+.report-new-section {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.report-new-section h4 { margin: 0 0 12px; }
+
+.report-form { display: flex; flex-direction: column; gap: 12px; }
+
+.report-form-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.report-form-row input,
+.report-form-row select,
+.report-form-row textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+/* Report list */
+.report-list-section h4 { margin: 0 0 12px; }
+
+.report-list { display: flex; flex-direction: column; gap: 8px; }
+
+.report-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--status-color);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.report-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.report-card-id { font-size: 10px; color: #607d8b; font-family: monospace; }
+
+.report-card-status {
+    font-size: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.report-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.report-card-target { font-size: 11px; color: #e5e7eb; font-weight: 600; }
+
+.report-card-reason { font-size: 10px; color: #90a4ae; }
+
+.report-card-response {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.response-label { font-size: 9px; color: #607d8b; text-transform: uppercase; }
+
+.response-text { font-size: 10px; color: #e5e7eb; display: block; margin-top: 2px; }
+
+.report-card-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.report-card-date { font-size: 9px; color: #607d8b; }
+
+/* Empty state */
+.report-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.report-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.report-empty p { color: #90a4ae; font-size: 11px; margin: 0; }

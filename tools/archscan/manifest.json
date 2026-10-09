@@ -1,0 +1,4908 @@
+{
+  "timestamp": "2026-09-12T21:36:46.605Z",
+  "bridgeFunctions": [
+    {
+      "name": "connectWallet",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 16,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "disconnectWallet",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 17,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "toggleNetwork",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 18,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SetAvatar",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 19,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SendReward",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 20,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SyncFullProfile",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 21,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncPortfolio",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 22,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "TriggerManualSync",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 23,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SetInMatchmakingQueue",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 24,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncSolvency",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 25,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "StartMatch",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 28,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "PlaceCard",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 29,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SyncMove",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 30,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncMatchMetadata",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 31,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncOpponentDeck",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 32,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncOpponentProfile",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 33,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncOpponentWanted",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 34,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetLocalPlayerIndex",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 35,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "initiateSuddenDeath",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 36,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "ApplyArtifactToBoard",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 37,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "GetGameState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 40,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetPhase",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 41,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "ResetGame",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 42,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SetBoardState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 43,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncRules",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 44,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncRewards",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 45,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncVaultBalance",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 46,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncClubs",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 47,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "ToggleRule",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 48,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncLatency",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 51,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "PushReplayFrame",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 52,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "CompleteRecovery",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 53,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SyncServerLoad",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 54,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncPlayerStats",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 55,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncPlaystyle",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 56,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "GetLevelLabelForDisplay",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 57,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "GetServerLoadColor",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 58,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "GetTierInfo",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 59,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "ToggleLeaderboard",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 60,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "GetTournamentArchiveBadge",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 61,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncTournament",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 62,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "AddToDeck",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 65,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "RemoveFromDeck",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 66,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "AutoBuildDeck",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 67,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SelectDeck",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 68,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "ImportARC72Card",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 69,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SyncCardMetadata",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 70,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetMasterVolume",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 73,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetMusicVolume",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 74,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetSfxVolume",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 75,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "PlaySelectSound",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 76,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SetAssetBase",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 77,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetApiBase",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 78,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetAdminState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 81,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetMaintenanceState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 82,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetTestingMode",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 83,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetHardMode",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 84,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "ForceActive",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 85,
+      "hasRegistration": true,
+      "hasHandler": false
+    },
+    {
+      "name": "SetPlayerReady",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "main.go",
+      "type": "complete",
+      "line": 86,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "GetMenuState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 89,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SyncMenuState",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 90,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetMenuLayout",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 91,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetControllerType",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 92,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetControllerFocus",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 93,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "HandleControllerInput",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 94,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "ToggleStarItem",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 95,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "SetButtonOverrideWASM",
+      "file": "bridge_service.go",
+      "registeredIn": "bridge_service.go",
+      "implementedIn": "menu_state.go",
+      "type": "complete",
+      "line": 96,
+      "hasRegistration": true,
+      "hasHandler": true
+    },
+    {
+      "name": "InitiateRecovery",
+      "file": "main.go",
+      "registeredIn": "main.go",
+      "implementedIn": null,
+      "type": "registration-only",
+      "line": 3951,
+      "hasRegistration": true,
+      "hasHandler": false
+    }
+  ],
+  "flowIntegrity": {
+    "completeFlows": 48,
+    "registrationOnly": 20,
+    "handlerOnly": 0,
+    "totalFlows": 68,
+    "integrityPercent": 71
+  },
+  "jsModules": [
+    {
+      "file": "Public\\js\\achievements.js",
+      "fileName": "achievements.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openAchievements",
+        "closeAchievements",
+        "filterAchievements"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\achievement_progress.js",
+      "fileName": "achievement_progress.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initAchievementProgress"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initAchievementProgress"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\admin.js",
+      "fileName": "admin.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "availableNetworks",
+        "globalClubs",
+        "adminFocusNetwork",
+        "ignoredReporters",
+        "setCachedAdminHeaders",
+        "setAvailableNetworks",
+        "setGlobalClubs",
+        "setAdminFocusNetwork",
+        "setIgnoredReporters",
+        "cachedAdminHeaders",
+        "renderMutationAuditDashboard",
+        "renderSolvencyDashboard",
+        "renderNodeHealthDashboard",
+        "renderAdminAutomationButtons",
+        "ignoreReporter",
+        "renderDistrictTaxDashboard",
+        "renderDLCRegistryDashboard",
+        "renderTaxDashboard",
+        "renderCommissionAuditDashboard",
+        "updateAdminRewardList",
+        "adminBanWalletFromLog",
+        "adminLogTicker",
+        "startAdminLogPolling",
+        "stopAdminLogPolling",
+        "updateAdminNetworkUI",
+        "onAdminNetworkSelectChange",
+        "adminCyberSecurityAudit",
+        "renderNodeHealthAudit",
+        "renderSystemSanityCheck",
+        "renderDistrictTaxAudit",
+        "renderShopTokenPresets",
+        "renderShopTokenPresetEditor",
+        "saveShopTokenPresetsFromEditor"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "./wallet.js",
+        "./utils.js",
+        "./game.js",
+        "./leaderboard.js",
+        "./economy.js"
+      ],
+      "windowBindings": [
+        "__shopTokenPresets",
+        "__shopTokenPresets",
+        "__shopTokenPresets"
+      ],
+      "exportCount": 33,
+      "importCount": 8,
+      "connectionCount": 44
+    },
+    {
+      "file": "Public\\js\\admin_dashboard.js",
+      "fileName": "admin_dashboard.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openAdminDashboard",
+        "hideAllOverlays",
+        "switchADTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\admin_panel.js",
+      "fileName": "admin_panel.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "adminPanelOpen",
+        "adminPanelClose",
+        "adminPanelLogin",
+        "adminSetFeatureState",
+        "adminSetVBV",
+        "adminResetTutorial"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\advertising.js",
+      "fileName": "advertising.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openAdvertising",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\ai_citizens.js",
+      "fileName": "ai_citizens.js",
+      "category": "ai",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openAICitizens",
+        "hideAllOverlays",
+        "switchAITab",
+        "_aiAdopt",
+        "_aiRelease",
+        "_aiChallenge",
+        "_aiView3D",
+        "enter3DWorld"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 8
+    },
+    {
+      "file": "Public\\js\\amm_chart.js",
+      "fileName": "amm_chart.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initAmmChart"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initAmmChart"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\asset_viewer.js",
+      "fileName": "asset_viewer.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openAssetViewer",
+        "hideAllOverlays",
+        "switchAVTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\audio.js",
+      "fileName": "audio.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "masterVolume",
+        "musicVolume",
+        "sfxVolume",
+        "lastMasterVolume",
+        "lastSfxVolume",
+        "lastMusicVolume",
+        "MUSIC_PHASE_MAP",
+        "initAudioContext",
+        "syncSFXGain",
+        "syncMusicGain",
+        "updateSfxVolume",
+        "updateMasterVolume",
+        "updateMusicVolume",
+        "toggleMuteMaster",
+        "toggleMuteSfx",
+        "toggleMuteMusic",
+        "playMoodMoteSFX",
+        "playConnectionSFX",
+        "playBlackoutSFX",
+        "playComboSFX",
+        "playCloakFailureSFX",
+        "stopDistrictStabilizerThrum",
+        "playStaffTrainingSFX",
+        "playEcosystemAlertSFX",
+        "playProcedureInterruptedSFX",
+        "playLongWarningSFX",
+        "playBattleStartSFX",
+        "playCloakDisruptorSFX",
+        "playMutationSuccessSFX",
+        "playCharacterVoiceLine",
+        "stopChallengeWaitSFX",
+        "stopMutationInsuranceHum",
+        "playChallengeAcceptedSFX",
+        "playChallengeDeclinedSFX",
+        "selectAmbientTrack",
+        "syncAmbientGain",
+        "updateAmbientVolume",
+        "toggleMuteAmbient",
+        "initAmbientChannel",
+        "transitionAmbient",
+        "updateAmbientFromTheme",
+        "stopMutationSoundscape"
+      ],
+      "imports": [
+        "./config.js"
+      ],
+      "windowBindings": [
+        "PlaySound",
+        "initAudioContext",
+        "playMoodMoteSFX",
+        "playCharacterVoiceLine",
+        "playConnectionSFX",
+        "playBlackoutSFX",
+        "playCloakFailureSFX",
+        "playDistrictStabilizerThrum",
+        "stopDistrictStabilizerThrum",
+        "playComboSFX",
+        "playSabotageReparationSFX",
+        "playStaffTrainingSFX",
+        "playEcosystemAlertSFX",
+        "playMutationSuccessSFX",
+        "playCloakDisruptorSFX",
+        "playBattleStartSFX",
+        "playChallengeWaitSFX",
+        "stopChallengeWaitSFX",
+        "playChallengeAcceptedSFX",
+        "playChallengeDeclinedSFX",
+        "transitionMusic",
+        "playMutationSoundscape",
+        "playMutationInsuranceHum",
+        "stopMutationInsuranceHum",
+        "stopMutationSoundscape",
+        "playProcedureInterruptedSFX",
+        "playLongWarningSFX",
+        "updateAmbientFromTheme",
+        "initAmbientChannel",
+        "updateAmbientVolume",
+        "toggleMuteAmbient"
+      ],
+      "exportCount": 42,
+      "importCount": 1,
+      "connectionCount": 74
+    },
+    {
+      "file": "Public\\js\\audio_context.js",
+      "fileName": "audio_context.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "AudioContextManager",
+        "initAudioContextManager",
+        "getAudioContextManager"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 3,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\audio_engine.js",
+      "fileName": "audio_engine.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "audioEngine"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\black_market.js",
+      "fileName": "black_market.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initBlackMarket"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initBlackMarket"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\bridge_router.js",
+      "fileName": "bridge_router.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openBridgeRouter",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\campaign_mode.js",
+      "fileName": "campaign_mode.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCampaignMode"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCampaignMode"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\card_animations.js",
+      "fileName": "card_animations.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "animateCardFlip",
+        "triggerCaptureBurst",
+        "animateComboChain",
+        "applyElementalGlow",
+        "applyMoodAura",
+        "animateCardPlace",
+        "animateGameOver",
+        "initCardAnimations"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCardAnimations",
+        "triggerCaptureBurst",
+        "animateCardFlip",
+        "animateComboChain",
+        "applyElementalGlow",
+        "applyMoodAura",
+        "animateCardPlace",
+        "animateGameOver"
+      ],
+      "exportCount": 8,
+      "importCount": 0,
+      "connectionCount": 16
+    },
+    {
+      "file": "Public\\js\\card_progression.js",
+      "fileName": "card_progression.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCardProgression"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCardProgression"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\card_titles.js",
+      "fileName": "card_titles.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCardTitles",
+        "checkTitleUnlocks"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCardTitles",
+        "checkTitleUnlocks"
+      ],
+      "exportCount": 2,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\career_tree.js",
+      "fileName": "career_tree.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCareerTree",
+        "openCareers"
+      ],
+      "imports": [
+        "./pathway_avenues.js"
+      ],
+      "windowBindings": [
+        "hideAllOverlays",
+        "openCareers"
+      ],
+      "exportCount": 2,
+      "importCount": 1,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\character_mood.js",
+      "fileName": "character_mood.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCharacterMood"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCharacterMood"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\children_bots.js",
+      "fileName": "children_bots.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openChildrenBots",
+        "hideAllOverlays",
+        "switchCBTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\church_storefront.js",
+      "fileName": "church_storefront.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initChurchStorefront"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "openChurchFoundry",
+        "initChurchStorefront"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\club_foundry.js",
+      "fileName": "club_foundry.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initClubFoundry"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "clubAddMember",
+        "clubManageStaff",
+        "clubViewInventory",
+        "initClubFoundry"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\collective-intelligence.js",
+      "fileName": "collective-intelligence.js",
+      "category": "ai",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "collectiveIntelligence"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\combined_events.js",
+      "fileName": "combined_events.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openCombinedEvents",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\community_dashboard.js",
+      "fileName": "community_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openCommunityDashboard",
+        "hideAllOverlays",
+        "switchCDTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\config.js",
+      "fileName": "config.js",
+      "category": "core",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "CONFIG"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\constellation_config.js",
+      "fileName": "constellation_config.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "ConstellationConfig"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\constellation_hub.js",
+      "fileName": "constellation_hub.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "__hubVisibilityBound",
+        "constellationZoom",
+        "constellationResetZoom",
+        "constellationToggleParticles",
+        "constellationReset",
+        "renderStarredItems",
+        "renderNodes",
+        "openConstellationHub",
+        "refreshConstellationHub",
+        "unstarFromConstellation",
+        "constellationOpenPanel"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 11
+    },
+    {
+      "file": "Public\\js\\constellation_spectate.js",
+      "fileName": "constellation_spectate.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openJusticeDashboard",
+        "switchJusticeTab",
+        "openCriminality",
+        "openConstellationSpectate",
+        "closeConstellationSpectate",
+        "constellationSpectateRefresh",
+        "constellationSpectateOpenPlayer",
+        "constellationSpectateCloseDetail",
+        "constellationSpectateOpenBounty"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 9
+    },
+    {
+      "file": "Public\\js\\constellation_tutorial.js",
+      "fileName": "constellation_tutorial.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openConstellationTutorial",
+        "constellationTutorialNext",
+        "constellationTutorialSkip",
+        "tutorialActionComplete",
+        "showToast"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\controller_nav.js",
+      "fileName": "controller_nav.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "enable",
+        "disable",
+        "isActive",
+        "getType",
+        "getFocusIndex"
+      ],
+      "imports": [
+        "./menu_customization.js"
+      ],
+      "windowBindings": [],
+      "exportCount": 5,
+      "importCount": 1,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\counterfeit_scanner.js",
+      "fileName": "counterfeit_scanner.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCounterfeitScanner"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCounterfeitScanner"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\creator_economy.js",
+      "fileName": "creator_economy.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "purchaseDLC",
+        "attendEvent",
+        "openCreatorEconomy",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\creator_store.js",
+      "fileName": "creator_store.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "_buyProduct",
+        "txModalOpen",
+        "openCreatorStore",
+        "hideAllOverlays",
+        "switchCSTab",
+        "onCreatorRoyaltyPaid",
+        "onCreatorRoyaltyReceived"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\creator_storefront.js",
+      "fileName": "creator_storefront.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "CreatorStorefront"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\creator_studio.js",
+      "fileName": "creator_studio.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initCreatorStudio"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initCreatorStudio"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\criminality.js",
+      "fileName": "criminality.js",
+      "category": "social",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "rumorTimers",
+        "activeRumors",
+        "staffTrainingInterval",
+        "ghostProtocolInterval",
+        "allianceInviteInterval",
+        "updateActiveRumors",
+        "renderRumorBoard",
+        "openCourthouse",
+        "openSecuritySentry",
+        "deployTrap",
+        "openTrophyView",
+        "openLaunderingTerminal",
+        "acceptJusticeMission",
+        "abortJusticeMission",
+        "performForensicAudit",
+        "flagPlayerForReview",
+        "acceptUnderworldContract",
+        "abortUnderworldContract",
+        "openHeistPlanningOverlay",
+        "updateHeistRiskAssessment",
+        "sendHeistRequest",
+        "executeHeistStrike",
+        "handleHeistResult",
+        "openKidnapSelectionOverlay",
+        "executeKidnap",
+        "showKidnapOverlay",
+        "releaseHostage",
+        "startRecoveryTimer",
+        "sendAllianceInvite",
+        "acceptAlliance",
+        "dissolveAlliance",
+        "initiateRegionalSabotage",
+        "initiateCloakDisruption",
+        "handleContractCompleted"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "./wallet.js",
+        "./utils.js",
+        "./admin.js",
+        "./game.js"
+      ],
+      "windowBindings": [
+        "GetGameState",
+        "openLaunderingTerminal",
+        "openCriminality",
+        "submitLaunderRequest",
+        "purchaseBountyHunterLicense",
+        "initiateAOSRaid",
+        "purchaseRaidInsurance",
+        "freezeDividends",
+        "purchaseBountyBond",
+        "refundBountyBond",
+        "openSignatureReconciliation",
+        "openSignatureReconciliation",
+        "fetchJusticeMissionsAndRender",
+        "acceptJusticeMission",
+        "abortJusticeMission",
+        "flagPlayerForReview",
+        "acceptUnderworldContract",
+        "abortUnderworldContract",
+        "sendHeistRequest",
+        "freezeDividends"
+      ],
+      "exportCount": 34,
+      "importCount": 7,
+      "connectionCount": 61
+    },
+    {
+      "file": "Public\\js\\daily_challenges.js",
+      "fileName": "daily_challenges.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openDailyChallenges",
+        "closeDailyChallenges"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\deck.js",
+      "fileName": "deck.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "userNFTs",
+        "currentAvatarUrl",
+        "cropState",
+        "isCropInitialized",
+        "setUserNFTs",
+        "setCurrentAvatarUrl",
+        "setCropState",
+        "setIsCropInitialized",
+        "openDeckManager",
+        "closeDeckManager",
+        "renderDeckManager",
+        "renderAvatarGrid",
+        "applyAvatarFilters",
+        "selectAvatar",
+        "setupCropEvents"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "./wallet.js",
+        "./utils.js",
+        "./game.js"
+      ],
+      "windowBindings": [
+        "hideAllOverlays"
+      ],
+      "exportCount": 15,
+      "importCount": 6,
+      "connectionCount": 22
+    },
+    {
+      "file": "Public\\js\\deck_manager.js",
+      "fileName": "deck_manager.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initDeckManager"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initDeckManager"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\devsim.js",
+      "fileName": "devsim.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "GetGameState",
+        "__devClubs",
+        "__devShopRegistry",
+        "userAddress",
+        "lastLobbyPlayers",
+        "myClientId"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\dev_game_hub.js",
+      "fileName": "dev_game_hub.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openDevGameHub",
+        "hideAllOverlays",
+        "__devGameHubCatalog"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\dividend_yield.js",
+      "fileName": "dividend_yield.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initDividendYield"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initDividendYield"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\early_tasks.js",
+      "fileName": "early_tasks.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openEarlyTasks",
+        "hideAllOverlays",
+        "markHubVisited",
+        "openLeaderboardRegion"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\economy.js",
+      "fileName": "economy.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "TERRITORY_MAP",
+        "MOOD_CLASS_MAP",
+        "MOOD_EMOJI_MAP",
+        "resolveShopToken",
+        "GlobalShopRegistry",
+        "openVaultInteraction",
+        "switchFoundryTab",
+        "openMutationHistoryOverlay",
+        "openMutationFoundryOverlay",
+        "adjustMutationVector",
+        "submitMutationLoyaltySynthesis",
+        "openClubLeaseBoard",
+        "renderClubLeaseBoard",
+        "openCreateLeaseOverlay",
+        "takeLease",
+        "submitCreateLease",
+        "initiateRecoveryChallenge",
+        "openRecoveryBountyOverlay",
+        "switchShopCategory",
+        "promptBid",
+        "openConsignmentOverlay",
+        "selectConsignmentItem",
+        "startTickerAnimation",
+        "updateBountyTicker",
+        "startBountyAnimation",
+        "openClubFoundry",
+        "renderRegionalAllianceWidget",
+        "tradeShares",
+        "openTradeSharesOverlay",
+        "updateMarketTicker"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "../collective-intelligence.js",
+        "./wallet.js",
+        "./utils.js",
+        "./admin.js",
+        "./game.js"
+      ],
+      "windowBindings": [
+        "submitVaultDonation",
+        "switchFoundryTab",
+        "adjustMutationVector",
+        "submitVectorRealignment",
+        "submitMoodRecalibration",
+        "submitMutationLoyaltySynthesis",
+        "initiateRecoveryChallenge",
+        "openRecoveryBountyOverlay",
+        "submitRecoveryBounty",
+        "hideAllOverlays",
+        "GetGameState",
+        "claimDividends",
+        "harvestAllDividends",
+        "updateTradeImpact",
+        "confirmTrade"
+      ],
+      "exportCount": 30,
+      "importCount": 8,
+      "connectionCount": 53
+    },
+    {
+      "file": "Public\\js\\entity_market.js",
+      "fileName": "entity_market.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openEntityMarket",
+        "switchEMTab",
+        "emApplyFilters",
+        "emBuy"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\entity_shares.js",
+      "fileName": "entity_shares.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "buyShare",
+        "openEntityShares",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\equipment_system.js",
+      "fileName": "equipment_system.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initEquipmentSystem"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initEquipmentSystem"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\error_handler.js",
+      "fileName": "error_handler.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "walletModalOpen",
+        "errorHandler"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\events_arena.js",
+      "fileName": "events_arena.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initEventsArena"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "eventsCreate",
+        "initEventsArena"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\extended_dashboard.js",
+      "fileName": "extended_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openExtendedDashboard",
+        "hideAllOverlays",
+        "switchEDTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\faith_church.js",
+      "fileName": "faith_church.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "api",
+        "txModalOpen",
+        "showToast",
+        "openFaithChurch",
+        "hideAllOverlays",
+        "switchChTab",
+        "chToggleExpand",
+        "chUpgrade",
+        "chVisitRegion",
+        "chClaimAll",
+        "chPerformRitual",
+        "chStartGambit",
+        "chResolveRivalry"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 13
+    },
+    {
+      "file": "Public\\js\\faith_extended.js",
+      "fileName": "faith_extended.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openFaithExtended",
+        "hideAllOverlays",
+        "switchFeTab",
+        "feJoinReligion",
+        "feBuyReligion"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\faith_system.js",
+      "fileName": "faith_system.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openFaithSystem",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\faith_war_gambit.js",
+      "fileName": "faith_war_gambit.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initFaithWarGambit"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initFaithWarGambit"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\faucet_dashboard.js",
+      "fileName": "faucet_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "formatMicroVBV",
+        "FaucetDashboard",
+        "openFaucetDashboard"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\final_dashboard.js",
+      "fileName": "final_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openFinalDashboard",
+        "hideAllOverlays",
+        "switchFDTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\game.js",
+      "fileName": "game.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "activeCardId",
+        "aiThinking",
+        "pendingQuickCastId",
+        "lastBoardState",
+        "currentChallengerId",
+        "currentOpponentId",
+        "spectatorMatchState",
+        "myPlayerIndex",
+        "matchHistorySaved",
+        "lastLobbyPlayers",
+        "lastTauntPhase",
+        "lastTauntTurn",
+        "setMyPlayerIndex",
+        "setCurrentOpponentId",
+        "setSpectatorMatchState",
+        "setMatchHistorySaved",
+        "setLastLobbyPlayers",
+        "setLastTauntPhase",
+        "setLastTauntTurn",
+        "setPendingQuickCastId",
+        "buildEmptyBoard",
+        "toggleMatchmakingQueue",
+        "handleMatchmakingUpdate",
+        "updatePlayerList",
+        "sendChatMessage",
+        "handleChatKey",
+        "renderChatMessage",
+        "showChallengeNotification",
+        "acceptChallenge",
+        "sendMatchSync",
+        "declineChallenge",
+        "sendSpectate",
+        "proceedToWarRoom",
+        "sendChallenge",
+        "triggerToggleNetwork",
+        "selectCard",
+        "clickGrid",
+        "rejoinActiveMatch",
+        "calculateDeckRating",
+        "showPowerTooltip",
+        "openSpectatorWagerOverlay"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "./wallet.js",
+        "../collective-intelligence.js",
+        "./utils.js",
+        "./audio.js"
+      ],
+      "windowBindings": [
+        "refreshIdentity",
+        "toggleMatchmakingQueue",
+        "sendChatMessage",
+        "handleChatKey",
+        "saveMatchResult",
+        "renderMatchHistory",
+        "showChallengeNotification",
+        "acceptChallenge",
+        "sendMatchSync",
+        "reportGloat",
+        "declineChallenge",
+        "sendSpectate",
+        "proceedToWarRoom",
+        "sendChallenge",
+        "triggerToggleNetwork",
+        "selectCard",
+        "clickGrid",
+        "executeQuickCast",
+        "showPowerTooltip",
+        "buildEmptyBoard",
+        "updatePotentialPayout",
+        "rejoinActiveMatch"
+      ],
+      "exportCount": 41,
+      "importCount": 7,
+      "connectionCount": 70
+    },
+    {
+      "file": "Public\\js\\game_board.js",
+      "fileName": "game_board.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initGameBoard"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initGameBoard"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\game_locations.js",
+      "fileName": "game_locations.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initGameLocations"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "GameLocation",
+        "initGameLocations"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\game_modes.js",
+      "fileName": "game_modes.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initGameModes"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initGameModes"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\game_multiplayer.js",
+      "fileName": "game_multiplayer.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initGameMultiplayer",
+        "handleMultiplayerMessage",
+        "startPingInterval"
+      ],
+      "imports": [
+        "./network.js"
+      ],
+      "windowBindings": [
+        "getMatchHistory",
+        "initGameMultiplayer",
+        "handleMultiplayerMessage",
+        "startPingInterval"
+      ],
+      "exportCount": 3,
+      "importCount": 1,
+      "connectionCount": 8
+    },
+    {
+      "file": "Public\\js\\game_screen.js",
+      "fileName": "game_screen.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "GAME_SCREEN_HTML",
+        "renderGameScreen"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 2,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\gaming_os.js",
+      "fileName": "gaming_os.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "leaseModule",
+        "openGamingOS",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\governance.js",
+      "fileName": "governance.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "api",
+        "openGovernancePanel",
+        "hideAllOverlays",
+        "switchGvTab",
+        "gvVote",
+        "gvAcceptMission"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\governance_chambers.js",
+      "fileName": "governance_chambers.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initGovernanceChambers"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "govRunCandidate",
+        "govViewElection",
+        "initGovernanceChambers"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\governance_extended.js",
+      "fileName": "governance_extended.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openGovExtended",
+        "hideAllOverlays",
+        "switchGeTab",
+        "geCloseElection",
+        "geRegisterCandidate",
+        "geAwardCard",
+        "geUseRepShield"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\identity_editor.js",
+      "fileName": "identity_editor.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initIdentityEditor"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initIdentityEditor"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\industrial_flow.js",
+      "fileName": "industrial_flow.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initIndustrialFlow"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initIndustrialFlow"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\industrial_loop.js",
+      "fileName": "industrial_loop.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openIndustrialLoop",
+        "switchILTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\infrastructure_lease.js",
+      "fileName": "infrastructure_lease.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "createLease",
+        "openInfrastructureLease",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\investment_dashboard.js",
+      "fileName": "investment_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "hideAllOverlays",
+        "openInvestmentDashboard",
+        "closeInvestmentDashboard",
+        "switchInvestmentTab",
+        "investInEntity",
+        "claimDividends",
+        "onInvestmentConfirmed",
+        "onInvestmentUpdate",
+        "onDividendClaimed"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 9
+    },
+    {
+      "file": "Public\\js\\items_equip.js",
+      "fileName": "items_equip.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initItemsEquip"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initItemsEquip"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\justice_dashboard.js",
+      "fileName": "justice_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initJusticeDashboard"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "justiceGenerateMission",
+        "justiceUseTruthSerum",
+        "justiceUseRepShield",
+        "justiceBountyBoard",
+        "initJusticeDashboard",
+        "initJusticeDashboard"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\launchpad.js",
+      "fileName": "launchpad.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "backLaunch",
+        "openLaunchpad",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\leaderboard.js",
+      "fileName": "leaderboard.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "totalTournaments",
+        "lastTournamentData",
+        "seasonEnd",
+        "currentTournamentPage",
+        "tournamentLimit",
+        "setSeasonEnd",
+        "filterSeasonHistory"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./ui.js",
+        "./wallet.js",
+        "./utils.js"
+      ],
+      "windowBindings": [],
+      "exportCount": 7,
+      "importCount": 5,
+      "connectionCount": 12
+    },
+    {
+      "file": "Public\\js\\leaderboard_region.js",
+      "fileName": "leaderboard_region.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openLeaderboardRegion",
+        "hideAllOverlays",
+        "switchLBTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\life_assets.js",
+      "fileName": "life_assets.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openLifeAssets",
+        "hideAllOverlays",
+        "switchLATab",
+        "_laView3D",
+        "enter3DWorld"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\loan_terms.js",
+      "fileName": "loan_terms.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initLoanTerms"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initLoanTerms"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\market_creator_panel.js",
+      "fileName": "market_creator_panel.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openMarketCreator",
+        "hideAllOverlays",
+        "switchMcTab",
+        "mcPurchaseProduct",
+        "mcBuildItem",
+        "mcBindNFT",
+        "mcBuyStolen",
+        "mcOnboardAsset",
+        "mcEscalate",
+        "mcResolve",
+        "mcRecord",
+        "mcTransferAsset",
+        "mcCreateEvent",
+        "mcEnterEvent"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 14
+    },
+    {
+      "file": "Public\\js\\match_arena.js",
+      "fileName": "match_arena.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "placeMatchWager",
+        "GetGameState",
+        "openMatchArena",
+        "hideAllOverlays",
+        "closeMatchArena"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\match_creator.js",
+      "fileName": "match_creator.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initMatchCreator"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "GameConfig",
+        "initMatchCreator"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\mechanics.js",
+      "fileName": "mechanics.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "toMicro",
+        "addMicro",
+        "hashU64",
+        "Mechanic",
+        "MechanicEngine",
+        "microToTint"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 6,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\mechanic_defs.js",
+      "fileName": "mechanic_defs.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "M_REGION_VITALITY",
+        "M_CLUB_MOJO",
+        "M_RIVALRY_AURA",
+        "M_THEME_GRAVITY",
+        "M_CAREER_RIPPLE",
+        "DEFAULT_MECHANICS"
+      ],
+      "imports": [
+        "./mechanics.js"
+      ],
+      "windowBindings": [],
+      "exportCount": 6,
+      "importCount": 1,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\menu-constellation.js",
+      "fileName": "menu-constellation.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [],
+      "imports": [
+        "./menu_customization.js",
+        "./user_preferences.js"
+      ],
+      "windowBindings": [
+        "renderStarredItems"
+      ],
+      "exportCount": 0,
+      "importCount": 2,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\menu-dock.js",
+      "fileName": "menu-dock.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openMenuDockCategory",
+        "closeMenuDockPanel"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\menu_customization.js",
+      "fileName": "menu_customization.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 0
+    },
+    {
+      "file": "Public\\js\\menu_customization_panel.js",
+      "fileName": "menu_customization_panel.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "renderPreview",
+        "open",
+        "close",
+        "switchTab",
+        "selectShape",
+        "selectSize",
+        "onGridChange",
+        "setControllerScheme",
+        "testController",
+        "selectPerButton",
+        "onPerButtonShapeChange",
+        "onPerButtonSizeChange",
+        "removePerButtonOverride",
+        "saveMenuCustomization",
+        "resetMenuCustomization",
+        "exportMenuCustomization",
+        "importMenuCustomization",
+        "renderPerButtonList",
+        "renderControllerTab",
+        "renderGridDiagram"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "renderStarredItems",
+        "hideAllOverlays",
+        "renderStarredItems",
+        "openMenuCustomization",
+        "closeMenuCustomization"
+      ],
+      "exportCount": 20,
+      "importCount": 0,
+      "connectionCount": 25
+    },
+    {
+      "file": "Public\\js\\misc_panel.js",
+      "fileName": "misc_panel.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openMiscPanel",
+        "hideAllOverlays",
+        "switchMpTab",
+        "mpActivateAd",
+        "mpMintAsset",
+        "mpConfirmTx",
+        "mpCreateDLC",
+        "mpActivateLaunch",
+        "mpIntegrateLaunch",
+        "mpRegisterModule",
+        "mpSpawnPet",
+        "mpAddReward",
+        "mpRecomputeRivalry",
+        "mpResolveRivalry",
+        "mpCreateSeasonEvent"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 15
+    },
+    {
+      "file": "Public\\js\\network.js",
+      "fileName": "network.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "socket",
+        "myClientId",
+        "reconnectAttempts",
+        "nonceResolver",
+        "identitySyncTimeout",
+        "lastPingTime",
+        "currentLatency",
+        "setMyClientId",
+        "setNonceResolver",
+        "setReconnectAttempts",
+        "setIdentitySyncTimeout",
+        "setLastPingTime",
+        "setCurrentLatency",
+        "getNonceResolver",
+        "getReconnectAttempts",
+        "getIdentitySyncTimeout",
+        "getLastPingTime",
+        "getCurrentLatency",
+        "initWebSocket",
+        "sendPing",
+        "requestMatchSync",
+        "handleServerMessage"
+      ],
+      "imports": [
+        "./config.js",
+        "./ui.js",
+        "./wallet.js",
+        "./leaderboard.js",
+        "./game.js",
+        "./economy.js",
+        "./admin.js",
+        "./criminality.js",
+        "./game.js"
+      ],
+      "windowBindings": [
+        "onNonceResponse",
+        "sendPing",
+        "requestMatchSync",
+        "__setWorld3DLobbyPlayers",
+        "__vbtWsDispatch"
+      ],
+      "exportCount": 22,
+      "importCount": 9,
+      "connectionCount": 36
+    },
+    {
+      "file": "Public\\js\\npc_taunts.js",
+      "fileName": "npc_taunts.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initNpcTaunts"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initNpcTaunts"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\operations_dashboard.js",
+      "fileName": "operations_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openOperationsDashboard",
+        "hideAllOverlays",
+        "switchODTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\orphan_cleaner.js",
+      "fileName": "orphan_cleaner.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openOrphanCleaner",
+        "hideAllOverlays",
+        "switchOcTab",
+        "ocClickAd",
+        "ocPauseAd",
+        "ocBurnAsset",
+        "ocModifyAsset",
+        "ocRemoveMember",
+        "ocDeactivateStore",
+        "ocReactivateStore",
+        "ocResell",
+        "ocRemoveReward",
+        "ocUpdateRewardAsset",
+        "ocUpdateRewardBase",
+        "ocEndEvent",
+        "ocUpdateRewardPool",
+        "ocRefillVault",
+        "ocResetStats",
+        "ocResyncStats"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 19
+    },
+    {
+      "file": "Public\\js\\owner_stats.js",
+      "fileName": "owner_stats.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "OwnerStats",
+        "openOwnerStats"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\panel_manager.js",
+      "fileName": "panel_manager.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "PanelManager"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\particles.js",
+      "fileName": "particles.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "triggerMoodMote",
+        "triggerCloakFailureParticles",
+        "triggerMutationInsuranceEffect",
+        "triggerStaffTrainingEffect",
+        "triggerMutationSuccessParticles",
+        "triggerDistrictStabilizerEffect",
+        "triggerCloakDisruptorParticles",
+        "initParticleSystem",
+        "animateParticles",
+        "triggerFoundryFusion",
+        "triggerCaptureParticles",
+        "triggerGlobalKidnapEffect",
+        "triggerContractCompleteEffect",
+        "triggerMutationScarEffect"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "triggerCaptureParticles",
+        "triggerCloakFailureParticles",
+        "triggerCloakDisruptorParticles",
+        "triggerDistrictStabilizerEffect",
+        "triggerContractCompleteEffect",
+        "triggerStaffTrainingEffect",
+        "triggerMutationInsuranceEffect",
+        "triggerMutationSuccessParticles",
+        "triggerFoundryFusion",
+        "triggerGlobalKidnapEffect",
+        "triggerMutationScarEffect",
+        "triggerCaptureParticles",
+        "initParticleSystem"
+      ],
+      "exportCount": 14,
+      "importCount": 0,
+      "connectionCount": 27
+    },
+    {
+      "file": "Public\\js\\pathway_avenues.js",
+      "fileName": "pathway_avenues.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "getPathway",
+        "getAllPathways"
+      ],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 2,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\persistent_identity.js",
+      "fileName": "persistent_identity.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "GetGameState",
+        "openPersistentIdentity",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\pet_battle_arena.js",
+      "fileName": "pet_battle_arena.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openPetBattleArena",
+        "switchPBATab",
+        "pbaSelectPet",
+        "pbaFindMatch",
+        "pbaAttack",
+        "pbaSelectBreeder",
+        "pbaBreed",
+        "pbaTrain",
+        "pbaJoinTournament"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 9
+    },
+    {
+      "file": "Public\\js\\pet_breeder.js",
+      "fileName": "pet_breeder.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initPetBreeder"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initPetBreeder"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\placeholder_assets.js",
+      "fileName": "placeholder_assets.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "PlaceholderAssets"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\player_profile.js",
+      "fileName": "player_profile.js",
+      "category": "social",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "hideAllOverlays",
+        "getActiveWallet",
+        "GetGameState",
+        "GetGameState",
+        "submitTerritoryPurchase",
+        "GetGameState",
+        "openReplayViewer",
+        "renderMatchHistory",
+        "openShopsOverlay",
+        "switchShopCategory",
+        "__ppOpenShop",
+        "openPlayerProfile",
+        "closePlayerProfile",
+        "ppOpenCategory",
+        "ppOpenSub",
+        "ppSwitchRegion",
+        "ppDistrictDetail",
+        "ppOpenRegionalManager",
+        "ppExpandTerritory",
+        "ppSpectatePlayer",
+        "ppOpenReplay",
+        "onCareerTierDemoted"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 22
+    },
+    {
+      "file": "Public\\js\\post_match_wagers.js",
+      "fileName": "post_match_wagers.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initPostMatchWagers",
+        "resolveWager",
+        "resolveBounty"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initPostMatchWagers",
+        "resolveWager",
+        "resolveBounty"
+      ],
+      "exportCount": 3,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\religion_governance.js",
+      "fileName": "religion_governance.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openReligionGovernance",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\remaining_tabs.js",
+      "fileName": "remaining_tabs.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initLaunchpad",
+        "initAds",
+        "initVehicles",
+        "initStatsOverlay",
+        "initWorldContent",
+        "initGamingOS",
+        "initLocalModel",
+        "initGovernor",
+        "initLeaderboard",
+        "initCompliance",
+        "initMaintenance",
+        "initSystemMsg",
+        "initOrphans",
+        "initRegions"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initLaunchpad",
+        "initAds",
+        "initVehicles",
+        "initStatsOverlay",
+        "initWorldContent",
+        "initGamingOS",
+        "initLocalModel",
+        "initGovernor",
+        "initLeaderboard",
+        "initCompliance",
+        "initMaintenance",
+        "initSystemMsg",
+        "initOrphans",
+        "initRegions"
+      ],
+      "exportCount": 14,
+      "importCount": 0,
+      "connectionCount": 28
+    },
+    {
+      "file": "Public\\js\\replay_viewer.js",
+      "fileName": "replay_viewer.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initReplayViewer"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initReplayViewer"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\report_history.js",
+      "fileName": "report_history.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initReportHistory"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initReportHistory"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\rewards_center.js",
+      "fileName": "rewards_center.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initRewardsCenter"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initRewardsCenter"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\rivalry.js",
+      "fileName": "rivalry.js",
+      "category": "social",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "RivalryEngine"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "openRivalryViewer",
+        "switchRivTab",
+        "rivChallenge",
+        "rivSendChallenge"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\rivalry_challenge.js",
+      "fileName": "rivalry_challenge.js",
+      "category": "social",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initRivalryChallenge"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "rivalryNewChallenge",
+        "rivalryViewLeaderboard",
+        "initRivalryChallenge"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\rivalry_viewer.js",
+      "fileName": "rivalry_viewer.js",
+      "category": "social",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openRivalryViewer",
+        "hideAllOverlays",
+        "switchRVTab",
+        "_rvResolve",
+        "onRivalryUpdate"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\seasonal_events.js",
+      "fileName": "seasonal_events.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initSeasonalEvents",
+        "handleSeasonalWebSocket"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initSeasonalEvents",
+        "handleSeasonalWebSocket",
+        "openSeasonalEvents",
+        "openWorldDashboard",
+        "switchWDTab",
+        "initSeasonalEvents"
+      ],
+      "exportCount": 2,
+      "importCount": 0,
+      "connectionCount": 8
+    },
+    {
+      "file": "Public\\js\\season_countdown.js",
+      "fileName": "season_countdown.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initSeasonCountdown"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initSeasonCountdown"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\security_dashboard.js",
+      "fileName": "security_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openSecurityDashboard",
+        "hideAllOverlays",
+        "switchSDTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\settings_panel.js",
+      "fileName": "settings_panel.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "showToast",
+        "walletDisconnect",
+        "showToast",
+        "openSettings",
+        "closeSettings",
+        "settingsSetVolume",
+        "settingsToggleMute",
+        "settingsSetQuality",
+        "settingsResetTutorial",
+        "settingsDisconnect"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 10
+    },
+    {
+      "file": "Public\\js\\spectate.js",
+      "fileName": "spectate.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openSpectate",
+        "switchSPTab",
+        "spWatch",
+        "spViewReplay",
+        "spSearchPlayer"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\stat_overlay.js",
+      "fileName": "stat_overlay.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openStatOverlay",
+        "hideAllOverlays"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\systems_panel.js",
+      "fileName": "systems_panel.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openSystemsPanel",
+        "hideAllOverlays",
+        "switchSpTab",
+        "spSpawnAI",
+        "spChallengeAI",
+        "spReleaseAI",
+        "spStartReplay",
+        "spCaptureReplay",
+        "spStopReplay",
+        "spLinkIdentity",
+        "spUnlinkIdentity",
+        "spResolveIdentity",
+        "spAddChurchItem",
+        "spAddChurchMember",
+        "spRivalryAction",
+        "spRivalryJoin",
+        "spRivalryDetect"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 17
+    },
+    {
+      "file": "Public\\js\\system_dashboard.js",
+      "fileName": "system_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openSystemDashboard",
+        "hideAllOverlays",
+        "switchSDTab",
+        "sdRecomputeRivalry",
+        "sdRequestRivalry",
+        "sdJoinRivalry",
+        "sdResolveRivalry",
+        "sdRivalryAction",
+        "sdListRivalries"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 9
+    },
+    {
+      "file": "Public\\js\\tea_house.js",
+      "fileName": "tea_house.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initTeaHouse"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initTeaHouse"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\territory_map.js",
+      "fileName": "territory_map.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initTerritoryMap"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initTerritoryMap"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\theme_dashboard.js",
+      "fileName": "theme_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openThemeDashboard",
+        "hideAllOverlays",
+        "switchThemeTab",
+        "loadWeatherForRegion",
+        "loadDynamicsForRegion"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\theme_engine.js",
+      "fileName": "theme_engine.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "themeEngine"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 1
+    },
+    {
+      "file": "Public\\js\\tournament_brackets.js",
+      "fileName": "tournament_brackets.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initTournamentBrackets"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "tournamentSpectate",
+        "tournamentViewBracket",
+        "initTournamentBrackets"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\treasure_map.js",
+      "fileName": "treasure_map.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initTreasureMap"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initTreasureMap"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\tutorial_system.js",
+      "fileName": "tutorial_system.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initTutorialSystem",
+        "showTutorialOverlay",
+        "injectTutorialCSS"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initTutorialSystem",
+        "showTutorialOverlay"
+      ],
+      "exportCount": 3,
+      "importCount": 0,
+      "connectionCount": 5
+    },
+    {
+      "file": "Public\\js\\tx_modal.js",
+      "fileName": "tx_modal.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "showToast",
+        "txModalOpen",
+        "txModalCancel",
+        "txModalConfirm"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 4
+    },
+    {
+      "file": "Public\\js\\ui.js",
+      "fileName": "ui.js",
+      "category": "game",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "tooltipEl",
+        "maintenanceTicker",
+        "districtScannerTimerInterval",
+        "seasonTimerInterval",
+        "banTicker",
+        "mapZoom",
+        "adjustMapZoom",
+        "updateMissionHUD",
+        "updateAvatarIdentityStyle",
+        "updateStaffTrainingVisuals",
+        "updateMoodCatalystVisuals",
+        "showToast",
+        "openTerritoryMapOverlay",
+        "updateMapStatusIndicators",
+        "startDistrictScannerTimer",
+        "openTerritoryView",
+        "openRegionalManager",
+        "setTransactionStatus",
+        "hideAllOverlays",
+        "showMainGameContainer",
+        "highlightStartButton",
+        "handleMaintenanceUI",
+        "syncBoardParticles",
+        "showTournamentTransition",
+        "updateDynamicArenaFloor",
+        "renderCardHTML",
+        "movePowerTooltip",
+        "hidePowerTooltip",
+        "showMutationStabilityTooltip",
+        "showQuickCastMenu",
+        "handleLocalBanUI",
+        "showMatchPreview",
+        "shareTournamentVictory",
+        "openSettingsOverlay",
+        "closeSettingsOverlay",
+        "generateBracketHTML",
+        "updateTournamentPaginationUI",
+        "startSeasonTimer",
+        "renderHofEcosystemGuardianBanner",
+        "renderDonationLeaderboard",
+        "switchHofTab",
+        "toggleTournamentDetails",
+        "handleTournamentUI",
+        "openTournamentBracket",
+        "closeTournamentBracket",
+        "updateSpectatorHUD"
+      ],
+      "imports": [
+        "./config.js",
+        "./particles.js",
+        "./network.js",
+        "./wallet.js",
+        "./game.js",
+        "./audio.js",
+        "./admin.js",
+        "./criminality.js",
+        "./leaderboard.js",
+        "./utils.js",
+        "./economy.js"
+      ],
+      "windowBindings": [
+        "showToast",
+        "hideAllOverlays",
+        "GetGameState",
+        "GetGameState",
+        "toggleActionDropdown",
+        "highlightStartButton",
+        "GetGameState",
+        "GetGameState",
+        "hideAllOverlays"
+      ],
+      "exportCount": 46,
+      "importCount": 11,
+      "connectionCount": 66
+    },
+    {
+      "file": "Public\\js\\underworld.js",
+      "fileName": "underworld.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openUnderworld",
+        "switchUWTab",
+        "uwStartHeist",
+        "uwKidnap",
+        "uwCapture",
+        "uwAcceptContract"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\underworld_contracts.js",
+      "fileName": "underworld_contracts.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initUnderworldContracts"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initUnderworldContracts"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    },
+    {
+      "file": "Public\\js\\user_preferences.js",
+      "fileName": "user_preferences.js",
+      "category": "menu",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 0
+    },
+    {
+      "file": "Public\\js\\utilities_dashboard.js",
+      "fileName": "utilities_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openUtilitiesDashboard",
+        "hideAllOverlays",
+        "switchUDTab"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 3
+    },
+    {
+      "file": "Public\\js\\utils.js",
+      "fileName": "utils.js",
+      "category": "core",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "assetCache",
+        "envoiCache",
+        "getAssetSymbol",
+        "shortenAddress",
+        "getCachedEnvoiName",
+        "getNetworkConfig",
+        "reportGloat"
+      ],
+      "imports": [
+        "./config.js",
+        "./network.js",
+        "./wallet.js",
+        "./ui.js",
+        "./admin.js"
+      ],
+      "windowBindings": [],
+      "exportCount": 7,
+      "importCount": 5,
+      "connectionCount": 12
+    },
+    {
+      "file": "Public\\js\\wallet.js",
+      "fileName": "wallet.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "userAddress",
+        "isVerified",
+        "linkedWallets",
+        "payoutAddress",
+        "walletProvider",
+        "signClient",
+        "wcModal",
+        "setWalletProvider",
+        "setPayoutAddress",
+        "setUserAddress",
+        "setIsVerified",
+        "setLinkedWallets",
+        "openPayoutSettings",
+        "savePayoutAddress",
+        "updatePayoutUI",
+        "closeWalletSelector",
+        "updateWalletUI",
+        "addXChainWallet"
+      ],
+      "imports": [
+        "./config.js",
+        "./ui.js",
+        "./utils.js",
+        "./network.js",
+        "./audio.js"
+      ],
+      "windowBindings": [
+        "hideAllOverlays",
+        "processRewardPayout",
+        "hideAllOverlays",
+        "onLinkWalletResponse"
+      ],
+      "exportCount": 18,
+      "importCount": 5,
+      "connectionCount": 27
+    },
+    {
+      "file": "Public\\js\\wallet_modal.js",
+      "fileName": "wallet_modal.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "walletModalOpen",
+        "walletModalClose",
+        "walletConnect",
+        "walletDisconnect",
+        "walletIsConnected",
+        "walletGetAddress"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 6
+    },
+    {
+      "file": "Public\\js\\wallet_state.js",
+      "fileName": "wallet_state.js",
+      "category": "economy",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "getWalletAddress",
+        "isWalletConnected",
+        "getVBVBalanceMicro",
+        "getVBVBalance",
+        "setWalletAddress",
+        "setVBVBalanceMicro",
+        "setVBVBalance",
+        "canAfford",
+        "deductVBV",
+        "addVBV",
+        "api",
+        "apiJSON"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 12
+    },
+    {
+      "file": "Public\\js\\world3d.js",
+      "fileName": "world3d.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [],
+      "imports": [
+        "./mechanics.js",
+        "./mechanic_defs.js"
+      ],
+      "windowBindings": [
+        "sendSpectate",
+        "World3DEngine",
+        "enter3DWorld",
+        "enterMenuWorld",
+        "__setWorld3DLobbyPlayers"
+      ],
+      "exportCount": 0,
+      "importCount": 2,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\world_dashboard.js",
+      "fileName": "world_dashboard.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "hideAllOverlays",
+        "wdOpenClub",
+        "openWorldDashboard",
+        "hideAllOverlays",
+        "openWorldDashboardToTab",
+        "hideAllOverlays",
+        "switchWDTab",
+        "wdAdoptOrphan",
+        "wdReclaimOrphan",
+        "wdBuyMarket",
+        "wdTakeLoan",
+        "wdRepayLoan",
+        "wdClaimDividends",
+        "wdJoinEvent",
+        "wdClaimTreasure",
+        "wdSubmitReport"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 16
+    },
+    {
+      "file": "Public\\js\\world_events.js",
+      "fileName": "world_events.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": false,
+      "exports": [],
+      "imports": [],
+      "windowBindings": [
+        "openWorldEvents",
+        "hideAllOverlays",
+        "switchWETab",
+        "_weView3D",
+        "enter3DWorld",
+        "_weClaim",
+        "_weEnter"
+      ],
+      "exportCount": 0,
+      "importCount": 0,
+      "connectionCount": 7
+    },
+    {
+      "file": "Public\\js\\zen_garden.js",
+      "fileName": "zen_garden.js",
+      "category": "js",
+      "isIIFE": false,
+      "isESModule": true,
+      "exports": [
+        "initZenGarden"
+      ],
+      "imports": [],
+      "windowBindings": [
+        "initZenGarden"
+      ],
+      "exportCount": 1,
+      "importCount": 0,
+      "connectionCount": 2
+    }
+  ],
+  "htmlScripts": [
+    {
+      "file": "Public\\index.html",
+      "src": "wasm_exec.js",
+      "type": "standalone",
+      "line": 21
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "/vendor/algosdk.min.js",
+      "type": "standalone",
+      "line": 24
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "/vendor/walletconnect-sign-client.umd.js",
+      "type": "standalone",
+      "line": 28
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "https://bundle.run/buffer@6.0.3",
+      "type": "standalone",
+      "line": 39
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/investment_dashboard.js",
+      "type": "standalone",
+      "line": 715
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/creator_store.js",
+      "type": "standalone",
+      "line": 720
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/ai_citizens.js",
+      "type": "standalone",
+      "line": 723
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/world_events.js",
+      "type": "standalone",
+      "line": 726
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/leaderboard_region.js",
+      "type": "standalone",
+      "line": 729
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/rivalry_viewer.js",
+      "type": "standalone",
+      "line": 732
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/life_assets.js",
+      "type": "standalone",
+      "line": 735
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/early_tasks.js",
+      "type": "standalone",
+      "line": 738
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/combined_events.js",
+      "type": "standalone",
+      "line": 741
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/religion_governance.js",
+      "type": "standalone",
+      "line": 742
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/stat_overlay.js",
+      "type": "standalone",
+      "line": 743
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/industrial_loop.js",
+      "type": "standalone",
+      "line": 744
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/faith_system.js",
+      "type": "standalone",
+      "line": 747
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/children_bots.js",
+      "type": "standalone",
+      "line": 750
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/entity_market.js",
+      "type": "standalone",
+      "line": 753
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/pet_battle_arena.js",
+      "type": "standalone",
+      "line": 754
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/persistent_identity.js",
+      "type": "standalone",
+      "line": 757
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/entity_shares.js",
+      "type": "standalone",
+      "line": 758
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/infrastructure_lease.js",
+      "type": "standalone",
+      "line": 759
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/governance.js",
+      "type": "standalone",
+      "line": 760
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/bridge_router.js",
+      "type": "standalone",
+      "line": 761
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/creator_economy.js",
+      "type": "standalone",
+      "line": 762
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/faith_church.js",
+      "type": "standalone",
+      "line": 763
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/launchpad.js",
+      "type": "standalone",
+      "line": 764
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/advertising.js",
+      "type": "standalone",
+      "line": 765
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/gaming_os.js",
+      "type": "standalone",
+      "line": 766
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/asset_viewer.js",
+      "type": "standalone",
+      "line": 769
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/dev_game_hub.js",
+      "type": "standalone",
+      "line": 772
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "app.js",
+      "type": "standalone",
+      "line": 776
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/panel_manager.js",
+      "type": "standalone",
+      "line": 779
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/creator_storefront.js",
+      "type": "standalone",
+      "line": 802
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/world3d.js",
+      "type": "standalone",
+      "line": 823
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/achievements.js",
+      "type": "standalone",
+      "line": 859
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/daily_challenges.js",
+      "type": "standalone",
+      "line": 860
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/settings_panel.js",
+      "type": "standalone",
+      "line": 861
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/underworld.js",
+      "type": "standalone",
+      "line": 862
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/spectate.js",
+      "type": "standalone",
+      "line": 863
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/audio_engine.js",
+      "type": "standalone",
+      "line": 864
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/error_handler.js",
+      "type": "standalone",
+      "line": 865
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/wallet_state.js",
+      "type": "standalone",
+      "line": 866
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/wallet_modal.js",
+      "type": "standalone",
+      "line": 867
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/tx_modal.js",
+      "type": "standalone",
+      "line": 868
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/faucet_dashboard.js",
+      "type": "standalone",
+      "line": 869
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/theme_dashboard.js",
+      "type": "standalone",
+      "line": 870
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/world_dashboard.js",
+      "type": "standalone",
+      "line": 871
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/placeholder_assets.js",
+      "type": "standalone",
+      "line": 872
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/constellation_hub.js",
+      "type": "standalone",
+      "line": 873
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/match_arena.js",
+      "type": "standalone",
+      "line": 874
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/constellation_spectate.js",
+      "type": "standalone",
+      "line": 875
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/constellation_tutorial.js",
+      "type": "standalone",
+      "line": 876
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/owner_stats.js",
+      "type": "standalone",
+      "line": 877
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/system_dashboard.js",
+      "type": "standalone",
+      "line": 878
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/admin_dashboard.js",
+      "type": "standalone",
+      "line": 879
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/community_dashboard.js",
+      "type": "standalone",
+      "line": 880
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/utilities_dashboard.js",
+      "type": "standalone",
+      "line": 881
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/operations_dashboard.js",
+      "type": "standalone",
+      "line": 882
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/security_dashboard.js",
+      "type": "standalone",
+      "line": 883
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/extended_dashboard.js",
+      "type": "standalone",
+      "line": 884
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/final_dashboard.js",
+      "type": "standalone",
+      "line": 885
+    },
+    {
+      "file": "Public\\index.html",
+      "src": "js/world3d.js",
+      "type": "module",
+      "line": 823
+    }
+  ],
+  "scssPartials": [
+    {
+      "file": "Public\\src\\scss\\base\\_dashboard.scss",
+      "fileName": "_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 47
+    },
+    {
+      "file": "Public\\src\\scss\\base\\_reset.scss",
+      "fileName": "_reset.scss",
+      "isPartial": true,
+      "ruleCount": 0
+    },
+    {
+      "file": "Public\\src\\scss\\base\\_typography.scss",
+      "fileName": "_typography.scss",
+      "isPartial": true,
+      "ruleCount": 59
+    },
+    {
+      "file": "Public\\src\\scss\\base\\_variables.scss",
+      "fileName": "_variables.scss",
+      "isPartial": true,
+      "ruleCount": 0
+    },
+    {
+      "file": "Public\\src\\scss\\components\\_buttons.scss",
+      "fileName": "_buttons.scss",
+      "isPartial": true,
+      "ruleCount": 17
+    },
+    {
+      "file": "Public\\src\\scss\\components\\_cards.scss",
+      "fileName": "_cards.scss",
+      "isPartial": true,
+      "ruleCount": 79
+    },
+    {
+      "file": "Public\\src\\scss\\components\\_overlays.scss",
+      "fileName": "_overlays.scss",
+      "isPartial": true,
+      "ruleCount": 257
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_achievement_progress.scss",
+      "fileName": "_achievement_progress.scss",
+      "isPartial": true,
+      "ruleCount": 38
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_admin_panel.scss",
+      "fileName": "_admin_panel.scss",
+      "isPartial": true,
+      "ruleCount": 8
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_ai-citizens.scss",
+      "fileName": "_ai-citizens.scss",
+      "isPartial": true,
+      "ruleCount": 23
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_amm_chart.scss",
+      "fileName": "_amm_chart.scss",
+      "isPartial": true,
+      "ruleCount": 37
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_asset-viewer.scss",
+      "fileName": "_asset-viewer.scss",
+      "isPartial": true,
+      "ruleCount": 8
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_black_market.scss",
+      "fileName": "_black_market.scss",
+      "isPartial": true,
+      "ruleCount": 21
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_campaign_mode.scss",
+      "fileName": "_campaign_mode.scss",
+      "isPartial": true,
+      "ruleCount": 24
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_card_animations.scss",
+      "fileName": "_card_animations.scss",
+      "isPartial": true,
+      "ruleCount": 13
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_card_progression.scss",
+      "fileName": "_card_progression.scss",
+      "isPartial": true,
+      "ruleCount": 31
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_card_titles.scss",
+      "fileName": "_card_titles.scss",
+      "isPartial": true,
+      "ruleCount": 34
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_career_tree.scss",
+      "fileName": "_career_tree.scss",
+      "isPartial": true,
+      "ruleCount": 38
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_character_mood.scss",
+      "fileName": "_character_mood.scss",
+      "isPartial": true,
+      "ruleCount": 19
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_children-bots.scss",
+      "fileName": "_children-bots.scss",
+      "isPartial": true,
+      "ruleCount": 36
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_church_storefront.scss",
+      "fileName": "_church_storefront.scss",
+      "isPartial": true,
+      "ruleCount": 45
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_club_foundry.scss",
+      "fileName": "_club_foundry.scss",
+      "isPartial": true,
+      "ruleCount": 33
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_constellation_hub.scss",
+      "fileName": "_constellation_hub.scss",
+      "isPartial": true,
+      "ruleCount": 114
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_constellation_spectate.scss",
+      "fileName": "_constellation_spectate.scss",
+      "isPartial": true,
+      "ruleCount": 39
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_constellation_tutorial.scss",
+      "fileName": "_constellation_tutorial.scss",
+      "isPartial": true,
+      "ruleCount": 12
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_controller_nav.scss",
+      "fileName": "_controller_nav.scss",
+      "isPartial": true,
+      "ruleCount": 11
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_counterfeit_scanner.scss",
+      "fileName": "_counterfeit_scanner.scss",
+      "isPartial": true,
+      "ruleCount": 23
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_creator-store.scss",
+      "fileName": "_creator-store.scss",
+      "isPartial": true,
+      "ruleCount": 17
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_creator_studio.scss",
+      "fileName": "_creator_studio.scss",
+      "isPartial": true,
+      "ruleCount": 20
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_criminality.scss",
+      "fileName": "_criminality.scss",
+      "isPartial": true,
+      "ruleCount": 177
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_deck_manager.scss",
+      "fileName": "_deck_manager.scss",
+      "isPartial": true,
+      "ruleCount": 24
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_dividend_yield.scss",
+      "fileName": "_dividend_yield.scss",
+      "isPartial": true,
+      "ruleCount": 38
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_early-tasks.scss",
+      "fileName": "_early-tasks.scss",
+      "isPartial": true,
+      "ruleCount": 8
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_economy.scss",
+      "fileName": "_economy.scss",
+      "isPartial": true,
+      "ruleCount": 123
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_entity-market.scss",
+      "fileName": "_entity-market.scss",
+      "isPartial": true,
+      "ruleCount": 19
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_equipment_system.scss",
+      "fileName": "_equipment_system.scss",
+      "isPartial": true,
+      "ruleCount": 26
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_error_handler.scss",
+      "fileName": "_error_handler.scss",
+      "isPartial": true,
+      "ruleCount": 14
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_events_arena.scss",
+      "fileName": "_events_arena.scss",
+      "isPartial": true,
+      "ruleCount": 36
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_faith_church.scss",
+      "fileName": "_faith_church.scss",
+      "isPartial": true,
+      "ruleCount": 80
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_faith_war_gambit.scss",
+      "fileName": "_faith_war_gambit.scss",
+      "isPartial": true,
+      "ruleCount": 20
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_faucet_dashboard.scss",
+      "fileName": "_faucet_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 47
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_game_board.scss",
+      "fileName": "_game_board.scss",
+      "isPartial": true,
+      "ruleCount": 45
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_game_locations.scss",
+      "fileName": "_game_locations.scss",
+      "isPartial": true,
+      "ruleCount": 22
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_game_modes.scss",
+      "fileName": "_game_modes.scss",
+      "isPartial": true,
+      "ruleCount": 37
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_game_multiplayer.scss",
+      "fileName": "_game_multiplayer.scss",
+      "isPartial": true,
+      "ruleCount": 52
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_game_systems.scss",
+      "fileName": "_game_systems.scss",
+      "isPartial": true,
+      "ruleCount": 40
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_governance.scss",
+      "fileName": "_governance.scss",
+      "isPartial": true,
+      "ruleCount": 33
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_governance_chambers.scss",
+      "fileName": "_governance_chambers.scss",
+      "isPartial": true,
+      "ruleCount": 31
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_identity_editor.scss",
+      "fileName": "_identity_editor.scss",
+      "isPartial": true,
+      "ruleCount": 29
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_industrial-loop.scss",
+      "fileName": "_industrial-loop.scss",
+      "isPartial": true,
+      "ruleCount": 49
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_industrial_flow.scss",
+      "fileName": "_industrial_flow.scss",
+      "isPartial": true,
+      "ruleCount": 28
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_investment.scss",
+      "fileName": "_investment.scss",
+      "isPartial": true,
+      "ruleCount": 38
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_items_equip.scss",
+      "fileName": "_items_equip.scss",
+      "isPartial": true,
+      "ruleCount": 26
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_justice.scss",
+      "fileName": "_justice.scss",
+      "isPartial": true,
+      "ruleCount": 33
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_justice_dashboard.scss",
+      "fileName": "_justice_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 55
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_leaderboard-region.scss",
+      "fileName": "_leaderboard-region.scss",
+      "isPartial": true,
+      "ruleCount": 9
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_life-assets.scss",
+      "fileName": "_life-assets.scss",
+      "isPartial": true,
+      "ruleCount": 5
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_loan_terms.scss",
+      "fileName": "_loan_terms.scss",
+      "isPartial": true,
+      "ruleCount": 38
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_lobby.scss",
+      "fileName": "_lobby.scss",
+      "isPartial": true,
+      "ruleCount": 12
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_match_arena.scss",
+      "fileName": "_match_arena.scss",
+      "isPartial": true,
+      "ruleCount": 17
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_match_creator.scss",
+      "fileName": "_match_creator.scss",
+      "isPartial": true,
+      "ruleCount": 29
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_menu-constellation.scss",
+      "fileName": "_menu-constellation.scss",
+      "isPartial": true,
+      "ruleCount": 87
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_menu-dock.scss",
+      "fileName": "_menu-dock.scss",
+      "isPartial": true,
+      "ruleCount": 33
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_menu_customization.scss",
+      "fileName": "_menu_customization.scss",
+      "isPartial": true,
+      "ruleCount": 162
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_menu_customization_panel.scss",
+      "fileName": "_menu_customization_panel.scss",
+      "isPartial": true,
+      "ruleCount": 41
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_npc_taunts.scss",
+      "fileName": "_npc_taunts.scss",
+      "isPartial": true,
+      "ruleCount": 31
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_panels.scss",
+      "fileName": "_panels.scss",
+      "isPartial": true,
+      "ruleCount": 15
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_pet-battle-arena.scss",
+      "fileName": "_pet-battle-arena.scss",
+      "isPartial": true,
+      "ruleCount": 86
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_pet_breeder.scss",
+      "fileName": "_pet_breeder.scss",
+      "isPartial": true,
+      "ruleCount": 65
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_player-profile.scss",
+      "fileName": "_player-profile.scss",
+      "isPartial": true,
+      "ruleCount": 60
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_post_match_wagers.scss",
+      "fileName": "_post_match_wagers.scss",
+      "isPartial": true,
+      "ruleCount": 22
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_remaining_tabs.scss",
+      "fileName": "_remaining_tabs.scss",
+      "isPartial": true,
+      "ruleCount": 16
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_replay_viewer.scss",
+      "fileName": "_replay_viewer.scss",
+      "isPartial": true,
+      "ruleCount": 19
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_report_history.scss",
+      "fileName": "_report_history.scss",
+      "isPartial": true,
+      "ruleCount": 25
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_rewards_center.scss",
+      "fileName": "_rewards_center.scss",
+      "isPartial": true,
+      "ruleCount": 11
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_rivalry-viewer.scss",
+      "fileName": "_rivalry-viewer.scss",
+      "isPartial": true,
+      "ruleCount": 13
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_rivalry.scss",
+      "fileName": "_rivalry.scss",
+      "isPartial": true,
+      "ruleCount": 14
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_rivalry_challenge.scss",
+      "fileName": "_rivalry_challenge.scss",
+      "isPartial": true,
+      "ruleCount": 33
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_seasonal.scss",
+      "fileName": "_seasonal.scss",
+      "isPartial": true,
+      "ruleCount": 24
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_seasonal_events.scss",
+      "fileName": "_seasonal_events.scss",
+      "isPartial": true,
+      "ruleCount": 35
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_season_countdown.scss",
+      "fileName": "_season_countdown.scss",
+      "isPartial": true,
+      "ruleCount": 24
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_shops.scss",
+      "fileName": "_shops.scss",
+      "isPartial": true,
+      "ruleCount": 82
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_social.scss",
+      "fileName": "_social.scss",
+      "isPartial": true,
+      "ruleCount": 115
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_spectate.scss",
+      "fileName": "_spectate.scss",
+      "isPartial": true,
+      "ruleCount": 8
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_tea_house.scss",
+      "fileName": "_tea_house.scss",
+      "isPartial": true,
+      "ruleCount": 59
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_territory.scss",
+      "fileName": "_territory.scss",
+      "isPartial": true,
+      "ruleCount": 144
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_territory_map.scss",
+      "fileName": "_territory_map.scss",
+      "isPartial": true,
+      "ruleCount": 19
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_theme_dashboard.scss",
+      "fileName": "_theme_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 29
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_theme_engine.scss",
+      "fileName": "_theme_engine.scss",
+      "isPartial": true,
+      "ruleCount": 24
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_tournament_brackets.scss",
+      "fileName": "_tournament_brackets.scss",
+      "isPartial": true,
+      "ruleCount": 63
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_treasure_map.scss",
+      "fileName": "_treasure_map.scss",
+      "isPartial": true,
+      "ruleCount": 22
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_tx_modal.scss",
+      "fileName": "_tx_modal.scss",
+      "isPartial": true,
+      "ruleCount": 16
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_underworld.scss",
+      "fileName": "_underworld.scss",
+      "isPartial": true,
+      "ruleCount": 13
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_underworld_contracts.scss",
+      "fileName": "_underworld_contracts.scss",
+      "isPartial": true,
+      "ruleCount": 31
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_ux_enhancements.scss",
+      "fileName": "_ux_enhancements.scss",
+      "isPartial": true,
+      "ruleCount": 43
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_wallet_modal.scss",
+      "fileName": "_wallet_modal.scss",
+      "isPartial": true,
+      "ruleCount": 17
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_world-events.scss",
+      "fileName": "_world-events.scss",
+      "isPartial": true,
+      "ruleCount": 13
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_world_dashboard.scss",
+      "fileName": "_world_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 27
+    },
+    {
+      "file": "Public\\src\\scss\\features\\_zen_garden.scss",
+      "fileName": "_zen_garden.scss",
+      "isPartial": true,
+      "ruleCount": 13
+    },
+    {
+      "file": "Public\\src\\scss\\layouts\\_app-shell.scss",
+      "fileName": "_app-shell.scss",
+      "isPartial": true,
+      "ruleCount": 14
+    },
+    {
+      "file": "Public\\src\\scss\\layouts\\_dashboard.scss",
+      "fileName": "_dashboard.scss",
+      "isPartial": true,
+      "ruleCount": 70
+    },
+    {
+      "file": "Public\\src\\scss\\layouts\\_main-layout.scss",
+      "fileName": "_main-layout.scss",
+      "isPartial": true,
+      "ruleCount": 23
+    },
+    {
+      "file": "Public\\src\\scss\\main.scss",
+      "fileName": "main.scss",
+      "isPartial": false,
+      "ruleCount": 0
+    },
+    {
+      "file": "Public\\src\\scss\\themes\\_neon-glass.scss",
+      "fileName": "_neon-glass.scss",
+      "isPartial": true,
+      "ruleCount": 4
+    },
+    {
+      "file": "Public\\src\\scss\\utilities\\_animations.scss",
+      "fileName": "_animations.scss",
+      "isPartial": true,
+      "ruleCount": 23
+    },
+    {
+      "file": "Public\\src\\scss\\utilities\\_spacing.scss",
+      "fileName": "_spacing.scss",
+      "isPartial": true,
+      "ruleCount": 432
+    }
+  ],
+  "buildTagViolations": [],
+  "summary": {
+    "bridgeFunctions": 68,
+    "completeFlows": 48,
+    "registrationOnly": 20,
+    "handlerOnly": 0,
+    "flowIntegrityPercent": 71,
+    "jsModules": 141,
+    "esModules": 70,
+    "iifeModules": 0,
+    "htmlScripts": 64,
+    "scssPartials": 106,
+    "violations": 0
+  },
+  "changes": {
+    "timestamp": "2026-09-12T21:36:46.647Z",
+    "added": [],
+    "removed": [],
+    "modified": []
+  }
+}

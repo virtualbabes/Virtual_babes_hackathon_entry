@@ -1,0 +1,179 @@
+/* === Club Foundry === */
+.club-foundry-container { padding: 8px 0; }
+
+.club-foundry-header { margin-bottom: 16px; }
+
+.club-types-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.club-type-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.club-type-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: #00bcd4;
+    transform: translateY(-2px);
+}
+
+.club-type-card.selected {
+    border-color: #00bcd4;
+    background: rgba(0, 188, 212, 0.1);
+    box-shadow: 0 0 12px rgba(0, 188, 212, 0.3);
+}
+
+.club-type-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+
+.club-type-name { font-size: 12px; font-weight: 700; color: #e5e7eb; display: block; }
+
+.club-type-desc { font-size: 9px; color: #90a4ae; display: block; margin: 4px 0; }
+
+.club-type-cost { font-size: 10px; color: #00bcd4; font-weight: 600; }
+
+/* Create form */
+.club-create-form {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.club-form-row { margin-bottom: 12px; }
+
+.club-form-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.club-form-row input,
+.club-form-row select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.club-form-actions { margin-top: 16px; }
+
+.club-foundry-info {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.club-foundry-info h4 { margin: 0 0 8px; font-size: 12px; }
+
+.club-foundry-info ul { margin: 0; padding-left: 16px; }
+
+.club-foundry-info li { font-size: 11px; color: #90a4ae; margin-bottom: 4px; }
+
+/* Club management */
+.club-management-container { display: flex; flex-direction: column; gap: 12px; }
+
+.club-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.club-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.club-card-name { font-size: 16px; font-weight: 700; color: #e5e7eb; }
+
+.club-card-type {
+    font-size: 9px;
+    background: rgba(0, 188, 212, 0.15);
+    color: #00bcd4;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    margin-left: 8px;
+}
+
+.club-card-mojo { font-size: 14px; color: #ff9800; font-weight: 600; }
+
+.club-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.club-stat-mini {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+}
+
+.club-stat-label { display: block; font-size: 8px; color: #607d8b; text-transform: uppercase; }
+
+.club-stat-val { font-size: 14px; font-weight: 700; color: #e5e7eb; }
+
+.club-staff-section, .club-members-section { margin-bottom: 12px; }
+
+.club-staff-section h5, .club-members-section h5 {
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+}
+
+.club-staff-list, .club-members-list { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.club-staff-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.staff-role-badge {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.role-ceo { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+.role-manager { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+.role-security { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.role-clerk { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+
+.staff-wallet, .club-member-badge {
+    font-size: 9px;
+    color: #90a4ae;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.club-actions-row { display: flex; gap: 8px; flex-wrap: wrap; }

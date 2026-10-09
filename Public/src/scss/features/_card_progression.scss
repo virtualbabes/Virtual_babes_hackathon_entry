@@ -1,0 +1,170 @@
+/* === Card Progression */
+.progression-container { padding: 8px 0; }
+
+.pg-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(233, 30, 99, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.pg-icon { font-size: 32px; }
+
+.pg-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.pg-tab {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-size: 11px;
+    color: #90a4ae;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pg-tab:hover { border-color: #e91e63; }
+
+.pg-tab.active {
+    background: rgba(233, 30, 99, 0.15);
+    border-color: #e91e63;
+    color: #e5e7eb;
+}
+
+.pg-panel { display: none; }
+
+.pg-panel.active { display: block; }
+
+.pg-panel h4 { margin: 0 0 8px; }
+
+.pg-panel p { margin: 0 0 12px; }
+
+.pg-card-select {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pg-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pg-card:hover { border-color: #9c27b0; }
+
+.pg-card.selected {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0;
+}
+
+.pg-card-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.pg-card-level { display: block; font-size: 9px; color: #4caf50; }
+
+.pg-card-tier { display: block; font-size: 9px; color: #90a4ae; }
+
+.pg-training-game {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 12px;
+    position: relative;
+    height: 60px;
+}
+
+.pg-training-bar {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+}
+
+.pg-zone { flex: 1; }
+
+.pg-zone.fail { background: rgba(239, 68, 68, 0.3); }
+
+.pg-zone.success { background: rgba(76, 175, 80, 0.3); }
+
+.pg-zone.critical { background: rgba(255, 215, 0, 0.5); }
+
+.pg-training-marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 30px;
+    background: #e91e63;
+    border-radius: 2px;
+    box-shadow: 0 0 10px #e91e63;
+}
+
+.pg-train-btn { width: 100%; }
+
+.pg-fusion-base, .pg-fusion-sacrifices {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.pg-fusion-base h5, .pg-fusion-sacrifices h5 { margin: 0 0 8px; color: #e5e7eb; }
+
+.pg-fusion-slot {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pg-sacrifice-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 6px;
+}
+
+.pg-fusion-card.base {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.pg-fuse-btn { width: 100%; }
+
+.pg-upgrade-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pg-upgrade-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.pg-upgrade-card .pg-card-name { flex: 1; }
+
+.pg-upgrade-cost { font-size: 11px; color: #ffc107; }

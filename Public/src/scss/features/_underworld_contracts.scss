@@ -1,0 +1,134 @@
+/* === Underworld Contracts === */
+.underworld-container { padding: 8px 0; }
+
+.underworld-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.underworld-icon { font-size: 32px; }
+
+.underworld-info { flex: 1; }
+
+.underworld-cut {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.cut-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.cut-value { font-size: 20px; font-weight: 700; color: #f44336; }
+
+.underworld-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.warning-icon { font-size: 16px; }
+
+.warning-text { font-size: 10px; color: #f44336; }
+
+.available-contracts-section h4 { margin: 0 0 12px; }
+
+.contracts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.contract-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.contract-card:hover {
+    border-color: #f44336;
+    transform: translateY(-2px);
+}
+
+.contract-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.contract-icon { font-size: 24px; }
+
+.contract-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.contract-card-body { margin-bottom: 8px; }
+
+.contract-desc { display: block; font-size: 10px; color: #90a4ae; margin-bottom: 6px; }
+
+.contract-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.contract-difficulty { font-size: 10px; color: #ffc107; }
+
+.contract-reward { font-size: 11px; color: #4caf50; font-weight: 600; }
+
+.contract-accept-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+.active-contracts-section { margin-bottom: 16px; }
+
+.active-contracts-section h4 { margin: 0 0 12px; }
+
+.active-contract-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.active-contract-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.active-contract-name { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.active-contract-status {
+    font-size: 8px;
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.active-contract-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.progress-bar { flex: 1; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
+
+.progress-fill { height: 100%; background: #4caf50; border-radius: 3px; }
+
+.progress-text { font-size: 9px; color: #90a4ae; }
+
+.contract-abort-btn { width: 100%; font-size: 9px; padding: 4px; }

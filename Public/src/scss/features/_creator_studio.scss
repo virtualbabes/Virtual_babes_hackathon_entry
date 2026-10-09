@@ -1,0 +1,96 @@
+/* === Creator Studio */
+.creator-studio-container { padding: 8px 0; }
+
+.studio-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.studio-icon { font-size: 32px; }
+
+.studio-info { flex: 1; }
+
+.studio-stats { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 8px 16px; }
+
+.studio-products-num { display: block; font-size: 18px; font-weight: 700; color: #9c27b0; }
+
+.studio-products-label { font-size: 9px; color: #90a4ae; }
+
+.studio-create-section { margin-bottom: 16px; }
+
+.studio-create-section h4 { margin: 0 0 12px; }
+
+.studio-create-form {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.studio-form-row { margin-bottom: 12px; }
+
+.studio-form-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.studio-form-row input,
+.studio-form-row select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.studio-products-section h4 { margin: 0 0 12px; }
+
+.studio-products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.product-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.product-card:hover { transform: translateY(-2px); border-color: #9c27b0; }
+
+.product-card-icon { font-size: 24px; display: block; margin-bottom: 6px; text-align: center; }
+
+.product-card-info { margin-bottom: 6px; }
+
+.product-card-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.product-card-price { display: block; font-size: 11px; color: #4caf50; font-weight: 600; }
+
+.product-card-status {
+    display: block;
+    font-size: 8px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.status-active { color: #4caf50; }
+
+.status-inactive { color: #9e9e9e; }
+
+.product-edit-btn { width: 100%; font-size: 9px; padding: 4px; }

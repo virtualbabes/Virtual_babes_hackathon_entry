@@ -1,0 +1,51 @@
+// Public\src\scss\features\_creator-store.scss
+// P7-C: CreatorStore overlay styles (migrated from inline index.html <style>)
+
+.creator-panels { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 8px; min-height: 500px; }
+
+/* Panel layout for creator store */
+#creator-store-overlay .panel-marketplace { grid-column: span 1; min-height: 400px; max-height: 520px; overflow-y: auto; }
+#creator-store-overlay .panel-products { grid-column: span 1; min-height: 400px; max-height: 520px; overflow-y: auto; }
+#creator-store-overlay .panel-mycreations { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+#creator-store-overlay .panel-reviews { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+
+/* Creator cards */
+.creator-cards-grid { display: flex; flex-direction: column; gap: 12px; padding: 6px; }
+.creator-card { background: rgba(75, 0, 130, 0.1); border: 1px solid rgba(169, 74, 233, 0.25); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s ease; }
+.creator-card:hover { border-color: var(--neon-purple); box-shadow: 0 0 8px rgba(169, 74, 233, 0.3); transform: translateY(-2px); background: rgba(75, 0, 130, 0.18); }
+.creator-card h3 { color: #e1bee7; margin: 0 0 6px 0; font-size: 1em; letter-spacing: 0.5px; }
+
+/* Product cards (reused pattern) */
+.product-cards-grid { display: flex; flex-direction: column; gap: 12px; padding: 6px; }
+.product-card { background: rgba(0, 97, 106, 0.1); border: 1px solid rgba(0, 255, 255, 0.2); border-radius: 8px; padding: 14px; transition: all 0.2s ease; }
+.product-card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 6px rgba(0, 255, 255, 0.25); transform: translateY(-1px); }
+.product-card h3 { color: #80deea; margin: 0 0 6px 0; font-size: 0.95em; }
+.product-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+
+/* Product tags */
+.product-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.tag { background: rgba(0, 255, 255, 0.1); border: 1px solid rgba(0, 255, 255, 0.3); color: #4dd0e1; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; }
+
+/* Commission summary grid */
+.commission-summary-grid { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+.comm-item { background: rgba(255, 235, 59, 0.05); border: 1px solid rgba(255, 235, 59, 0.2); padding: 10px 16px; border-radius: 8px; min-width: 140px; text-align: center; }
+
+/* Royalty history list */
+.royalty-history-list { list-style: none; padding: 0; margin-top: 8px; font-size: 0.75em; color: #b0bec5; max-height: 120px; overflow-y: auto; }
+.royalty-history-list li { padding: 4px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; gap: 16px; }
+
+/* Responsive layout for creator store */
+@media (max-width: 900px) {
+    #creator-store-overlay .panel-marketplace,
+    #creator-store-overlay .panel-products,
+    #creator-store-overlay .panel-mycreations,
+    #creator-store-overlay .panel-reviews { grid-column: span 1; max-height: none; }
+}
+
+/* Neon pulse animation for creator overlay */
+@keyframes creatorPulse {
+    from { box-shadow: 0 0 25px rgba(75, 0, 130, 0.3); }
+    to   { box-shadow: 0 0 45px rgba(75, 0, 130, 0.6); }
+}
+
+#creator-store-overlay.active { animation: creatorPulse 4s ease-in-out infinite; }

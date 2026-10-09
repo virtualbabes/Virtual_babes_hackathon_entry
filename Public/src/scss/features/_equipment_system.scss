@@ -1,0 +1,121 @@
+/* === Equipment System */
+.equipment-container { padding: 8px 0; }
+
+.eq-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(233, 30, 99, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.eq-icon { font-size: 32px; }
+
+.eq-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.eq-section h4 { margin: 0 0 12px; }
+
+.eq-card-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.eq-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.eq-card:hover { border-color: #e91e63; }
+
+.eq-card.selected {
+    background: rgba(233, 30, 99, 0.15);
+    border-color: #e91e63;
+}
+
+.eq-card-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.eq-card-tier { display: block; font-size: 9px; color: #90a4ae; }
+
+.eq-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.eq-slot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.eq-slot-icon { font-size: 24px; }
+
+.eq-slot-name { font-size: 11px; font-weight: 700; color: #e5e7eb; min-width: 80px; }
+
+.eq-slot-item { font-size: 11px; color: #4caf50; flex: 1; }
+
+.eq-slot-item.empty { color: #90a4ae; }
+
+.eq-slot-stat { font-size: 10px; color: #ffc107; }
+
+.eq-slot-remove {
+    width: 24px;
+    height: 24px;
+    background: #f44336;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.eq-catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.eq-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.eq-item:hover { transform: translateY(-2px); border-color: #4caf50; }
+
+.eq-item.rarity-common { border-color: #a19d94; }
+.eq-item.rarity-rare { border-color: #3b82f6; }
+.eq-item.rarity-epic { border-color: #a855f7; }
+
+.eq-item-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.eq-item-name { display: block; font-size: 10px; font-weight: 700; color: #e5e7eb; }
+
+.eq-item-stat { display: block; font-size: 9px; color: #4caf50; margin-top: 2px; }
+
+.eq-item-rarity { display: block; font-size: 8px; text-transform: uppercase; margin-top: 2px; color: #90a4ae; }

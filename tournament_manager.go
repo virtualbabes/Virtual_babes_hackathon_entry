@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -26,9 +26,12 @@ import (
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
-const regCacheName = "registrations.json"
+// TournamentService manages the lifecycle of competitive events, brackets, and prize distributions.
+// PILLAR 5: Stateless Service Design.
+type TournamentService struct{}
 
-func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request) {
+// HandleTournamentRegister processes player registrations for active events.
+func (s *TournamentService) HandleTournamentRegister(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
 	voiConfig, ok := l.availableNetworks["Voi Mainnet"]
 	l.mutex.RUnlock()
@@ -54,11 +57,18 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Registration is currently closed", http.StatusForbidden)
 		return
 	}
-	if l.isWalletRegistered(targetWallet) {
+	if s.IsWalletRegistered(l, targetWallet) {
 		l.mutex.RUnlock()
 		http.Error(w, "Wallet already registered", http.StatusForbidden)
 		return
 	}
+
+	// PILLAR 5: Defensive Map Handling.
+	l.mutex.Lock()
+	if l.processingRegistrations == nil {
+		l.processingRegistrations = make(map[string]time.Time)
+	}
+	l.mutex.Unlock()
 
 	// 0. Verification Throttling: Check if already processing or TxID recycled
 	if _, isProcessing := l.processingRegistrations[targetWallet]; isProcessing {
@@ -92,7 +102,7 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}()
 
 	openTime := l.tournament.OpenTime
-	buyInAmt := l.tournament.BuyInAmount
+	buyInMicro := l.tournament.BuyInMicro
 
 	// Identify Elite Status
 	l.mutex.RLock()
@@ -115,8 +125,12 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}
 
 	var actualRegistrationTime time.Time
-	var divisor float64 = 1000000.0
 	var verifyNetwork string = "Voi"
+
+	// paidTxID is the transaction id reserved for the PAID path only
+	// (txid_memo.go). Elite registrations are free and deliberately consume no
+	// transaction id, so they never take a reservation.
+	var paidTxID, claimReason string
 
 	if !isElite {
 		if req.TxID == "" {
@@ -124,8 +138,18 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
+		// ── UNIFORM TXID GUARD (txid_memo.go) ──────────────────────────────
+		// Reserve BEFORE the (slow) oracle call so two concurrent submissions of
+		// the same txid cannot both verify and both register.
+		paidTxID, claimReason = l.claimTxID(req.TxID)
+		if paidTxID == "" {
+			http.Error(w, claimReason, http.StatusConflict)
+			return
+		}
+
 		// STRICT ENFORCEMENT: Only VOI and ALGO networks support tournament buy-ins
 		if req.Network != "VOI" && req.Network != "ALGO" {
+			l.releaseTxID(paidTxID)
 			http.Error(w, "Tournament registration payments are only accepted on Voi or Algorand", http.StatusBadRequest)
 			return
 		}
@@ -151,13 +175,10 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		// PILLAR 3: Dynamic Precision.
 		// Fetch specific network config to get the correct micro-unit divisor for the buy-in asset.
 		l.mutex.RLock()
-		netCfg, hasCfg := l.availableNetworks[verifyNetwork+" Mainnet"]
+		_, hasCfg := l.availableNetworks[verifyNetwork+" Mainnet"]
 		l.mutex.RUnlock()
 
-		divisor = 1000000.0 // Fallback to standard 6 decimals (VBV/AVoi)
-		if hasCfg && netCfg.PowerDivisor > 0 {
-			divisor = netCfg.PowerDivisor
-		}
+		_ = hasCfg
 
 		// PILLAR 3: Concurrency Throttling.
 		// Limit simultaneous indexer requests to prevent rate-limiting during burst registration.
@@ -165,15 +186,19 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 		case l.oracleSemaphore <- struct{}{}:
 			// Acquired slot, proceed to oracle
 		case <-time.After(15 * time.Second):
+			l.releaseTxID(paidTxID)
 			http.Error(w, "Arena Indexer busy. Please try again in a few moments.", http.StatusServiceUnavailable)
 			return
 		}
 		defer func() { <-l.oracleSemaphore }()
 
-		// PILLAR 3: Bound Verification. Include tournament ID to prevent replay exploits.
-		prefix := "VBT_TOURN_BUYIN:" + l.tournament.ID + ":"
-		verified, txUnixTime, err := l.verifyBuyInTransaction(verifyNetwork, req.TxID, uint64(buyInAmt*divisor), buyInAsset, targetWallet, l.vaultAddress, prefix)
+		// Include tournament ID to prevent replay exploits (the prefix itself is
+		// owned by note_vocabulary.go).
+		prefix := NoteTournamentBuyIn(l.tournament.ID)
+		// Use OracleService for authoritative blockchain verification.
+		verified, txUnixTime, err := l.oracleService.VerifyBuyInTransaction(l, verifyNetwork, req.TxID, buyInMicro, buyInAsset, targetWallet, l.vaultAddress, prefix)
 		if err != nil || !verified || txUnixTime < openTime.Unix() {
+			l.releaseTxID(paidTxID)
 			log.Printf("[TOURNAMENT] Verification failed for %s on %s. Error: %v\n", targetWallet, verifyNetwork, err)
 			msg := "Payment verification failed or transaction too old"
 			if err != nil && strings.Contains(err.Error(), "429") {
@@ -196,57 +221,62 @@ func (l *Lobby) handleTournamentRegister(w http.ResponseWriter, r *http.Request)
 	}
 
 	// PILLAR 3: TxID Reuse Protection (Atomic Verification).
-	// Ensure the TxID wasn't committed by a concurrent request during the oracle verification window.
-	if !isElite && req.TxID != "" {
-		if _, isUsed := l.registeredTxIDs[req.TxID]; isUsed {
-			l.mutex.Unlock()
-			http.Error(w, "Transaction ID already utilized for another entry", http.StatusConflict)
-			return
-		}
-	}
-
+	// The RESERVATION taken before the oracle call IS the atomic protection: no
+	// concurrent request can have committed this id while we held it, so the old
+	// read-then-write re-check (and its TOCTOU window) is unnecessary.
+	// Elite entries are free and consume no id, so they hold no reservation.
 	l.paidParticipants = append(l.paidParticipants, targetWallet)
 	if !isElite {
-		l.registeredTxIDs[req.TxID] = actualRegistrationTime
-		l.faucetBalance += (buyInAmt / 2.0)
-		l.tournamentPotBonus += (buyInAmt / 2.0)
+		l.commitTxIDLocked(paidTxID, actualRegistrationTime)
+		// PILLAR 2: Integer Supremacy. 
+		// All tournament logic now operates on micro-unit integers.
+		l.faucetBalanceMicro += l.tournament.BuyInMicro
+		l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+		l.tournament.PotMicro += (l.tournament.BuyInMicro / 2)
 	}
 	l.mutex.Unlock()
 
 	// Only process kickback if the registration was actually committed and not elite
 	if !isElite {
-		l.distributeTournamentKickback(targetWallet, uint64(buyInAmt*divisor), actualRegistrationTime, verifyNetwork)
+		l.clubService.DistributeTournamentKickback(l, targetWallet, buyInMicro, actualRegistrationTime)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "is_elite": isElite})
 }
 
-func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) {
+// HandleTournamentHistory retrieves archived tournament summaries from the blockchain.
+func (s *TournamentService) HandleTournamentHistory(l *Lobby, w http.ResponseWriter, r *http.Request) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	vaultAddr := l.vaultAddress
 	l.mutex.RUnlock()
 
 	// PILLAR 4: RPC Failover. Utilizing unified dispatcher for resilient history retrieval.
-	resp, err := l.indexerRequest(voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
+	resp, err := l.oracleService.IndexerRequest(l, voiConfig, fmt.Sprintf("/arc200/transfers?contractId=%s&from=%s&limit=1000",
 		voiConfig.AssetID, vaultAddr))
 
 	if err != nil {
-		http.Error(w, fmt.Sprintf("History retrieval failed: %v", err), http.StatusInternalServerError)
+		// Indexer unreachable (e.g. dev with no local node) — return empty history, not 500.
+		log.Printf("[TOURNAMENT] History indexer unreachable: %v. Returning empty history.", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}, "total": 0})
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, fmt.Sprintf("Indexer returned non-200 status: %d", resp.StatusCode), http.StatusInternalServerError)
+		// Indexer returned non-200 (e.g. 404) — return empty history, not 500.
+		log.Printf("[TOURNAMENT] History indexer returned %d. Returning empty history.", resp.StatusCode)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"history": []interface{}{}, "total": 0})
 		return
 	}
 	var res struct {
 		Transfers []struct {
 			TransactionID string `json:"transactionId"`
 			GroupID       string `json:"groupId"`
-			To            string `json:"to"`
+			To            string `json:"to"` // Recipient of the payout
 			Metadata      string `json:"metadata"`
 		} `json:"transfers"`
 	}
@@ -258,25 +288,25 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	payoutTxIDs := make(map[string][]string)            // TournamentID -> list of TxIDs
 	if json.NewDecoder(resp.Body).Decode(&res) == nil {
 		for _, tx := range res.Transfers {
-			if strings.HasPrefix(tx.Metadata, "VBT_TOURN_SUMM:") {
+			if strings.HasPrefix(tx.Metadata, NotePrefixTournSummary) {
 				var s TournamentSummary
-				// Defensive check: ensure the summary has a valid ID after unmarshaling
-				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_SUMM:")), &s); err == nil && s.ID != "" {
+				// Defensive check: ensure the summary has a valid ID and PotMicro after unmarshaling
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, NotePrefixTournSummary)), &s); err == nil && s.ID != "" {
 					uniqueSummaries[s.ID] = s
 				}
-			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_DATA:") {
+			} else if strings.HasPrefix(tx.Metadata, NotePrefixTournData) {
 				var chunk struct {
 					ID      string
 					Matches []TournamentMatch `json:"m"`
 				}
-				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_DATA:")), &chunk)
+				json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, NotePrefixTournData)), &chunk)
 				chunkMap[tx.TransactionID] = chunk.Matches
-			} else if strings.HasPrefix(tx.Metadata, "VBT_WIN:") {
+			} else if strings.HasPrefix(tx.Metadata, NotePrefixWin) {
 				var data struct {
 					TID string `json:"tid"` // Tournament ID
 					MID string `json:"mid"` // Match ID
 				}
-				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_WIN:")), &data); err == nil {
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, NotePrefixWin)), &data); err == nil {
 					if data.TID != "" && data.MID != "" {
 						if matchReceipts[data.TID] == nil {
 							matchReceipts[data.TID] = make(map[string]string)
@@ -288,12 +318,12 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 						matchTxIDs[data.TID][data.MID] = tx.TransactionID
 					}
 				}
-			} else if strings.HasPrefix(tx.Metadata, "VBT_TOURN_PAYOUT:") {
+			} else if strings.HasPrefix(tx.Metadata, NotePrefixTournPayout) {
 				// PILLAR 4: Group Payout Verification.
 				var data struct {
 					TID string `json:"tid"`
 				}
-				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, "VBT_TOURN_PAYOUT:")), &data); err == nil && data.TID != "" {
+				if err := json.Unmarshal([]byte(strings.TrimPrefix(tx.Metadata, NotePrefixTournPayout)), &data); err == nil && data.TID != "" {
 					targetID := tx.TransactionID
 					if tx.GroupID != "" {
 						targetID = tx.GroupID
@@ -380,7 +410,8 @@ func (l *Lobby) handleTournamentHistory(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]interface{}{"history": history})
 }
 
-func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
+// ProcessTournamentResult updates the bracket with the outcome of a match.
+func (s *TournamentService) ProcessTournamentResult(l *Lobby, matchID, winnerWallet string) {
 	// PILLAR 3: Bracket Integrity. Ignore results if tournament is no longer active.
 	if !l.tournament.Active {
 		return
@@ -471,13 +502,14 @@ func (l *Lobby) processTournamentResult(matchID, winnerWallet string) {
 		}
 	}
 	if roundComplete {
-		l.advanceTournamentRound()
+		s.AdvanceTournamentRound(l)
 	} else {
-		l.broadcastTournamentState()
+		s.BroadcastTournamentState(l)
 	}
 }
 
-func (l *Lobby) advanceTournamentRound() {
+// AdvanceTournamentRound progresses the bracket to the next level.
+func (s *TournamentService) AdvanceTournamentRound(l *Lobby) {
 	var roundWinners []string
 	for _, m := range l.tournament.Matches {
 		if m.Round == l.tournament.CurrentRound && m.Winner != "" {
@@ -486,7 +518,7 @@ func (l *Lobby) advanceTournamentRound() {
 	}
 
 	if len(roundWinners) <= 1 {
-		go l.finalizeTournament(roundWinners)
+		go s.FinalizeTournament(l, roundWinners)
 		return
 	}
 
@@ -509,11 +541,11 @@ func (l *Lobby) advanceTournamentRound() {
 		})
 		log.Printf("[TOURNAMENT] Generated bracket match: %s", l.tournament.Matches[len(l.tournament.Matches)-1].ID)
 	}
-	l.broadcastTournamentState()
+	s.BroadcastTournamentState(l)
 }
 
 // determineTop5 identifies the tournament rankings based on bracket progression.
-func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string {
+func (s *TournamentService) DetermineTop5(l *Lobby, matches []TournamentMatch, winner string) []string {
 	top5 := []string{}
 	if winner == "" {
 		return top5
@@ -622,7 +654,8 @@ func (l *Lobby) determineTop5(matches []TournamentMatch, winner string) []string
 	return top5
 }
 
-func (l *Lobby) finalizeTournament(winners []string) {
+// FinalizeTournament settles rewards and archives the event results on-chain.
+func (s *TournamentService) FinalizeTournament(l *Lobby, winners []string) {
 	l.mutex.Lock()
 	winner := ""
 	if len(winners) > 0 {
@@ -631,69 +664,84 @@ func (l *Lobby) finalizeTournament(winners []string) {
 
 	// PILLAR 1: Governor's Tax Integration.
 	// 5% of the total tournament pot is routed to the club controlling the 'arena_center' territory.
-	var govTax float64
 	centerClub := l.getClubByTerritoryID("arena_center")
+	var govTaxMicro uint64 // PILLAR 2: Integer Supremacy
+	var govTax float64     // PILLAR 2: Governor tax (VBV)
 	if centerClub != nil {
-		// PILLAR 3: Economic Precision. Use micro-unit rounding to prevent dust leaks.
-		potMicro := uint64(l.tournament.Pot*1000000 + 0.5)
-		govTaxMicro := (potMicro*5 + 50) / 100
+		govTaxMicro = (l.tournament.PotMicro * 5) / 100
 		govTax = float64(govTaxMicro) / 1000000.0
-		centerClub.Treasury += govTax
+
+		// PILLAR 2: Unified Organizational Accounting.
+		// Route the 5% Governor Tax via the Token-Sink Router for forensic auditing.
+		if l.tokenSinkRouter != nil {
+			l.faucetBalanceMicro -= govTaxMicro
+			l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+
+			matrix := RevenueSplitMatrix{FaucetShare: 0.0, ClubShare: 0.0, GovernanceShare: 1.0}
+			_ = l.tokenSinkRouter.RouteCriminalTax("arena_center", govTaxMicro, matrix, 0, "arena_center")
+
+			// Sync treasury from authoritative router node
+			numericID, _ := strconv.ParseUint(strings.TrimPrefix(centerClub.ID, "CLUB-"), 10, 64)
+			if node, ok := l.tokenSinkRouter.ActiveClubs[numericID]; ok {
+				centerClub.TreasuryMicro = node.TreasuryBalance
+			}
+		} else {
+			centerClub.TreasuryMicro += govTaxMicro
+		}
+
 		centerClub.LastActivity = time.Now()
 		l.logAdminAuditLocked("GOVERNOR_TAX_PAID", centerClub.ID, fmt.Sprintf("Tournament Pot Tax: %.2f $VBV", govTax))
 
-		// INDUSTRIAL LOOP: Deduct distributed tax from liquid faucet balance.
-		l.faucetBalance -= govTax
+		// PILLAR 2: Ledger Integrity.
+		// Governor's tax is a virtual liability shift within the vault.
+		// The physical total remains unchanged until a scheduled payout occurs.
 		l.applyDynamicScalingLocked()
 	}
 	// Calculate effective pot available for player distribution
-	effectivePot := l.tournament.Pot - govTax
+	effectivePotMicro := l.tournament.PotMicro - uint64(govTax * 1000000)
 	// Placement Identification & Multi-Asset Reward Loop
-	top5 := l.determineTop5(l.tournament.Matches, winner)
+	top5 := s.DetermineTop5(l, l.tournament.Matches, winner)
 	payoutPercentages := []float64{0.40, 0.25, 0.15, 0.10, 0.10}
 
 	// PILLAR 3: Bracket Integrity.
 	// Clone the matches and close the bracket state immediately to release the Lobby loop.
 	summaryMatches := make([]TournamentMatch, len(l.tournament.Matches))
 	copy(summaryMatches, l.tournament.Matches)
-	totalPot := l.tournament.Pot
 
 	l.tournament.Active = false
-	l.broadcastTournamentState()
+	s.BroadcastTournamentState(l)
 
 	// PILLAR 2: Unreserved Liquidity.
 	// Reserve the effective prize pool plus a 10% buffer to cover potential
-	// Diamond Tier reputation bonuses. This prevents negative results in
-	// dynamic scaling during the high-concurrency payout window.
-	l.pendingTournamentPayouts = effectivePot * 1.1
+	// Diamond Tier reputation bonuses. This prevents negative results in dynamic scaling.
+	// PILLAR 2: Integer Supremacy.
+	l.pendingTournamentPayoutsMicro = uint64(float64(effectivePotMicro) * 1.1)
 	l.mutex.Unlock()
 
 	var payoutTxIDs []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	if effectivePot > 0 && len(top5) > 0 {
+	if effectivePotMicro > 0 && len(top5) > 0 {
 		// PILLAR 3: Economic Precision.
 		// The loop iterates only over the actual number of players in top5.
 		// If top5 is shorter than 5, only the corresponding payout percentages are distributed.
 		// The remaining portion of the effectivePot is retained in the faucet.
-		log.Printf("[TOURNAMENT] Finalizing Event. Pot: %.2f $VBV (Tax: %.2f). Payout Ranks: %v\n", effectivePot, govTax, top5)
+		log.Printf("[TOURNAMENT] Finalizing Event. Pot: %.2f $VBV (Tax: %.2f). Payout Ranks: %v\n", float64(effectivePotMicro)/1000000.0, govTax, top5)
 
-		for i, player := range top5 {
+		for i, player := range top5 { // PILLAR 2: Integer Supremacy
 			if i >= len(payoutPercentages) {
 				break
 			}
 			// Calculate Pot Share (Primary Asset)
-			// PILLAR 3: Economic Precision. Convert percentage to integer for rounding.
-			effectivePotMicro := uint64(effectivePot*1000000 + 0.5)
-			percentInt := uint64(payoutPercentages[i]*100 + 0.5)
-			shareMicro := (effectivePotMicro*percentInt + 50) / 100
+			percentMicro := uint64(payoutPercentages[i] * 100)
+			shareMicro := (effectivePotMicro * percentMicro) / 100
 
 			wg.Add(1)
 			// Dispatch grouped rewards
 			go func(p string, rank int, amt uint64) {
 				defer wg.Done()
-				gid, skipped, err := l.dispatchTournamentRewards(p, rank+1, amt)
+				gid, skipped, err := s.DispatchTournamentRewards(l, p, rank+1, amt)
 				if err != nil {
 					log.Printf("[TOURNAMENT ERROR] Payout failed for rank %d (%s): %v\n", rank+1, p, err)
 				} else {
@@ -713,7 +761,8 @@ func (l *Lobby) finalizeTournament(winners []string) {
 
 	// Payouts complete: Clear remainders from skipped assets or rounding
 	l.mutex.Lock()
-	l.pendingTournamentPayouts = 0
+	l.pendingTournamentPayoutsMicro = 0 // PILLAR 2: Integer Supremacy
+	l.logAdminAuditLocked("TOURNAMENT_PAYOUTS_RESERVATION_CLEARED", l.tournament.ID, "Liquidity reservation released after payout group completion.")
 	l.mutex.Unlock()
 
 	// PILLAR 4: Deep Verification Hash.
@@ -740,23 +789,41 @@ func (l *Lobby) finalizeTournament(winners []string) {
 	}
 
 	summary := TournamentSummary{
-		ID: l.tournament.ID, Timestamp: time.Now(),
-		Pot: totalPot, Winner: winner, Matches: summaryMatches,
+		ID: l.tournament.ID, Timestamp: time.Now(), // PILLAR 2: Integer Supremacy
+		PotMicro: l.tournament.PotMicro, Winner: winner, Matches: summaryMatches,
 		PayoutsHash: payoutsHash,
 	}
 
-	l.recordTournamentOnChain(summary)
+	s.RecordTournamentOnChain(l, summary)
 }
 
-func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
-	var childLinks []string
+// tournamentArchiveChunkBytes is the match-bytes threshold above which the archive is
+// split into per-chunk DATA notes. It is a DOMAIN choice (readable data records); the
+// note SIZE is no longer this function's problem, because the record writer measures
+// every note against the AVM cap and splits it again if it has to.
+const tournamentArchiveChunkBytes = 800
+
+// tournamentArchiveMatchesPerChunk bounds how many matches one archive DATA note carries.
+const tournamentArchiveMatchesPerChunk = 4
+
+// RecordTournamentOnChain persists the tournament summary to the chain.
+//
+// MEASURED AND FIXED 2026-09-19 (Problems.md §39): this function used to "write" BOTH
+// note streams with `IndexerRequest(l, cfg, prefix+json)`, which issues an HTTP **GET**
+// whose URL PATH is the note — so the archive was written NOWHERE, a nonsense request was
+// fired per chunk, and `summary.Links` was filled with those URLs. `Links` is documented
+// as "TxIDs for additional match data", so the field was being handed a FABRICATED value.
+// The notes now go through the ONE writer (`sendAuditNoteStream`), and `Links` is left
+// EMPTY rather than invented: a txid exists only once a note is dispatched and confirmed,
+// and the dispatcher logs every one of them.
+func (s *TournamentService) RecordTournamentOnChain(l *Lobby, summary TournamentSummary) {
 	matchBytes, _ := json.Marshal(summary.Matches)
 	hash := sha256.Sum256(matchBytes)
 	summary.Checksum = hex.EncodeToString(hash[:])
 
-	if len(matchBytes) > 800 {
-		for i := 0; i < len(summary.Matches); i += 4 {
-			end := i + 4
+	if len(matchBytes) > tournamentArchiveChunkBytes {
+		for i := 0; i < len(summary.Matches); i += tournamentArchiveMatchesPerChunk {
+			end := i + tournamentArchiveMatchesPerChunk
 			if end > len(summary.Matches) {
 				end = len(summary.Matches)
 			}
@@ -765,21 +832,20 @@ func (l *Lobby) recordTournamentOnChain(summary TournamentSummary) {
 				Matches []TournamentMatch `json:"m"`
 			}{ID: summary.ID, Matches: summary.Matches[i:end]}
 			chunkJSON, _ := json.Marshal(chunk)
-			txid, err := l.sendNoteTx(fmt.Sprintf("VBT_TOURN_DATA:%s", string(chunkJSON)))
-			if err == nil {
-				childLinks = append(childLinks, txid)
-			}
+			l.sendAuditNoteStream(NotePrefixTournData, chunkJSON)
 		}
 		summary.Matches = nil
 	}
 
-	summary.Links = childLinks
+	// NO INVENTED LINKS — see the doc comment.
+	summary.Links = nil
+
 	jsonData, _ := json.Marshal(summary)
-	l.sendNoteTx(fmt.Sprintf("VBT_TOURN_SUMM:%s", string(jsonData)))
+	l.sendAuditNoteStream(NotePrefixTournSummary, jsonData)
 }
 
 // dispatchTournamentRewards handles multi-asset distribution for tournament finishers.
-func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMicro uint64) (types.Digest, []string, error) {
+func (s *TournamentService) DispatchTournamentRewards(l *Lobby, recipient string, rank int, potShareMicro uint64) (types.Digest, []string, error) {
 	l.mutex.RLock()
 	voiConfig, _ := l.availableNetworks["Voi Mainnet"]
 	var skippedAssets []string
@@ -803,7 +869,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		return types.Digest{}, nil, fmt.Errorf("no Voi nodes configured")
 	}
 
-	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], "")
+	client, _ := algod.MakeClient(voiConfig.NodeURLs[0], voiConfig.AlgodToken)
 	mnemonicRaw := os.Getenv("FAUCET_MNEMONIC")
 	if mnemonicRaw == "" {
 		log.Println("[TOURNAMENT CRITICAL] FAUCET_MNEMONIC environment variable is NOT SET. Tournament payouts will FAIL.")
@@ -818,7 +884,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 
 	var txns []types.Transaction
 	vaultAddrObj, _ := types.DecodeAddress(l.vaultAddress)
-	note := []byte(fmt.Sprintf("VBT_TOURN_PAYOUT:{\"tid\":\"%s\",\"rank\":%d,\"pot_share\":%d}", l.tournament.ID, rank, potShareMicro))
+	note := []byte(fmt.Sprintf(NotePrefixTournPayout+"{\"tid\":\"%s\",\"rank\":%d,\"pot_share\":%d}", l.tournament.ID, rank, potShareMicro))
 	var totalUnits float64
 
 	// Build Atomic Group for all active reward assets
@@ -835,7 +901,7 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 		}
 
 		// NEW: Granular Opt-in Verification to prevent group failure
-		optedIn, _, err := l.checkAssetOptIn("VOI", recipient, appIDStr)
+		optedIn, _, err := l.oracleService.CheckAssetOptIn(l, "VOI", recipient, appIDStr)
 		if err != nil || !optedIn {
 			log.Printf("[TOURNAMENT] Skipping asset %s for %s: Opt-in missing or error: %v", appIDStr, recipient, err)
 			skippedAssets = append(skippedAssets, appIDStr)
@@ -891,22 +957,25 @@ func (l *Lobby) dispatchTournamentRewards(recipient string, rank int, potShareMi
 
 	// INDUSTRIAL LOOP: Deduct payout from liquid faucet balance and trigger scaling.
 	l.mutex.Lock()
-	l.faucetBalance -= totalUnits
-	l.pendingTournamentPayouts -= float64(appliedPotPortionMicro) / 1000000.0
+	l.faucetBalanceMicro -= uint64(totalUnits * 1000000)
+	l.faucetBalance = float64(l.faucetBalanceMicro) / 1000000.0
+	l.pendingTournamentPayoutsMicro -= appliedPotPortionMicro // PILLAR 2: Integer Supremacy
 	l.applyDynamicScalingLocked()
 	l.mutex.Unlock()
 
 	return gid, skippedAssets, nil
 }
 
-func (l *Lobby) broadcastTournamentState() {
+// BroadcastTournamentState sends real-time bracket updates to all connected clients.
+func (s *TournamentService) BroadcastTournamentState(l *Lobby) {
 	payload, _ := json.Marshal(l.tournament)
 	go func() {
 		l.broadcast <- jsonListEnvelope("tournament_update", payload)
 	}()
 }
 
-func (l *Lobby) isWalletRegistered(wallet string) bool {
+// IsWalletRegistered checks if a specific address has already entered the event.
+func (s *TournamentService) IsWalletRegistered(l *Lobby, wallet string) bool {
 	for _, p := range l.paidParticipants {
 		if strings.EqualFold(p, wallet) {
 			return true

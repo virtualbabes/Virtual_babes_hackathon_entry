@@ -1,0 +1,421 @@
+// ============================================================================
+// P2-D1 Bounty Tracker Overlay — Neon-Glass Styled SCSS Stylesheet
+// Active bounty display with enhanced tracking from Bounty Hunter career tier.
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Main overlay panel container
+// ----------------------------------------------------------------------------
+.bounty-tracker-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    min-width: 420px;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    
+    // Neon-glass aesthetic matching game design system
+    background: linear-gradient(135deg, 
+        rgba(20, 24, 40, 0.92) 0%, 
+        rgba(30, 36, 58, 0.88) 100%);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    
+    border: 1px solid rgba(52, 199, 214, 0.35);
+    border-radius: 16px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 40px rgba(52, 199, 214, 0.1);
+    
+    overflow: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    
+    &.hidden {
+        display: none;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Header section
+// ----------------------------------------------------------------------------
+.bounty-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(52, 199, 214, 0.2);
+    background: linear-gradient(to bottom, 
+        rgba(52, 199, 214, 0.08) 0%,
+        transparent 100%);
+    
+    h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #e0f7fa;
+        text-shadow: 0 0 12px rgba(52, 199, 214, 0.5);
+        letter-spacing: 0.5px;
+        
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+}
+
+.bounty-close-btn {
+    background: none;
+    border: none;
+    color: rgba(224, 247, 250, 0.6);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    
+    &:hover {
+        color: #e74c3c;
+        text-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Hunter tier display section
+// ----------------------------------------------------------------------------
+.hunter-tier-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(52, 199, 214, 0.1);
+    
+    .tier-label {
+        font-size: 13px;
+        color: rgba(224, 247, 250, 0.6);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .tier-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #34c7d6;
+        
+        // Tier-specific glow colors
+        &.tier-peon { color: rgba(255, 255, 255, 0.8); }
+        &.tier-apprentice { color: #9b59b6; text-shadow: 0 0 8px rgba(155, 89, 182, 0.4); }
+        &.tier-journeyman { color: #3498db; text-shadow: 0 0 10px rgba(52, 152, 219, 0.5); }
+        &.tier-expert { color: #e67e22; text-shadow: 0 0 12px rgba(230, 126, 34, 0.5); }
+        &.tier-master { color: #f39c12; text-shadow: 0 0 14px rgba(243, 156, 18, 0.6); }
+        &.tier-boss { 
+            color: #e74c3c; 
+            font-size: 16px;
+            text-shadow: 0 0 16px rgba(231, 76, 60, 0.8), 0 0 32px rgba(231, 76, 60, 0.4);
+        }
+    }
+    
+    .tracking-bonus {
+        margin-left: auto;
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-weight: 500;
+        
+        &.active {
+            background: linear-gradient(90deg, 
+                rgba(52, 199, 214, 0.2) 0%,
+                rgba(46, 204, 113, 0.15) 100%);
+            color: #2ecc71;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+        
+        &.inactive {
+            background: rgba(149, 165, 166, 0.1);
+            color: rgba(149, 165, 166, 0.5);
+            border: 1px solid rgba(149, 165, 166, 0.2);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Bounty list container
+// ----------------------------------------------------------------------------
+.bounty-list-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    
+    // Custom scrollbar styling matching game aesthetic
+    &::-webkit-scrollbar { width: 8px; }
+    &::-webkit-scrollbar-track { 
+        background: rgba(0, 0, 0, 0.15); 
+        border-radius: 4px; 
+    }
+    &::-webkit-scrollbar-thumb { 
+        background: rgba(52, 199, 214, 0.3); 
+        border-radius: 4px; 
+        
+        &:hover { background: rgba(52, 199, 214, 0.5); }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Individual bounty card
+// ----------------------------------------------------------------------------
+.bounty-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    
+    background: linear-gradient(90deg, 
+        rgba(52, 199, 214, 0.06) 0%,
+        transparent 100%);
+    border-left: 3px solid #34c7d6;
+    border-radius: 8px;
+    
+    transition: all 0.25s ease;
+    
+    &:hover {
+        background: linear-gradient(90deg, 
+            rgba(52, 199, 214, 0.12) 0%,
+            rgba(46, 204, 113, 0.06) 100%);
+        border-left-color: #2ecc71;
+    }
+    
+    // Enhanced target indicator (when tracking bonus applies)
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0; right: 0;
+        width: 8px; height: 8px;
+        background: #34c7d6;
+        border-radius: 50%;
+        box-shadow: 0 0 6px rgba(52, 199, 214, 0.6);
+    }
+    
+    &:has(.enhanced) {
+        &::after {
+            background: #f39c12;
+            box-shadow: 0 0 8px rgba(243, 156, 18, 0.7);
+            animation: pulse-enhanced 2s ease-in-out infinite;
+        }
+    }
+}
+
+@keyframes pulse-enhanced {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.bounty-target-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .target-name {
+        font-size: 14px;
+        font-weight: 500;
+        color: #e0f7fa;
+    }
+    
+    .wallet-prefix {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: rgba(224, 247, 250, 0.4);
+        background: rgba(0, 0, 0, 0.2);
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+}
+
+.bounty-stats {
+    display: flex;
+    gap: 16px;
+    
+    .bounty-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #f39c12;
+        
+        &.enhanced {
+            color: #e74c3c;
+            
+            .bonus-indicator {
+                display: inline-block;
+                margin-left: 8px;
+                font-size: 12px;
+                padding: 2px 6px;
+                background: rgba(231, 76, 60, 0.15);
+                color: #e74c3c;
+                border-radius: 4px;
+            }
+        }
+    }
+}
+
+.bounty-timer {
+    font-size: 12px;
+    color: rgba(224, 247, 250, 0.5);
+    
+    span {
+        font-weight: 500;
+        
+        &.expired {
+            color: #e74c3c;
+        }
+    }
+}
+
+.drone-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    
+    &.active-drone {
+        background: rgba(52, 199, 214, 0.15);
+        color: #34c7d6;
+        animation: drone-pulse 3s ease-in-out infinite;
+    }
+}
+
+@keyframes drone-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.capture-btn {
+    align-self: flex-end;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    
+    background: linear-gradient(90deg, 
+        rgba(231, 76, 60, 0.8) 0%,
+        rgba(192, 57, 43, 0.8) 100%);
+    border: 1px solid rgba(231, 76, 60, 0.4);
+    color: #fff;
+    border-radius: 6px;
+    
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+        background: linear-gradient(90deg, 
+            rgba(231, 76, 60, 1) 0%,
+            rgba(192, 57, 43, 1) 100%);
+        box-shadow: 0 0 12px rgba(231, 76, 60, 0.5);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Empty state (no active bounties)
+// ----------------------------------------------------------------------------
+.bounty-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    
+    p {
+        font-size: 14px;
+        color: rgba(224, 247, 250, 0.35);
+        text-align: center;
+        line-height: 1.6;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Quick action buttons section
+// ----------------------------------------------------------------------------
+.bounty-actions {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid rgba(52, 199, 214, 0.1);
+    
+    .bounty-action-btn {
+        flex: 1;
+        padding: 10px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 8px;
+        
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .refresh-btn {
+        background: linear-gradient(90deg, 
+            rgba(52, 152, 219, 0.7) 0%,
+            rgba(46, 134, 193, 0.7) 100%);
+        border: 1px solid rgba(52, 152, 219, 0.4);
+        color: #fff;
+        
+        &:hover {
+            background: linear-gradient(90deg, 
+                rgba(52, 152, 219, 1) 0%,
+                rgba(46, 134, 193, 1) 100%);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.4);
+        }
+    }
+    
+    .license-btn {
+        background: linear-gradient(90deg, 
+            rgba(46, 204, 113, 0.7) 0%,
+            rgba(39, 174, 96, 0.7) 100%);
+        border: 1px solid rgba(46, 204, 113, 0.4);
+        color: #fff;
+        
+        &:hover {
+            background: linear-gradient(90deg, 
+                rgba(46, 204, 113, 1) 0%,
+                rgba(39, 174, 96, 1) 100%);
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Bounty notification toasts (fallback from JS showNotification)
+// ----------------------------------------------------------------------------
+.bounty-notification {
+    animation: notif-slide-in 0.3s ease-out;
+    
+    &.bounty-notif-success { border-left: 4px solid #2ecc71; }
+    &.bounty-notif-error   { border-left: 4px solid #e74c3c; }
+    &.bounty-notif-warning { border-left: 4px solid #f39c12; }
+    &.bounty-notif-info    { border-left: 4px solid #3498db; }
+}
+
+@keyframes notif-slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+// ----------------------------------------------------------------------------
+// Responsive adjustments (mobile/tablet)
+// ----------------------------------------------------------------------------
+@media (max-width: 640px) {
+    .bounty-tracker-panel {
+        min-width: auto;
+        width: calc(100vw - 32px);
+        max-height: 75vh;
+        top: 60%;
+    }
+    
+    .bounty-actions {
+        flex-direction: column;
+        
+        .bounty-action-btn {
+            padding: 12px 16px;
+        }
+    }
+}

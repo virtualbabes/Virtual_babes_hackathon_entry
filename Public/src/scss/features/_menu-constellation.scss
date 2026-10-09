@@ -1,0 +1,933 @@
+// ============================================================================
+// Menu Constellation â€” Card-constellation lobby (DISTINCTIVE DESIGN)
+// ----------------------------------------------------------------------------
+// Cards with prominent category titles, deep visual layers, and proper alignment.
+// ============================================================================
+
+.constellation-lobby {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #090a0f;
+}
+
+.constellation-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+
+  .constellation-bg-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .bg-nebula {
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(99, 102, 241, 0.15), transparent 60%),
+      radial-gradient(ellipse at 80% 50%, rgba(168, 85, 247, 0.1), transparent 60%);
+  }
+
+  .bg-stars {
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255, 255, 255, 0.8), transparent),
+      radial-gradient(1px 1px at 30% 70%, rgba(255, 255, 255, 0.6), transparent),
+      radial-gradient(1px 1px at 50% 30%, rgba(255, 255, 255, 0.7), transparent),
+      radial-gradient(1px 1px at 70% 80%, rgba(255, 255, 255, 0.5), transparent),
+      radial-gradient(1px 1px at 90% 40%, rgba(255, 255, 255, 0.6), transparent);
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+
+  .bg-particles {
+    background:
+      radial-gradient(2px 2px at 15% 25%, rgba(99, 102, 241, 0.4), transparent),
+      radial-gradient(2px 2px at 45% 60%, rgba(168, 85, 247, 0.3), transparent),
+      radial-gradient(2px 2px at 75% 35%, rgba(255, 215, 0, 0.3), transparent);
+    animation: float 8s ease-in-out infinite;
+  }
+}
+
+@keyframes twinkle {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.constellation-title {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: 40px;
+
+  h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #e5e7eb;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+  }
+
+  p {
+    font-size: 14px;
+    color: #90a4ae;
+    margin-top: 8px;
+    letter-spacing: 2px;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Card Grid - Responsive grid that fills the viewport
+// ---------------------------------------------------------------------------
+.constellation-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  grid-template-rows: repeat(2, auto);
+  gap: 16px;
+  width: 70vw;
+  max-width: 1000px;
+  padding: 0 24px;
+  margin-bottom: 40px;
+}
+
+.constellation-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 17 / 24;
+  border-radius: 16px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  background: rgba(15, 18, 30, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  display: block;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+
+  &:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: var(--card-color);
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.7),
+      0 0 30px rgba(var(--card-color-rgb, 99, 102, 241), 0.4);
+  }
+
+  &:focus {
+    outline: 2px solid var(--card-color);
+    outline-offset: 2px;
+  }
+
+  .card-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center top;
+    z-index: 0;
+  }
+
+  .card-effect {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.3;
+    mix-blend-mode: overlay;
+    transition: opacity 0.4s;
+    z-index: 1;
+  }
+
+  &:hover .card-effect {
+    opacity: 0.5;
+  }
+
+  .card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.95));
+    z-index: 2;
+  }
+
+  .card-border {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, var(--card-color), transparent) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s;
+    z-index: 3;
+  }
+
+  &:hover .card-border {
+    opacity: 0.6;
+  }
+
+  .card-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 10px;
+    z-index: 4;
+    text-align: center;
+  }
+
+  .card-icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 0 8px var(--card-color));
+  }
+
+  .card-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--card-color);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    font-weight: 700;
+    text-shadow: 0 0 10px var(--card-color);
+  }
+
+  .card-name {
+    font-size: 10px;
+    color: #e5e7eb;
+    font-weight: 600;
+  }
+
+  .card-glow {
+    position: absolute;
+    inset: -2px;
+    border-radius: 18px;
+    background: var(--card-color);
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 0.4s;
+    filter: blur(15px);
+  }
+
+  &:hover .card-glow {
+    opacity: 0.3;
+  }
+}
+
+.tutorial-card {
+  width: 140px !important;
+  height: 190px !important;
+  align-self: center;
+}
+
+// ---------------------------------------------------------------------------
+// Quick Play Button
+// ---------------------------------------------------------------------------
+.quick-play-btn {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 32px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3));
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-family: 'Orbitron', sans-serif;
+
+  &:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5));
+    border-color: rgba(99, 102, 241, 0.8);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+  }
+
+  .quick-play-icon {
+    font-size: 24px;
+  }
+
+  .quick-play-label {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #e5e7eb;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Quick Play Screen
+// ---------------------------------------------------------------------------
+.quick-play-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #090a0f;
+  transition: opacity 0.3s;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .qp-arena-floor {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.4;
+    mask-image: linear-gradient(transparent, black 30%);
+    -webkit-mask-image: linear-gradient(transparent, black 30%);
+  }
+
+  .qp-content {
+    display: flex;
+    align-items: center;
+    gap: 60px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .qp-player-card,
+  .qp-opponent-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .qp-card-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #90a4ae;
+    text-transform: uppercase;
+  }
+
+  .qp-card-art {
+    width: 200px;
+    height: 280px;
+    border-radius: 16px;
+    background-size: cover;
+    background-position: center;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+
+  .qp-card-back {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    color: #6366f1;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border-color: rgba(99, 102, 241, 0.3);
+    animation: pulse-back 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-back {
+    0%, 100% { border-color: rgba(99, 102, 241, 0.3); }
+    50% { border-color: rgba(99, 102, 241, 0.7); }
+  }
+
+  .qp-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .qp-radar {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .qp-radar-sweep {
+    position: absolute;
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.8));
+    transform-origin: left center;
+    animation: radar-sweep 2s linear infinite;
+  }
+
+  @keyframes radar-sweep {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .qp-radar-ring {
+    position: absolute;
+    inset: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+  }
+
+  .qp-radar-ring.ring-2 {
+    inset: 25px;
+  }
+
+  .qp-status {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    color: #e5e7eb;
+    text-align: center;
+  }
+
+  .qp-eta {
+    font-size: 13px;
+    color: #90a4ae;
+  }
+
+  .qp-cancel-btn {
+    position: absolute;
+    bottom: 40px;
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #9ca3af;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e5e7eb;
+    }
+  }
+
+  .qp-accept-btn {
+    position: absolute;
+    bottom: 40px;
+    padding: 16px 40px;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    animation: accept-pulse 1s ease-in-out infinite;
+
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+    }
+  }
+
+  @keyframes accept-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+    50% { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0); }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tutorial Screen
+// ---------------------------------------------------------------------------
+.tutorial-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 10, 15, 0.98);
+  transition: opacity 0.3s;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .tutorial-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(99, 102, 241, 0.1), transparent 60%),
+      radial-gradient(ellipse at 70% 50%, rgba(168, 85, 247, 0.1), transparent 60%);
+  }
+
+  .tutorial-content {
+    position: relative;
+    z-index: 1;
+    width: 90%;
+    max-width: 900px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .tutorial-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h2 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      letter-spacing: 2px;
+      color: #e5e7eb;
+      margin: 0;
+    }
+
+    .tutorial-close {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #9ca3af;
+      font-size: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e5e7eb;
+      }
+    }
+  }
+
+  .tutorial-video-container {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  .tutorial-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .tutorial-item {
+    padding: 12px 20px;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    color: #e5e7eb;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hide default lobby when nexus is active
+// ---------------------------------------------------------------------------
+.nexus-lobby-active {
+  .main-game-container,
+  .side-rail,
+  .arena-stage,
+  .action-dock,
+  #tournament-banner,
+  #lobby-placeholder,
+  #matchmaking-container {
+    display: none !important;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Responsive â€” keep cards large enough to be visible
+// ---------------------------------------------------------------------------
+@media (max-width: 1200px) {
+  .constellation-grid {
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .constellation-grid {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (max-width: 650px) {
+  .constellation-grid {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .quick-play-btn {
+    padding: 12px 24px;
+    font-size: 14px;
+  }
+
+  .tutorial-card {
+    width: 120px !important;
+    height: 160px !important;
+  }
+}
+
+// ---------------------------------------------------------------------------
+/* Mini menu (3 main buttons) */
+.ch-mini-menu {
+    display: flex;
+    gap: 12px;
+    margin: 20px auto;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.menu-btn.small {
+    padding: 16px 20px;
+    min-width: auto;
+    flex: 0 1 auto;
+}
+
+.ch-starred-section {
+    margin-top: 30px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.ch-starred-section .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #6e7681;
+    margin-bottom: 16px;
+}
+
+.ch-starred-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.ch-no-favorites {
+    color: #6e7681;
+    font-size: 13px;
+    padding: 20px;
+}
+
+// Shown only while the favourites grid uses a RADIAL layout (circle / arc / spokes):
+// the wheel was reachable but nothing said it could be turned.
+.ch-starred-hint {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: #6e7681;
+}
+
+// Items counter-rotate against the ring spin so their labels stay upright, so the
+// transition must live on the item, not only on the grid.
+.ch-starred-grid {
+    transform-origin: center center;
+}
+
+.ch-starred-btn {
+    transform-origin: center center;
+}
+
+.ch-starred-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.ch-starred-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--btn-color, #ffd700);
+    transform: scale(1.05);
+}
+
+.ch-starred-icon {
+    font-size: 28px;
+}
+
+.ch-starred-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #e5e7eb;
+}
+// ---------------------------------------------------------------------------
+.constellation-customize-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #90a4ae;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-color: rgba(99, 102, 241, 0.4);
+  }
+}
+
+.constellation-customize-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.customize-panel {
+  background: rgba(15, 18, 30, 0.98);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.customize-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: #e5e7eb;
+    margin: 0;
+  }
+}
+
+.customize-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #90a4ae;
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+  }
+}
+
+.customize-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.customize-section {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.customize-label {
+  display: block;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #90a4ae;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.customize-col-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.customize-col-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #90a4ae;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+  }
+
+  &.active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #e5e7eb;
+  }
+}
+
+.customize-cat-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.customize-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #6366f1;
+  }
+}
+
+.customize-cat-icon {
+  font-size: 18px;
+}
+
+.customize-cat-label {
+  font-size: 12px;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+.customize-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.customize-reset,
+.customize-cancel,
+.customize-save {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.customize-reset {
+  margin-right: auto;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #90a4ae;
+
+  &:hover {
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+  }
+}
+
+.customize-cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #90a4ae;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+  }
+}
+
+.customize-save {
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #e5e7eb;
+
+  &:hover {
+    background: rgba(99, 102, 241, 0.3);
+    border-color: rgba(99, 102, 241, 0.6);
+  }
+}

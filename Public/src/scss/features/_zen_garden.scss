@@ -1,0 +1,103 @@
+/* === Zen Garden */
+.zen-garden {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.zen-garden-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.zen-garden-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #e5e7eb;
+}
+
+.zen-garden-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.zen-element {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+}
+
+.zen-element:hover {
+    border-color: rgba(255, 193, 7, 0.4);
+    transform: translateY(-2px);
+}
+
+.zen-element-icon {
+    font-size: 24px;
+}
+
+.zen-element-name {
+    font-size: 10px;
+    color: #90a4ae;
+    text-align: center;
+}
+
+.zen-element-tier {
+    font-size: 9px;
+    color: #ffc107;
+    font-weight: 600;
+}
+
+.zen-garden-stats {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.zen-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.zen-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #4caf50;
+}
+
+.zen-stat-label {
+    font-size: 9px;
+    color: #90a4ae;
+    text-transform: uppercase;
+}
+
+.zen-meditate-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 6px;
+    color: #ffc107;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zen-meditate-btn:hover {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 193, 7, 0.1));
+    border-color: #ffc107;
+}

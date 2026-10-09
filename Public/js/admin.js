@@ -2,12 +2,16 @@ import { CONFIG } from './config.js';
 import { socket, setNonceResolver } from './network.js';
 import { showToast, setTransactionStatus } from './ui.js';
 import { userAddress, walletProvider, signClient, linkedWallets } from './wallet.js';
-import { getAssetSymbol, getNetworkConfig } from './utils.js';
+import { getAssetSymbol, getNetworkConfig, shortenAddress } from './utils.js';
+import { lastLobbyPlayers } from './game.js';
 import { fetchLeaderboard } from './leaderboard.js';
+import { GlobalShopRegistry, resolveShopToken } from './economy.js';
 
 export let availableNetworks = {};
 export let globalClubs = {};
 export let adminFocusNetwork = "";
+let lastPlatformAlertTotal = 0; // PILLAR 5: Internal state for alert throttling
+let lastGhostAlertTotal = 0; // PILLAR 5: Internal state for alert throttling
 export let ignoredReporters = new Set(JSON.parse(localStorage.getItem("vbabes_ignored_reporters") || "[]"));
 
 // Setters for external modules
@@ -115,7 +119,7 @@ export function renderSolvencyDashboard(data) {
                 <span class="font-bold text-neon-green uppercase letter-spacing-1">System Solvency: <b class="${data.status === 'HEALTHY' ? 'text-neon-green' : 'text-error'}">${data.status}</b></span>
                 <span class="font-mono font-size-0-8em opacity-5">${new Date(data.timestamp).toLocaleString()}</span>
             </div>
-            <div class="display-grid gap-15 text-center border-bottom-glass pb-15 mb-10" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="display-grid gap-15 text-center border-bottom-glass pb-15 mb-10" style="grid-template-columns: repeat(7, 1fr);">
                 <div>
                     <div class="font-xs opacity-6 uppercase mb-5">Physical Vault</div>
                     <b class="text-neon-cyan">${(data.physical_vault / 1000000).toFixed(2)} $VBV</b>
@@ -132,8 +136,20 @@ export function renderSolvencyDashboard(data) {
                     <div class="font-xs opacity-6 uppercase mb-5">Net Surplus</div>
                     <b class="${surplusClass}">${(data.net_surplus / 1000000).toFixed(2)} $VBV</b>
                 </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Ghost Rec.</div>
+                    <b class="text-error">${((data.ghost_reclaimed || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Stag. Fees</div>
+                    <b class="text-warning">${((data.stagnation_fees || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Plat. Fees</div>
+                    <b class="text-neon-purple">${((data.platform_fees || 0) / 1000000).toFixed(2)} $VBV</b>
+                </div>
             </div>
-            <div class="font-size-0-75em opacity-7 italic text-center p-10 bg-black-80 rounded">
+            <div class="font-size-0-75em ${data.kernel_healthy ? 'opacity-7' : 'text-error'} italic text-center p-10 bg-black-80 rounded">
                 ${data.audit_report}
             </div>
         </div>
@@ -335,7 +351,7 @@ export async function adminExportAuditLog() {
  * PILLAR 3: Administrative Expansion.
  */
 export async function adminForcePayout() {
-    const targetId = document.getElementById("admin-force-payout-id").value.trim();
+    const targetId = document.getElementById("admin-force-payout-id")?.value.trim();
     if (!targetId) {
         showToast("Please enter a valid ClientID or Wallet Address.", "error");
         return;
@@ -451,8 +467,8 @@ export async function adminSimulateMutationFailure() {
  * Creates a specified number of regional clubs and simulates decay over a duration.
  */
 export async function adminSimulateMojoDecay() {
-    const numClubs = parseInt(document.getElementById("admin-mojo-sim-clubs").value);
-    const durationMinutes = parseInt(document.getElementById("admin-mojo-sim-duration").value);
+    const numClubs = parseInt(document.getElementById("admin-mojo-sim-clubs")?.value);
+    const durationMinutes = parseInt(document.getElementById("admin-mojo-sim-duration")?.value);
 
     if (isNaN(numClubs) || numClubs <= 0 || isNaN(durationMinutes) || durationMinutes <= 0) {
         showToast("❌ Please enter valid numbers for clubs and duration.", "error");
@@ -606,6 +622,7 @@ export async function fetchAdminLogs() { // Exported for use in app.js
             fetchNodeHealth(); // Refresh node health dashboard
             fetchLedgerAudit(); // Refresh solvency dashboard
             fetchMutationAudit(); // New: Refresh mutation audit dashboard
+            fetchDLCRegistry(); // New: Refresh DLC registry dashboard
             adminCommissionAudit(); // PILLAR 1: Refresh alliance dividends
             adminTaxAudit(); // PILLAR 1: Refresh systemic taxes
             adminDistrictTaxAudit(); // PILLAR 1: Refresh localized policies
@@ -654,6 +671,7 @@ export function renderDistrictTaxDashboard(data) {
                 <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
                     <th class="p-10">DISTRICT</th>
                     <th class="p-10">GOVERNOR</th>
+                    <th class="p-10 text-right">DIVIDEND POOL</th>
                     <th class="p-10 text-right">TAX RATE</th>
                 </tr>
             </thead>
@@ -665,6 +683,7 @@ export function renderDistrictTaxDashboard(data) {
                             <span class="text-white">${d.governor_name}</span><br/>
                             <small class="opacity-5 font-mono">${d.governor_address}</small>
                         </td>
+                        <td class="p-10 text-right"><b class="text-neon-green">${((d.dividend_pool || 0) / 1000000).toFixed(2)} $VBV</b></td>
                         <td class="p-10 text-right"><b class="text-neon-green">${d.tax_rate.toFixed(1)}%</b></td>
                     </tr>
                 `).join('')}
@@ -673,6 +692,133 @@ export function renderDistrictTaxDashboard(data) {
     `;
 }
 
+/**
+ * fetchDLCRegistry retrieves the current state of the DLC registry.
+ * PILLAR 4: Console Expansion Management.
+ */
+export async function fetchDLCRegistry() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry`, { headers });
+        const data = await response.json();
+        if (response.ok) {
+            renderDLCRegistryDashboard(data);
+        } else {
+            showToast(`❌ Failed to fetch DLC registry: ${data.message || response.statusText}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC registry fetch failed", err);
+        showToast("❌ Network error fetching DLC registry.", "error");
+    }
+}
+
+/**
+ * renderDLCRegistryDashboard displays the DLC products in the admin panel.
+ * PILLAR 4: Console Expansion Management.
+ */
+export function renderDLCRegistryDashboard(registry) {
+    const container = document.getElementById("admin-dlc-registry-display");
+    if (!container) return;
+
+    if (!registry || Object.keys(registry).length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No DLC products registered.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">ID</th>
+                    <th class="p-10">NAME</th>
+                    <th class="p-10">COST ($VBV)</th>
+                    <th class="p-10">CREATOR</th>
+                    <th class="p-10 text-right">ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${Object.values(registry).map(p => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10"><b class="text-neon-cyan">${p.arena_voucher_id}</b></td>
+                        <td class="p-10">${p?.name}</td>
+                        <td class="p-10">${(p.cost_micro / 1000000).toFixed(2)}</td>
+                        <td class="p-10 font-mono font-xs opacity-7">${shortenAddress(p.creator_wallet)}</td>
+                        <td class="p-10 text-right">
+                            <button class="outline x-small border-neon-cyan" onclick="adminUpdateDLCProduct('${p.arena_voucher_id}', '${p?.name}', '${p.description}', ${p.cost_micro}, '${p.creator_wallet}')">EDIT</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * adminUpdateDLCProduct allows administrators to add or modify DLC products.
+ * PILLAR 4: Console Expansion Management.
+ */
+export async function adminUpdateDLCProduct(id, name, description, costMicro, creatorWallet) {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    // For simplicity, this example assumes direct input or pre-filled form.
+    // In a real UI, you'd have a modal with input fields.
+    const product = {
+        arena_voucher_id: id || prompt("Enter DLC Product ID:", "NEW_DLC_ITEM"),
+        name: name || prompt("Enter DLC Name:", "New DLC Item"),
+        description: description || prompt("Enter DLC Description:", "A new item for console players."),
+        cost_micro: costMicro || parseInt(prompt("Enter Cost in micro-VBV:", "100000000")), // Default 100 VBV
+        creator_wallet: creatorWallet || prompt("Enter Creator Wallet:", userAddress),
+    };
+
+    if (!product.arena_voucher_id || !product?.name || !product.cost_micro || !product.creator_wallet) {
+        showToast("❌ Missing required DLC product fields.", "error");
+        return;
+    }
+
+    // PILLAR 2: Integer Supremacy.
+    // Ensure cost is a valid positive integer to prevent backend arithmetic drift.
+    const cost = parseInt(product.cost_micro);
+    if (isNaN(cost) || cost <= 0) {
+        showToast("❌ Invalid cost amount. Must be a positive integer (micro-units).", "error");
+        return;
+    }
+    product.cost_micro = cost;
+
+    // PILLAR 3: Identity Validation & Normalization.
+    // Verify the creator wallet conforms to supported network standards.
+    const wallet = product.creator_wallet.trim();
+    const isEVM = wallet.startsWith("0x") && wallet.length === 42;
+    const isAVM = wallet.length === 58;
+    const isSOL = (wallet?.length ?? 0) >= 32 && (wallet?.length ?? 0) <= 44; // Solana Base58 length range
+
+    if (!isEVM && !isAVM && !isSOL) {
+        showToast("❌ Invalid Creator Wallet address format.", "error");
+        return;
+    }
+    // Normalize AVM and EVM to lowercase; Solana remains case-sensitive.
+    if (!isSOL) product.creator_wallet = wallet.toLowerCase();
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry/update`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+        if (response.ok) {
+            showToast(`✅ DLC product '${product?.name}' updated.`, "success");
+            fetchDLCRegistry(); // Refresh the dashboard
+        } else {
+            const err = await response.text();
+            showToast(`❌ DLC Update Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        console.error("DLC update failed", err);
+        showToast("❌ Network error updating DLC registry.", "error");
+    }
+}
 /**
  * adminTaxAudit fetches the aggregated session tax revenue.
  * PILLAR 1: Industrial Loop Tracking.
@@ -700,15 +846,34 @@ export async function adminTaxAudit() {
 export function renderTaxDashboard(data) {
     const container = document.getElementById("admin-tax-revenue-display");
     if (!container) return;
-    const corp = (data.corporate_tax_total / 1000000).toFixed(2);
-    const lux = (data.luxury_tax_total / 1000000).toFixed(2);
-    const sabo = (data.sabotage_surcharge_total / 1000000).toFixed(2);
-    const govS = (data.governor_surcharge_total / 1000000).toFixed(2);
-    const total = (parseFloat(corp) + parseFloat(lux) + parseFloat(sabo) + parseFloat(govS)).toFixed(2);
+
+    // PILLAR 2: Solvency Guard.
+    // Trigger a high-priority alert if session ghost reclamation exceeds the critical threshold (5,000 $VBV).
+    // Guarded to only fire when the total increments while above the limit to prevent polling spam.
+    if ((data.ghost_tax_total || 0) > 5000000000 && (data.ghost_tax_total || 0) > lastGhostAlertTotal) {
+        showToast("👻 <b>GHOST ALERT:</b> Session reclamation total exceeds 5,000 $VBV. Verify Creator Hub initialization status.", "critical");
+        lastGhostAlertTotal = data.ghost_tax_total;
+    }
+
+    // PILLAR 2: Solvency Guard.
+    // Trigger a high-priority alert if session platform fees exceed the critical threshold (2,000 $VBV).
+    // Guarded to only fire when the total increments while above the limit to prevent polling spam.
+    if ((data.platform_tax_total || 0) > 2000000000 && (data.platform_tax_total || 0) > lastPlatformAlertTotal) {
+        showToast("💸 <b>SURCHARGE ALERT:</b> Session Platform Fees total exceeds 2,000 $VBV. High volume of self-redemptions detected.", "critical");
+        lastPlatformAlertTotal = data.platform_tax_total;
+    }
+    const corp = ((data.corporate_tax_total || 0) / 1000000).toFixed(2);
+    const lux = ((data.luxury_tax_total || 0) / 1000000).toFixed(2);
+    const sabo = ((data.sabotage_surcharge_total || 0) / 1000000).toFixed(2);
+    const govS = ((data.governor_surcharge_total || 0) / 1000000).toFixed(2);
+    const ghost = ((data.ghost_tax_total || 0) / 1000000).toFixed(2);
+    const plat = ((data.platform_tax_total || 0) / 1000000).toFixed(2);
+    const stag = ((data.stagnation_tax_total || 0) / 1000000).toFixed(2);
+    const total = (parseFloat(corp) + parseFloat(lux) + parseFloat(sabo) + parseFloat(govS) + parseFloat(ghost) + parseFloat(plat) + parseFloat(stag)).toFixed(2);
     
     container.innerHTML = `
         <div class="glass-panel p-10 m-0 border-neon-green accelerated" style="background: rgba(0,0,0,0.4); grid-column: 1 / -1;">
-            <div class="display-grid gap-15 text-center" style="grid-template-columns: repeat(5, 1fr);">
+            <div class="display-grid gap-15 text-center" style="grid-template-columns: repeat(8, 1fr);">
                 <div>
                     <div class="font-xs opacity-6 uppercase mb-5">Corporate Recovery</div>
                     <b class="text-neon-cyan">${corp} $VBV</b>
@@ -728,6 +893,21 @@ export function renderTaxDashboard(data) {
                     <div class="font-xs opacity-6 uppercase mb-5">Gov Surcharge</div>
                     <b class="text-gold">${govS} $VBV</b>
                     <div class="font-xs opacity-4 mt-2">(Capital Revenue)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Platform Fees</div>
+                    <b class="text-neon-purple">${plat} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(Self-Redeem)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Ghost Reclamation</div>
+                    <b class="text-error">${ghost} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(100% Recycle)</div>
+                </div>
+                <div>
+                    <div class="font-xs opacity-6 uppercase mb-5">Stagnation Fees</div>
+                    <b class="text-warning">${stag} $VBV</b>
+                    <div class="font-xs opacity-4 mt-2">(25% Siphon)</div>
                 </div>
                 <div><div class="font-xs opacity-6 uppercase mb-5">Session Total</div><b class="text-neon-green">${total} $VBV</b></div>
             </div>
@@ -824,29 +1004,103 @@ export function updateAdminRewardList(rewards) { // Exported for use in app.js
     });
 }
 
+/**
+ * toMicro converts an operator-entered amount into EXACT integer micro-units.
+ *
+ * The ledger is integer micro-VBV (Architecture Ledger), so the decimal string is split by
+ * DIGITS rather than multiplied as a float: "7.5" becomes 7500000 exactly, with no rounding
+ * step to drift. Returns null when the input is not a decimal number with at most six decimal
+ * places, so the caller can REFUSE instead of silently rounding.
+ */
+export function toMicro(value) {
+    const s = String(value ?? "").trim();
+    if (!/^\d+(\.\d{0,6})?$/.test(s)) return null;
+    const [whole, fraction = ""] = s.split(".");
+    const micro = Number(whole) * 1000000 + Number((fraction + "000000").slice(0, 6));
+    return Number.isSafeInteger(micro) ? micro : null;
+}
+
+/**
+ * updateAdminRewardRegistry renders the SERVED reward-token registry: role, source, the live
+ * scaled amount beside the template amount, and whether the token is payable. It displays what
+ * the server reports and never reconstructs registry state on the client.
+ */
+export function updateAdminRewardRegistry(tokens, containerId = "admin-reward-list") {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = "";
+    const rows = Array.isArray(tokens) ? tokens : [];
+    if (rows.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "font-xs opacity-7 p-5";
+        empty.textContent = "No reward tokens are registered.";
+        container.appendChild(empty);
+        return;
+    }
+    const units = (micro) => (Number(micro || 0) / 1000000).toFixed(2); // display only
+    rows.forEach((t) => {
+        const div = document.createElement("div");
+        div.className = "flex-row justify-between align-center p-5 border-bottom-glass font-xs";
+        const label = document.createElement("span");
+        const parts = [`${t.role}`, t.symbol ? `${t.symbol} (${t.decimals}d)` : "(no symbol)", `ID ${t.asset_id}`, `src ${t.source}`];
+        if (!t.payable) parts.push("NOT PAYABLE");
+        label.textContent = parts.join(" · ");
+        const amt = document.createElement("span");
+        amt.className = t.payable ? "text-neon-green" : "opacity-7";
+        amt.textContent = `${units(t.scaled_micro)} / ${units(t.initial_micro)} $VBV`;
+        div.appendChild(label);
+        div.appendChild(amt);
+        // The env-owned primary token is read-only: the amount is changed in the environment.
+        if (t.role !== "primary") {
+            const btn = document.createElement("button");
+            btn.className = "outline x-small border-error text-error";
+            btn.textContent = "X";
+            btn.title = "Unregister this reward token";
+            btn.addEventListener("click", () => window.adminRemoveReward(t.asset_id));
+            div.appendChild(btn);
+        }
+        container.appendChild(div);
+    });
+}
+
+/**
+ * adminAddReward REGISTERS (or updates) a reward token. The amount is sent as `amount_micro`
+ * (integer micro-VBV); the server refuses a float `amount` field outright, so a legacy body can
+ * never be silently ignored.
+ */
 export async function adminAddReward() { // Exported for use in app.js
     try {
-        const assetID = document.getElementById("admin-add-asset").value;
-        const amount = parseFloat(document.getElementById("admin-add-amt").value);
-        if (!assetID || isNaN(amount)) return;
+        const assetID = (document.getElementById("admin-add-asset")?.value || "").trim();
+        const amountMicro = toMicro(document.getElementById("admin-add-amt")?.value);
+        if (!assetID) {
+            showToast("❌ Asset ID is required.", "error");
+            return;
+        }
+        if (amountMicro === null) {
+            showToast("❌ Amount must be a number with at most 6 decimal places (sent as exact integer micro-VBV).", "error");
+            return;
+        }
 
         const headers = await getAdminHeaders();
         if (!headers) return;
 
-        setTransactionStatus(`Adding reward asset ${assetID}...`, "info");
+        setTransactionStatus(`Registering reward token ${assetID}...`, "info");
 
         const response = await fetch(`${CONFIG.API_BASE}/api/reward/add`, {
             method: 'POST',
             headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ asset_id: assetID, amount: amount })
+            body: JSON.stringify({ asset_id: assetID, amount_micro: amountMicro })
         });
 
         if (response.ok) {
-            showToast("✅ Reward asset added.", "success");
+            const data = await response.json().catch(() => ({}));
+            updateAdminRewardRegistry(data.reward_tokens);
+            showToast(`✅ Reward token ${assetID} registered.`, "success");
             setTransactionStatus(null);
         } else {
             const err = await response.text();
             setTransactionStatus(`❌ Action Failed: ${err}`, "critical");
+            showToast("❌ Reward token refused.", "error");
         }
     } catch (err) { 
         setTransactionStatus(`❌ Action Failed: ${err.message}`, "critical");
@@ -879,12 +1133,108 @@ export async function adminRemoveReward(assetId) { // Exported for use in app.js
     }
 }
 
+/**
+ * splitUrlList splits an input value into a URL list.
+ * Comma / newline / semicolon separated, so an operator can register SEVERAL bases
+ * (the indexer transport fails over through them in order).
+ */
+function splitUrlList(value) {
+    return String(value || "")
+        .split(/[\n,;]+/)
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0);
+}
+
+/**
+ * adminNetworkFormPayload builds a NetworkConfig-shaped payload from the
+ * "Add New Network" form.
+ * Field names MUST match the Go struct json tags (network_name / indexer_urls /
+ * node_urls / chain_id ...) because the server decodes a NetworkConfig and rejects
+ * a body that names none of its required fields.
+ */
+function adminNetworkFormPayload() {
+    const val = (id) => (document.getElementById(id)?.value || "").trim();
+    return {
+        network_name: val("new-network-name"),
+        explorer_url: val("new-explorer-url"),
+        indexer_urls: splitUrlList(val("new-indexer-url")),
+        node_urls: splitUrlList(val("new-node-url")),
+        faucet_url: val("new-faucet-url"),
+        asset_id: val("new-asset-id"),
+        app_id: val("new-app-id"),
+        chain_id: val("new-chain-id"),
+        power_divisor: parseFloat(val("new-power-divisor")) || 0,
+        power_base: parseInt(val("new-power-base"), 10) || 0
+    };
+}
+
+/**
+ * fillAdminNetworkForm loads an already-registered network into the form.
+ * POST /api/admin/network/add UPSERTS by network_name, so loading the current
+ * values first lets an operator EDIT an entry (in particular its indexer base)
+ * instead of blindly replacing it.
+ */
+function fillAdminNetworkForm(name) {
+    const cfg = availableNetworks[name];
+    if (!cfg) return;
+    const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value !== undefined && value !== null) el.value = value;
+    };
+    set("new-network-name", cfg.network_name || name);
+    set("new-explorer-url", cfg.explorer_url || "");
+    set("new-indexer-url", (cfg.indexer_urls || []).join(", "));
+    set("new-node-url", (cfg.node_urls || []).join(", "));
+    set("new-faucet-url", cfg.faucet_url || "");
+    set("new-asset-id", cfg.asset_id || "");
+    set("new-app-id", cfg.app_id || "");
+    set("new-chain-id", cfg.chain_id || "");
+    set("new-power-divisor", cfg.power_divisor || "");
+    set("new-power-base", cfg.power_base || "");
+}
+
 export async function adminAddNetwork() {
     try {
         const headers = await getAdminHeaders();
         if (!headers) return;
-        // Implementation logic for adding network config
-        showToast("✅ Network configuration added.", "success");
+        // The registry upsert persists the WHOLE registry to networks.json, so this is the
+        // one door that sets the indexer base(s) the server reads chain state through.
+        const payload = adminNetworkFormPayload();
+        if (!payload.network_name) {
+            showToast("❌ Network name is required.", "error");
+            setTransactionStatus(null);
+            return;
+        }
+        if (payload.indexer_urls.length === 0) {
+            showToast("❌ At least one indexer URL is required — every chain read goes through it.", "error");
+            setTransactionStatus(null);
+            return;
+        }
+        if (payload.node_urls.length === 0) {
+            showToast("❌ At least one node RPC URL is required.", "error");
+            setTransactionStatus(null);
+            return;
+        }
+        if (!payload.chain_id) {
+            showToast("❌ A CAIP-2 chain ID is required (e.g. algorand:r20fSQI8gWe_kFZziNonSPCXLwcQmH_n).", "error");
+            setTransactionStatus(null);
+            return;
+        }
+
+        setTransactionStatus(`Saving network ${payload.network_name}...`, "info");
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/network/add`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (response.ok) {
+            showToast(`✅ ${payload.network_name} saved (${payload.indexer_urls.length} indexer base${payload.indexer_urls.length === 1 ? '' : 's'}).`, "success");
+            setTransactionStatus(null);
+        } else {
+            const err = await response.text();
+            setTransactionStatus(`❌ Network save failed: ${err}`, "critical");
+            showToast("❌ Network save failed.", "error");
+        }
     } catch (err) { 
         showToast("❌ Failed to add network", "error"); 
     }
@@ -922,8 +1272,8 @@ export async function adminUpdateRules() {
 
 export async function adminBanWallet(walletToBan = null, hoursToBan = null) {
     try {
-        const wallet = walletToBan || document.getElementById("admin-ban-wallet").value.trim();
-        const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours").value);
+        const wallet = walletToBan || document.getElementById("admin-ban-wallet")?.value.trim();
+        const hours = hoursToBan || parseInt(document.getElementById("admin-ban-hours")?.value);
         if (!wallet) return;
         const headers = await getAdminHeaders();
         if (!headers) return;
@@ -950,7 +1300,7 @@ export async function adminBanWallet(walletToBan = null, hoursToBan = null) {
 
 export async function adminAvatarBan(url = null, hours = null) {
     try {
-        const targetUrl = url || document.getElementById("admin-ban-avatar-url").value.trim();
+        const targetUrl = url || document.getElementById("admin-ban-avatar-url")?.value.trim();
         const headers = await getAdminHeaders();
         if (!targetUrl || !headers) return;
 
@@ -979,8 +1329,8 @@ export function adminBanWalletFromLog(wallet) {
 
 export async function adminUpdatePowerScaling() {
     try {
-        const divisor = parseFloat(document.getElementById("admin-power-divisor").value);
-        const base = parseInt(document.getElementById("admin-power-base").value);
+        const divisor = parseFloat(document.getElementById("admin-power-divisor")?.value);
+        const base = parseInt(document.getElementById("admin-power-base")?.value);
         const headers = await getAdminHeaders();
         if (!headers) return;
 
@@ -1041,7 +1391,7 @@ export async function adminToggleDevMode() {
 
 export async function adminSimulateTournament() {
     try {
-        const size = parseInt(document.getElementById("admin-sim-size").value);
+        const size = parseInt(document.getElementById("admin-sim-size")?.value);
         const isBuyIn = document.getElementById("admin-sim-buyin").checked;
         const headers = await getAdminHeaders();
         if (!headers) return;
@@ -1070,6 +1420,7 @@ export function startAdminLogPolling() { // Exported for use in app.js
     if (adminLogTicker) return;
     adminLogTicker = setInterval(fetchLastAdminAction, 15000); // Check every 15s for status bar
     renderAdminAutomationButtons(); // Render automation buttons when polling starts (admin panel is active)
+    renderShopTokenPresets(); // Populate the Shop Token Presets display from saved/localStorage state
 }
 
 /**
@@ -1078,7 +1429,7 @@ export function startAdminLogPolling() { // Exported for use in app.js
 function updateDashboardStats(data) {
     const balanceEl = document.getElementById("admin-dashboard-balance");
     const countEl = document.getElementById("admin-dashboard-pending-count");
-    if (balanceEl && data.balance !== undefined) balanceEl.innerText = `${data.balance.toFixed(2)} $VBV`;
+    if (balanceEl && data?.balance !== undefined) balanceEl.innerText = `${data?.balance.toFixed(2)} $VBV`;
     if (countEl && data.pending_rewards_count !== undefined) countEl.innerText = data.pending_rewards_count;
 }
 
@@ -1097,7 +1448,7 @@ export async function fetchLastAdminAction() { // Exported for use in app.js
 
         const response = await fetch(`${CONFIG.API_BASE}/api/admin/logs?limit=1`, { headers });
         const data = await response.json();
-        if (data.status === "success" && data.logs.length > 0) {
+        if (data.status === "success" && (data.logs?.length ?? 0) > 0) {
             updateDashboardStats(data);
             const last = data.logs[0];
             document.getElementById("admin-last-action").innerHTML = `<b>${last.action}:</b> ${last.target} (${last.timestamp})`;
@@ -1114,6 +1465,8 @@ export function updateAdminNetworkUI() { // Exported for use in app.js
     onAdminNetworkSelectChange();
 }
 
+let lastNetworkFormFill = null;
+
 export function onAdminNetworkSelectChange() { // Exported for use in app.js
     const select = document.getElementById("admin-network-select");
     if (!select) return;
@@ -1121,13 +1474,29 @@ export function onAdminNetworkSelectChange() { // Exported for use in app.js
     const config = availableNetworks[name] || {};
     const details = document.getElementById("admin-network-details");
     if (details) {
-        details.innerText = `Node: ${config.node_urls ? config.node_urls[0] : 'None'}`;
+        // textContent (never innerHTML) — these are operator-supplied URLs.
+        details.innerHTML = "";
+        const row = (label, value) => {
+            const div = document.createElement("div");
+            div.textContent = `${label}: ${value}`;
+            details.appendChild(div);
+        };
+        row("Indexer", (config.indexer_urls || []).join(", ") || "None");
+        row("Node", (config.node_urls || []).join(", ") || "None");
+    }
+    // Seed the Add/Update form with the selected network's CURRENT values so an entry can be
+    // EDITED (in particular its indexer base) rather than blindly replaced by the upsert.
+    // Only on an actual selection change: this handler also runs on every lobby update, and
+    // re-filling then would wipe an operator's in-progress edit.
+    if (name && name !== lastNetworkFormFill) {
+        lastNetworkFormFill = name;
+        fillAdminNetworkForm(name);
     }
 }
 
 export async function adminSetActiveNetwork() { // Exported for use in app.js
     try {
-        const networkName = document.getElementById("admin-network-select").value;
+        const networkName = document.getElementById("admin-network-select")?.value;
         const headers = await getAdminHeaders();
         if (!headers) return;
 
@@ -1153,7 +1522,7 @@ export async function adminSetActiveNetwork() { // Exported for use in app.js
 
 export async function adminBroadcast() {
     // This function is explicitly exported for use by app.js
-    const text = document.getElementById("admin-msg-text").value;
+    const text = document.getElementById("admin-msg-text")?.value;
     const priority = document.getElementById("admin-msg-priority")?.value || "info";
     if (!text) return;
 
@@ -1174,7 +1543,8 @@ export async function adminBroadcast() {
 
         if (response.ok) {
             showToast("📢 Message broadcasted successfully.", "success");
-            document.getElementById("admin-msg-text").value = "";
+            const adminMsgEl = document.getElementById("admin-msg-text");
+            if (adminMsgEl) adminMsgEl.value = "";
             setTransactionStatus(null);
         } else {
             const err = await response.text();
@@ -1220,11 +1590,328 @@ export function adminCyberSecurityAudit() {
 
         return `
             <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
-                <div class="font-bold text-neon-purple mb-5 border-bottom-glass pb-5">${club.name.toUpperCase()}</div>
-                <div class="font-xs opacity-6 mb-10">Mojo: ${club.club_mojo} | Staff: ${Object.keys(club.staff || {}).length}</div>
+                <div class="font-bold text-neon-purple mb-5 border-bottom-glass pb-5">${club?.name.toUpperCase()}</div>
+                <div class="font-xs opacity-6 mb-10">Mojo: ${club.club_mojo} | Staff: ${Object.keys(club.staff || {})?.length ?? 0}</div>
                 <div class="flex-col">
-                    ${defenses.length > 0 ? defenses.join('') : '<div class="opacity-3 font-xs italic">No active defenses detected.</div>'}
+                    ${defenses?.length ?? 0 > 0 ? defenses.join('') : '<div class="opacity-3 font-xs italic">No active defenses detected.</div>'}
                 </div>
             </div>`;
     }).join('')
+}
+
+/**
+ * adminRestockDLC triggers a manual restock for a specific DLC item.
+ * PILLAR 2: Integer Supremacy.
+ */
+export async function adminRestockDLC(id) {
+    const qty = parseInt(prompt(`Enter restock quantity for ${id}:`, "10"));
+    if (isNaN(qty) || qty <= 0) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/dlc-registry/restock`, {
+            method: "POST",
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ arena_voucher_id: id, quantity: qty })
+        });
+        if (response.ok) {
+            showToast(`✅ Successfully restocked ${qty} units of ${id}.`, "success");
+            fetchDLCRegistry();
+        } else {
+            const err = await response.text();
+            showToast(`❌ Restock Failed: ${err}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Network error restocking DLC.", "error");
+    }
+}
+
+/**
+ * adminNodeHealthAudit renders the RPC node cluster health report.
+ * PILLAR 4: Network Resiliency — covers /api/admin/node-health-audit.
+ */
+export async function adminNodeHealthAudit() {
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/node-health-audit`, { headers });
+        if (response.ok) {
+            const data = await response.json();
+            renderNodeHealthAudit(data);
+        } else {
+            showToast(`❌ Node audit failed: ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        showToast("❌ Network error fetching node health.", "error");
+    }
+}
+
+/**
+ * renderNodeHealthAudit displays RPC node cluster status.
+ */
+export function renderNodeHealthAudit(data) {
+    const container = document.getElementById("admin-node-health-display");
+    if (!container) return;
+
+    const nodes = data.nodes || [];
+    if (nodes.length === 0) {
+        container.innerHTML = `<div class="grid-span-all opacity-5 py-20 italic">No nodes registered.</div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table w-full text-left" style="border-collapse: collapse;">
+            <thead>
+                <tr class="opacity-5 font-size-0-7em letter-spacing-1 border-bottom-glass">
+                    <th class="p-10">NETWORK</th>
+                    <th class="p-10">NODE URL</th>
+                    <th class="p-10">STATUS</th>
+                    <th class="p-10">LATENCY (ms)</th>
+                    <th class="p-10">LAST CHECK</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${nodes.map(n => `
+                    <tr class="border-bottom-glass font-size-0-85em hover-bg-dim">
+                        <td class="p-10">${n.network || 'Unknown'}</td>
+                        <td class="p-10 font-mono font-xs opacity-7">${n.url || '?'}</td>
+                        <td class="p-10 ${n.healthy ? 'text-neon-green' : 'text-error'}">${n.healthy ? 'HEALTHY' : 'UNHEALTHY'}</td>
+                        <td class="p-10">${n.latency_ms ?? '?'}</td>
+                        <td class="p-10">${n.last_check || 'Never'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+/**
+ * adminSystemSanityCheck performs a comprehensive ledger and node audit.
+ * PILLAR 4: Live Deployment & Monitoring — covers /api/admin/system-sanity-check.
+ */
+export async function adminSystemSanityCheck() {
+    if (!confirm("⚠️ This will run a full ledger invariant audit. Continue?")) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("Running comprehensive system sanity check...", "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/system-sanity-check`, { method: 'POST', headers });
+        if (response.ok) {
+            const data = await response.json();
+            renderSystemSanityCheck(data);
+            showToast("✅ System sanity check complete.", "success");
+        } else {
+            setTransactionStatus(`❌ Sanity check failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Sanity check network error", "critical");
+        showToast("❌ Network error during sanity check.", "error");
+    }
+}
+
+/**
+ * renderSystemSanityCheck displays ledger invariants and node connectivity results.
+ */
+export function renderSystemSanityCheck(data) {
+    const container = document.getElementById("admin-sanity-check-display");
+    if (!container) return;
+
+    const checks = data.checks || [];
+    container.innerHTML = checks?.length ?? 0 > 0 ? checks.map(c => `
+        <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
+            <div class="${c.passed ? 'text-neon-green' : 'text-error'} font-bold mb-5">
+                ${c.passed ? '✅' : '❌'} ${c?.name}
+            </div>
+            <div class="font-xs opacity-7">${c.message || 'No details'}</div>
+        </div>
+    `).join('') : '<div class="opacity-5 italic py-20">No results available.</div>';
+}
+
+/**
+ * adminEmergencyShutdown executes a scorched-earth protocol to preserve state and terminate sessions.
+ * PILLAR 3: Administrative Security — covers /api/admin/emergency-shutdown.
+ */
+export async function adminEmergencyShutdown() {
+    if (!confirm("⚠️ CRITICAL: This will shut down all active sessions and preserve state. Confirm?")) return;
+    if (!confirm("⚠️ SECOND CONFIRMATION: This action is irreversible without external recovery.")) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus("🔴 EMERGENCY SHUTDOWN INITIATED...", "critical");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/emergency-shutdown`, { method: 'POST', headers });
+        if (response.ok) {
+            showToast("✅ Emergency shutdown executed successfully.", "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Shutdown failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Shutdown network error", "critical");
+        showToast("❌ Network error during shutdown.", "error");
+    }
+}
+
+/**
+ * adminSimulateLoad stress-tests the telemetry throughput.
+ * PILLAR 4: Performance Monitoring & Stress Testing — covers /api/admin/simulate-load.
+ */
+export async function adminSimulateLoad() {
+    const count = parseInt(prompt("Enter number of concurrent load events:", "50")) || 50;
+    if (count <= 0) return;
+
+    const headers = await getAdminHeaders();
+    if (!headers) return;
+
+    setTransactionStatus(`Stress-testing with ${count} concurrent transactions...`, "warning");
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/admin/simulate-load`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ count })
+        });
+        if (response.ok) {
+            const data = await response.json();
+            showToast(`✅ Load test complete: ${data.transactions || count} transactions processed.`, "success");
+            setTransactionStatus(null);
+        } else {
+            setTransactionStatus(`❌ Load test failed`, "critical");
+            showToast(`❌ ${await response.text()}`, "error");
+        }
+    } catch (err) {
+        setTransactionStatus("❌ Load test network error", "critical");
+        showToast("❌ Network error during load test.", "error");
+    }
+}
+
+/**
+ * renderDistrictTaxAudit displays district-level tax collection data.
+ */
+export function renderDistrictTaxAudit(data) {
+    const container = document.getElementById("admin-district-tax-display");
+    if (!container) return;
+
+    const districts = data.districts || [];
+    const totalRevenue = data.total_revenue_micro || 0;
+
+    container.innerHTML = `
+        <div class="mb-10 font-bold text-neon-cyan">Total District Revenue: ${(totalRevenue / 1000000).toFixed(2)} $VBV</div>
+        ${districts?.length ?? 0 > 0 ? districts.map(d => `
+            <div class="glass-panel p-10 m-0 border-neon-cyan accelerated" style="background: rgba(0,0,0,0.4);">
+                <div class="font-bold text-neon-purple mb-5">${d?.name || 'Unknown District'}</div>
+                <div class="font-xs opacity-7">
+                    Collected: ${(d.collected_micro || 0) / 1000000} $VBV | 
+                    Distributed: ${(d.distributed_micro || 0) / 1000000} $VBV | 
+                    Retained: ${(d.retained_micro || 0) / 1000000} $VBV
+                </div>
+            </div>
+        `).join('') : '<div class="opacity-5 italic py-20">No district data available.</div>'}\
+    `;
+}
+
+// ============================================================================
+// Shop Token Presets (admin-panel token locking)
+// Lets an admin lock each shop category to a settlement token. The live front-end
+// resolveShopToken() reads window.__shopTokenPresets; we persist to localStorage so
+// the gating survives reloads. Backend NUGGET/UNIT settlement is a documented follow-up
+// (requires on-chain asset verification infra); the front-end gating is fully operative.
+// ============================================================================
+const SHOP_TOKEN_KEY = 'nft_seduction_shop_token_presets';
+const SHOP_TOKEN_OPTIONS = ['VBV', 'NUGGET', 'UNIT'];
+
+function loadShopTokenPresets() {
+    try {
+        const raw = localStorage.getItem(SHOP_TOKEN_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === 'object') { window.__shopTokenPresets = parsed; return parsed; }
+    } catch (e) {}
+    if (!window.__shopTokenPresets) window.__shopTokenPresets = {};
+    return window.__shopTokenPresets;
+}
+
+function saveShopTokenPresets(presets) {
+    window.__shopTokenPresets = presets;
+    try { localStorage.setItem(SHOP_TOKEN_KEY, JSON.stringify(presets)); } catch (e) {}
+}
+
+// Shop categories = distinct ClubType values from GlobalShopRegistry + explicit Nugget/Unit shops.
+function shopTokenCategories() {
+    const cats = new Set();
+    Object.values(GlobalShopRegistry || {}).forEach(it => { if (it.ClubType) cats.add(it.ClubType); });
+    cats.add('Nugget');
+    cats.add('Unit');
+    return Array.from(cats).sort();
+}
+
+export function renderShopTokenPresets() {
+    const container = document.getElementById('admin-shop-token-display');
+    if (!container) return;
+    const presets = loadShopTokenPresets();
+    const cats = shopTokenCategories();
+    if (!cats?.length ?? 0) {
+        container.innerHTML = '<div class="opacity-5 italic py-20">No shop categories detected.</div>';
+        return;
+    }
+    container.innerHTML = cats.map(c => {
+        const tok = presets[c] || resolveShopToken(c);
+        return `<div class="glass-panel p-10 m-0 accelerated" style="background: rgba(0,0,0,0.4); display:flex; justify-content:space-between; align-items:center;">
+            <span class="font-bold text-neon-purple">${c}</span>
+            <span class="token-badge token-${tok.toLowerCase()}">${tok}</span>
+        </div>`;
+    }).join('');
+}
+
+export function renderShopTokenPresetEditor() {
+    const presets = loadShopTokenPresets();
+    const cats = shopTokenCategories();
+    const rows = cats.map(c => {
+        const cur = presets[c] || resolveShopToken(c);
+        const opts = SHOP_TOKEN_OPTIONS.map(t => `<option value="${t}" ${t === cur ? 'selected' : ''}>${t}</option>`).join('');
+        return `<div class="flex-row align-center gap-10 mb-10">
+            <span class="flex-1 font-bold text-neon-purple">${c}</span>
+            <select class="glass-input" data-cat="${c}">${opts}</select>
+        </div>`;
+    }).join('');
+    showTokenPresetModal(rows);
+}
+
+function showTokenPresetModal(rowsHTML) {
+    const overlay = document.getElementById('shop-token-modal');
+    if (overlay) overlay.remove();
+    const el = document.createElement('div');
+    el.id = 'shop-token-modal';
+    el.className = 'overlay';
+    el.innerHTML = `<div class="glass-panel medium" style="text-align:center;">
+        <h2 class="text-gold">SHOP TOKEN PRESETS</h2>
+        <p class="font-size-0-75em opacity-6 mb-15">Lock each shop category to its settlement token.</p>
+        <div id="shop-token-rows">${rowsHTML}</div>
+        <div class="mt-20 flex-row justify-center gap-15">
+            <button class="outline" onclick="document.getElementById('shop-token-modal').remove()">CANCEL</button>
+            <button class="bg-gold text-dark font-bold" onclick="saveShopTokenPresetsFromEditor()">SAVE PRESETS</button>
+        </div>
+    </div>`;
+    document.body.appendChild(el);
+}
+
+export function saveShopTokenPresetsFromEditor() {
+    const rows = document.querySelectorAll('#shop-token-rows select[data-cat]');
+    const presets = {};
+    rows.forEach(s => { presets[s.getAttribute('data-cat')] = s.value; });
+    saveShopTokenPresets(presets);
+    const disp = document.getElementById('admin-shop-token-display');
+    if (disp) renderShopTokenPresets();
+    const modal = document.getElementById('shop-token-modal');
+    if (modal) modal.remove();
+    if (typeof showToast === 'function') showToast('Shop token presets saved.', 'info');
 }

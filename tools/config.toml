@@ -1,0 +1,50 @@
+# NFT-Seduction Unified Toolchain Configuration
+# Defines CLI subcommands, paths to internal tooling, and metadata.
+
+[build.console_ps]
+path = "tools/build/build_console.ps1"
+desc = "Dev console builder (PowerShell)"
+
+[build.console_sh]
+path = "tools/build/build_console.sh"
+desc = "Dev console builder (Bash)"
+
+[build.mobile_ps]
+path = "tools/build/build_mobile.ps1"
+desc = "Mobile build script (PowerShell)"
+
+[build.mobile_sh]
+path = "tools/build/build_mobile.sh"
+desc = "Mobile build script (Bash)"
+
+[build.integrity]
+path = "tools/build/check_scripts.sh"
+desc = "Build integrity check (Bash)"
+
+[server.dev]
+path = "tools/server/dev_server.ps1"
+desc = "Unified local dev server (build + watch + health watchdog + optional CDP test harness)"
+
+[archscan.scan]
+path = "tools/archscan/scan.js"
+desc = "Architecture bridge scanner"
+
+[archscan.wired]
+path = "tools/archscan/wired.js"
+desc = "Wired vs orphaned detector"
+
+[archscan.render]
+path = "tools/archscan/render.js"
+desc = "Diagram renderer"
+
+[archscan.watch]
+path = "tools/archscan/watch.js"
+desc = "Architecture change watcher"
+
+[flow.debug]
+path = "tools/flow/flow_debug.js"
+desc = "Menu flow + controller nav debugger"
+
+[flow.verify]
+path = "tools/flow/flow_verify.js"
+desc = "Verify menu customization pipeline"

@@ -15,6 +15,7 @@ Last Amended: 2026-06-20
 ## Deterministic Finance
 
 * `uint64` integer micro-units only.
+* **No floating-point math anywhere in the ledger, $VBV economy, or economic simulation.** This is a constitutional hard rule, not a style preference.
 * Floating point prohibited for:
   * Balances
   * Transfers
@@ -22,7 +23,13 @@ Last Amended: 2026-06-20
   * Rewards
   * Debts
   * Interest
-* Floating point permitted for UI presentation only.
+  * Fees
+  * Royalties
+  * Career / combat XP
+  * Any ledger counter or economic accumulator
+* Floats are non-deterministic and drift — never store, sum, split, or compare money, XP, or ledger values with `float`/`float64`/`double`.
+* If a fractional concept is required, represent it as an integer in the smallest unit (e.g. micro-VBV) and perform integer arithmetic.
+* Floating point permitted for **UI presentation only** (display formatting).
 
 ## Industrial Loop
 

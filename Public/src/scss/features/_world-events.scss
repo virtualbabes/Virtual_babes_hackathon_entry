@@ -1,0 +1,46 @@
+// Public\src\scss\features\_world-events.scss
+// §26: Treasure Hunt + User Events overlay (menu mode)
+
+/* World Events sub-panel tabs */
+.we-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(0, 255, 255, 0.03);
+    grid-column: span 2;
+}
+.we-tab {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #9ca3af;
+    transition: all 0.2s;
+}
+.we-tab:hover { border-color: #00f2fe; color: #e6e6e6; }
+.we-tab.active { background: #00f2fe; border-color: #00f2fe; color: #0a0e17; }
+.we-panel { grid-column: span 2; }
+.we-panel.hidden { display: none; }
+
+.world-events-panel { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 8px; min-height: 520px; }
+
+#world-events-overlay .panel-cache { grid-column: span 1; }
+#world-events-overlay .panel-event { grid-column: span 1; }
+#world-events-overlay .panel-caches { grid-column: span 1; max-height: 420px; overflow-y: auto; }
+#world-events-overlay .panel-events { grid-column: span 1; max-height: 420px; overflow-y: auto; }
+
+#world-events-overlay label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b0bec5; margin-bottom: 8px; }
+#world-events-overlay input, #world-events-overlay select {
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(0, 255, 255, 0.2);
+    color: #e0f7fa; border-radius: 6px; padding: 7px 9px; font-size: 13px;
+}
+#world-events-overlay input:focus, #world-events-overlay select:focus { outline: none; border-color: var(--neon-cyan); }
+
+.we-grid { display: flex; flex-direction: column; gap: 10px; padding: 6px; }
+.we-card { background: rgba(0, 97, 106, 0.1); border: 1px solid rgba(0, 255, 255, 0.22); border-radius: 8px; padding: 12px; }
+.we-card h4 { color: #80deea; margin: 0 0 6px 0; font-size: 0.95em; }
+.ai-status { grid-column: span 2; color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }

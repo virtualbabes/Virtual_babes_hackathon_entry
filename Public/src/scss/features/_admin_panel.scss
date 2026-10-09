@@ -1,0 +1,42 @@
+﻿// ============================================================================
+// Admin Panel - the ONE admin surface (#admin-control-panel)
+// ----------------------------------------------------------------------------
+// AUDITED 2026-09-15 (ADMIN AUTHORITY pass). The password-login panel (admin_panel.js) and the
+// operations/final dashboards were DELETED; their rules are removed with them because they matched
+// NO element in the app (verified repo-wide): .admin-panel-overlay (the removed
+// #admin-panel-overlay container), .admin-panel, .admin-panel-close, .admin-login*, .admin-error,
+// .admin-content h2, .admin-feature-row* and .admin-status.
+// What remains is what the kept panel uses: .admin-section* (its wrapper .admin-panel-main is
+// styled in _overlays.scss).
+// ============================================================================
+
+.admin-section {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 8px;
+}
+
+.admin-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin: 0 0 12px 0;
+}
+
+.admin-section input {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 12px;
+    &:focus { outline: none; border-color: var(--theme-accent); }
+}
+
+.admin-section button {
+    margin-top: 4px;
+}

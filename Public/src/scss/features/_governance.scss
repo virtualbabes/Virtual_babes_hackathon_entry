@@ -1,0 +1,170 @@
+// ============================================================================
+// Governance — Voting weight, election timer, candidate list
+// ============================================================================
+
+/* Tabs */
+.gv-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    background: rgba(var(--theme-accent-rgb), 0.05);
+}
+
+.gv-tab {
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: #90a4ae;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.6;
+    &:hover { opacity: 0.85; border-color: rgba(var(--theme-accent-rgb), 0.3); }
+    &.active {
+        background: rgba(var(--theme-accent-rgb), 0.15);
+        border-color: var(--theme-accent);
+        color: #e0e0e0;
+        opacity: 1;
+        text-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.6);
+    }
+}
+
+.gv-panel { padding: 16px; &.hidden { display: none; } }
+
+/* Weight */
+.gv-weight {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gv-total {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--theme-accent);
+    text-align: center;
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.gv-weight-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #90a4ae;
+    span:last-child { font-weight: 600; color: #e0e0e0; }
+}
+
+/* Election */
+.gv-election {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gv-election-info {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.gv-election-region { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+.gv-election-status {
+    font-size: 12px;
+    color: #90a4ae;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(var(--theme-accent-rgb), 0.1);
+    &.active { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+}
+
+/* Election timer */
+.gv-election-timer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.gv-timer-label { font-size: 11px; color: #90a4ae; text-transform: uppercase; }
+.gv-timer-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--theme-accent);
+    text-shadow: 0 0 12px rgba(var(--theme-accent-rgb), 0.5);
+}
+
+/* Candidates */
+.gv-candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gv-candidate-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.gv-candidate-name { flex: 1; font-size: 13px; font-weight: 600; color: #e0e0e0; }
+.gv-candidate-votes { font-size: 12px; color: #3fb950; font-weight: 600; }
+.gv-candidate-party { font-size: 11px; color: #90a4ae; }
+
+.gv-vote-btn { align-self: center; }
+
+/* Leaderboard */
+.gv-leaderboard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gv-leader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.gv-leader.top-1 { border-color: #ffd700; background: rgba(255, 215, 0, 0.05); }
+.gv-leader.top-2 { border-color: #c0c0c0; background: rgba(192, 192, 192, 0.05); }
+.gv-leader.top-3 { border-color: #cd7f32; background: rgba(205, 127, 50, 0.05); }
+
+.gv-rank {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--theme-accent);
+    min-width: 40px;
+}
+
+.gv-leader.top-1 .gv-rank { color: #ffd700; }
+.gv-leader.top-2 .gv-rank { color: #c0c0c0; }
+.gv-leader.top-3 .gv-rank { color: #cd7f32; }
+
+.gv-name { flex: 1; font-size: 12px; color: #90a4ae; }
+.gv-score { font-size: 13px; font-weight: 600; color: #e0e0e0; }

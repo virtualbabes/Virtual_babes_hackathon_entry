@@ -1,0 +1,303 @@
+// ============================================================================
+// Achievements, Daily Challenges, Settings — UI styling
+// ============================================================================
+
+/* Achievements */
+.achievements-overlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: rgba(9, 10, 15, 0.95);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.achievements-panel {
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 32px;
+    background: rgba(15, 18, 30, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+}
+
+.achievements-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #90a4ae;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.achievements-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.achievement-tab {
+    padding: 6px 12px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 999px;
+    color: #90a4ae;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    &:hover, &.active {
+        border-color: var(--theme-accent);
+        color: #e0e0e0;
+    }
+}
+
+.achievements-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.achievement-badge {
+    padding: 12px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    text-align: center;
+    transition: all 0.2s ease;
+    &.unlocked {
+        border-color: var(--theme-accent);
+        box-shadow: 0 0 12px var(--theme-accent-glow);
+    }
+    &.locked {
+        opacity: 0.5;
+    }
+}
+
+.achievement-icon { font-size: 28px; margin-bottom: 6px; }
+.achievement-name { font-size: 12px; font-weight: 600; color: #e0e0e0; margin-bottom: 4px; }
+.achievement-desc { font-size: 10px; color: #90a4ae; margin-bottom: 8px; }
+
+.achievement-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.achievement-progress-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.achievement-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--theme-accent), #3fb950);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.achievement-progress-text { font-size: 10px; color: #90a4ae; min-width: 30px; }
+.achievement-reward { font-size: 10px; color: #3fb950; font-weight: 600; }
+.claim-btn { padding: 4px 8px; font-size: 10px; margin-top: 6px; }
+.claimed-badge { font-size: 10px; color: #10b981; }
+
+/* Daily Challenges */
+.daily-challenges-overlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: rgba(9, 10, 15, 0.95);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.daily-challenges-panel {
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 32px;
+    background: rgba(15, 18, 30, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+}
+
+.daily-challenges-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #90a4ae;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.challenges-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #90a4ae;
+}
+
+.challenges-timer span {
+    font-family: 'Orbitron', sans-serif;
+    color: #f59e0b;
+}
+
+.challenges-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.challenge-card {
+    padding: 12px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    &.complete {
+        border-color: #10b981;
+    }
+}
+
+.challenge-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.challenge-name { font-size: 13px; color: #e0e0e0; }
+.challenge-reward { font-size: 12px; color: #3fb950; font-weight: 600; }
+
+.challenge-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.challenge-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.challenge-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--theme-accent), #3fb950);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.challenge-progress-text { font-size: 11px; color: #90a4ae; min-width: 40px; }
+
+/* Settings */
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: rgba(9, 10, 15, 0.95);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-panel {
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 32px;
+    background: rgba(15, 18, 30, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+}
+
+.settings-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #90a4ae;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.settings-section {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 8px;
+}
+
+.settings-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin: 0 0 12px 0;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.setting-row label {
+    font-size: 12px;
+    color: #90a4ae;
+    min-width: 80px;
+}
+
+.setting-row input[type="range"] {
+    flex: 1;
+}
+
+.setting-row select {
+    padding: 6px 10px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 12px;
+}
+
+.settings-wallet-address {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    color: #3fb950;
+}

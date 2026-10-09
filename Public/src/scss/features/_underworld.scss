@@ -1,0 +1,94 @@
+// ============================================================================
+// Underworld Panel Styles
+// ============================================================================
+
+.underworld-panel {
+  max-width: 900px;
+  width: 95%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.uw-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.uw-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #90a4ae;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &.active, &:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #e5e7eb;
+  }
+}
+
+.uw-heist, .uw-kidnap, .uw-bounty, .uw-rumors, .uw-contracts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.uw-heist-card, .uw-kidnap-card, .uw-bounty-card, .uw-contract-card {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.1);
+  }
+}
+
+.uw-heist-name, .uw-kidnap-name, .uw-bounty-name, .uw-contract-id {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.uw-heist-difficulty, .uw-kidnap-ransom, .uw-bounty-amount, .uw-contract-reward {
+  font-size: 12px;
+  color: #ffd700;
+  margin-bottom: 12px;
+}
+
+.uw-contract-type {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-bottom: 8px;
+}
+
+.uw-rumor-card {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+
+  &.positive { border-color: rgba(16, 185, 129, 0.3); }
+  &.negative { border-color: rgba(239, 68, 68, 0.3); }
+}
+
+.uw-rumor-text {
+  font-size: 13px;
+  color: #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.uw-rumor-strength {
+  font-size: 11px;
+  color: #90a4ae;
+}

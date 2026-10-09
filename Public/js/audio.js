@@ -5,12 +5,28 @@ export let musicVolume = parseFloat(localStorage.getItem('musicVolume') || '0.5'
 export let sfxVolume = parseFloat(localStorage.getItem('sfxVolume') || '0.5');
 export let lastMasterVolume = parseFloat(localStorage.getItem('lastMasterVolume') || (masterVolume > 0 ? masterVolume : '0.5')); // PILLAR 4: Load last non-zero volume
 export let lastSfxVolume = parseFloat(localStorage.getItem('lastSfxVolume') || (sfxVolume > 0 ? sfxVolume : '0.5')); // PILLAR 4: Load last non-zero volume
+export let lastMusicVolume = parseFloat(localStorage.getItem('lastMusicVolume') || (musicVolume > 0 ? musicVolume : '0.5')); // PILLAR 4: Load last non-zero volume
 
 // --- Low-Latency Audio Subsystem (Web Audio API) ---
 let audioCtx = null;
 let sfxGainNode = null;
 let musicGainNode = null;
 let currentMutationSoundscapeSource = null;
+
+// PILLAR 6: Phase-Based Track Mapping
+export const MUSIC_PHASE_MAP = {
+    "DISCONNECTED": "Not_connected_ambient",
+    "Setup": "Unbuilt_deck_ambient",
+    "Lobby": "ambient_menu_music_2",
+    "TournamentLobby": "Tournament_game_ambient",
+    "Active_Casual": "2_player_ambient_1",
+    "Active_Quick": "quick_play_ambient_1",
+    "Active_Tournament": "Tournament_game_ambient_2",
+    "Finished": "ambient_menu_music_4"
+};
+
+let currentMusicGain = null;
+let isMusicTransitioning = false;
 let currentMutationInsuranceHumSource = null;
 let currentDistrictStabilizerThrumSource = null;
 const bufferCache = new Map(); // url -> Promise<AudioBuffer>
@@ -321,6 +337,22 @@ export function playBattleStartSFX() {
 }
 
 /**
+ * Plays a high-pitched static discharge for cloak disruption events.
+ * PILLAR 3: Criminality & Intelligence Feedback.
+ */
+export function playCloakDisruptorSFX() {
+    playSFX('High-pitched_static_discharge.mp3');
+}
+
+/**
+ * Plays a successful mutation chain reaction for procedure completion.
+ * PILLAR 6: Specialized Gene-Editing Feedback.
+ */
+export function playMutationSuccessSFX() {
+    playSFX('Chain_reaction.mp3');
+}
+
+/**
  * Plays the low-frequency industrial background for the Mutation Foundry.
  * PILLAR 6: Specialized Gene-Editing Feedback.
  */
@@ -511,35 +543,203 @@ export function playChallengeDeclinedSFX() {
         'Chalenge_declined2.mp3',
         'Chalenge_declined3.mp3'
     ];
-    const randomVariant = variants[Math.floor(Math.random() * variants.length)];
+    const randomVariant = variants[Math.floor(Math.random() * variants?.length ?? 0)];
     playSFX(randomVariant);
+}
+
+// --- Ambient Audio Manager (ThemeEngine-Driven) ---
+let ambientGainNode = null;
+let currentAmbientSource = null;
+let currentAmbientGain = null;
+let ambientVolume = parseFloat(localStorage.getItem('ambientVolume') || '0.5');
+let targetAmbientTrack = null;
+let lastIntensity = -1;
+let lastClimate = null;
+
+/**
+ * Maps theme intensity + climate to an ambient track index.
+ * Returns 0-3 corresponding to the 4 menu ambient tracks.
+ */
+export function selectAmbientTrack(intensity, climate) {
+    // Climate weights: CALM=0, BREEZY=1, STORMY=2, BLIGHTED=3
+    const climateWeight = { 'CALM': 0, 'BREEZY': 1, 'STORMY': 2, 'BLIGHTED': 3 }[climate] ?? 1;
+    // Intensity: 0-100 → 0-3 scale
+    const intensityWeight = Math.floor(intensity / 25);
+    // Combined score 0-6 → map to 0-3
+    const score = Math.min(3, Math.floor((climateWeight + intensityWeight) / 2));
+    return score;
+}
+
+/**
+ * Updates the Ambient GainNode to match master and ambient volume settings.
+ */
+export function syncAmbientGain() {
+    if (!ambientGainNode || !audioCtx) return;
+    const gain = masterVolume * ambientVolume;
+    ambientGainNode.gain.setTargetAtTime(gain, audioCtx.currentTime, 0.05);
+}
+
+/**
+ * Centralized setter for Ambient volume.
+ */
+export function updateAmbientVolume(value) {
+    ambientVolume = parseFloat(value);
+    localStorage.setItem('ambientVolume', ambientVolume);
+    if (ambientVolume > 0) {
+        localStorage.setItem('lastAmbientVolume', ambientVolume);
+    }
+    syncAmbientGain();
+}
+
+/**
+ * Toggles the ambient volume between 0 and its last non-zero value.
+ */
+export function toggleMuteAmbient() {
+    const last = parseFloat(localStorage.getItem('lastAmbientVolume') || '0.5');
+    if (ambientVolume > 0) {
+        updateAmbientVolume(0);
+    } else {
+        updateAmbientVolume(last > 0 ? last : 0.5);
+    }
+}
+
+/**
+ * Initializes the ambient audio channel. Call after initAudioContext().
+ */
+export function initAmbientChannel() {
+    if (!audioCtx) initAudioContext();
+    if (!audioCtx || ambientGainNode) return;
+    ambientGainNode = audioCtx.createGain();
+    ambientGainNode.connect(audioCtx.destination);
+    syncAmbientGain();
+}
+
+/**
+ * Crossfades to a new ambient track based on theme intensity + climate.
+ * Smoothly transitions over 2 seconds.
+ */
+export function transitionAmbient(trackIndex) {
+    if (musicVolume <= 0 && masterVolume <= 0) return;
+    const trackName = `ambient_menu_music_${trackIndex + 1}`;
+    if (targetAmbientTrack === trackName) return;
+    targetAmbientTrack = trackName;
+    
+    // Lazy init ambient channel
+    if (!ambientGainNode) initAmbientChannel();
+    if (!audioCtx) return;
+    
+    const path = `${trackName}.mp3`;
+    const fadeTime = 2.0; // 2s crossfade for ambient
+    
+    // Don't block on async — fire and forget
+    (async () => {
+        const buffer = await getSFXBuffer(path);
+        if (!buffer || !audioCtx || !ambientGainNode) return;
+        
+        const now = audioCtx.currentTime;
+        
+        // Fade out current ambient
+        if (currentAmbientSource && currentAmbientGain) {
+            const oldGain = currentAmbientGain;
+            const oldSource = currentAmbientSource;
+            oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+            oldGain.gain.linearRampToValueAtTime(0, now + fadeTime);
+            setTimeout(() => {
+                try { oldSource.stop(); oldSource.disconnect(); oldGain.disconnect(); } catch(e) {}
+            }, fadeTime * 1000);
+        }
+        
+        // Start new ambient track
+        const newGain = audioCtx.createGain();
+        newGain.gain.setValueAtTime(0, now);
+        newGain.gain.linearRampToValueAtTime(ambientVolume * masterVolume, now + fadeTime);
+        newGain.connect(ambientGainNode);
+        
+        currentAmbientSource = audioCtx.createBufferSource();
+        currentAmbientSource.buffer = buffer;
+        currentAmbientSource.loop = true;
+        currentAmbientSource.connect(newGain);
+        currentAmbientSource.start(now);
+        
+        currentAmbientGain = newGain;
+        
+        console.log(`[AUDIO] Ambient transitioned to: ${trackName} (intensity: ${lastIntensity}, climate: ${lastClimate})`);
+    })();
+}
+
+/**
+ * Updates ambient audio based on live ThemeEngine data.
+ * Call this when /api/player/progression returns.
+ */
+export function updateAmbientFromTheme(theme, region) {
+    if (!theme || !region) return;
+    const { intensity } = theme;
+    const { climate } = region;
+    
+    // Throttle: only update if intensity changed by >10 or climate changed
+    if (Math.abs(intensity - lastIntensity) < 10 && climate === lastClimate) return;
+    lastIntensity = intensity;
+    lastClimate = climate;
+    
+    const trackIndex = selectAmbientTrack(intensity, climate);
+    transitionAmbient(trackIndex);
 }
 
 // --- Music Management ---
 let currentMusicSource = null;
 
 /**
- * Plays a background music track using the high-performance gain node.
+ * transitionMusic handles seamless cross-fading between ambient tracks.
+ * PILLAR 6: Phase-Based Atmosphere.
  */
-export async function playMusic(path) {
-    if (musicVolume <= 0 || masterVolume <= 0) return;
+export async function transitionMusic(trackName) {
+    if (musicVolume <= 0 || masterVolume <= 0 || isMusicTransitioning) return;
+    
+    const currentTrack = localStorage.getItem('currentMusicTrack');
+    if (currentTrack === trackName) return;
+
+    isMusicTransitioning = true;
 
     if (!audioCtx) initAudioContext();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch(e) { return; }
+    }
 
+    const path = trackName.includes('.') ? trackName : `${trackName}.mp3`;
     const buffer = await getSFXBuffer(path);
     if (!buffer || !audioCtx) return;
 
-    if (currentMusicSource) {
-        try { currentMusicSource.stop(); } catch (e) {}
+    const fadeTime = 1.5; // 1.5s linear cross-fade
+    const now = audioCtx.currentTime;
+
+    // 1. Fade out current track if active
+    if (currentMusicSource && currentMusicGain) {
+        const oldGain = currentMusicGain;
+        const oldSource = currentMusicSource;
+        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+        oldGain.gain.linearRampToValueAtTime(0, now + fadeTime);
+        
+        setTimeout(() => {
+            try { oldSource.stop(); oldSource.disconnect(); oldGain.disconnect(); } catch(e) {}
+        }, fadeTime * 1000);
     }
+
+    // 2. Start new track with fade in
+    const newGain = audioCtx.createGain();
+    newGain.gain.setValueAtTime(0, now);
+    newGain.gain.linearRampToValueAtTime(musicVolume * masterVolume, now + fadeTime);
+    newGain.connect(audioCtx.destination); // Connect to master destination
 
     currentMusicSource = audioCtx.createBufferSource();
     currentMusicSource.buffer = buffer;
     currentMusicSource.loop = true;
-    currentMusicSource.connect(musicGainNode);
-    currentMusicSource.start(0);
-    console.log(`[AUDIO] Track Active: ${path}`);
+    currentMusicSource.connect(newGain);
+    currentMusicSource.start(now);
+
+    currentMusicGain = newGain;
+    localStorage.setItem('currentMusicTrack', trackName);
+    isMusicTransitioning = false;
+    console.log(`[AUDIO] Transitioned to: ${trackName}`);
 }
 
 /**
@@ -566,15 +766,20 @@ window.playSabotageReparationSFX = playSabotageReparationSFX;
 window.playStaffTrainingSFX = playStaffTrainingSFX;
 window.playEcosystemAlertSFX = playEcosystemAlertSFX;
 window.playMutationSuccessSFX = playMutationSuccessSFX;
+window.playCloakDisruptorSFX = playCloakDisruptorSFX;
 window.playBattleStartSFX = playBattleStartSFX;
 window.playChallengeWaitSFX = playChallengeWaitSFX;
 window.stopChallengeWaitSFX = stopChallengeWaitSFX;
 window.playChallengeAcceptedSFX = playChallengeAcceptedSFX;
 window.playChallengeDeclinedSFX = playChallengeDeclinedSFX;
-window.playMusic = playMusic;
+window.transitionMusic = transitionMusic;
 window.playMutationSoundscape = playMutationSoundscape;
 window.playMutationInsuranceHum = playMutationInsuranceHum;
 window.stopMutationInsuranceHum = stopMutationInsuranceHum;
 window.stopMutationSoundscape = stopMutationSoundscape;
 window.playProcedureInterruptedSFX = playProcedureInterruptedSFX;
 window.playLongWarningSFX = playLongWarningSFX;
+window.updateAmbientFromTheme = updateAmbientFromTheme;
+window.initAmbientChannel = initAmbientChannel;
+window.updateAmbientVolume = updateAmbientVolume;
+window.toggleMuteAmbient = toggleMuteAmbient;

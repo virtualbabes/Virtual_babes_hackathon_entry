@@ -1,0 +1,117 @@
+/* === Replay Viewer === */
+.replay-viewer-container { padding: 8px 0; }
+
+.replay-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.1), rgba(96, 125, 139, 0.05));
+    border: 1px solid rgba(158, 158, 158, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.replay-icon { font-size: 32px; }
+
+.replay-info { flex: 1; }
+
+.replay-controls-top { display: flex; gap: 4px; }
+
+.replay-btn {
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.replay-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: #9e9e9e;
+}
+
+/* Theater screen */
+.replay-screen {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    min-height: 150px;
+}
+
+.replay-frame { text-align: center; }
+
+.replay-frame-number {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    margin-bottom: 8px;
+}
+
+.replay-board {
+    font-size: 11px;
+    color: #e5e7eb;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 12px;
+}
+
+.replay-empty-screen {
+    text-align: center;
+    padding: 32px;
+}
+
+.replay-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.replay-empty-screen p { color: #90a4ae; font-size: 11px; margin: 0; }
+
+/* Scrubber */
+.replay-scrubber-section { margin-bottom: 16px; }
+
+.replay-scrubber-section h4 { margin: 0 0 12px; }
+
+.replay-scrubber {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.replay-scrubber input[type="range"] {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.replay-scrubber-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #607d8b;
+}
+
+/* Match info */
+.replay-info-section h4 { margin: 0 0 12px; }
+
+.replay-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.replay-info-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+}
+
+.replay-info-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.replay-info-value { font-size: 14px; font-weight: 700; color: #e5e7eb; }

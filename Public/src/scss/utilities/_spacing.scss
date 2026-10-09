@@ -620,6 +620,7 @@ $spacing-scale: (
 
 // New Max-Heights
 .max-h-150 { max-height: 150px; }
+.max-h-200 { max-height: 200px; }
 .max-h-300 { max-height: 300px; }
 .max-h-400 { max-height: 400px; }
 .max-h-50vh { max-height: 50vh; }
@@ -629,6 +630,7 @@ $spacing-scale: (
 .border-warning { border-color: #ffa657 !important; }
 .border-gold { border-color: #ffd700 !important; }
 .border-grey { border-color: #888 !important; }
+.border-neon-cyan { border-color: $color-neon-cyan !important; }
 .border-purple { border-color: var(--neon-purple) !important; } // New
 .border-bottom-glass { border-bottom: 1px solid var(--glass-border); } // New
 .border-dashed { border-style: dashed !important; }

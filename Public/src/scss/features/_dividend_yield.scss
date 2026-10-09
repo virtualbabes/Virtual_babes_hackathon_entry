@@ -1,0 +1,185 @@
+/* === Dividend Yield === */
+.dividend-container { padding: 8px 0; }
+
+.garden-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(139, 195, 74, 0.05));
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.garden-icon { font-size: 32px; }
+
+.garden-info { flex: 1; }
+
+.garden-total {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.garden-total-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.garden-total-value { font-size: 24px; font-weight: 700; color: #4caf50; }
+
+/* Bloom stats */
+.bloom-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.bloom-stat {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.bloom-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.bloom-value { display: block; font-size: 16px; font-weight: 700; color: #e5e7eb; }
+
+.bloom-label { font-size: 9px; color: #90a4ae; }
+
+/* Compound toggle */
+.compound-toggle-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.compound-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+.compound-toggle input { display: none; }
+
+.compound-toggle-slider {
+    width: 36px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.compound-toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: #9e9e9e;
+    border-radius: 50%;
+    transition: transform 0.3s, background 0.3s;
+}
+
+.compound-toggle input:checked + .compound-toggle-slider { background: rgba(76, 175, 80, 0.3); }
+
+.compound-toggle input:checked + .compound-toggle-slider::after {
+    transform: translateX(16px);
+    background: #4caf50;
+}
+
+.compound-toggle-label { font-size: 11px; color: #e5e7eb; font-weight: 600; }
+
+.compound-toggle-desc { font-size: 10px; color: #90a4ae; }
+
+/* Investment trees */
+.investment-trees-section { margin-bottom: 16px; }
+
+.investment-trees-section h4 { margin: 0 0 12px; }
+
+.investment-trees-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.investment-tree {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.investment-tree.tree-blooming {
+    border-color: rgba(76, 175, 80, 0.4);
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.investment-tree:hover { transform: translateY(-2px); }
+
+.tree-canopy { position: relative; margin-bottom: 8px; }
+
+.tree-icon { font-size: 32px; }
+
+.tree-bloom-particle {
+    position: absolute;
+    font-size: 12px;
+    animation: particle-float 2s ease-in-out infinite;
+}
+
+.particle-1 { top: 0; left: 20%; animation-delay: 0s; }
+
+.particle-2 { top: 10px; right: 20%; animation-delay: 0.7s; }
+
+@keyframes particle-float {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+    50% { transform: translateY(-8px) scale(1.2); opacity: 0.7; }
+}
+
+.tree-info { margin-bottom: 8px; }
+
+.tree-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.tree-value { display: block; font-size: 14px; color: #4caf50; font-weight: 600; }
+
+.tree-stats {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.tree-stat { font-size: 9px; font-weight: 600; }
+
+.tree-growth { color: #4caf50; }
+
+.tree-yield { color: #ffc107; }
+
+.tree-claim-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+/* Claim all */
+.claim-all-section { text-align: center; }
+
+.claim-all-section button { width: 100%; }
+
+/* Empty garden */
+.garden-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.garden-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.garden-empty p { color: #90a4ae; font-size: 11px; margin: 0; }

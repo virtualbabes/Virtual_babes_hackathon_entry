@@ -1,0 +1,91 @@
+/* === Card Animations (injected via JS) */
+/* This file provides additional SCSS for card animations that complement the JS-injected CSS */
+
+/* Board container for animations */
+.board-container {
+    position: relative;
+    perspective: 1000px;
+}
+
+/* Grid slot with animation support */
+.grid-slot {
+    position: relative;
+    transition: transform 0.3s ease-out, box-shadow 0.3s ease-out;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+}
+
+/* Card flip animation states */
+.card-flipping {
+    animation: cardFlip 0.6s ease-in-out;
+}
+
+@keyframes cardFlip {
+    0% { transform: rotateY(0deg) scale(1); }
+    50% { transform: rotateY(90deg) scale(1.1); }
+    100% { transform: rotateY(180deg) scale(1); }
+}
+
+/* Combo chain flash */
+.combo-flash {
+    animation: comboFlash 0.3s ease-out;
+}
+
+@keyframes comboFlash {
+    0% { background: rgba(255, 215, 0, 0.8); }
+    100% { background: transparent; }
+}
+
+/* Mood aura pulse */
+.mood-aura {
+    animation: moodPulse 2s ease-in-out infinite;
+}
+
+@keyframes moodPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
+/* Elemental glow effects */
+.elemental-fire { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+.elemental-water { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+.elemental-earth { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); }
+.elemental-air { box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); }
+
+/* Card placement animation */
+.card-placing {
+    animation: cardPlace 0.3s ease-out;
+}
+
+@keyframes cardPlace {
+    0% { transform: scale(0) rotateZ(180deg); opacity: 0; }
+    50% { transform: scale(1.1) rotateZ(0deg); opacity: 1; }
+    100% { transform: scale(1) rotateZ(0deg); opacity: 1; }
+}
+
+/* Card particle */
+.card-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Game over fanfare */
+.game-over-flash {
+    animation: gameOverFlash 1s ease-in-out;
+}
+
+@keyframes gameOverFlash {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 60px currentColor; }
+}
+
+/* Prisoner rule: card loss animation */
+.card-lost {
+    animation: cardLost 0.5s ease-out forwards;
+}
+
+@keyframes cardLost {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0) rotateZ(360deg); opacity: 0; }
+}

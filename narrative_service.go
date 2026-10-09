@@ -9,10 +9,14 @@ import (
 	"time"
 )
 
-// generateNPCCommentary picks an NPC to comment on a player's style via chat.
+// NarrativeService manages NPC interactions, meta-sentiment analysis, and lobby atmosphere.
+// PILLAR 5: Stateless Service Design.
+type NarrativeService struct{}
+
+// GenerateNPCCommentary picks an NPC to comment on a player's style via chat.
 // This function has been moved from lobby_manager.go and market_service.go to
 // centralize narrative logic and eliminate code duplication.
-func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
+func (s *NarrativeService) GenerateNPCCommentary(l *Lobby, clientID string, trigger string) {
 	l.mutex.RLock()
 	wallet, ok := l.wallets[clientID]
 	if !ok {
@@ -54,7 +58,7 @@ func (l *Lobby) generateNPCCommentary(clientID string, trigger string) {
 	avgAgg := global.AvgAggressiveness // FIXED: Corrected access to global.AvgAggressiveness
 	l.mutex.RUnlock()
 
-	displayName := l.ResolveEnvoiName(wallet)
+	displayName := l.oracleService.ResolveEnvoiName(l, wallet)
 	message := ""
 	switch trigger {
 	case "LOBBY_ENTRY":

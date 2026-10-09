@@ -1,0 +1,124 @@
+/* === Treasure Map === */
+.treasure-map-container { padding: 8px 0; }
+
+.treasure-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.05));
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.treasure-icon { font-size: 32px; }
+
+.treasure-info { flex: 1; }
+
+.treasure-stats { display: flex; gap: 12px; }
+
+.treasure-stat {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.treasure-stat-num { display: block; font-size: 16px; font-weight: 700; color: #e5e7eb; }
+
+.treasure-stat-label { font-size: 9px; color: #90a4ae; }
+
+/* Map grid */
+.treasure-map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.treasure-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.treasure-card:hover {
+    border-color: #ffc107;
+    transform: translateY(-2px);
+}
+
+.treasure-card.claimed {
+    opacity: 0.4;
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.treasure-card.hidden {
+    border-style: dashed;
+    border-color: rgba(158, 158, 158, 0.3);
+}
+
+.treasure-card-icon { font-size: 24px; display: block; margin-bottom: 8px; text-align: center; }
+
+.treasure-card-info { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+.treasure-card-region { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.treasure-card-reward { font-size: 11px; color: #ffc107; font-weight: 600; }
+
+.treasure-claim-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+.treasure-claimed-badge {
+    display: block;
+    text-align: center;
+    font-size: 9px;
+    color: #4caf50;
+    font-weight: 700;
+}
+
+.treasure-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.treasure-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.treasure-empty p { color: #90a4ae; font-size: 11px; margin: 0; }
+
+/* Spawn form */
+.treasure-spawn-section {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.treasure-spawn-section h4 { margin: 0 0 12px; }
+
+.treasure-form-row { margin-bottom: 12px; }
+
+.treasure-form-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.treasure-form-row input,
+.treasure-form-row select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+}

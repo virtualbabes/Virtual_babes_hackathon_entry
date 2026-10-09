@@ -1,0 +1,367 @@
+// ============================================================================
+// _justice.scss — Justice Hegemony Dashboard Styles (P2-A, Task 4007)
+// ============================================================================
+// Neon-glass bounty dashboard visuals, Truth Serum animation, shield indicators.
+// Inherits design tokens from _tokens.scss and base patterns from _neon-glass.scss.
+// ============================================================================
+
+// --- Bounty Dashboard Overlay ---
+.justice-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: $z-index-modal;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.75);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.justice-body {
+    display: flex;
+    gap: $spacing-lg;
+    width: 100%;
+    max-width: 960px;
+    max-height: 80vh;
+    padding: $spacing-lg;
+}
+
+// --- Tabs ---
+.justice-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba($color-neon-cyan, 0.2);
+    background: rgba(99, 102, 241, 0.05);
+}
+.justice-tab {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid rgba($color-neon-cyan, 0.2);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: $color-text-muted;
+    transition: all 0.2s;
+    &:hover { border-color: $color-neon-cyan; color: $color-text-main; }
+    &.active { background: $color-neon-cyan; border-color: $color-neon-cyan; color: $color-dark-grey; }
+}
+.justice-panel { width: 100%; }
+.justice-panel.hidden { display: none; }
+
+// --- Header ---
+.justice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: $spacing-md $spacing-xl;
+    border-bottom: 1px solid rgba($color-neon-cyan, 0.3);
+
+    h2 {
+        font-family: $font-heading;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 8px rgba($color-neon-cyan, 0.5);
+        margin: 0;
+        font-size: $font-size-xl;
+    }
+
+    .close-btn {
+        padding: $spacing-xs $spacing-sm;
+        border-radius: $border-radius-sm;
+        background: transparent;
+        border: 1px solid $color-neon-cyan;
+        color: $color-neon-cyan;
+        cursor: pointer;
+        transition: all $transition-fast;
+
+        &:hover {
+            background: rgba($color-neon-cyan, 0.15);
+            box-shadow: 0 0 12px rgba($color-neon-cyan, 0.3);
+        }
+    }
+}
+
+// --- Stats Panel (Faction Power) ---
+.justice-stats-panel {
+    flex: 0 0 200px;
+    padding: $spacing-md;
+    border-radius: $border-radius-md;
+    border: 1px solid rgba($color-neon-purple, 0.3);
+
+    h3 {
+        font-family: $font-heading;
+        color: $color-neon-purple;
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: $spacing-sm;
+    }
+
+    .stat-block {
+        font-size: $font-size-2xl;
+        font-weight: 700;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 10px rgba($color-neon-cyan, 0.4);
+        padding: $spacing-sm;
+        background: rgba($color-neon-purple, 0.05);
+        border-radius: $border-radius-sm;
+        text-align: center;
+    }
+
+    .stat-label {
+        font-size: $font-size-xs;
+        color: $color-text-secondary;
+        text-align: center;
+        margin-top: $spacing-xs;
+    }
+}
+
+// --- Bounty Panel (Scrollable List) ---
+.justice-bounty-panel {
+    flex: 1;
+    min-width: 0;
+    padding: $spacing-md;
+    border-radius: $border-radius-md;
+    border: 1px solid rgba($color-neon-cyan, 0.3);
+
+    h3 {
+        font-family: $font-heading;
+        color: $color-neon-cyan;
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: $spacing-sm;
+    }
+
+    .bounty-scroll {
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: $spacing-xs;
+
+        &::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        &::-webkit-scrollbar-track {
+            background: rgba($color-neon-cyan, 0.05);
+            border-radius: $border-radius-sm;
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: rgba($color-neon-cyan, 0.3);
+            border-radius: $border-radius-sm;
+
+            &:hover {
+                background: rgba($color-neon-cyan, 0.5);
+            }
+        }
+    }
+}
+
+// --- Bounty Items ---
+.bounty-item {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    padding: $spacing-sm $spacing-lg;
+    margin-bottom: $spacing-xs;
+    border-radius: $border-radius-sm;
+    background: rgba($color-neon-cyan, 0.03);
+    border-left: 3px solid rgba($color-neon-cyan, 0.4);
+    transition: all 0.2s ease;
+
+    &:hover {
+        background: rgba($color-neon-cyan, 0.08);
+        border-left-color: $color-neon-cyan;
+        box-shadow: 0 0 8px rgba($color-neon-cyan, 0.15);
+    }
+
+    .bounty-target {
+        font-family: $font-mono;
+        font-size: $font-size-xs;
+        color: $color-text-main;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .bounty-details {
+        display: flex;
+        gap: $spacing-sm;
+        font-size: $font-size-xs;
+
+        .wanted-level {
+            color: $color-error-red;
+        }
+
+        .reward {
+            color: $color-gold;
+        }
+    }
+
+    .bounty-action-btn {
+        padding: $spacing-xs $spacing-sm;
+        font-size: $font-size-xs;
+        background: transparent;
+        border: 1px solid $color-neon-cyan;
+        color: $color-neon-cyan;
+        cursor: pointer;
+        transition: all $transition-fast;
+        white-space: nowrap;
+
+        &:hover {
+            background: rgba($color-neon-cyan, 0.2);
+        }
+    }
+}
+
+.empty-state {
+    text-align: center;
+    padding: $spacing-xl;
+    color: $color-text-muted;
+    font-style: italic;
+    font-size: $font-size-sm;
+}
+
+// --- Effects Panel (Truth Serum + Shield) ---
+.justice-effects-panel {
+    flex: 0 0 220px;
+    padding: $spacing-md;
+    border-radius: $border-radius-md;
+    border: 1px solid rgba($color-neon-purple, 0.3);
+
+    h3 {
+        font-family: $font-heading;
+        color: $color-neon-purple;
+        font-size: $font-size-sm;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: $spacing-md;
+    }
+
+    .effect-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: $spacing-xs 0;
+        font-size: $font-size-xs;
+        color: $color-text-secondary;
+
+        span:first-child {
+            color: $color-text-main;
+        }
+    }
+}
+
+// --- Effect Indicators ---
+.effect-indicator {
+    font-size: $font-size-xs;
+    padding: $spacing-xs $spacing-sm;
+    border-radius: $border-radius-sm;
+    transition: all 0.3s ease;
+
+    &.active {
+        background: rgba($color-neon-green, 0.15);
+        color: $color-neon-green;
+        box-shadow: 0 0 6px rgba($color-neon-green, 0.2);
+        animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    &.inactive {
+        background: rgba($color-text-muted, 0.1);
+        color: $color-text-muted;
+    }
+}
+
+// --- Truth Serum Animation ---
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 6px rgba($color-neon-green, 0.2);
+    }
+    50% {
+        box-shadow: 0 0 14px rgba($color-neon-green, 0.4);
+    }
+}
+
+// --- Truth Serum Overlay Effect ---
+.truth-serum-active {
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border: 2px solid rgba($color-neon-purple, 0.6);
+        border-radius: $border-radius-md;
+        animation: serum-scan 1.5s ease-in-out infinite;
+        pointer-events: none;
+    }
+}
+
+@keyframes serum-scan {
+    0%, 100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+}
+
+// --- Shield Overlay Effect ---
+.shield-active {
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border: 2px solid rgba(0, 180, 255, 0.5);
+        border-radius: calc($border-radius-md + 4px);
+        animation: shield-bubble 3s ease-in-out infinite;
+        pointer-events: none;
+    }
+}
+
+@keyframes shield-bubble {
+    0%, 100% {
+        opacity: 0.3;
+        box-shadow: 0 0 8px rgba(0, 180, 255, 0.2);
+    }
+    50% {
+        opacity: 0.6;
+        box-shadow: 0 0 16px rgba(0, 180, 255, 0.4);
+    }
+}
+
+// --- Responsive Adjustments ---
+@media (max-width: 768px) {
+    .justice-body {
+        flex-direction: column;
+        padding: $spacing-sm;
+    }
+
+    .justice-stats-panel,
+    .justice-effects-panel {
+        flex: none;
+        width: 100%;
+    }
+
+    .justice-bounty-panel {
+        min-height: 200px;
+    }
+
+    .bounty-item {
+        flex-wrap: wrap;
+    }
+
+    .bounty-details {
+        width: 100%;
+        margin-left: $spacing-sm;
+    }
+}

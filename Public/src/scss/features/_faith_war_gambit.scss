@@ -1,0 +1,84 @@
+/* === Faith War Gambit */
+.faith-container { padding: 8px 0; }
+
+.faith-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(103, 58, 183, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.faith-candles { font-size: 32px; }
+
+.faith-info { flex: 1; }
+
+.faith-coherence { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 8px 16px; }
+
+.faith-coherence-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.faith-coherence-value { font-size: 24px; font-weight: 700; }
+
+.faith-coherence-section { margin-bottom: 16px; }
+
+.faith-coherence-section h4 { margin: 0 0 12px; }
+
+.faith-coherence-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.faith-coherence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #9c27b0, #e91e63);
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.faith-coherence-text { font-size: 10px; color: #90a4ae; }
+
+.faith-rituals-section { margin-bottom: 16px; }
+
+.faith-rituals-section h4 { margin: 0 0 12px; }
+
+.faith-rituals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.ritual-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+}
+
+.ritual-icon { font-size: 24px; display: block; margin-bottom: 6px; }
+
+.ritual-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.ritual-effect { display: block; font-size: 9px; color: #4caf50; margin-bottom: 8px; }
+
+.ritual-perform-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+.faith-gambit-section h4 { margin: 0 0 12px; }
+
+.gambit-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+}
+
+.gambit-card p { margin: 0 0 12px; }
+
+.gambit-btn { width: 100%; }

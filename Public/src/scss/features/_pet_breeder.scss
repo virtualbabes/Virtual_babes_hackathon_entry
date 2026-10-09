@@ -1,0 +1,381 @@
+/* === Pet Breeder / Genetics Lab === */
+.pet-breeder-container { padding: 8px 0; }
+
+.pet-lab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(76, 175, 80, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.pet-lab-icon {
+    font-size: 32px;
+    margin-right: 12px;
+}
+
+.pet-lab-title { display: flex; align-items: center; }
+
+.pet-lab-stats { display: flex; gap: 8px; }
+
+.pet-stat-chip {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-width: 50px;
+}
+
+.pet-stat-num { display: block; font-size: 18px; font-weight: 700; color: #e5e7eb; }
+
+.pet-stat-label { font-size: 9px; color: #90a4ae; text-transform: uppercase; }
+
+/* Breeding chamber */
+.breeding-chamber {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(156, 39, 176, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.breeding-chamber h4 { margin: 0 0 12px; }
+
+.breeding-slots {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.breeding-slot {
+    flex: 1;
+    min-width: 120px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.breeding-slot.slot-filled {
+    border-style: solid;
+    border-color: rgba(156, 39, 176, 0.4);
+    background: rgba(156, 39, 176, 0.05);
+}
+
+.slot-placeholder {
+    text-align: center;
+    padding: 16px 0;
+}
+
+.slot-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.slot-label { font-size: 10px; color: #90a4ae; }
+
+/* Pet slot card */
+.pet-slot-card { position: relative; }
+
+.pet-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.pet-slot-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.pet-slot-level {
+    font-size: 9px;
+    background: rgba(156, 39, 176, 0.2);
+    color: #9c27b0;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.pet-slot-stats { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+.pet-stat-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pet-stat-name { font-size: 8px; color: #90a4ae; min-width: 20px; }
+
+.pet-stat-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.pet-stat-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.pet-slot-clear {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 10px;
+    border-radius: 50%;
+}
+
+/* Breeding center */
+.breeding-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.breeding-dna {
+    position: relative;
+    width: 40px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+}
+
+.dna-strand {
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(180deg, #9c27b0, #4caf50);
+    border-radius: 2px;
+    animation: dna-pulse 2s ease-in-out infinite;
+}
+
+.dna-strand.strand-1 { animation-delay: 0s; }
+.dna-strand.strand-2 { animation-delay: 0.3s; }
+.dna-strand.strand-3 { animation-delay: 0.6s; }
+
+@keyframes dna-pulse {
+    0%, 100% { transform: scaleY(1); opacity: 0.6; }
+    50% { transform: scaleY(1.2); opacity: 1; }
+}
+
+.breeding-active .dna-strand {
+    animation: dna-breed 0.5s ease-in-out infinite;
+}
+
+@keyframes dna-breed {
+    0%, 100% { transform: scaleY(1); }
+    25% { transform: scaleY(1.5); }
+    75% { transform: scaleY(0.5); }
+}
+
+.breed-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Breeding result */
+.breeding-result {
+    margin-top: 16px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    animation: result-pop 0.5s ease-out;
+}
+
+@keyframes result-pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.breeding-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.breeding-result-icon { font-size: 24px; }
+
+.breeding-result-title { font-size: 14px; font-weight: 700; color: #4caf50; }
+
+.breeding-result-name {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #e5e7eb;
+    margin-bottom: 12px;
+}
+
+.breeding-result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.breeding-stat {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.breeding-stat-label { display: block; font-size: 8px; color: #90a4ae; }
+
+.breeding-stat-val { font-size: 14px; font-weight: 700; }
+
+/* Pet collection */
+.pet-collection-section { margin-bottom: 16px; }
+
+.pet-collection-section h4 { margin: 0 0 12px; }
+
+.pet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.pet-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    transition: all 0.2s;
+}
+
+.pet-card:hover {
+    transform: translateY(-2px);
+    border-color: #9c27b0;
+}
+
+.pet-card.pet-mature {
+    border-color: rgba(76, 175, 80, 0.3);
+    background: rgba(76, 175, 80, 0.03);
+}
+
+.pet-card.pet-immature {
+    border-color: rgba(255, 193, 7, 0.3);
+    background: rgba(255, 193, 7, 0.03);
+}
+
+.pet-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.pet-card-name { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.pet-card-element {
+    font-size: 8px;
+    background: rgba(156, 39, 176, 0.2);
+    color: #9c27b0;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.pet-card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.pet-card-level { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.pet-card-maturity { font-size: 9px; }
+
+.pet-card-maturity.mature { color: #4caf50; }
+.pet-card-maturity.immature { color: #ffc107; }
+
+.pet-card-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.pet-stat-mini {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pet-stat-mini-label { font-size: 7px; color: #607d8b; min-width: 18px; }
+
+.pet-stat-mini-track {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.pet-stat-mini-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.pet-card-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.pet-card-actions button {
+    flex: 1;
+    font-size: 9px;
+    padding: 4px 6px;
+}
+
+/* Genetics guide */
+.genetics-guide h4 { margin: 0 0 12px; }
+
+.gene-traits-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.gene-trait {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 9px;
+    color: #90a4ae;
+}
+
+.gene-color {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* Empty state */
+.pet-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.pet-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.pet-empty p { color: #90a4ae; font-size: 11px; margin: 0; }

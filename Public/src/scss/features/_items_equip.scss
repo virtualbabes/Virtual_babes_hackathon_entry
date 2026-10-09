@@ -1,0 +1,142 @@
+/* === Items Equip */
+.items-equip-container { padding: 8px 0; }
+
+.inventory-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(103, 58, 183, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.inventory-icon { font-size: 32px; }
+
+.inventory-info { flex: 1; }
+
+.inventory-count { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 8px 16px; }
+
+.inventory-count-num { display: block; font-size: 18px; font-weight: 700; color: #9c27b0; }
+
+.inventory-count-label { font-size: 9px; color: #90a4ae; }
+
+/* Equip slots */
+.equip-slots-section { margin-bottom: 16px; }
+
+.equip-slots-section h4 { margin: 0 0 12px; }
+
+.equip-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.equip-slot {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    min-height: 80px;
+}
+
+.equip-slot.slot-filled {
+    border-color: rgba(156, 39, 176, 0.4);
+    background: rgba(156, 39, 176, 0.05);
+}
+
+.equip-slot-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+.equip-slot-name { font-size: 9px; color: #e5e7eb; font-weight: 600; }
+
+.equip-slot-label { font-size: 9px; color: #607d8b; }
+
+/* Categories */
+.item-categories { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.item-cat-btn {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #90a4ae;
+    cursor: pointer;
+    font-size: 10px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.item-cat-btn:hover { background: rgba(255, 255, 255, 0.06); color: #e5e7eb; }
+
+.item-cat-btn.active { background: rgba(156, 39, 176, 0.15); border-color: #9c27b0; color: #9c27b0; }
+
+/* Item grid */
+.item-grid-section h4 { margin: 0 0 12px; }
+
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+
+.item-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 2px solid var(--item-color);
+    border-radius: 8px;
+    padding: 10px;
+    transition: all 0.2s;
+}
+
+.item-card:hover { transform: translateY(-2px); }
+
+.item-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+
+.item-icon { font-size: 20px; }
+
+.item-rarity { font-size: 8px; font-weight: 700; }
+
+.item-card-body { margin-bottom: 8px; }
+
+.item-name { display: block; font-size: 10px; font-weight: 700; color: #e5e7eb; }
+
+.item-effect { display: block; font-size: 9px; color: #90a4ae; }
+
+.item-equip-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+// --- Forge & Bond (the /api/items/build + /api/items/bind-nft controls) -----------------
+// These two engine capabilities had no owner in the client at all, so the styles are new
+// rather than reused: a compact two-row form plus a status line that states the outcome.
+.items-forge-section {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.forge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    input {
+        flex: 1 1 120px;
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 10px;
+        color: #e5e7eb;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+
+    .vbt-btn { flex: 0 0 auto; font-size: 10px; padding: 6px 10px; }
+}
+
+.forge-note {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: #90a4ae;
+}
+
+// The old `.item-equip-btn` rule is kept: `.item-detail-btn` is the same control, renamed
+// because the button no longer claims to equip anything.
+.item-detail-btn { width: 100%; font-size: 9px; padding: 4px; }
+

@@ -1,0 +1,100 @@
+// ============================================================================
+// _lobby.scss — Lobby mode: board hidden, lobby placeholder shown, action
+// buttons collapsed into a dropdown. Board only appears in match/spectate/replay.
+// ============================================================================
+@import '../base/variables';
+@import '../themes/neon-glass';
+
+// --- Lobby placeholder (replaces the board in menu/lobby) ---
+.lobby-placeholder {
+    @include neon-glass-panel;
+    margin: $spacing-xl auto;
+    max-width: 460px;
+    text-align: center;
+    padding: $spacing-xl;
+    border-color: rgba($color-neon-cyan, 0.3);
+
+    .lobby-placeholder-icon { font-size: 48px; margin-bottom: $spacing-sm; }
+    h3 {
+        font-family: $font-heading;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 10px rgba($color-neon-cyan, 0.4);
+        margin-bottom: $spacing-sm;
+    }
+    p { color: $color-text-secondary; font-size: $font-size-sm; line-height: 1.6; }
+    .lobby-placeholder-actions {
+        display: flex;
+        gap: $spacing-sm;
+        justify-content: center;
+        margin: $spacing-md 0;
+        flex-wrap: wrap;
+    }
+    .lobby-hint {
+        font-size: $font-size-xs;
+        color: $color-text-muted;
+        font-style: italic;
+        margin-top: $spacing-md;
+    }
+}
+
+// --- Action dropdown (buttons always visible) ---
+.action-dropdown {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+    width: 100%;
+}
+
+// Toggle is hidden — buttons are always visible on the main screen
+.action-dropdown-toggle {
+    display: none;
+}
+
+// Action dock: ensure the button container never clips and always shows its children
+.action-dock {
+    .action-dropdown {
+        overflow: visible; // don't clip buttons that grow on hover
+    }
+}
+
+// On wide screens, allow buttons to grow larger (3-4 per row)
+@media (min-width: $breakpoint-xl) {
+    .action-dropdown-list {
+        > button,
+        > .btn,
+        > .vbt-btn {
+            flex: 1 1 140px;
+            min-width: 140px;
+            padding: $spacing-md $spacing-lg;
+            font-size: $font-size-base;
+            min-height: 48px;
+        }
+    }
+}
+
+// Button list always expanded
+// ROW-WRAP: buttons share rows on wide screens so each stays legible
+// (a single vertical column in a 280-360px rail makes them invisibly tiny)
+.action-dropdown-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: $spacing-sm;
+
+    // Each button grows to fill available width but never shrinks below 120px
+    // → 2 per row in the dock rail, 3-4 per row when the layout collapses
+    > button,
+    > .btn,
+    > .vbt-btn {
+        flex: 1 1 120px;
+        min-width: 120px;
+        max-width: 100%;
+        text-align: center;
+        justify-content: center;
+        padding: $spacing-md $spacing-sm;
+        font-size: $font-size-sm;
+        min-height: 44px; // touch-target compliant
+    }
+}
+
+

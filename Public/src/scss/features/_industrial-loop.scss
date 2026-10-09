@@ -1,0 +1,204 @@
+// ============================================================================
+// Industrial Loop — Flow diagram, health bars, metrics
+// ============================================================================
+
+/* Tabs */
+.il-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    background: rgba(var(--theme-accent-rgb), 0.05);
+}
+
+.il-tab {
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: #90a4ae;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.6;
+    &:hover { opacity: 0.85; border-color: rgba(var(--theme-accent-rgb), 0.3); }
+    &.active {
+        background: rgba(var(--theme-accent-rgb), 0.15);
+        border-color: var(--theme-accent);
+        color: #e0e0e0;
+        opacity: 1;
+        text-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.6);
+    }
+}
+
+.il-panel { padding: 16px; &.hidden { display: none; } }
+
+/* Flow diagram */
+.il-flow-diagram {
+    position: relative;
+    min-height: 120px;
+    padding: 20px 0;
+    overflow-x: auto;
+}
+
+.il-flow-lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.il-flow-line {
+    stroke: rgba(var(--theme-accent-rgb), 0.3);
+    stroke-width: 2;
+    fill: none;
+    &.critical { stroke: #ef4444; stroke-dasharray: 5 5; }
+    &.optimal { stroke: rgba(var(--theme-accent-rgb), 0.4); }
+}
+
+.il-flow-nodes {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    padding: 0 20px;
+}
+
+.il-flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 2px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 8px;
+    min-width: 80px;
+    transition: all 0.2s ease;
+    &.optimal { border-color: rgba(16, 185, 129, 0.4); }
+    &.degraded { border-color: rgba(245, 158, 11, 0.4); }
+    &.critical { border-color: rgba(239, 68, 68, 0.4); }
+}
+
+.il-node-icon { font-size: 20px; }
+.il-node-name { font-size: 11px; color: #e0e0e0; font-weight: 600; }
+.il-node-throughput { font-size: 10px; color: #90a4ae; }
+.il-node-efficiency { font-size: 12px; font-weight: 700; color: var(--theme-accent); }
+
+.il-flow-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: #90a4ae;
+}
+
+.il-legend-item { display: flex; align-items: center; gap: 4px; }
+.il-dot { width: 8px; height: 8px; border-radius: 50%; }
+.il-dot.optimal { background: #10b981; }
+.il-dot.degraded { background: #f59e0b; }
+.il-dot.critical { background: #ef4444; }
+
+/* Health bars */
+.il-health-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.il-health-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.il-health-name {
+    flex: 1;
+    font-size: 12px;
+    color: #e0e0e0;
+}
+
+.il-health-bar {
+    flex: 2;
+    height: 8px;
+    background: rgba(var(--theme-accent-rgb), 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.il-health-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    &.optimal { background: linear-gradient(90deg, #10b981, #34d399); }
+    &.degraded { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    &.critical { background: linear-gradient(90deg, #ef4444, #f87171); }
+}
+
+.il-health-value {
+    width: 40px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    &.optimal { color: #10b981; }
+    &.degraded { color: #f59e0b; }
+    &.critical { color: #ef4444; }
+}
+
+.il-health-status {
+    width: 70px;
+    font-size: 10px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    text-align: center;
+    &.optimal { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    &.degraded { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    &.critical { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+}
+
+/* Maintenance timer */
+.il-maintenance-timer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+}
+
+.il-timer-label { font-size: 12px; color: #90a4ae; }
+.il-timer-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f59e0b;
+}
+
+/* Metrics */
+.il-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+}
+
+.il-metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 8px;
+}
+
+.il-metric-label { font-size: 11px; color: #90a4ae; text-transform: uppercase; }
+.il-metric-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+}
+.il-metric-unit { font-size: 11px; color: #90a4ae; }

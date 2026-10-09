@@ -1,0 +1,129 @@
+/* === Industrial Flow === */
+.industrial-flow-container { padding: 8px 0; }
+
+.industrial-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.1), rgba(96, 125, 139, 0.05));
+    border: 1px solid rgba(158, 158, 158, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.industrial-gear-icon { font-size: 32px; animation: gear-spin 10s linear infinite; }
+
+@keyframes gear-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.industrial-header-info { flex: 1; }
+
+.industrial-health {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.industrial-health-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.industrial-health-value { font-size: 24px; font-weight: 700; }
+
+/* Pipeline */
+.industrial-pipeline { margin-bottom: 16px; }
+
+.industrial-pipeline h4 { margin: 0 0 12px; }
+
+.pipeline-scroll { overflow-x: auto; padding-bottom: 8px; }
+
+.pipeline-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: max-content;
+}
+
+.pipeline-phase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    min-width: 70px;
+    transition: all 0.3s;
+}
+
+.pipeline-phase.phase-active {
+    border-color: var(--phase-color);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
+}
+
+.pipeline-phase.phase-inactive {
+    opacity: 0.4;
+}
+
+.pipeline-phase-icon { font-size: 20px; }
+
+.pipeline-phase-name { font-size: 9px; color: #e5e7eb; font-weight: 600; }
+
+.pipeline-arrow {
+    font-size: 16px;
+    color: #607d8b;
+    margin: 0 4px;
+}
+
+/* Metrics */
+.industrial-metrics-section { margin-bottom: 16px; }
+
+.industrial-metrics-section h4 { margin: 0 0 12px; }
+
+.industrial-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.industrial-metric-card {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.metric-value { display: block; font-size: 18px; font-weight: 700; color: #e5e7eb; }
+
+.metric-label { font-size: 9px; color: #90a4ae; }
+
+/* Phase details */
+.industrial-phases-section h4 { margin: 0 0 12px; }
+
+.industrial-phases-list { display: flex; flex-direction: column; gap: 6px; }
+
+.phase-detail-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--phase-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.phase-detail-icon { font-size: 20px; }
+
+.phase-detail-info { flex: 1; }
+
+.phase-detail-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.phase-detail-desc { display: block; font-size: 9px; color: #90a4ae; }
+
+.phase-detail-volume { font-size: 11px; font-weight: 600; color: #00bcd4; }

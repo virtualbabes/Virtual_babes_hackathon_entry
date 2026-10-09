@@ -1,0 +1,168 @@
+// ============================================================================
+// Transaction Modal — Reusable confirmation pattern
+// ============================================================================
+
+.tx-modal-overlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: rgba(9, 10, 15, 0.9);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.tx-modal {
+    position: relative;
+    width: 90%;
+    max-width: 420px;
+    padding: 32px;
+    background: rgba(15, 18, 30, 0.95);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.tx-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    color: #90a4ae;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    &:hover { background: rgba(99, 102, 241, 0.2); color: #e0e0e0; }
+}
+
+.tx-modal-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e0e0e0;
+    margin: 0 0 16px 0;
+}
+
+.tx-modal-body {
+    margin-bottom: 24px;
+}
+
+.tx-modal-action {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+
+.tx-modal-cost {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tx-cost-label {
+    font-size: 13px;
+    color: #90a4ae;
+}
+
+.tx-cost-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: $color-neon-cyan;
+}
+
+.tx-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.tx-modal-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+}
+
+.tx-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(99, 102, 241, 0.2);
+    border-top-color: $color-neon-cyan;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tx-modal-loading span {
+    font-size: 13px;
+    color: #90a4ae;
+}
+
+.tx-modal-success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+}
+
+.tx-checkmark {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.2);
+    border: 2px solid #10b981;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #10b981;
+    animation: check-pop 0.4s ease-out;
+}
+
+@keyframes check-pop {
+    0% { transform: scale(0); }
+    80% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.tx-modal-success span {
+    font-size: 14px;
+    color: #10b981;
+    font-weight: 600;
+}
+
+.tx-modal-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+}
+
+.tx-error-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.2);
+    border: 2px solid #ef4444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #ef4444;
+}
+
+#tx-error-text {
+    font-size: 13px;
+    color: #ef4444;
+    text-align: center;
+}

@@ -3,13 +3,386 @@
 package main
 
 import (
+	"context"
 	"sync"
 
 	"log"
+
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+// SessionState represents the network status of a player's session.
+type SessionState string
+
+const (
+	StateConnected         SessionState = "CONNECTED"
+	StatePendingDisconnect SessionState = "PENDING_DISCONNECT"
+)
+
+// PlayerSession tracks the quarantine state of a disconnected user.
+type PlayerSession struct {
+	WalletAddress   string
+	CurrentState    SessionState
+	CancelTimer     context.CancelFunc // Callback function to halt the eviction sequence
+	LastActiveFrame uint64
+}
+
+// GracePeriodMatrix manages connection drop events and automated state restoration.
+// PILLAR 4: Network Resiliency.
+type GracePeriodMatrix struct {
+	Mu              sync.Mutex
+	ActiveSessions  map[string]*PlayerSession
+	DisconnectGrace time.Duration
+	EvictionWorker  func(wallet string) // Core system hook to drop player rank / trigger match forfeit
+}
+
+// FrameDelta captures a single state transition for recovery logs.
+type FrameDelta struct {
+	SequenceID uint64         `json:"sequence_id"`
+	MoveIntent []byte         `json:"move_intent"`
+	StateHash  BoardStateHash `json:"state_hash"`
+}
+
+// SyncHandshaker manages the chronological verification of match frames.
+type SyncHandshaker struct {
+	Mu               sync.RWMutex
+	CurrentSequence  uint64
+	HistoricalFrames map[uint64]FrameDelta
+	LastVerifiedHash BoardStateHash
+}
+
+// RegionalGovernanceMetric tracks dividends for governors.
+// PILLAR 2: uint64 Precision.
+type RegionalGovernanceMetric struct {
+	GovernorAddress      string  `json:"governor_address"`
+	DistrictDividendPool uint64  `json:"district_dividend_pool"`
+	CustomTaxRate        float64 `json:"custom_tax_rate"` // PILLAR 1: Political Influence (0.0 to 0.20)
+}
+
+// ClubTreasuryNode represents a localized organization vault.
+type ClubTreasuryNode struct {
+	ClubID          uint64 `json:"club_id"`
+	TreasuryBalance uint64 `json:"treasury_balance"`
+}
+
+// TokenSinkRouter manages the atomic distribution of capital flows.
+// PILLAR 2: Ledger circularity.
+type TokenSinkRouter struct {
+	Mu                   sync.RWMutex
+	GlobalFaucetPool     *uint64 // Reference to the system rewards reservoir
+	AdminMaintenancePool *uint64 // PILLAR 2: Infrastructure Siphon (Section 11)
+	Ledger               interface{} // Reconciled: back-reference to *Lobby (used by economy triggers)
+	ActiveClubs          map[uint64]*ClubTreasuryNode
+	MarketNodes          map[string]*EntityMarketNode // PILLAR 2: AMM Persistence
+	RegionalDistricts    map[string]*RegionalGovernanceMetric
+	Audit                *TokenSinkAuditReporter // PILLAR 2: Invariant Monitoring
+	SiphonNotifier       func(string)            // PILLAR 2: Infrastructure Funding Alerts
+}
+
+// EntityMarketNode implements an Automated Market Maker (AMM) for entity shares.
+// PILLAR 2: Dynamic Supply-Elastic Pricing.
+type EntityMarketNode struct {
+	Mu                      sync.RWMutex `json:"-"`
+	EntityID                string       `json:"entity_id"`
+	TotalSharesIssued       uint64       `json:"total_shares_issued"`
+	ReserveBalance          uint64       `json:"reserve_balance"`            // Micro-VBV
+	ReserveRatio            float64      `json:"reserve_ratio"`              // e.g., 0.33
+	DividendPoolMicro       uint64       `json:"dividend_pool_micro"`        // PILLAR 1: Yield-Bearing Assets
+	CumulativeYieldPerShare uint64       `json:"cumulative_yield_per_share"` // PILLAR 2: Integer Supremacy
+	IsDividendFrozen        bool         `json:"is_dividend_frozen"`         // PILLAR 3: Justice Counter-play
+	// Reconciled field (mechanical reconciliation)
+	Reputation              uint64       `json:"reputation,omitempty"`        // Reputation score (1 rep = 0.0001x boost)
+}
+
+// VerificationHook handles cryptographic validation of market commands.
+// PILLAR 3: Switchboard Security.
+type VerificationHook struct {
+	Mu             sync.RWMutex
+	ActiveNonces   map[uint64]time.Time // Valid nonces + TTL
+	ConsumedNonces map[uint64]bool      // Replay protection
+}
+
+// EvictionPayload represents the reason for a session termination.
+type EvictionPayload struct {
+	WalletAddress string `json:"wallet_address"`
+	ReasonCode    string `json:"reason_code"` // e.g., "SESSION_EXPIRED" or "INSUFFICIENT_LIQUIDITY"
+}
+
+// SessionWatchdog monitors active player eligibility throughout their session.
+// PILLAR 3: Continuous Verification.
+type SessionWatchdog struct {
+	Mu               sync.Mutex
+	AuditInterval    time.Duration
+	ActiveMonitoring map[string]time.Time // Key: Wallet Address -> Join Time
+}
+
+// HostageSituation represents a unique criminal capture event.
+// PILLAR 3: Multi-Slot Attacker Isolation.
+type HostageSituation struct {
+	AttackerAddress string `json:"attacker_address"`
+	AssetID         uint64 `json:"asset_id"`
+	RansomAmount    uint64 `json:"ransom_amount"`   // PILLAR 2: uint64 Precision
+	ExpirationTime  int64  `json:"expiration_time"` // Unix Timestamp (48h Rule)
+}
+
+// VictimRegistry tracks active kidnappings indexed by victim and attacker.
+// This eliminates the "Immunity Exploit" by allowing multiple attackers per victim.
+type VictimRegistry struct {
+	Mu sync.RWMutex `json:"-"`
+	// ActiveKidnaps maps Victim Address -> Attacker Address -> Situation details.
+	// PILLAR 3: Modular Authority (Fine-grained locking).
+	ActiveKidnaps map[string]map[string]HostageSituation `json:"active_kidnaps"`
+}
+
+// CyberInterceptEvent represents a cyber-interception opportunity detected by Intel-Agent.
+// PILLAR 13: Justice Hegemony — Intel-Agent combat hooks base type.
+type CyberInterceptEvent struct {
+	EventID        string    `json:"event_id"`        // UUID v4 unique identifier
+	SourceWallet   string    `json:"source_wallet"`   // Originating wallet (suspect signal source)
+	TargetWallet   string    `json:"target_wallet"`   // Intercept target wallet
+	SignalStrength int       `json:"signal_strength"` // 1-100 signal quality score
+	DecryptBonus   float64   `json:"decrypt_bonus"`   // Multiplier from Intel-Agent career tier
+	CreatedAt      time.Time `json:"created_at"`      // Event creation timestamp
+	ExpiresAt      time.Time `json:"expires_at"`      // TTL (e.g., 30 minutes)
+	Intercepted    bool      `json:"intercepted"`     // Whether successfully intercepted by Intel-Agent
+}
+
+// RaidEvidence represents forensic data collected during a criminal raid or cyber-intercept.
+// PILLAR 13: Justice Hegemony — Forensic Analyst combat hooks base type.
+type RaidEvidence struct {
+	EvidenceID   string    `json:"evidence_id"`   // UUID v4 unique identifier
+	SourceWallet string    `json:"source_wallet"` // Collector wallet (ForensicAnalyst)
+	TargetWallet string    `json:"target_wallet"` // Suspect target wallet
+	CrimeType    string    `json:"crime_type"`    // e.g., "KIDNAP", "LAUNDERING", "COUNTERFEIT"
+	Confidence   float64   `json:"confidence"`    // 0.0-1.0 confidence score (evidence accuracy)
+	CollectedAt  time.Time `json:"collected_at"`  // Collection timestamp
+	Expired      bool      `json:"expired"`        // Whether evidence has degraded beyond use
+	Intercepted  bool      `json:"intercepted,omitempty"` // Reconciled: whether this record was from a cyber-intercept
+	CreatedAt    time.Time `json:"created_at,omitempty"`   // Reconciled: record creation time
+}
+
+// EvidencePool stores forensic evidence collected during criminal events.
+type EvidencePool struct {
+	Mu            sync.RWMutex
+	ActiveRecords map[string]*RaidEvidence
+}
+
+// SeasonEventPhase represents the lifecycle stage of a seasonal event.
+type SeasonEventPhase string
+
+const (
+	SeasonAnnouncement   SeasonEventPhase = "ANNOUNCEMENT"    // Event announced, players can register
+	SeasonActive         SeasonEventPhase = "ACTIVE"          // Event is live with multiplier effects
+	SeasonResolution     SeasonEventPhase = "RESOLUTION"      // Event ended, computing payouts
+	SeasonTreasuryPayout SeasonEventPhase = "TREASURY_PAYOUT" // Rewards distributed to participants
+)
+
+// SeasonEventType defines the category of seasonal event.
+type SeasonEventType string
+
+const (
+	SeasonHarvestFest   SeasonEventType = "HARVEST_FEST"   // Resource gathering multiplier week
+	SeasonShadowAuction SeasonEventType = "SHADOW_AUCTION" // Criminality rewards doubled
+	SeasonTerritoryWar  SeasonEventType = "TERRITORY_WAR"  // Club territory bonuses ×2
+	SeasonCryptoRaid    SeasonEventType = "CRYPTO_RAID"    // Bounty capture XP bonus week
+	SeasonDiamondWeek   SeasonEventType = "DIAMOND_WEEK"   // All rewards +50% for Diamond+ reputation players
+)
+
+// SeasonEvent represents a seasonal event managed by the Industrial Loop.
+// PILLAR 1: Sacred Industrial Loop — Event-driven value circulation per vision lines 107-159.
+type SeasonEvent struct {
+	EventID            string               `json:"event_id"`              // UUID v4 unique identifier
+	Type               SeasonEventType      `json:"type"`                  // Category of event
+	Title              string               `json:"title"`                 // Display title (e.g., "Harvest Fest 2026-Q3")
+	Description        string               `json:"description"`           // Event lore and mechanics description
+	StartTime          time.Time            `json:"start_time"`            // Announcement start timestamp
+	EndTime            time.Time            `json:"end_time"`              // Resolution trigger timestamp
+	Multiplier         float64              `json:"multiplier"`            // Base reward multiplier (e.g., 1.5 = +50%)
+	TreasuryBudget     uint64               `json:"treasury_budget_micro"` // Treasury allocation in micro-VBV
+	ActiveParticipants map[string]time.Time `json:"-"`                     // Key: wallet -> registration time (not serialized)
+	Status             SeasonEventPhase     `json:"status"`                // Current lifecycle phase
+	CreatedBy          string               `json:"created_by"`            // Admin wallet that created event
+}
+
+// SeasonRewardPool tracks treasury allocation for a seasonal event.
+type SeasonRewardPool struct {
+	TotalAllocated uint64            `json:"total_allocated_micro"` // Treasury budget in micro-VBV
+	Distributed    uint64            `json:"distributed_micro"`     // Amount already paid out
+	PerParticipant map[string]uint64 `json:"-"`                     // Key: wallet -> reward amount (not serialized)
+}
+
+// §26 — User-authored event types (distributed via shops §14/§19 or admin panel).
+type UserEventType string
+
+const (
+	UserEventTreasureHunt UserEventType = "TREASURE_HUNT"
+	UserEventSearchRescue UserEventType = "SEARCH_RESCUE"
+	UserEventGangBashing   UserEventType = "GANG_BASHING"
+	UserEventWildBotHunt   UserEventType = "WILD_BOT_HUNT"
+	UserEventPetBreeding   UserEventType = "PET_BREEDING_SHOW"
+	UserEventSystem        UserEventType = "SYSTEM_EVENT" // career surge, rival clash, cross-chain fiesta
+)
+
+// TreasureCache (§26.1) — a findable loot cache at a region coordinate.
+type TreasureCache struct {
+	CacheID    string    `json:"cache_id"`    // UUID
+	Region     string    `json:"region"`      // region tag (§15)
+	X          float64   `json:"x"`           // explorer coord (§25.3)
+	Y          float64   `json:"y"`           // explorer coord
+	Z          float64   `json:"z"`           // explorer coord
+	RewardMicro uint64   `json:"reward_micro"` // micro-VBV, or 0 if NFT reward
+	RewardKind string    `json:"reward_kind"` // "VBV" | "ITEM_NFT" | "CARD_NFT" | "SCAR_NFT"
+	RewardRef  string    `json:"reward_ref"`  // asset ID if NFT reward
+	BondMicro  uint64    `json:"bond_micro"`  // optional entry bond (BountyHunter pattern)
+	Hidden     bool      `json:"hidden"`      // requires tunneling/fog reveal (§25.6)
+	CreatedBy  string    `json:"created_by"`  // author wallet (user or system)
+	ExpiresAt  time.Time `json:"expires_at"`
+	Claimed    bool      `json:"claimed"`
+}
+
+// UserEvent (§26.2) — a user-authored event listed/sold like an item-NFT (§23).
+type UserEvent struct {
+	EventID     string       `json:"event_id"`     // UUID
+	Type        UserEventType `json:"type"`         // UserEventType
+	Title       string       `json:"title"`        // custom display name (hub-lease, §15.3)
+	Description string       `json:"description"`
+	Region      string       `json:"region"`       // spawn region
+	RewardMicro uint64       `json:"reward_micro"` // pool
+	EntryMicro  uint64       `json:"entry_micro"`  // participation cost
+	BondedNFT   string       `json:"bonded_nft"`   // §23 bonded asset ID (author royalty)
+	Creator     string       `json:"creator"`      // author wallet
+	RoyaltyBps  uint64       `json:"royalty_bps"`  // §23 royalty (≤1000)
+	Status      string       `json:"status"`       // ANNOUNCEMENT | ACTIVE | RESOLUTION
+	CreatedAt   time.Time    `json:"created_at"`
+	ExpiresAt   time.Time    `json:"expires_at"`
+}
+
+// RegionView (§25.3 / §26) — aggregated region payload for the explorer + menu warp.
+type RegionView struct {
+	Region     string           `json:"region"`
+	Cap        int              `json:"cap"`    // AI citizen cap (1 + idx, §15)
+	Count      int              `json:"count"`   // AI citizens present
+	Caches     []*TreasureCache `json:"caches"`  // active caches
+	Events     []*UserEvent     `json:"events"`  // active user events
+	// §30 Pet World: 3D-world power overlay summary for this region's entities (pets + bots).
+	EntityPowerOverlay *EntityPowerOverlay `json:"entity_power_overlay,omitempty"`
+}
+
+// ── §30 EntityStats (Pet World) ───────────────────────────────────────────────
+// Shared stat vector for pets + bot-children. INTEGER ONLY (1..100) — never float
+// (constitutional ledger rule). These stats are the 3D-world power overlay: they cap the
+// entity's effective power level and modulate boosts/degradations from events, rivalries,
+// regional dynamics, and owner relationship status.
+type EntityStats struct {
+	Speed       uint64 `json:"speed"`       // 1..100
+	Intelligence uint64 `json:"intelligence"` // 1..100
+	Willpower   uint64 `json:"willpower"`   // 1..100
+	Strength    uint64 `json:"strength"`    // 1..100
+	Charisma    uint64 `json:"charisma"`    // 1..100
+	Agility     uint64 `json:"agility"`     // 1..100
+}
+
+// StatSum returns the integer sum (used for power-overlay normalization). Pure uint64.
+func (s EntityStats) StatSum() uint64 {
+	return s.Speed + s.Intelligence + s.Willpower + s.Strength + s.Charisma + s.Agility
+}
+
+// DominantStat returns the stat name with the highest value (ties → first). Used for
+// function-based leveling (racer→Speed, companion→Charisma, etc.).
+func (s EntityStats) DominantStat() string {
+	best, name := s.Speed, "Speed"
+	if s.Intelligence > best { best, name = s.Intelligence, "Intelligence" }
+	if s.Willpower > best { best, name = s.Willpower, "Willpower" }
+	if s.Strength > best { best, name = s.Strength, "Strength" }
+	if s.Charisma > best { best, name = s.Charisma, "Charisma" }
+	if s.Agility > best { best, name = s.Agility, "Agility" }
+	return name
+}
+
+// ── §26.4 PetNFT ───────────────────────────────────────────────────────────────
+// Companion pet, bonded asset (§23), breedable. Distinct from AI citizens (§3).
+// Deterministic traits (PILLAR 2 integer math) — no cloud RNG.
+type PetNFT struct {
+	PetID      string    `json:"pet_id"`
+	Owner      string    `json:"owner"`        // wallet
+	Name       string    `json:"name"`         // user-customized (§15.3 hub-lease naming rule)
+	SireID     string    `json:"sire_id"`      // lineage
+	DamID      string    `json:"dam_id"`       // lineage
+	BirthAt    time.Time `json:"birth_at"`
+	MaturityMs int64     `json:"maturity_ms"`  // ms to reach riding/breeding age
+	Traits     uint64    `json:"traits"`       // deterministic trait bitfield (PILLAR 2)
+	CreatedAt  time.Time `json:"created_at"`
+	// §27.7.3 provenance (mirrors AICitizen): legitimate spawn = Certified; off-ledger/personal =
+	// BlackMarketAdopted and ineligible for legitimate breeding (§26.4.1) + economic perks.
+	Certified          bool `json:"certified,omitempty"`
+	BlackMarketAdopted bool `json:"black_market_adopted,omitempty"`
+	// §26.4.2 GROOMING LADDER — the deliberate counterpart to the §25.6.1 vehicle part ladder.
+	// Breeding progresses a companion by LINEAGE; grooming progresses it by INVESTMENT. Keys are
+	// EntityStats axes (SPEED/INTELLIGENCE/…), values are purchased levels (0..PetGroomMaxLevel).
+	// Integer only; the fee is sink-routed exactly like the vehicle part fee.
+	Grooming map[string]uint64 `json:"grooming,omitempty"`
+	// §30 Pet World: stat vector + level + owner relationship status (all integer; no float).
+	Stats            EntityStats `json:"stats,omitempty"`             // 3D-world power-overlay stats
+	PetLevel         uint64      `json:"pet_level,omitempty"`         // function-based level (derived from dominant stat)
+	Mature           bool        `json:"mature,omitempty"`            // MaturityMs elapsed → eligible for tournaments/rewards
+	Region           string      `json:"region,omitempty"`            // deployed region
+	OwnerOpinion     uint64      `json:"owner_opinion,omitempty"`     // direct owner→pet opinion (1..100)
+	OwnerCrossOpinion uint64     `json:"owner_cross_opinion,omitempty"` // owner's standing w/ other owners' asset-bots in event (1..100)
+}
+
+// ── §25.6 VehicleNFT ──────────────────────────────────────────────────────────
+// Player-owned vehicle (car/flyer/digger). Bonded asset (§23), custom name (§15.3).
+// Unlocked progressively by Level L (§24.5) + career.
+//
+// §25.6.1 VEHICLE UPGRADE LADDER — the deliberate counterpart to §26.4 pet breeding.
+// Pets progress by LINEAGE + TIME; vehicles progress by PARTS + INVESTMENT. Parts are
+// one per EntityStats axis, every stat is an integer 1..StatMax, and every fee is routed
+// to a deterministic sink (Architecture Ledger: no float, no silent mint/burn).
+type VehicleNFT struct {
+	VehicleID string    `json:"vehicle_id"`
+	Owner     string    `json:"owner"`
+	Name      string    `json:"name"`      // user-customized (§15.3)
+	Kind      string    `json:"kind"`      // "GROUND"|"FLYER"|"DIGGER"
+	MinLevel  uint64    `json:"min_level"` // Level L gate (§24.5)
+	CreatedAt time.Time `json:"created_at"`
+
+	// §25.6.1 upgrade ladder (the mirror of PetNFT's §26.4 progression fields)
+	Stats        EntityStats       `json:"stats,omitempty"`         // stat vector advanced by parts
+	VehicleLevel uint64            `json:"vehicle_level,omitempty"` // 1 + Σ part levels (build level)
+	Upgrades     map[string]uint64 `json:"upgrades,omitempty"`      // PART -> level (0..VehiclePartMaxLevel)
+	Region       string            `json:"region,omitempty"`        // deployed region (feeds the §30 overlay)
+	// Break-in window: CreatedAt + BreakInMs is the earliest a vehicle is race-ready.
+	// Integer/time-based, the same shape as PetNFT's maturity gate.
+	BreakInMs int64 `json:"break_in_ms,omitempty"`
+	// §27.7.3 provenance (mirrors PetNFT/AICitizen): a legitimate build is Certified;
+	// an off-ledger acquisition is BlackMarketAdopted and ineligible for progress.
+	Certified          bool `json:"certified,omitempty"`
+	BlackMarketAdopted bool `json:"black_market_adopted,omitempty"`
+}
+
+// ── §25.7 WorldContentNFT ─────────────────────────────────────────────────────
+// Native world entity (NPC / animal / scenery / weather) — user-authored, buyable,
+// deployable into a region. Bonded asset (§23). Client-side rendered instance.
+type WorldContentNFT struct {
+	ContentID string    `json:"content_id"`
+	Creator   string    `json:"creator"`       // author wallet (royalty, §23)
+	Kind      string    `json:"kind"`          // "NPC"|"ANIMAL"|"SCENERY"|"WEATHER"
+	Region    string    `json:"region"`        // deployed region
+	Deployed  bool      `json:"deployed"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SeasonalEventEngine manages the lifecycle of seasonal events.
+type SeasonalEventEngine struct {
+	Mu                sync.RWMutex                 `json:"-"`
+	ActiveEvents      map[string]*SeasonEvent      // Key: EventID -> *SeasonEvent
+	CurrentRewardPool map[string]*SeasonRewardPool // Key: EventID -> *SeasonRewardPool
+	// §26 — treasure hunt + user-event matrices
+	Caches     map[string]*TreasureCache `json:"-"` // Key: CacheID -> *TreasureCache
+	UserEvents map[string]*UserEvent     `json:"-"` // Key: EventID -> *UserEvent
+}
 
 // NonceData stores the nonce value and its creation time for expiration logic.
 type NonceData struct {
@@ -22,6 +395,75 @@ type RateBucket struct {
 	Tokens     float64
 	LastUpdate time.Time
 }
+
+// ============================================================================
+// §25.10 — Region/Territory Rivalry Matrix (asset-type + citizen-value keyed)
+// Calibration constants (§25.10.1) — single source of truth for balancing.
+// ============================================================================
+
+const (
+	RIVAL_COLLISION_THRESHOLD = 40000 // 40% signature overlap triggers auto-rivalry
+	RIVAL_SHOWCASE_BUFF_BPS   = 5000  // +5% capital visibility weight
+	RIVAL_CACHE_BASE_MICRO    = 50000000 // $VBV 50 resident loot cache base
+	RIVAL_GOV_REP             = 1000  // governor reputation gain
+	RIVAL_WORKER_BONUS_CAP    = 200000000 // $VBV 200 cap per worker
+	RIVAL_CREATOR_MULT        = 1200  // ×1.2 for built (not buy-deploy) assets
+	RIVAL_W_WORKER_BASE       = 100000 // user-worker base weight (bps×1000)
+)
+
+// Asset-class weights (bps×1000) — §25.10.1 fine-grain calibration.
+const (
+	W_USER_WORKER  = 100000
+	W_AI_PRIDE     = 80000
+	W_MODEL_CITIZEN = 60000
+	W_VEHICLE      = 50000
+	W_PET_BLOODLINE = 45000
+	W_WORLD_CONTENT = 40000
+	W_ITEM_ARCHETYPE = 35000
+	W_EVENT_TYPE    = 30000
+)
+
+// AssetSignature — a region/territory's weighted asset strength (§25.10.1).
+type AssetSignature struct {
+	Region     string `json:"region"`
+	Territory  string `json:"territory"` // club/territory ID; "" for region-level
+	IsCapital  bool   `json:"is_capital"`
+	UserWorkers int   `json:"user_workers"`   // count of employed workers (career.go)
+	AICitizenPride int `json:"ai_pride"`      // Σ Reputation×(AttachmentTier+1)
+	ModelCitizens  int `json:"model_citizens"` // Σ Level L (clamped 75)
+	Vehicles   int   `json:"vehicles"`
+	Pets      int   `json:"pets"`
+	WorldContent int `json:"world_content"`
+	Items     int   `json:"items"`
+	Events    int   `json:"events"`
+	Score     uint64 `json:"score"` // computed weighted total (integer)
+}
+
+// RegionRivalry — an active rivalry pair (Territory-vs-Territory or Capital-vs-Capital).
+type RegionRivalry struct {
+	RivalryID  string `json:"rivalry_id"`
+	Level      string `json:"level"` // "TERRITORY" | "REGION"
+	SideA      string `json:"side_a"` // region/territory tag
+	SideB      string `json:"side_b"` // region/territory tag
+	AssetClass string `json:"asset_class"` // contested dominant class
+	ScoreA     uint64 `json:"score_a"`
+	ScoreB     uint64 `json:"score_b"`
+	Winner     string `json:"winner"` // "" until resolved
+	Declared   bool   `json:"declared"` // governor-declared duel at leaderboard region
+	CreatedAt  time.Time `json:"created_at"`
+	ResolvedAt time.Time `json:"resolved_at"`
+}
+
+// RivalryEngine manages region/territory rivalries (§25.10).
+type RivalryEngine struct {
+	Mu        sync.RWMutex        `json:"-"`
+	Signatures map[string]*AssetSignature // Key: region|territory -> signature
+	Rivalries map[string]*RegionRivalry   // Key: RivalryID
+}
+
+
+// TokenBucket preserves compatibility with legacy counterfeit rate limiting.
+type TokenBucket = RateBucket
 
 // Client represents one connected WebSocket user.
 type Client struct {
@@ -38,68 +480,164 @@ type Client struct {
 }
 
 // Lobby manages the central state of the arena.
+// IdentityProfile represents a cross-platform identity anchored by a primary wallet.
+type IdentityProfile struct {
+	PrimaryWallet   string            `json:"primary_wallet"`
+	ReputationScore uint64            `json:"reputation_score"`
+	LinkedPlatforms map[string]string `json:"linked_platforms"` // e.g., "discord": "user123"
+	LastSynced      time.Time         `json:"last_synced"`
+}
+
 type Lobby struct {
-	clients                  map[string]*Client
-	matches                  map[string]*MatchState
-	inventory                map[int]ServerCard
-	persistentCardCache      map[int]ServerCard
-	tournamentPotBonus       float64
-	pendingTournamentPayouts float64
-	tournamentCache          map[string]*interface{}
-	paidParticipants         []string
-	matchmakingPool          []QueueEntry
-	bannedAvatars            map[string]time.Time
-	registeredTxIDs          map[string]time.Time
-	processingRewards        map[string]time.Time
-	processingOnboarding     map[string]time.Time
-	processingRegistrations  map[string]time.Time
-	activeKidnappings        map[int]KidnapState
-	wallets                  map[string]string
-	clubs                    map[string]*Club
-	blackMarket              []Loan
-	rumors                   map[string]*Rumor
-	loans                    map[string]*Loan
-	auctions                 map[string]*Auction
-	leaderboard              map[string]PlayerStats
-	matchHistory             map[string]MatchHistory
-	linkedWallets            map[string]WalletLinkInfo
-	vaultAddress             string
-	faucetBalance            float64
-	rewardStack              map[string]uint64
-	playerBalances           map[string]uint64
-	initialRewards           map[string]uint64
-	holdingBonuses           map[string][]HoldingBonus
-	initialBaseReward        uint64
-	seasonStart              time.Time
-	seasonNumber             int
-	maxFaucetCapacity        float64
-	rewardAssetID            string
-	avoiAssetID              string
-	baseReward               uint64
-	nonces                   map[string]NonceData
-	availableNetworks        map[string]NetworkConfig
-	adminFocusNetwork        string
-	maintenanceMode          bool
-	maintenanceTime          time.Time
-	rateLimits               map[string]time.Time
-	httpRateLimits           map[string]*RateBucket
-	tournament               TournamentState
-	globalSentiment          GlobalSentiment
-	register                 chan *Client
-	unregister               chan *Client
-	broadcast                chan []byte
-	onboardedWallets         map[string]bool
-	onboardingSemaphore      chan struct{}
-	oracleSemaphore          chan struct{}
-	envoiCache               map[string]string
-	envoiMutex               sync.RWMutex
-	lastSeenDistricts        map[string]string
-	treasuryAverages         map[string]float64
-	treasuryCrashed          map[string]bool
-	SybilSyncComplete        bool
-	WCProjectID              string
-	DataDir                  string
-	mutex                    sync.RWMutex
+	clients                       map[string]*Client
+	matches                       map[string]*MatchState
+	tournamentPotBonusMicro       uint64 // PILLAR 2: Integer Supremacy
+	pendingTournamentPayoutsMicro uint64 // PILLAR 2: Integer Supremacy
+	inventory                     map[int]ServerCard
+	persistentCardCache           map[int]ServerCard
+	tournamentPotBonus            float64
+	pendingTournamentPayouts      float64
+	tournamentCache               map[string]*interface{}
+	paidParticipants              []string
+	matchmakingPool               []QueueEntry
+	bannedAvatars                 map[string]time.Time
+	registeredTxIDs               map[string]time.Time
+	// pendingTxIDs holds in-flight transaction-id reservations from claimTxID
+	// (txid_memo.go). Deliberately NOT persisted: a reservation describes work
+	// this process has started but not yet applied, so a restart leaves nothing
+	// behind — and nothing was applied.
+	pendingTxIDs                  map[string]time.Time
+	processingRewards             map[string]time.Time
+	processingOnboarding          map[string]time.Time
+	processingRegistrations       map[string]time.Time
+	lastVaultSync                 time.Time                    // PILLAR 5: throttled on-demand $VBV vault/gas sync timestamp
+	activeKidnappings             map[int]KidnapState          // Legacy card-based tracking
+	victimRegistry                *VictimRegistry              // PILLAR 3: Improved multi-attacker logic
+	marketNodes                   map[string]*EntityMarketNode // PILLAR 2: AMM State
+	tokenSinkRouter               *TokenSinkRouter             // PILLAR 2: Economic flow control
+	verificationHook              *VerificationHook            // PILLAR 3: Crypto Gate
+	sessionWatchdog               *SessionWatchdog             // PILLAR 3: Active session auditor
+	payoutScheduler               *PayoutScheduler             // PILLAR 2: Governor distributions
+	clubService                   *ClubService                 // PILLAR 5: Organization logic
+	careerService                 *CareerService               // PILLAR 5: Employment logic
+	courthouseService             *CourthouseService           // PILLAR 5: Legal logic
+	onboardingService             *OnboardingService           // PILLAR 5: New player onboarding logic
+	achievementService            *AchievementService          // PILLAR 5: Trophy logic
+	oracleService                 *OracleService               // PILLAR 5: Blockchain interaction logic
+	tournamentService             *TournamentService           // PILLAR 5: Competitive logic
+	loanService                   *LoanService                 // PILLAR 5: Lending logic
+	auctionService                *AuctionService              // PILLAR 5: Art Gallery logic
+	blackMarketService            *BlackMarketService          // PILLAR 5: Underworld logic
+	counterfeitService            *CounterfeitService          // PILLAR 5: Counterfeit workflow
+	narrativeService              *NarrativeService            // PILLAR 5: Story & Atmosphere logic
+	nautilusDEXPathService        *NautilusDEXPathService      // PILLAR 2: Console Creator Payouts
+	playerService                 *PlayerService               // PILLAR 5: Player attribute logic
+	justiceService                *JusticeService              // PILLAR 7: Justice Hegemony Path
+	justiceHandlers               *JusticeHandlers             // PILLAR 7: HTTP presentation layer for Justice Dashboard
+	entityInvestmentService       *EntityInvestmentService     // PILLAR 2 / Phase 7-A: Entity Investment Layer (Player-to-Player Share Allocation)
+	evidencePool                  *EvidencePool                // PILLAR 13: Forensic evidence pool for Raid events
+	seasonEngine                  *SeasonalEventEngine         // PILLAR 1: Seasonal event lifecycle management (Industrial Loop)
+	rivalryEngine                 *RivalryEngine                // §25.10: Region/Territory rivalry matrix
+	themeEngine                   *ThemeEngine                  // §27 / KEY 3.5: ThemeEngine (ThemeVector + World-Dynamics Signature)
+	pets                          map[string]*PetNFT            // §26.4: companion pets (bonded assets)
+	vehicles                      map[string]*VehicleNFT        // §25.6: player-owned vehicles (bonded assets)
+	worldContent                  map[string]*WorldContentNFT   // §25.7: native world entities (bonded assets)
+	creatorStore                  *CreatorStore                // PILLAR 7-C: Creator storefront and royalty system
+	identityBridge                *IdentityBridge              // PILLAR 7-E: Cross-platform identity ownership
+	aiEngine                      *AICitizenEngine             // PILLAR 7-D: AI Autonomous Economy (citizen lifecycle)
+	itemRegistry                  *ItemRegistry                // KEY 3.5 Slice 2: persisted Item Shop archetype registry (v4 §14)
+	bondedAssets                  *BondedAssetRegistry         // §23.5 / KEY 3.5: Bonded Asset Registry (user-named cosmetic NFTs)
+	localModelPromotions         *LocalModelPromotionRegistry // §24.5/§24.6: Local-Model Promotion bridge (birth-certified bot-child → local LLM)
+	entityEvents                 *EntityEventEngine           // §30 Pet World: entity event + stat + power-overlay engine
+	contractEngine                *ContractEngine              // PILLAR 3: Underworld Contracts dynamic engine
+	rateLimiter                   *RateLimiterService          // PILLAR 1-C: Rate Limiting & DDoS Mitigation
+	playerDirectInvestments       map[string]map[string]uint64 // Key: wallet -> map[entity_id]amountMicro (P7-A Entity Investment Layer)
+	dividendTracker               *EntityDividendTracker       // P7-A: Per-entity dividend distribution state tracking
+	fencedListings                map[string]FenceListing      // P2-B3: Fenced Goods Marketplace listings
+	fencedListingsMu              sync.RWMutex                 // Protects fencedListings map
+	tenantVaults                  *TenantVaultRegistry         // A6 + Stage A: vault-only addresses leased to a tenant own bot
+
+	// Workstream C: the platform purchase and lease GRANTS, one owner for every console and mobile store.
+	consoleEntitlements *ConsoleEntitlementRegistry // keyed by the platform purchase id
+	counterfeitRateLimit          map[string]*TokenBucket      // Per-wallet counterfeit operation rate limiting
+	counterfeitRateLimitMu        sync.RWMutex                 // Protects counterfeitRateLimit map
+	gracePeriodMatrix             *GracePeriodMatrix           // PILLAR 4: Connection quarantine
+	ledgerClient                  *LoadBalancedLedgerClient    // PILLAR 4: Resilient RPC Cluster (Voi Mainnet)
+	algorandMainnetClient         *LoadBalancedLedgerClient    // PILLAR-B: Algorand Mainnet transaction cluster
+	multiChainRouter              *MultiChainRouter            // PILLAR-B: Multi-chain transaction routing
+	telemetry                     *TelemetryLogger             // PILLAR 4: System Observability
+	matchHandshakers              map[string]*SyncHandshaker   // PILLAR 4: Frame sequence matching
+	wallets                       map[string]string
+	clubs                         map[string]*Club
+	blackMarket                   []Loan
+	rumors                        map[string]*Rumor
+	loans                         map[string]*Loan
+	auctions                      map[string]*Auction
+	leaderboard                   map[string]PlayerStats
+	matchHistory                  map[string]MatchHistory
+	linkedWallets                 map[string]WalletLinkInfo
+	vaultAddress                  string
+	faucetBalanceMicro            uint64 // PILLAR 2: Source of truth for integer accounting
+	CorporateTaxTotal             uint64 // Session total micro-units (Task 898)
+	CorporateTaxCount             uint64 // Session total contributing contracts (Task 912)
+	LuxuryTaxTotal                uint64 // Session total micro-units (Task 898)
+	LuxuryTaxCount                uint64 // Session total Master Tier item sales (Task 913)
+	SabotageSurchargeTotal        uint64 // Session total distributed to Governors (Task 915)
+	GovernorSurchargeTotal        uint64 // Session total collected by capital owner (Task 917)
+	PlatformTaxTotal              uint64 // PILLAR 2: Session total from self-redemptions
+	AdminMaintenancePool          uint64 // PILLAR 2: Infrastructure Siphon (Section 11)
+	faucetBalance                 float64
+
+	vaultBalanceLive             bool                        // PILLAR 5: true if last on-chain VBV vault read succeeded (live source)
+	rewardStack                   map[string]uint64
+	rewardTokens                  map[string]RewardToken // Reward-token registry descriptor (reward_registry.go)
+	playerBalances                map[string]uint64
+	initialRewards                map[string]uint64
+	initialBaseReward             uint64
+	seasonStart                   time.Time
+	seasonNumber                  int
+	maxFaucetCapacity             float64
+	rewardAssetID                 string
+	avoiAssetID                   string
+	baseReward                    uint64
+	nonces                        map[string]NonceData
+	availableNetworks             map[string]NetworkConfig
+	adminFocusNetwork             string
+	maintenanceMode               bool
+	maintenanceTime               time.Time
+	maintenancePriority           string
+	rateLimits                    map[string]time.Time
+	httpRateLimits                map[string]*RateBucket
+	tournament                    TournamentState
+	globalSentiment               GlobalSentiment
+	register                      chan *Client
+	unregister                    chan *Client
+	broadcast                     chan []byte
+	onboardedWallets              map[string]bool
+	onboardingSemaphore           chan struct{}
+	oracleSemaphore               chan struct{}
+	envoiCache                    map[string]string
+	envoiMutex                    sync.RWMutex
+	lastSeenDistricts             map[string]string
+	// §31 orphan tracking: last confirmed activity time per wallet (used for 90d orphan grace).
+	lastActive                   map[string]time.Time
+	treasuryAverages              map[string]float64
+	treasuryCrashed               map[string]bool
+	SybilSyncComplete             bool
+	WCProjectID                   string
+	DataDir                       string
+	RewardRatio                   float64 // PILLAR 2: Current scaling ratio for transparency
+	// --- Reconciled Lobby surface (KEY 3.5 mechanical reconciliation: re-added infrastructure where no in-repo replacement existed) ---
+	ethClient                     *EthereumClient              `json:"-"` // Ethereum trust-anchor client (multi-chain)
+	clientWallets                 map[string]string            `json:"-"` // wallet -> linked client id
+	GhostTaxTotal                 uint64                       `json:"-"` // Session ghost-tax sink (micro-VBV)
+	StagnationTaxTotal            uint64                       `json:"-"` // Session stagnation-tax sink (micro-VBV)
+	playerInvestmentRecords       map[string][]*EntityInvestmentRecord `json:"-"` // wallet -> investment records
+	playerLiquidityTiers          map[string]string          `json:"-"` // wallet -> liquidity tier (reconciled to string tiers "Peon"/"Apprentice"/...)
+	nodeReserveBalance            uint64                       `json:"-"` // Entity market reserve mirror
+	counterfeitRateLimiterMu      sync.RWMutex                `json:"-"` // Protects counterfeitRateLimit
+	counterfeitLastGen            map[string]time.Time        `json:"-"` // Per-wallet last counterfeit gen
+	mutex                         sync.RWMutex
 }
 
 func (l *Lobby) GetLevelLabelForDisplay(power int) string {

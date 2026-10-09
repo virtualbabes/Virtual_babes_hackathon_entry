@@ -1,0 +1,246 @@
+/* === Tea House */
+.tea-house-container { padding: 8px 0; }
+
+.tea-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(34, 197, 94, 0.05));
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.tea-icon { font-size: 32px; }
+
+.tea-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.tea-tab {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-size: 11px;
+    color: #90a4ae;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tea-tab:hover { border-color: #4caf50; }
+
+.tea-tab.active {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: #4caf50;
+    color: #e5e7eb;
+}
+
+.tea-panel { display: none; }
+
+.tea-panel.active { display: block; }
+
+.tea-panel h4 { margin: 0 0 8px; }
+
+.tea-panel p { margin: 0 0 12px; }
+
+.tea-recipes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.tea-recipe {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.tea-recipe:hover { transform: translateY(-2px); border-color: #4caf50; }
+
+.tea-recipe.rarity-common { border-color: rgba(161, 157, 148, 0.3); }
+.tea-recipe.rarity-rare { border-color: rgba(59, 130, 246, 0.3); }
+.tea-recipe.rarity-epic { border-color: rgba(168, 85, 247, 0.3); }
+.tea-recipe.rarity-legendary { border-color: rgba(255, 193, 7, 0.3); }
+
+.tea-recipe-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.tea-recipe-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.tea-recipe-desc { display: block; font-size: 9px; color: #90a4ae; margin-top: 2px; }
+
+.tea-recipe-buff { display: block; font-size: 9px; color: #4caf50; margin-top: 4px; }
+
+.tea-recipe-cost { display: block; font-size: 10px; color: #ffc107; margin-top: 4px; }
+
+.tea-brew-btn { width: 100%; margin-top: 8px; font-size: 9px; padding: 4px; }
+
+.tea-divination {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+}
+
+.tea-divination-display {
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.tea-hint-type {
+    font-size: 9px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.tea-hint-type.positive { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.tea-hint-type.warning { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.tea-hint-type.danger { background: rgba(239, 68, 68, 0.2); color: #f44336; }
+.tea-hint-type.achievement { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+.tea-hint-type.faith { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.tea-hint-type.underworld { background: rgba(107, 114, 128, 0.2); color: #6b7280; }
+
+.tea-divinate-btn { width: 100%; }
+
+/* === Zen Garden */
+.zen-garden-container { padding: 8px 0; }
+
+.zen-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.zen-icon { font-size: 32px; }
+
+.zen-level {
+    margin-left: auto;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.zen-level-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.zen-level-value { font-size: 24px; font-weight: 700; color: #9c27b0; }
+
+.zen-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.zen-section h4 { margin: 0 0 12px; }
+
+.zen-garden-display {
+    min-height: 100px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.zen-garden-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+}
+
+.zen-element {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.zen-element-icon { font-size: 24px; display: block; }
+
+.zen-element-name { font-size: 9px; color: #e5e7eb; }
+
+.zen-elements {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.zen-element-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.zen-element-card:hover:not(.owned) { border-color: #9c27b0; transform: translateY(-2px); }
+
+.zen-element-card.owned { opacity: 0.5; cursor: default; }
+
+.zen-element-card .zen-element-icon { font-size: 20px; }
+
+.zen-element-card .zen-element-name { font-size: 10px; font-weight: 700; color: #e5e7eb; }
+
+.zen-element-card .zen-element-desc { font-size: 9px; color: #90a4ae; }
+
+.zen-element-card .zen-element-cost { font-size: 9px; color: #ffc107; display: block; margin: 4px 0; }
+
+.zen-add-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+.zen-meditation {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+}
+
+.zen-meditation-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.zen-streak { font-size: 11px; color: #ffc107; font-weight: 700; }
+
+.zen-last { font-size: 10px; color: #90a4ae; }
+
+.zen-meditate-btn { width: 100%; }
+
+.zen-benefits {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.zen-benefit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.zen-benefit-icon { font-size: 16px; }
+
+.zen-benefit-text { font-size: 10px; color: #e5e7eb; }

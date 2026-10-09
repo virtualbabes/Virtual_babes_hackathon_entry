@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT-Seduction | Nexus Hub — Living Grimoire</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #090a0f;
+            --bg-panel: rgba(20, 24, 36, 0.5);
+            --neon-cyan: #00f2fe;
+            --neon-blue: #4facfe;
+            --neon-purple: #9b51e0;
+            --neon-green: #3fb950;
+            --neon-pink: #ff0080;
+            --neon-gold: #ffd700;
+            --neon-red: #ff4b4b;
+            --text-main: #e6e6e6;
+            --text-muted: #6e7681;
+            --glass-blur: 16px;
+            --arena-mood-color: #ffffff;
+            --arena-glow-intensity: 1;
+            --tone-mood: 4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .nexus-shell {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background: radial-gradient(ellipse at center, #0d1025 0%, #090a0f 70%);
+        }
+
+        .bg-layer { position: absolute; inset: 0; pointer-events: none; }
+
+        .bg-stars {
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, rgba(255,255,255,0.3), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(255,255,255,0.4), transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.2), transparent),
+                radial-gradient(2px 2px at 160px 30px, rgba(255,255,255,0.3), transparent);
+            background-size: 200px 100px;
+            animation: parallax-slow 60s linear infinite;
+        }
+
+        .bg-nebula {
+            background: radial-gradient(ellipse at 30% 50%, rgba(155, 81, 224, 0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 30%, rgba(0, 242, 254, 0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 50% 80%, rgba(255, 0, 128, 0.05) 0%, transparent 50%);
+            animation: nebula-drift 30s ease-in-out infinite alternate;
+        }
+
+        @keyframes parallax-slow { from { transform: translateY(0); } to { transform: translateY(-100px); } }
+        @keyframes nebula-drift { from { transform: scale(1) rotate(0deg); } to { transform: scale(1.1) rotate(2deg); } }
+
+        #particle-canvas { position: absolute; inset: 0; pointer-events: none; }
+
+        .top-bar {
+            position: absolute; top: 0; left: 0; right: 0; height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 24px;
+            background: linear-gradient(180deg, rgba(9,10,15,0.95) 0%, rgba(9,10,15,0.6) 100%);
+            border-bottom: 1px solid rgba(0, 242, 254, 0.15);
+            backdrop-filter: blur(10px); z-index: 100;
+        }
+
+        .top-bar-left, .top-bar-right { display: flex; align-items: center; gap: 16px; }
+
+        .wallet-display {
+            font-family: 'Orbitron', sans-serif; font-size: 12px;
+            color: var(--neon-green); letter-spacing: 1px;
+        }
+
+        .theme-indicator {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);
+        }
+
+        .theme-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--arena-mood-color);
+            box-shadow: 0 0 10px var(--arena-mood-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* === TONE + ELEMENT SELECTORS === */
+        .tone-element-selectors {
+            position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 24px; z-index: 100;
+            background: rgba(9, 10, 15, 0.85);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            border-radius: 20px; padding: 10px 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        .selector-group { display: flex; align-items: center; gap: 8px; }
+        .selector-label {
+            font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-muted); margin-right: 4px;
+        }
+        .selector-btn {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(30, 35, 50, 0.8);
+            cursor: pointer; font-size: 12px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s ease; opacity: 0.5;
+        }
+        .selector-btn:hover, .selector-btn.active {
+            opacity: 1; transform: scale(1.15);
+            border-color: var(--arena-mood-color);
+            box-shadow: 0 0 10px var(--arena-mood-color);
+        }
+
+        /* === CONSTELLATION === */
+        .constellation-container {
+            position: absolute; inset: 130px 0 90px 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .constellation-canvas {
+            position: relative; width: 100%; height: 100%;
+            max-width: 1400px; max-height: 900px;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .constellation-lines { position: absolute; inset: 0; pointer-events: none; }
+        .constellation-line {
+            stroke: rgba(0, 242, 254, 0.2); stroke-width: 1; fill: none;
+            stroke-dasharray: 5 5; animation: dash-flow 20s linear infinite;
+        }
+        @keyframes dash-flow { to { stroke-dashoffset: -100; } }
+
+        .feature-node {
+            position: absolute; transform: translate(-50%, -50%);
+            cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .feature-node:hover { z-index: 50; }
+
+        .node-core {
+            width: 65px; height: 65px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; transition: all 0.4s ease;
+        }
+
+        .node-icon { font-size: 22px; filter: grayscale(0.3); transition: all 0.4s ease; }
+
+        .node-label {
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+            font-family: 'Orbitron', sans-serif; font-size: 7px; letter-spacing: 1.5px;
+            text-transform: uppercase; white-space: nowrap; opacity: 0.7; transition: opacity 0.3s ease;
+        }
+
+        .feature-node:hover .node-label { opacity: 1; }
+
+        /* DORMANT */
+        .node-dormant .node-core {
+            background: rgba(30, 35, 50, 0.6);
+            border: 2px solid rgba(100, 100, 120, 0.3);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        .node-dormant .node-icon { filter: grayscale(1) brightness(0.5); opacity: 0.4; }
+        .node-dormant .node-label { color: var(--text-muted); }
+        .node-dormant::after {
+            content: '🔒'; position: absolute; top: -4px; right: -4px; font-size: 11px; opacity: 0.6;
+        }
+
+        /* DAWNING */
+        .node-dawning .node-core {
+            background: rgba(30, 35, 50, 0.8);
+            border: 2px solid rgba(0, 242, 254, 0.4);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2), inset 0 0 15px rgba(0, 242, 254, 0.1);
+            animation: dawn-pulse 3s ease-in-out infinite;
+        }
+        .node-dawning .node-icon { filter: grayscale(0.5) brightness(0.8); opacity: 0.7; }
+        .node-dawning .node-label { color: var(--neon-cyan); }
+        @keyframes dawn-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0, 242, 254, 0.2), inset 0 0 15px rgba(0, 242, 254, 0.1); }
+            50% { box-shadow: 0 0 35px rgba(0, 242, 254, 0.4), inset 0 0 25px rgba(0, 242, 254, 0.2); }
+        }
+
+        /* ALIVE */
+        .node-alive .node-core {
+            background: radial-gradient(circle at 30% 30%, rgba(0, 242, 254, 0.15), rgba(20, 24, 36, 0.9));
+            border: 2px solid var(--arena-mood-color);
+            box-shadow: 0 0 30px var(--arena-mood-color), inset 0 0 20px rgba(0, 242, 254, 0.15);
+            animation: alive-glow 2s ease-in-out infinite;
+        }
+        .node-alive .node-icon { filter: grayscale(0) brightness(1.2); opacity: 1; }
+        .node-alive .node-label { color: var(--arena-mood-color); text-shadow: 0 0 10px var(--arena-mood-color); }
+        @keyframes alive-glow {
+            0%, 100% { box-shadow: 0 0 30px var(--arena-mood-color), inset 0 0 20px rgba(0, 242, 254, 0.15); }
+            50% { box-shadow: 0 0 50px var(--arena-mood-color), inset 0 0 30px rgba(0, 242, 254, 0.25); }
+        }
+
+        /* Node positions */
+        .node-shops { top: 18%; left: 12%; }
+        .node-career { top: 10%; left: 30%; }
+        .node-clubs { top: 18%; left: 48%; }
+        .node-territory { top: 10%; left: 66%; }
+        .node-governor { top: 18%; left: 84%; }
+        .node-rivalry { top: 38%; left: 10%; }
+        .node-faith { top: 38%; left: 30%; }
+        .node-stats { top: 38%; left: 50%; }
+        .node-regional { top: 38%; left: 70%; }
+        .node-tournament { top: 38%; left: 88%; }
+        .node-entity { top: 58%; left: 12%; }
+        .node-children { top: 58%; left: 32%; }
+        .node-creator { top: 58%; left: 52%; }
+        .node-governance { top: 58%; left: 72%; }
+        .node-leasing { top: 78%; left: 22%; }
+        .node-identity { top: 78%; left: 45%; }
+
+        .unlock-flourish {
+            position: absolute; inset: -20px; border-radius: 50%;
+            border: 2px solid var(--neon-gold); opacity: 0;
+            animation: flourish-burst 1s ease-out forwards; pointer-events: none;
+        }
+        @keyframes flourish-burst {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        .node-tooltip {
+            position: absolute; bottom: calc(100% + 12px); left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(15, 18, 30, 0.95);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 10px; padding: 12px 16px; min-width: 180px;
+            opacity: 0; pointer-events: none; transition: all 0.3s ease;
+            backdrop-filter: blur(10px); z-index: 100;
+        }
+        .feature-node:hover .node-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .tooltip-title { font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 1px; color: var(--neon-cyan); margin-bottom: 4px; }
+        .tooltip-gate { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+        .tooltip-progress { width: 100%; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        .tooltip-progress-fill { height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green)); border-radius: 2px; transition: width 0.5s ease; }
+        .tooltip-progress-text { font-size: 9px; color: var(--text-muted); margin-top: 3px; text-align: right; }
+
+        /* === NPC NODES === */
+        .npc-core {
+            width: 80px !important;
+            height: 80px !important;
+            border-radius: 50% !important;
+            overflow: hidden;
+            border: 2px solid var(--arena-mood-color) !important;
+            box-shadow: 0 0 25px var(--arena-mood-color), inset 0 0 15px rgba(0, 242, 254, 0.2) !important;
+        }
+
+        .npc-core::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: linear-gradient(135deg, transparent 50%, rgba(0, 242, 254, 0.1) 100%);
+            pointer-events: none;
+        }
+
+        .node-dormant .npc-core {
+            border-color: rgba(100, 100, 120, 0.4) !important;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5) !important;
+            filter: grayscale(0.8) brightness(0.6);
+        }
+
+        .node-alive .npc-core {
+            animation: npc-breathe 3s ease-in-out infinite;
+        }
+
+        .npc-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        @keyframes npc-breathe {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        /* === NPC CELEBRATE VIDEO SWITCH === */
+        .npc-celebrate .npc-core {
+            box-shadow: 0 0 50px var(--neon-gold), inset 0 0 30px rgba(255, 215, 0, 0.4) !important;
+            animation: npc-celebrate-burst 0.6s ease-out !important;
+        }
+
+        @keyframes npc-celebrate-burst {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        .bottom-controls {
+            position: absolute; bottom: 0; left: 0; right: 0; height: 70px;
+            display: flex; align-items: center; justify-content: center; gap: 16px;
+            padding: 0 24px;
+            background: linear-gradient(0deg, rgba(9,10,15,0.95) 0%, rgba(9,10,15,0.6) 100%);
+            border-top: 1px solid rgba(0, 242, 254, 0.15);
+            backdrop-filter: blur(10px); z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(20, 24, 36, 0.8);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 8px; color: var(--text-main);
+            padding: 8px 16px; font-family: 'Rajdhani', sans-serif;
+            font-size: 11px; font-weight: 600; letter-spacing: 1px;
+            text-transform: uppercase; cursor: pointer; transition: all 0.3s ease;
+        }
+        .control-btn:hover { border-color: var(--neon-cyan); box-shadow: 0 0 20px rgba(0, 242, 254, 0.3); transform: translateY(-2px); }
+        .control-btn.primary { background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2)); border-color: var(--neon-cyan); }
+
+        .zoom-controls { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 100; }
+        .zoom-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(20, 24, 36, 0.8);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--neon-cyan); font-size: 16px; cursor: pointer;
+            transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;
+        }
+        .zoom-btn:hover { border-color: var(--neon-cyan); box-shadow: 0 0 15px rgba(0, 242, 254, 0.4); }
+
+        .volume-control { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+        .volume-row { display: flex; align-items: center; gap: 6px; }
+        .volume-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); width: 40px; }
+        .volume-slider { -webkit-appearance: none; width: 80px; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; }
+        .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); cursor: pointer; }
+
+        .animated-border { position: absolute; inset: 0; pointer-events: none; border-radius: 50%; animation: border-rotate 4s linear infinite; }
+        @keyframes border-rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .node-alive .animated-border { border-top-color: var(--arena-mood-color); border-right-color: rgba(0, 242, 254, 0.3); }
+
+        @media (max-width: 1000px) { .constellation-canvas { transform: scale(0.6); } .volume-control { display: none; } }
+        @media (max-width: 700px) { .constellation-canvas { transform: scale(0.4); } }
+
+        .loading-overlay { position: fixed; inset: 0; background: var(--bg-dark); display: flex; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.5s ease; }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner { width: 50px; height: 50px; border: 3px solid rgba(0, 242, 254, 0.2); border-top-color: var(--neon-cyan); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .toast-container { position: fixed; top: 130px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 500; }
+        .toast {
+            background: rgba(15, 18, 30, 0.95); border: 1px solid var(--arena-mood-color);
+            border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text-main);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2); animation: toast-slide-in 0.4s ease-out; max-width: 280px;
+        }
+        .toast.success { border-color: var(--neon-green); }
+        .toast.warning { border-color: var(--neon-gold); }
+        @keyframes toast-slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .world-preview {
+            position: absolute; top: 110px; right: 20px;
+            width: 160px; height: 90px;
+            background: rgba(15, 18, 30, 0.9);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: 10px; overflow: hidden; z-index: 100;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .world-preview:hover { border-color: var(--neon-cyan); box-shadow: 0 0 20px rgba(0, 242, 254, 0.3); transform: scale(1.02); }
+        .world-preview-inner { text-align: center; color: var(--text-muted); }
+        .world-preview-icon { font-size: 24px; margin-bottom: 2px; }
+        .world-preview-label { font-family: 'Orbitron', sans-serif; font-size: 8px; letter-spacing: 1px; color: var(--neon-cyan); }
+
+        .path-highlight .node-core { box-shadow: 0 0 40px var(--neon-gold), inset 0 0 25px rgba(255, 215, 0, 0.3); border-color: var(--neon-gold); }
+        .constellation-line.path-active { stroke: var(--neon-gold); stroke-width: 2; stroke-dasharray: none; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading"><div class="loading-spinner"></div></div>
+    <div class="toast-container" id="toast-container"></div>
+
+    <div class="nexus-shell" id="nexus">
+        <div class="bg-layer bg-stars"></div>
+        <div class="bg-layer bg-nebula"></div>
+        <canvas id="particle-canvas"></canvas>
+
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <div class="wallet-display">0x7a3B...F92d</div>
+                <div class="theme-indicator">
+                    <div class="theme-dot"></div>
+                    <span id="theme-text">ORDER • AETHER • INT:72 • ENT:35</span>
+                </div>
+            </div>
+            <div class="top-bar-right">
+                <div class="theme-indicator"><span>CLIMATE: BREEZY</span></div>
+            </div>
+        </div>
+
+        <!-- Tone + Element Selectors -->
+        <div class="tone-element-selectors">
+            <div class="selector-group">
+                <span class="selector-label">Tone</span>
+                <button class="selector-btn active" data-tone="0" title="Void">🌑</button>
+                <button class="selector-btn" data-tone="1" title="Malevolent">😈</button>
+                <button class="selector-btn" data-tone="2" title="Neutral">😐</button>
+                <button class="selector-btn" data-tone="3" title="Benevolent">😇</button>
+                <button class="selector-btn" data-tone="4" title="Order">⚖️</button>
+                <button class="selector-btn" data-tone="5" title="Nature">🌿</button>
+                <button class="selector-btn" data-tone="6" title="Machine">🤖</button>
+            </div>
+            <div class="selector-group">
+                <span class="selector-label">Element</span>
+                <button class="selector-btn" data-element="0" title="Fire">🔥</button>
+                <button class="selector-btn" data-element="1" title="Water">💧</button>
+                <button class="selector-btn" data-element="2" title="Earth">🌍</button>
+                <button class="selector-btn" data-element="3" title="Air">💨</button>
+                <button class="selector-btn active" data-element="4" title="Aether">✨</button>
+                <button class="selector-btn" data-element="5" title="Machine">⚙️</button>
+            </div>
+        </div>
+
+        <div class="world-preview" onclick="toggle3DWorld()">
+            <div class="world-preview-inner">
+                <div class="world-preview-icon">🌍</div>
+                <div class="world-preview-label">ENTER 3D WORLD</div>
+            </div>
+        </div>
+
+        <div class="constellation-container">
+            <div class="constellation-canvas" id="constellation">
+                <svg class="constellation-lines" id="constellation-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <line class="constellation-line" x1="12" y1="18" x2="30" y2="10" />
+                    <line class="constellation-line" x1="30" y1="10" x2="48" y2="18" />
+                    <line class="constellation-line" x1="48" y1="18" x2="66" y2="10" />
+                    <line class="constellation-line" x1="66" y1="10" x2="84" y2="18" />
+                    <line class="constellation-line" x1="84" y1="18" x2="70" y2="38" />
+                    <line class="constellation-line" x1="10" y1="38" x2="30" y2="38" />
+                    <line class="constellation-line" x1="30" y1="38" x2="50" y2="38" />
+                    <line class="constellation-line" x1="50" y1="38" x2="70" y2="38" />
+                    <line class="constellation-line" x1="70" y1="38" x2="88" y2="38" />
+                    <line class="constellation-line" x1="12" y1="58" x2="32" y2="58" />
+                    <line class="constellation-line" x1="32" y1="58" x2="52" y2="58" />
+                    <line class="constellation-line" x1="52" y1="58" x2="72" y2="58" />
+                    <line class="constellation-line" x1="84" y1="18" x2="22" y2="78" />
+                    <line class="constellation-line" x1="22" y1="78" x2="45" y2="78" />
+                </svg>
+
+                <!-- Row 1 -->
+                <div class="feature-node node-alive node-shops" data-feature="shops">
+                    <div class="node-core"><span class="node-icon">🛍️</span><div class="animated-border"></div></div>
+                    <div class="node-label">Shops</div>
+                    <div class="node-tooltip"><div class="tooltip-title">District Shops</div><div class="tooltip-gate">Unlocked</div></div>
+                </div>
+                <div class="feature-node node-alive node-career" data-feature="career">
+                    <div class="node-core"><span class="node-icon">⚔️</span><div class="animated-border"></div></div>
+                    <div class="node-label">Career</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Career Path</div><div class="tooltip-gate">Unlocked</div></div>
+                </div>
+                <div class="feature-node node-dawning node-clubs" data-feature="clubs">
+                    <div class="node-core"><span class="node-icon">🏛️</span></div>
+                    <div class="node-label">Clubs</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Club Foundry</div><div class="tooltip-gate">5000 VBV to found</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 60%"></div></div><div class="tooltip-progress-text">3,000 / 5,000</div></div>
+                </div>
+                <div class="feature-node node-dormant node-territory" data-feature="territory">
+                    <div class="node-core"><span class="node-icon">🗺️</span></div>
+                    <div class="node-label">Territory</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Territory Map</div><div class="tooltip-gate">Club + 2500 VBV</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 20%"></div></div><div class="tooltip-progress-text">Club required</div></div>
+                </div>
+                <div class="feature-node node-dormant node-governor" data-feature="governor">
+                    <div class="node-core"><span class="node-icon">👑</span></div>
+                    <div class="node-label">Governor</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Governor</div><div class="tooltip-gate">Own 2 territories</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">0 / 2</div></div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="feature-node node-dormant node-rivalry" data-feature="rivalry">
+                    <div class="node-core"><span class="node-icon">⚡</span></div>
+                    <div class="node-label">Rivalry</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Faction Rivalry</div><div class="tooltip-gate">Own pet/vehicle</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No pets</div></div>
+                </div>
+                <div class="feature-node node-dormant node-faith" data-feature="faith">
+                    <div class="node-core"><span class="node-icon">⛪</span></div>
+                    <div class="node-label">Faith</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Church & Faith</div><div class="tooltip-gate">Open a church</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No church</div></div>
+                </div>
+                <div class="feature-node node-dawning node-stats" data-feature="stats">
+                    <div class="node-core"><span class="node-icon">📊</span></div>
+                    <div class="node-label">Stats</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Power System</div><div class="tooltip-gate">Power intercept</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 40%"></div></div><div class="tooltip-progress-text">40%</div></div>
+                </div>
+                <div class="feature-node node-dormant node-regional" data-feature="regional">
+                    <div class="node-core"><span class="node-icon">🏰</span></div>
+                    <div class="node-label">Regional</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Regional Manager</div><div class="tooltip-gate">Become Governor</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">Gov required</div></div>
+                </div>
+                <div class="feature-node node-dormant node-tournament" data-feature="tournament">
+                    <div class="node-core"><span class="node-icon">🏆</span></div>
+                    <div class="node-label">Tournament</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Tournament Arena</div><div class="tooltip-gate">Deck + entry fee</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No deck</div></div>
+                </div>
+
+                <!-- Row 3 -->
+                <div class="feature-node node-dormant node-entity" data-feature="entity">
+                    <div class="node-core"><span class="node-icon">🐾</span></div>
+                    <div class="node-label">Entity Mkt</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Entity Market</div><div class="tooltip-gate">Own listable entity</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No entities</div></div>
+                </div>
+                <div class="feature-node node-dormant node-children" data-feature="children">
+                    <div class="node-core"><span class="node-icon">👶</span></div>
+                    <div class="node-label">Children</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Children Bots</div><div class="tooltip-gate">Own pet/vehicle</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No entities</div></div>
+                </div>
+                <div class="feature-node node-alive node-creator" data-feature="creator">
+                    <div class="node-core"><span class="node-icon">🎨</span><div class="animated-border"></div></div>
+                    <div class="node-label">Creator</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Creator Store</div><div class="tooltip-gate">Unlocked (free)</div></div>
+                </div>
+                <div class="feature-node node-dormant node-governance" data-feature="governance">
+                    <div class="node-core"><span class="node-icon">⚖️</span></div>
+                    <div class="node-label">Governance</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Governance</div><div class="tooltip-gate">Governor status</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">Not governor</div></div>
+                </div>
+
+                <!-- Row 4 -->
+                <div class="feature-node node-dormant node-leasing" data-feature="leasing">
+                    <div class="node-core"><span class="node-icon">🏗️</span></div>
+                    <div class="node-label">Leasing</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Infrastructure</div><div class="tooltip-gate">Own territory</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">No territory</div></div>
+                </div>
+                <div class="feature-node node-alive node-identity" data-feature="identity">
+                    <div class="node-core"><span class="node-icon">🪪</span><div class="animated-border"></div></div>
+                    <div class="node-label">Identity</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Identity</div><div class="tooltip-gate">Always available</div></div>
+                </div>
+
+                <!-- NPC Characters -->
+                <div class="feature-node node-alive node-npc-anya" data-feature="anya" style="top: 92%; left: 15%;">
+                    <div class="node-core npc-core">
+                        <video class="npc-video" autoplay loop muted playsinline src="Assets/Videos/NPC/anya-idle.mp4"></video>
+                        <div class="animated-border"></div>
+                    </div>
+                    <div class="node-label">Anya</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Anya</div><div class="tooltip-gate">Tutorial Guide — Always here to help</div></div>
+                </div>
+                <div class="feature-node node-alive node-npc-vbabes" data-feature="vbabes" style="top: 92%; left: 50%;">
+                    <div class="node-core npc-core">
+                        <video class="npc-video" autoplay loop muted playsinline src="Assets/Videos/NPC/vbabes-idle.mp4"></video>
+                        <div class="animated-border"></div>
+                    </div>
+                    <div class="node-label">Vbabes</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Vbabes</div><div class="tooltip-gate">Tutorial Guide — Your companion</div></div>
+                </div>
+                <div class="feature-node node-dormant node-crypto-seraph" data-feature="crypto-seraph" style="top: 92%; left: 85%;">
+                    <div class="node-core npc-core">
+                        <video class="npc-video" autoplay loop muted playsinline src="Assets/Videos/NPC/crypto-seraph-idle.mp4"></video>
+                    </div>
+                    <div class="node-label">Crypto-Seraph</div>
+                    <div class="node-tooltip"><div class="tooltip-title">Crypto-Seraph</div><div class="tooltip-gate">??? — Unlock at high tier</div><div class="tooltip-progress"><div class="tooltip-progress-fill" style="width: 0%"></div></div><div class="tooltip-progress-text">Dormant</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="volume-control">
+            <div class="volume-row"><span class="volume-label">Master</span><input type="range" class="volume-slider" min="0" max="100" value="70" id="vol-master"></div>
+            <div class="volume-row"><span class="volume-label">Music</span><input type="range" class="volume-slider" min="0" max="100" value="60" id="vol-music"></div>
+            <div class="volume-row"><span class="volume-label">SFX</span><input type="range" class="volume-slider" min="0" max="100" value="80" id="vol-sfx"></div>
+            <div class="volume-row"><span class="volume-label">Ambient</span><input type="range" class="volume-slider" min="0" max="100" value="50" id="vol-ambient"></div>
+        </div>
+
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="zoom(0.1)">+</button>
+            <button class="zoom-btn" onclick="zoom(-0.1)">−</button>
+            <button class="zoom-btn" onclick="resetZoom()">⟲</button>
+        </div>
+
+        <div class="bottom-controls">
+            <button class="control-btn primary" onclick="simulateUnlock()">✨ Unlock</button>
+            <button class="control-btn" onclick="highlightPath()">🛤️ Path</button>
+            <button class="control-btn" onclick="toggleParticles()">✨ Particles</button>
+            <button class="control-btn" onclick="resetDemo()">🔄 Reset</button>
+        </div>
+    </div>
+
+    <script>
+        // === DATA LAYER: Live endpoint with mock fallback ===
+        // Mock matches /api/player/progression response for empty wallet
+        const mockData = {
+            wallet: "2a3nwjmyq7awj5kimyjkwezs37fwnd3pext3xps6qonl6mdrjo257c7wei",
+            theme: { tone: 2, element: 0, intensity: 0, entropy: 0, mood_tag: 0 },
+            region: { name: "Governor", climate: "BLIGHTED", disaster_tier: 3 },
+            features: {
+                shops: { state: "alive", progress: 1.0, gate_text: "Unlocked" },
+                career: { state: "alive", progress: 1.0, gate_text: "Tier 0 — Level up through VBV" },
+                identity: { state: "alive", progress: 1.0, gate_text: "Always available" },
+                creator: { state: "dawning", progress: 0.5, gate_text: "Register as creator (free)" },
+                clubs: { state: "dormant", progress: 0.0, gate_text: "5000 VBV to found" },
+                territory: { state: "dormant", progress: 0.0, gate_text: "Found a club first" },
+                governor: { state: "dormant", progress: 0.0, gate_text: "Own 2 territories" },
+                regional: { state: "dormant", progress: 0.0, gate_text: "Become Governor first" },
+                rivalry: { state: "dormant", progress: 0.0, gate_text: "Own a pet or vehicle" },
+                faith: { state: "dormant", progress: 0.0, gate_text: "Open a church" },
+                stats: { state: "dormant", progress: 0.0, gate_text: "Power system intercept" },
+                tournament: { state: "dormant", progress: 0.0, gate_text: "Own a deck + entry fee" },
+                entity: { state: "dormant", progress: 0.0, gate_text: "Own a listable entity" },
+                children: { state: "dormant", progress: 0.0, gate_text: "Own a pet or vehicle" },
+                governance: { state: "dormant", progress: 0.0, gate_text: "Governor status required" },
+                leasing: { state: "dormant", progress: 0.0, gate_text: "Own a territory" }
+            },
+            constellation_paths: [
+                ["clubs", "territory", "governor", "regional"],
+                ["clubs", "territory", "governor", "governance"],
+                ["territory", "leasing"],
+                ["rivalry", "career"],
+                ["entity", "children"],
+                ["faith", "stats"],
+                ["shops", "creator"]
+            ]
+        };
+
+        let gameData = mockData;
+        let isLiveData = false;
+
+        async function fetchProgression() {
+            try {
+                const resp = await fetch('/api/player/progression');
+                if (!resp.ok) throw new Error('Progression endpoint unavailable');
+                const data = await resp.json();
+                gameData = data;
+                isLiveData = true;
+                showToast('Live data connected — ThemeEngine active', 'success');
+                applyLiveData();
+            } catch (err) {
+                console.warn('Using mock data — endpoint not reachable:', err.message);
+                gameData = mockData;
+                isLiveData = false;
+            }
+        }
+
+        function applyLiveData() {
+            // Apply theme vector
+            if (gameData.theme) {
+                const t = gameData.theme;
+                document.documentElement.style.setProperty('--arena-mood-color', elementColors[t.element] || '#00f2fe');
+                // Update tone/element selectors to match live state
+                document.querySelectorAll('[data-tone]').forEach(b => b.classList.toggle('active', parseInt(b.dataset.tone) === t.tone));
+                document.querySelectorAll('[data-element]').forEach(b => b.classList.toggle('active', parseInt(b.dataset.element) === t.element));
+                updateThemeText();
+            }
+            // Apply region climate
+            if (gameData.region) {
+                const climateEl = document.querySelector('.top-bar-right .theme-indicator span');
+                if (climateEl) climateEl.textContent = `CLIMATE: ${gameData.region.climate}`;
+            }
+            // Update ambient audio based on live theme
+            if (gameData.theme && gameData.region) {
+                if (window.updateAmbientFromTheme) window.updateAmbientFromTheme(gameData.theme, gameData.region);
+            }
+            // Apply feature unlock states (including NPC nodes)
+            if (gameData.features) {
+                Object.entries(gameData.features).forEach(([key, data]) => {
+                    const node = document.querySelector(`[data-feature="${key}"]`);
+                    if (node) {
+                        node.className = `feature-node node-${data.state}`;
+                        if (data.state === 'alive') {
+                            const core = node.querySelector('.node-core');
+                            if (!core.querySelector('.animated-border')) {
+                                const border = document.createElement('div');
+                                border.className = 'animated-border';
+                                core.appendChild(border);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        const elementColors = ['#ff4b2b', '#00f2fe', '#43e97b', '#f9d423', '#ffffff', '#9b51e0'];
+        const toneNames = ['VOID', 'MALEVOLENT', 'NEUTRAL', 'BENEVOLENT', 'ORDER', 'NATURE', 'MACHINE'];
+        const elementNames = ['FIRE', 'WATER', 'EARTH', 'AIR', 'AETHER', 'MACHINE'];
+        const battleVoiceMap = {
+            clubs: 'Boss/evil-laugh-47891.mp3',
+            territory: 'Boss/creepy-laugh-97997.mp3',
+            governor: 'Boss/evil-laugh-89423.mp3',
+            regional: 'Boss/laugh-101005.mp3',
+            governance: 'Boss/boo-and-laugh-7060.mp3',
+            faith: 'Witch/witch-laugh-95203.mp3',
+            rivalry: 'Witch/evil-witch-laugh-140135.mp3',
+            stats: 'Witch/evil-laugh-7-103773.mp3',
+            career: 'Mini-Boss/sinister-laugh-146634.mp3',
+            tournament: 'Mini-Boss/very-evil-laugh-205258.mp3',
+            entity: 'Mini-Boss/creepy-laugh-36864.mp3',
+            creator: 'Lady/soft-laughing-6445.mp3',
+            shops: 'Lady/woman-laugh-6421.mp3',
+            children: 'cute/cutie-laugh-83616.mp3',
+            identity: 'cute/girl-laugh-6689.mp3',
+            leasing: 'Mini-Boss/possessed-laugh-laugh-stereo-95060.mp3'
+        };
+        function playUnlockVoice(featureKey) {
+            const voiceFile = battleVoiceMap[featureKey];
+            if (!voiceFile) return;
+            const audio = new Audio(`Assets/Audio/${voiceFile}`);
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
+        }
+
+        // === PARTICLES ===
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let particlesEnabled = true;
+        let animationId;
+
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = (Math.random() - 0.5) * 0.5;
+                this.speedY = (Math.random() - 0.5) * 0.5;
+                this.opacity = Math.random() * 0.5 + 0.1;
+                this.life = Math.random() * 200 + 100;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life--;
+                if (this.life <= 0 || this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 242, 254, ${this.opacity * (this.life / 200)})`;
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            const count = Math.floor((gameData.theme.entropy / 100) * 80) + 20;
+            particles = [];
+            for (let i = 0; i < count; i++) particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            if (!particlesEnabled) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            animationId = requestAnimationFrame(animateParticles);
+        }
+
+        function toggleParticles() {
+            particlesEnabled = !particlesEnabled;
+            if (particlesEnabled) animateParticles();
+            else { ctx.clearRect(0, 0, canvas.width, canvas.height); cancelAnimationFrame(animationId); }
+        }
+
+        // === ZOOM ===
+        let zoomLevel = 1;
+        const constellation = document.getElementById('constellation');
+        function zoom(delta) {
+            zoomLevel = Math.max(0.4, Math.min(2.5, zoomLevel + delta));
+            constellation.style.transform = `scale(${zoomLevel})`;
+        }
+        function resetZoom() { zoomLevel = 1; constellation.style.transform = 'scale(1)'; }
+        document.getElementById('nexus').addEventListener('wheel', (e) => { e.preventDefault(); zoom(e.deltaY > 0 ? -0.05 : 0.05); });
+
+        // === TONE + ELEMENT SELECTORS ===
+        document.querySelectorAll('[data-tone]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-tone]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                gameData.theme.tone = parseInt(btn.dataset.tone);
+                updateThemeText();
+                showToast(`Tone: ${toneNames[gameData.theme.tone]}`, 'info');
+            });
+        });
+
+        document.querySelectorAll('[data-element]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-element]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                gameData.theme.element = parseInt(btn.dataset.element);
+                document.documentElement.style.setProperty('--arena-mood-color', elementColors[gameData.theme.element]);
+                updateThemeText();
+                showToast(`Element: ${elementNames[gameData.theme.element]}`, 'info');
+            });
+        });
+
+        function updateThemeText() {
+            document.getElementById('theme-text').textContent =
+                `${toneNames[gameData.theme.tone]} • ${elementNames[gameData.theme.element]} • INT:${gameData.theme.intensity} • ENT:${gameData.theme.entropy}`;
+        }
+
+        // === UNLOCK SIMULATION (dormant→dawning→alive) ===
+        function simulateUnlock() {
+            const dormant = document.querySelectorAll('.node-dormant');
+            const dawning = document.querySelectorAll('.node-dawning');
+            
+            let target;
+            if (dormant.length > 0) {
+                target = dormant[Math.floor(Math.random() * dormant.length)];
+                target.classList.remove('node-dormant');
+                target.classList.add('node-dawning');
+                const gate = target.querySelector('.tooltip-gate');
+                if (gate) gate.textContent = 'Almost there...';
+                const fill = target.querySelector('.tooltip-progress-fill');
+                if (fill) fill.style.width = '50%';
+                showToast(`${target.querySelector('.node-label').textContent} is dawning!`, 'success');
+                playUnlockVoice(target.dataset.feature);
+            } else if (dawning.length > 0) {
+                target = dawning[Math.floor(Math.random() * dawning.length)];
+                target.classList.remove('node-dawning');
+                target.classList.add('node-alive');
+                const core = target.querySelector('.node-core');
+                const border = document.createElement('div');
+                border.className = 'animated-border';
+                core.appendChild(border);
+                const gate = target.querySelector('.tooltip-gate');
+                if (gate) gate.textContent = 'Unlocked!';
+                showToast(`${target.querySelector('.node-label').textContent} is ALIVE!`, 'success');
+                
+                // Trigger NPC celebration
+                celebrateNPCs();
+                
+                // Play battle voice for unlock reveal
+                playUnlockVoice(target.dataset.feature);
+            } else {
+                showToast('All features unlocked!', 'success');
+                return;
+            }
+
+            const flourish = document.createElement('div');
+            flourish.className = 'unlock-flourish';
+            target.querySelector('.node-core').appendChild(flourish);
+            setTimeout(() => flourish.remove(), 1000);
+        }
+
+        function celebrateNPCs() {
+            const npcNodes = document.querySelectorAll('.node-alive .npc-core');
+            npcNodes.forEach(core => {
+                const video = core.querySelector('.npc-video');
+                if (video) {
+                    const currentSrc = video.src;
+                    const base = currentSrc.replace('-idle.mp4', '');
+                    video.src = base + '-celebrate.mp4';
+                    video.play();
+                    // Switch back to idle after 3 seconds
+                    setTimeout(() => {
+                        video.src = base + '-idle.mp4';
+                        video.play();
+                    }, 3000);
+                }
+            });
+        }
+
+        // === PATH HIGHLIGHTING ===
+        function highlightPath() {
+            document.querySelectorAll('.feature-node').forEach(n => n.classList.remove('path-highlight'));
+            const path = gameData.constellation_paths[Math.floor(Math.random() * gameData.constellation_paths.length)];
+            path.forEach((feature, i) => {
+                const node = document.querySelector(`[data-feature="${feature}"]`);
+                if (node) setTimeout(() => node.classList.add('path-highlight'), i * 200);
+            });
+            showToast('Progression path highlighted', 'info');
+        }
+
+        // === TOAST ===
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+        }
+
+        // === 3D WORLD ===
+        function toggle3DWorld() { showToast('3D World: Camera fly-through activated', 'info'); }
+
+        // === RESET ===
+        function resetDemo() {
+            document.querySelectorAll('.feature-node').forEach(node => {
+                const feature = node.dataset.feature;
+                const data = gameData.features[feature];
+                node.className = `feature-node node-${data.state}`;
+                if (data.state === 'alive') {
+                    const border = document.createElement('div');
+                    border.className = 'animated-border';
+                    node.querySelector('.node-core').appendChild(border);
+                }
+            });
+            showToast('Demo reset', 'info');
+        }
+
+        // === NODE CLICK ===
+        document.querySelectorAll('.feature-node').forEach(node => {
+            node.addEventListener('click', () => {
+                const feature = node.dataset.feature;
+                const data = gameData.features[feature];
+                if (data.state === 'alive') showToast(`Opening ${feature}...`, 'info');
+                else showToast(`${feature}: ${data.gate_text}`, 'warning');
+            });
+        });
+
+        // === INIT ===
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+                initParticles();
+                animateParticles();
+                fetchProgression();
+                showToast('Welcome to the Nexus', 'info');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

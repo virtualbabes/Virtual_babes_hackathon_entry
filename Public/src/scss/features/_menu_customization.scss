@@ -1,0 +1,622 @@
+// ============================================================================
+// Main Menu Customization — Button shapes, sizes, grids
+// ----------------------------------------------------------------------------
+// 60+ button shapes, 6 size tiers, 9 grid types
+// Each shape uses CSS clip-path for crisp rendering at any size
+// ============================================================================
+
+// --- Shape Library ---
+.shape-circle    { clip-path: circle(50% at 50% 50%); }
+.shape-oval      { clip-path: ellipse(50% 35% at 50% 50%); }
+.shape-star      { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.shape-triangle  { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+.shape-triangle-down { clip-path: polygon(0% 0%, 100% 0%, 50% 100%); }
+.shape-oblong    { clip-path: inset(0% 0% 0% 0% round 25px); }
+.shape-hexagon   { clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+.shape-octagon   { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+.shape-rectangle { clip-path: inset(0% 0% 0% 0% round 6px); }
+.shape-diamond   { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.shape-pentagon  { clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%); }
+.shape-shield    { clip-path: polygon(50% 0%, 100% 20%, 100% 65%, 50% 100%, 0% 65%, 0% 20%); }
+.shape-arrow-right { clip-path: polygon(0% 50%, 50% 0%, 50% 35%, 100% 35%, 100% 65%, 50% 65%, 50% 100%); }
+.shape-arrow-left  { clip-path: polygon(50% 0%, 50% 35%, 0% 35%, 0% 65%, 50% 65%, 50% 100%, 100% 50%); }
+.shape-cross     { clip-path: polygon(35% 0%, 65% 0%, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0% 65%, 0% 35%, 35% 35%); }
+.shape-parallelogram { clip-path: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%); }
+
+// --- Pathway-Specific Shapes ---
+.shape-justice-scales { clip-path: polygon(50% 0%, 55% 30%, 100% 30%, 100% 45%, 55% 45%, 60% 100%, 40% 100%, 45% 45%, 0% 45%, 0% 30%, 45% 30%); }
+.shape-shadow-crescent { clip-path: circle(50% at 60% 50%); }
+.shape-skull       { clip-path: polygon(25% 0%, 75% 0%, 100% 30%, 100% 70%, 75% 100%, 65% 85%, 35% 85%, 25% 100%, 0% 70%, 0% 30%); }
+.shape-ledger-book { clip-path: polygon(10% 0%, 90% 0%, 100% 15%, 100% 100%, 0% 100%, 0% 15%); }
+.shape-fingerprint { clip-path: polygon(50% 0%, 80% 15%, 100% 50%, 80% 85%, 50% 100%, 20% 85%, 0% 50%, 20% 15%); }
+.shape-dove       { clip-path: polygon(50% 0%, 70% 20%, 100% 40%, 80% 60%, 60% 100%, 50% 80%, 40% 100%, 20% 60%, 0% 40%, 30% 20%); }
+.shape-flame      { clip-path: polygon(50% 0%, 70% 20%, 100% 50%, 80% 80%, 60% 100%, 50% 80%, 40% 100%, 20% 80%, 0% 50%, 30% 20%); }
+.shape-chain      { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%); }
+.shape-crown      { clip-path: polygon(0% 100%, 0% 50%, 20% 70%, 35% 30%, 50% 60%, 65% 30%, 80% 70%, 100% 50%, 100% 100%); }
+.shape-eye        { clip-path: ellipse(50% 35% at 50% 50%); }
+.shape-mask       { clip-path: polygon(20% 0%, 80% 0%, 100% 30%, 90% 70%, 70% 100%, 50% 90%, 30% 100%, 10% 70%, 0% 30%); }
+.shape-gavel      { clip-path: polygon(40% 0%, 60% 0%, 70% 30%, 100% 50%, 70% 70%, 60% 100%, 40% 100%, 30% 70%, 0% 50%, 30% 30%); }
+.shape-beast      { clip-path: polygon(50% 0%, 65% 25%, 100% 20%, 80% 50%, 100% 80%, 65% 75%, 50% 100%, 35% 75%, 0% 80%, 20% 50%, 0% 20%, 35% 25%); }
+.shape-serpent    { clip-path: polygon(30% 0%, 70% 0%, 100% 20%, 80% 50%, 100% 80%, 70% 100%, 30% 100%, 0% 80%, 20% 50%, 0% 20%); }
+.shape-atom       { clip-path: circle(40% at 50% 50%); }
+.shape-heart      { clip-path: polygon(50% 100%, 0% 35%, 0% 15%, 25% 0%, 50% 25%, 75% 0%, 100% 15%, 100% 35%); }
+.shape-house      { clip-path: polygon(50% 0%, 100% 40%, 100% 100%, 0% 100%, 0% 40%); }
+.shape-coins      { clip-path: circle(40% at 50% 60%); }
+.shape-chart      { clip-path: polygon(0% 100%, 0% 60%, 25% 60%, 25% 40%, 50% 40%, 50% 20%, 75% 20%, 75% 50%, 100% 50%, 100% 100%); }
+.shape-people     { clip-path: polygon(25% 0%, 75% 0%, 100% 30%, 100% 100%, 0% 100%, 0% 30%); }
+.shape-sword      { clip-path: polygon(50% 0%, 55% 60%, 100% 70%, 100% 80%, 50% 100%, 0% 80%, 0% 70%, 45% 60%); }
+.shape-shield-alt { clip-path: polygon(50% 0%, 100% 15%, 100% 60%, 50% 100%, 0% 60%, 0% 15%); }
+.shape-flag       { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 50% 75%, 0% 100%); }
+.shape-key        { clip-path: polygon(20% 30%, 80% 30%, 80% 45%, 100% 45%, 100% 55%, 80% 55%, 80% 70%, 60% 70%, 60% 55%, 20% 55%); }
+.shape-rocket     { clip-path: polygon(50% 0%, 70% 30%, 100% 60%, 80% 100%, 50% 80%, 20% 100%, 0% 60%, 30% 30%); }
+.shape-dna        { clip-path: polygon(50% 0%, 60% 20%, 70% 10%, 80% 30%, 90% 20%, 100% 50%, 90% 80%, 80% 70%, 70% 90%, 60% 80%, 50% 100%, 40% 80%, 30% 90%, 20% 70%, 10% 80%, 0% 50%, 10% 20%, 20% 30%, 30% 10%, 40% 20%); }
+.shape-ghost      { clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 70% 85%, 60% 100%, 50% 85%, 40% 100%, 30% 85%, 20% 100%, 0% 80%, 0% 20%); }
+.shape-bomb       { clip-path: circle(40% at 50% 60%); }
+.shape-syringe    { clip-path: polygon(40% 0%, 60% 0%, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0% 60%, 0% 40%, 40% 40%); }
+.shape-recycle    { clip-path: polygon(50% 0%, 80% 20%, 100% 50%, 80% 80%, 50% 100%, 20% 80%, 0% 50%, 20% 20%); }
+.shape-scales-tri { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+.shape-network    { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+.shape-hourglass  { clip-path: polygon(20% 0%, 80% 0%, 50% 50%, 80% 100%, 20% 100%, 50% 50%); }
+.shape-dice       { clip-path: polygon(10% 10%, 90% 10%, 90% 90%, 10% 90%); }
+.shape-trophy     { clip-path: polygon(30% 0%, 70% 0%, 80% 30%, 100% 50%, 80% 80%, 20% 80%, 0% 50%, 20% 30%); }
+.shape-medal      { clip-path: circle(40% at 50% 50%); }
+.shape-ribbon     { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 70% 100%, 50% 70%, 30% 100%, 0% 30%); }
+.shape-lock       { clip-path: polygon(20% 40%, 80% 40%, 80% 100%, 20% 100%); }
+.shape-unlock     { clip-path: polygon(20% 40%, 80% 40%, 80% 100%, 20% 100%); }
+.shape-bell       { clip-path: polygon(50% 0%, 100% 40%, 100% 70%, 80% 100%, 20% 100%, 0% 70%, 0% 40%); }
+.shape-megaphone  { clip-path: polygon(0% 30%, 30% 0%, 100% 0%, 100% 100%, 30% 100%, 0% 70%); }
+.shape-palette    { clip-path: circle(50% at 50% 50%); }
+.shape-gear       { clip-path: polygon(40% 0%, 60% 0%, 60% 15%, 80% 15%, 80% 0%, 100% 0%, 100% 20%, 85% 20%, 85% 40%, 100% 40%, 100% 60%, 85% 60%, 85% 80%, 100% 80%, 100% 100%, 80% 100%, 80% 85%, 60% 85%, 60% 100%, 40% 100%, 40% 85%, 20% 85%, 20% 100%, 0% 100%, 0% 80%, 15% 80%, 15% 60%, 0% 60%, 0% 40%, 15% 40%, 15% 20%, 0% 20%, 0% 0%, 20% 0%, 20% 15%, 40% 15%); }
+.shape-robot      { clip-path: polygon(20% 20%, 80% 20%, 80% 80%, 20% 80%); }
+.shape-brain      { clip-path: circle(45% at 50% 50%); }
+.shape-chart-line { clip-path: polygon(0% 100%, 0% 60%, 25% 60%, 25% 40%, 50% 40%, 50% 20%, 75% 20%, 75% 50%, 100% 50%, 100% 100%); }
+.shape-bank       { clip-path: polygon(0% 40%, 50% 0%, 100% 40%, 100% 100%, 0% 100%); }
+.shape-courthouse { clip-path: polygon(0% 30%, 50% 0%, 100% 30%, 100% 100%, 0% 100%); }
+.shape-church     { clip-path: polygon(40% 0%, 60% 0%, 60% 30%, 100% 30%, 100% 100%, 0% 100%, 0% 30%, 40% 30%); }
+.shape-mosque     { clip-path: polygon(40% 0%, 60% 0%, 60% 20%, 100% 40%, 100% 100%, 0% 100%, 0% 40%, 40% 20%); }
+.shape-temple     { clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 100%, 0% 100%, 0% 30%); }
+.shape-tent       { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+.shape-campfire   { clip-path: polygon(50% 0%, 80% 50%, 100% 100%, 0% 100%, 20% 50%); }
+.shape-map        { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%); }
+.shape-globe      { clip-path: circle(50% at 50% 50%); }
+.shape-satellite  { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.shape-radar      { clip-path: circle(50% at 50% 50%); }
+.shape-handcuffs  { clip-path: polygon(20% 30%, 40% 30%, 40% 70%, 20% 70%); }
+.shape-magnifier  { clip-path: circle(35% at 45% 45%); }
+.shape-scales-balanced { clip-path: polygon(50% 0%, 55% 35%, 100% 35%, 100% 50%, 55% 50%, 50% 100%, 45% 50%, 0% 50%, 0% 35%, 45% 35%); }
+.shape-pill       { clip-path: ellipse(50% 25% at 50% 50%); }
+.shape-sparkles   { clip-path: polygon(50% 0%, 55% 45%, 100% 50%, 55% 55%, 50% 100%, 45% 55%, 0% 50%, 45% 45%); }
+.shape-clover     { clip-path: circle(30% at 35% 35%); }
+.shape-spade      { clip-path: polygon(50% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%); }
+.shape-heart-card { clip-path: polygon(50% 100%, 0% 35%, 0% 15%, 25% 0%, 50% 25%, 75% 0%, 100% 15%, 100% 35%); }
+.shape-club       { clip-path: polygon(50% 0%, 80% 30%, 80% 70%, 50% 100%, 20% 70%, 20% 30%); }
+.shape-joker      { clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%); }
+
+// --- Size Tiers ---
+.menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+    padding: 4px;
+
+    // Size variants
+    &.size-xs { width: 32px; height: 32px; font-size: 8px; .menu-btn-icon { font-size: 14px; } }
+    &.size-sm { width: 48px; height: 48px; font-size: 9px; .menu-btn-icon { font-size: 18px; } }
+    &.size-md { width: 72px; height: 72px; font-size: 11px; .menu-btn-icon { font-size: 24px; } }
+    &.size-lg { width: 96px; height: 96px; font-size: 13px; .menu-btn-icon { font-size: 32px; } }
+    &.size-xl { width: 128px; height: 128px; font-size: 15px; .menu-btn-icon { font-size: 40px; } }
+    &.size-xxl { width: 160px; height: 160px; font-size: 18px; .menu-btn-icon { font-size: 48px; } }
+
+    // Shape applied via clip-path
+    &[class*="shape-"] {
+        border: none; // clip-path doesn't respect border-radius
+    }
+
+    // Hit area (invisible, larger than visual)
+    &::before {
+        content: '';
+        position: absolute;
+        inset: -6px;
+        z-index: -1;
+    }
+}
+
+.menu-btn-icon {
+    pointer-events: none;
+}
+
+.menu-btn-label {
+    pointer-events: none;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+// --- Responsive Sizing ---
+@media (max-width: 600px) {
+    .menu-btn {
+        &.size-xs { width: 22px; height: 22px; }
+        &.size-sm { width: 34px; height: 34px; }
+        &.size-md { width: 50px; height: 50px; }
+        &.size-lg { width: 67px; height: 67px; }
+        &.size-xl { width: 90px; height: 90px; }
+        &.size-xxl { width: 112px; height: 112px; }
+    }
+}
+
+@media (min-width: 1024px) {
+    .menu-btn {
+        &.size-md { width: 86px; height: 86px; }
+        &.size-lg { width: 115px; height: 115px; }
+        &.size-xl { width: 154px; height: 154px; }
+    }
+}
+
+@media (min-width: 1920px) {
+    .menu-btn {
+        &.size-md { width: 101px; height: 101px; }
+        &.size-lg { width: 134px; height: 134px; }
+        &.size-xl { width: 179px; height: 179px; }
+    }
+}
+
+// --- Controller Focus ---
+.menu-btn:focus-visible {
+    outline: 3px solid var(--pathway-glow, #00f2fe);
+    outline-offset: 4px;
+    transform: scale(1.1);
+    z-index: 100;
+}
+
+.menu-btn.controller-focus {
+    animation: focus-pulse 1s infinite;
+    box-shadow: 0 0 20px var(--pathway-glow, #00f2fe);
+}
+
+@keyframes focus-pulse {
+    0%, 100% { box-shadow: 0 0 10px var(--pathway-glow, #00f2fe); }
+    50% { box-shadow: 0 0 30px var(--pathway-glow, #00f2fe), 0 0 60px var(--pathway-glow, #00f2fe); }
+}
+
+// --- Favorites Grid ---
+.ch-starred-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    padding: 16px;
+    position: relative;
+    min-height: 100px;
+}
+
+.ch-starred-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid var(--btn-color, #ffd700);
+    color: #e5e7eb;
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+    padding: 4px;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 0 20px var(--btn-color, #ffd700);
+        transform: scale(1.05);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+}
+
+.ch-starred-icon {
+    font-size: 24px;
+    pointer-events: none;
+}
+
+.ch-starred-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+}
+
+.ch-no-favorites {
+    color: #90a4ae;
+    font-size: 12px;
+    padding: 20px;
+}
+
+// --- Customization Panel ---
+.menu-customization-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(13, 16, 37, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 2000;
+    backdrop-filter: blur(20px);
+
+    h3 {
+        color: #e5e7eb;
+        margin-bottom: 16px;
+    }
+
+    .customization-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .customization-label {
+        color: #90a4ae;
+        font-size: 12px;
+        min-width: 80px;
+    }
+
+    select, input[type="range"] {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #e5e7eb;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        flex: 1;
+    }
+
+    .preview-grid {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        min-height: 200px;
+        margin: 16px 0;
+        position: relative;
+        background: rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* --- Customization Panel --- */
+.mc-section {
+    margin-bottom: 20px;
+    
+    h3 {
+        color: #e5e7eb;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 10px;
+    }
+}
+
+.mc-shape-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.mc-shape-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 48px;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    &.selected {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.1);
+    }
+}
+
+.mc-shape-preview {
+    width: 28px;
+    height: 28px;
+    background: #00bcd4;
+    border-radius: 2px;
+}
+
+.mc-shape-name {
+    font-size: 8px;
+    color: #90a4ae;
+    text-align: center;
+}
+
+.mc-more-shapes {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #90a4ae;
+    
+    summary {
+        cursor: pointer;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 4px;
+        
+        &:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+    }
+}
+
+.mc-size-picker {
+    display: flex;
+    gap: 8px;
+}
+
+.mc-size-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    &.selected {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.1);
+    }
+}
+
+.mc-size-preview {
+    background: #00bcd4;
+    border-radius: 2px;
+    
+    &.size-xs { width: 16px; height: 16px; }
+    &.size-sm { width: 24px; height: 24px; }
+    &.size-md { width: 32px; height: 32px; }
+    &.size-lg { width: 40px; height: 40px; }
+    &.size-xl { width: 48px; height: 48px; }
+    &.size-xxl { width: 56px; height: 56px; }
+}
+
+.mc-size-name {
+    font-size: 9px;
+    color: #90a4ae;
+}
+
+.mc-grid-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mc-grid-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+    
+    &.selected {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.1);
+    }
+}
+
+.mc-grid-preview {
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 188, 212, 0.3);
+    border: 2px dashed #00bcd4;
+    border-radius: 4px;
+}
+
+.mc-grid-name {
+    font-size: 9px;
+    color: #90a4ae;
+}
+
+.mc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    
+    label {
+        color: #90a4ae;
+        font-size: 11px;
+        min-width: 50px;
+    }
+    
+    input[type="range"] {
+        flex: 1;
+    }
+    
+    span {
+        color: #e5e7eb;
+        font-size: 11px;
+        min-width: 30px;
+        text-align: right;
+    }
+}
+
+.mc-preview {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    min-height: 150px;
+    background: rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.mc-preview-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 2px solid;
+    cursor: default;
+    transition: transform 0.2s;
+    
+    &:hover {
+        transform: scale(1.05);
+    }
+}
+
+.mc-preview-icon, .mc-preview-label {
+    pointer-events: none;
+}
+
+.mc-overrides {
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.mc-override-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+.mc-override-icon {
+    font-size: 16px;
+    width: 24px;
+    text-align: center;
+}
+
+.mc-override-label {
+    color: #e5e7eb;
+    font-size: 11px;
+    min-width: 50px;
+}
+
+.mc-override-shape, .mc-override-size {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e5e7eb;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+}
+
+.mc-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- Tabs --- */
+.mc-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.mc-tab {
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: #90a4ae;
+    cursor: pointer;
+    font-size: 11px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    
+    &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #e5e7eb;
+    }
+    
+    &.active {
+        background: rgba(0, 242, 254, 0.15);
+        color: #00f2fe;
+    }
+}
+
+.mc-tab-content {
+    &.hidden {
+        display: none;
+    }
+}
+
+/* --- Customize Button in Main Menu --- */
+.mc-customize-btn {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    padding: 8px 16px;
+    background: rgba(0, 188, 212, 0.15);
+    border: 1px solid rgba(0, 188, 212, 0.4);
+    border-radius: 8px;
+    color: #00bcd4;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 100;
+    transition: all 0.2s;
+    
+    &:hover {
+        background: rgba(0, 188, 212, 0.25);
+        box-shadow: 0 0 15px rgba(0, 188, 212, 0.3);
+    }
+}

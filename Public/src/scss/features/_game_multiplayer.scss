@@ -1,0 +1,330 @@
+/* === Game Multiplayer */
+.mp-container { padding: 8px 0; }
+
+.mp-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(233, 30, 99, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.mp-icon { font-size: 32px; }
+
+.mp-connection-status {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.mp-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.mp-status-dot.online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.mp-status-dot.offline { background: #ef4444; }
+
+.mp-status-text { font-size: 10px; color: #90a4ae; }
+
+.mp-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.mp-section h4 { margin: 0 0 12px; }
+
+.mp-connection-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.mp-wallet-status, .mp-server-status, .mp-latency {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.mp-wallet-label, .mp-server-label, .mp-latency-label {
+    display: block;
+    font-size: 9px;
+    color: #90a4ae;
+    text-transform: uppercase;
+}
+
+.mp-wallet-address, .mp-server-indicator, .mp-latency-value {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e5e7eb;
+    margin-top: 4px;
+}
+
+.mp-matchmaking {
+    display: flex;
+    gap: 8px;
+}
+
+.mp-matchmaking-status {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #90a4ae;
+    text-align: center;
+}
+
+/* Active Match */
+.mp-active-match {
+    border-color: rgba(233, 30, 99, 0.3);
+    background: rgba(233, 30, 99, 0.05);
+}
+
+.mp-match-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.mp-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.mp-player-avatar { font-size: 24px; }
+
+.mp-player-name { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.mp-player-score {
+    font-size: 18px;
+    font-weight: 700;
+    color: #e5e7eb;
+    min-width: 30px;
+    text-align: center;
+}
+
+.mp-vs {
+    font-size: 14px;
+    font-weight: 700;
+    color: #90a4ae;
+}
+
+/* Board */
+.mp-board-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.mp-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    width: 240px;
+    height: 240px;
+}
+
+.mp-board-tile {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mp-board-tile:hover { background: rgba(233, 30, 99, 0.1); border-color: #e91e63; }
+.mp-board-tile.occupied { background: rgba(156, 39, 176, 0.15); }
+.mp-board-tile.empty:hover { background: rgba(233, 30, 99, 0.2); }
+
+.mp-tile-card { font-size: 24px; }
+
+/* Hand */
+.mp-hand-section {
+    margin-bottom: 12px;
+}
+
+.mp-hand-section h5 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    color: #90a4ae;
+}
+
+.mp-hand {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.mp-hand-card {
+    width: 60px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mp-hand-card:hover { border-color: #e91e63; }
+.mp-hand-card.selected {
+    border-color: #e91e63;
+    background: rgba(233, 30, 99, 0.15);
+    transform: translateY(-4px);
+}
+
+.mp-card-icon { font-size: 24px; }
+
+.mp-card-power {
+    font-size: 10px;
+    font-weight: 700;
+    color: #e5e7eb;
+}
+
+/* Turn Indicator */
+.mp-turn-indicator {
+    text-align: center;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.mp-turn-indicator.my-turn {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.mp-turn-indicator.opponent-turn {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Match Actions */
+.mp-match-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+/* Chat */
+.mp-chat-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.mp-chat-messages {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+
+.mp-chat-msg {
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.mp-chat-msg.me {
+    background: rgba(233, 30, 99, 0.1);
+    text-align: right;
+}
+
+.mp-chat-msg.opponent {
+    background: rgba(156, 39, 176, 0.1);
+}
+
+.mp-chat-sender {
+    font-weight: 700;
+    color: #e5e7eb;
+    margin-right: 4px;
+}
+
+.mp-chat-text { color: #90a4ae; }
+
+.mp-chat-input {
+    display: flex;
+    gap: 8px;
+}
+
+.mp-chat-input input {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #e5e7eb;
+    font-size: 11px;
+}
+
+.mp-chat-input input:focus {
+    outline: none;
+    border-color: #e91e63;
+}
+
+/* History */
+.mp-history {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mp-history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+}
+
+.mp-history-opponent {
+    flex: 1;
+    font-size: 11px;
+    color: #e5e7eb;
+}
+
+.mp-history-result {
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 20px;
+    text-align: center;
+}
+
+.mp-history-result.win { color: #22c55e; }
+.mp-history-result.loss { color: #ef4444; }
+
+.mp-history-score {
+    font-size: 11px;
+    color: #90a4ae;
+    min-width: 30px;
+    text-align: center;
+}

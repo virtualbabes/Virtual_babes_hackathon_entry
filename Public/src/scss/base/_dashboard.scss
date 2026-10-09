@@ -137,7 +137,7 @@
     overflow: hidden;
     background: $glass-bg-color;
     -webkit-backdrop-filter: blur($glass-blur);
-    backdrop-filter: blur($glass-blur);
+    -webkit-backdrop-filter: blur($glass-blur);
     box-shadow: $glass-shadow;
 
     &.avatar-small {

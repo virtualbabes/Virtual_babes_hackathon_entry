@@ -1,0 +1,11 @@
+ [Persistence Sync] Worker active. Interval: 15m0s | Dir: ./data
+ [Telemetry] Exporter active. Serving metrics stream out at http://localhost:9090/metrics
+[MultiChain] Voi Mainnet healthy (primary network)
+[MultiChain] Algorand Mainnet initialized (secondary)
+ [Governor Scheduler] Payout engine active. Interval: 24h0m0s
+ VOICONOMY ARENA SERVER ONLINE: PORT 8090
+ WebSocket Switchboard & API Ready               
+ Rate Limiter Active: 7-tier wallet-based system  
+-------------------------------------------------
+ [Persistence Sync] Authoritative snapshot committed. Faucet: 0 VBV.
+ [Persistence Sync] Authoritative snapshot committed. Faucet: 0 VBV.

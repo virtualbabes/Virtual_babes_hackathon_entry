@@ -1,0 +1,131 @@
+/* === Game Locations */
+.locations-container { padding: 8px 0; }
+
+.loc-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.loc-icon { font-size: 32px; }
+
+.loc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.loc-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.loc-card:hover { transform: translateY(-2px); }
+
+.loc-card.selected {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0 !important;
+    box-shadow: 0 0 12px rgba(156, 39, 176, 0.3);
+}
+
+.loc-card-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.loc-card-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.loc-card-desc { display: block; font-size: 9px; color: #90a4ae; margin-top: 2px; }
+
+.loc-card-stakes { display: block; font-size: 8px; font-weight: 700; margin-top: 4px; text-transform: uppercase; }
+
+.loc-details {
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px solid;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.loc-details-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.loc-details-icon { font-size: 28px; }
+
+.loc-details-stakes {
+    margin-left: auto;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.loc-rules, .loc-theme, .loc-wager {
+    margin-bottom: 12px;
+}
+
+.loc-rules h5, .loc-theme h5, .loc-wager h5 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    color: #e5e7eb;
+}
+
+.loc-rules-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.loc-rule {
+    padding: 4px 8px;
+    background: rgba(156, 39, 176, 0.15);
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 4px;
+    font-size: 9px;
+    color: #e5e7eb;
+}
+
+.loc-theme-preview {
+    display: flex;
+    justify-content: center;
+}
+
+.loc-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 30px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 2px;
+}
+
+.loc-preview-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.loc-wager-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.loc-wager-amount {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffc107;
+    min-width: 80px;
+    text-align: center;
+}

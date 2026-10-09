@@ -1,0 +1,89 @@
+/* === Territory Map */
+.territory-map-container { padding: 8px 0; }
+
+.territory-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(139, 195, 74, 0.1), rgba(76, 175, 80, 0.05));
+    border: 1px solid rgba(139, 195, 74, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.territory-icon { font-size: 32px; }
+
+.territory-info { flex: 1; }
+
+.territory-control {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.territory-control-num { display: block; font-size: 18px; font-weight: 700; color: #4caf50; }
+
+.territory-control-label { font-size: 9px; color: #90a4ae; }
+
+.territory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.territory-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 3px solid var(--control-color);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.territory-card:hover { transform: translateY(-2px); }
+
+.territory-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.territory-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.territory-districts { font-size: 9px; color: #90a4ae; }
+
+.territory-card-body { margin-bottom: 8px; }
+
+.territory-controller { font-size: 10px; color: #90a4ae; }
+
+.territory-contest-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+.territory-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.legend-title { font-size: 10px; color: #90a4ae; }
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #e5e7eb;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}

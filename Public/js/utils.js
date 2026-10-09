@@ -39,8 +39,8 @@ export async function resolveAssetSymbol(id) {
  * shortenAddress provides a standardized truncation for blockchain identifiers.
  */
 export function shortenAddress(address) {
-    if (!address || address.length < 12) return address;
-    return address.substring(0, 6) + "..." + address.substring(address.length - 4);
+    if (!address || (address?.length ?? 0) < 12) return address;
+    return address.substring(0, 6) + "..." + address.substring((address?.length ?? 0) - 4);
 }
 
 /**
@@ -57,12 +57,12 @@ export function getCachedEnvoiName(address) {
  * Asynchronously resolves a .voi or .algo name for a wallet address.
  */
 export async function resolveEnvoiName(address) {
-    if (!address || address.length < 50 || envoiCache[address.toLowerCase()]) return;
+    if (!address || (address?.length ?? 0) < 50 || envoiCache[address.toLowerCase()]) return;
 
     // PILLAR 5: Memory Leak Protection.
     // If the cache exceeds 500 entries (high-traffic session), prune it 
     // to keep the frontend footprint lean.
-    if (Object.keys(envoiCache).length > 500) {
+    if ((Object.keys(envoiCache)?.length ?? 0) > 500) {
         console.log("[UTILS] Pruning Envoi name cache...");
         envoiCache = {};
     }
@@ -70,7 +70,7 @@ export async function resolveEnvoiName(address) {
     try {
         const response = await fetch(`${CONFIG.API_BASE}/api/envoi-name?address=${address}`);
         const data = await response.json();
-        if (data.name) envoiCache[address.toLowerCase()] = data.name;
+        if (data?.name) envoiCache[address.toLowerCase()] = data?.name;
     } catch (err) { console.warn(`[UTILS] Envoi resolution failed for ${address}`); }
 }
 

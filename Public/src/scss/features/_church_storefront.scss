@@ -1,0 +1,262 @@
+/* === Church Storefront === */
+.church-storefront-container { padding: 8px 0; }
+
+.cathedral-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.cathedral-stained-glass {
+    display: flex;
+    gap: 4px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+}
+
+.stained-pane {
+    flex: 1;
+    opacity: 0.8;
+}
+
+.cathedral-title { display: flex; align-items: center; gap: 12px; }
+
+.cathedral-icon { font-size: 32px; }
+
+.faith-coherence-display {
+    margin-left: auto;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.faith-coherence-label { display: block; font-size: 9px; color: #90a4ae; text-transform: uppercase; }
+
+.faith-coherence-value { font-size: 24px; font-weight: 700; }
+
+/* Dogma */
+.dogma-section { margin-bottom: 16px; }
+
+.dogma-section h4 { margin: 0 0 12px; }
+
+.dogma-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.dogma-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dogma-card:hover {
+    border-color: var(--dogma-color);
+    transform: translateY(-2px);
+}
+
+.dogma-card.selected {
+    border-color: var(--dogma-color);
+    background: rgba(156, 39, 176, 0.1);
+    box-shadow: 0 0 12px rgba(156, 39, 176, 0.3);
+}
+
+.dogma-icon { font-size: 24px; display: block; margin-bottom: 6px; }
+
+.dogma-name { font-size: 12px; font-weight: 700; color: #e5e7eb; display: block; }
+
+.dogma-desc { font-size: 9px; color: #90a4ae; display: block; margin-top: 4px; }
+
+/* Church list */
+.church-list-section { margin-bottom: 16px; }
+
+.church-list-section h4 { margin: 0 0 12px; }
+
+.church-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.church-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.church-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.church-card-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.church-card-dogma {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.church-card-dogma.purist { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.church-card-dogma.syncretic { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.church-card-dogma.orthodox { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+
+.church-card-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.church-stat {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    padding: 6px;
+}
+
+.church-stat-val { display: block; font-size: 14px; font-weight: 700; color: #e5e7eb; }
+
+.church-stat-label { font-size: 8px; color: #90a4ae; }
+
+.church-card-actions { display: flex; gap: 6px; }
+
+.church-card-actions button { flex: 1; font-size: 9px; padding: 4px 6px; }
+
+/* Faith store */
+.faith-store-section { margin-bottom: 16px; }
+
+.faith-store-section h4 { margin: 0 0 12px; }
+
+.faith-store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.faith-item-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.faith-item-card:hover {
+    border-color: #9c27b0;
+    transform: translateY(-2px);
+}
+
+.faith-item-icon { font-size: 24px; display: block; margin-bottom: 6px; }
+
+.faith-item-name { font-size: 11px; font-weight: 700; color: #e5e7eb; display: block; }
+
+.faith-item-effect { font-size: 9px; color: #4caf50; display: block; margin: 4px 0; }
+
+.faith-item-price { font-size: 10px; color: #ff9800; font-weight: 600; display: block; margin-bottom: 8px; }
+
+.faith-buy-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+/* Ritual history */
+.ritual-history-section h4 { margin: 0 0 12px; }
+
+.ritual-history-list { display: flex; flex-direction: column; gap: 6px; }
+
+.ritual-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.ritual-icon { font-size: 16px; }
+
+.ritual-name { font-size: 11px; color: #e5e7eb; font-weight: 600; }
+
+.ritual-effect { font-size: 10px; color: #4caf50; margin-left: auto; }
+
+/* Empty state */
+.church-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.church-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.church-empty p { color: #90a4ae; font-size: 11px; margin: 0 0 12px; }
+
+// --- Church lookup (/api/church/get) + the honest "not served" note --------------------------
+// New in the placement pass: /api/church/get had no owner in the client, and the faith store it
+// replaced was hard-coded. Both get styling so the leaf reads as a real, honest surface.
+.church-note {
+    margin: 4px 0 0;
+    font-size: 10px;
+    color: #90a4ae;
+}
+
+.church-lookup-section {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.church-lookup-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+
+    input {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 10px;
+        color: #e5e7eb;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+
+    .vbt-btn { flex: 0 0 auto; font-size: 10px; padding: 6px 10px; }
+}
+
+.church-lookup-out { max-height: 220px; overflow: auto; }
+
+.church-lookup-json {
+    margin: 0;
+    padding: 8px;
+    font-size: 10px;
+    color: #b2dfdb;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+}
+

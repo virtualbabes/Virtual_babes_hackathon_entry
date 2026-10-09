@@ -1,0 +1,186 @@
+/* === NPC Taunts */
+.taunts-container { padding: 8px 0; }
+
+.taunts-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.taunts-icon { font-size: 32px; }
+
+.taunts-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.taunts-section h4 { margin: 0 0 12px; }
+
+.taunts-npc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.taunts-npc {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.taunts-npc:hover { border-color: #9c27b0; }
+
+.taunts-npc.selected {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0;
+}
+
+.taunts-npc-icon { font-size: 24px; }
+
+.taunts-npc-info { flex: 1; }
+
+.taunts-npc-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.taunts-npc-role { display: block; font-size: 9px; color: #90a4ae; }
+
+.taunts-npc-mood { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+
+.taunts-npc-bar {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.taunts-npc-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.taunts-dialogue-display {
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.taunts-bubble {
+    display: flex;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    width: 100%;
+}
+
+.taunts-bubble-icon { font-size: 32px; }
+
+.taunts-bubble-content { flex: 1; }
+
+.taunts-bubble-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; margin-bottom: 4px; }
+
+.taunts-bubble-text { font-size: 12px; color: #90a4ae; font-style: italic; margin: 0; }
+
+.taunts-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* New button styles */
+.vbt-btn-gift {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vbt-btn-gift:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+
+.vbt-btn-challenge {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vbt-btn-challenge:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+
+.vbt-btn-gossip {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vbt-btn-gossip:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); }
+
+.vbt-btn-flirt {
+    background: linear-gradient(135deg, #ec4899, #db2777);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vbt-btn-flirt:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
+
+/* History */
+.taunts-history {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.taunts-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+    font-size: 10px;
+}
+
+.taunts-history-icon { font-size: 14px; }
+
+.taunts-history-name { font-weight: 700; color: #e5e7eb; }
+
+.taunts-history-text { color: #90a4ae; flex: 1; }
+
+.taunts-history-mood { font-size: 9px; font-weight: 700; text-transform: uppercase; }

@@ -1,5 +1,5 @@
 # Stage 1: Build Environment (Go 1.24 + Node.js)
-FROM golang:1.24-alpine3.20 AS builder
+FROM golang:1.25-alpine3.20 AS builder
 
 # Install system dependencies for build pipeline
 RUN apk add --no-cache nodejs npm git
@@ -39,13 +39,12 @@ COPY --from=builder /app/season.json* .
 # 5. Environment & Permissions
 ENV PORT=8088
 ENV DATA_DIR=/app/data
-ENV NODE_ENV=production
 
 RUN chmod +x ./entrypoint.sh ./server-bin
 
 # Pillar 4: High-Fidelity Health Monitoring
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget -qO- http://localhost:8088/api/health || exit 1
+  CMD wget -qO- http://localhost:8088/api/faucet/status || exit 1
 
 EXPOSE 8088
 

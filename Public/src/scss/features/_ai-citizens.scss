@@ -1,0 +1,61 @@
+// Public\src\scss\features\_ai-citizens.scss
+// §15 v3: AI Citizens overlay styles (spawn / adopt / challenge / region meter)
+
+/* AI sub-panel tabs */
+.ai-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(0, 255, 255, 0.03);
+    grid-column: span 2;
+}
+.ai-tab {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #9ca3af;
+    transition: all 0.2s;
+}
+.ai-tab:hover { border-color: var(--theme-accent); color: #e6e6e6; }
+.ai-tab.active { background: var(--theme-accent); border-color: var(--theme-accent); color: #0a0e17; }
+.ai-panel { grid-column: span 2; }
+.ai-panel.hidden { display: none; }
+.ai-grid { display: flex; flex-direction: column; gap: 10px; padding: 6px; }
+.ai-pathway-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 6px; }
+.ai-pathway-chip { padding: 8px; background: var(--theme-accent-dim); border: 1px solid rgba(var(--theme-accent-rgb), 0.2); border-radius: 6px; font-size: 11px; color: #e0f7fa; text-align: center; }
+
+.ai-citizens-panel { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 8px; min-height: 520px; }
+
+#ai-citizens-overlay .panel-spawn { grid-column: span 1; min-height: 320px; }
+#ai-citizens-overlay .panel-region-meter { grid-column: span 1; min-height: 200px; }
+#ai-citizens-overlay .panel-citizens { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+#ai-citizens-overlay .panel-free-agents { grid-column: span 1; min-height: 300px; max-height: 480px; overflow-y: auto; }
+
+#ai-citizens-overlay label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b0bec5; margin-bottom: 10px; }
+#ai-citizens-overlay input, #ai-citizens-overlay select {
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(0, 255, 255, 0.2);
+    color: #e0f7fa; border-radius: 6px; padding: 7px 9px; font-size: 13px;
+}
+#ai-citizens-overlay input:focus, #ai-citizens-overlay select:focus { outline: none; border-color: var(--neon-cyan); }
+
+.ai-status { grid-column: span 2; color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }
+
+/* Citizen cards */
+.ai-citizens-grid, .ai-free-agents-grid { display: flex; flex-direction: column; gap: 10px; padding: 6px; }
+.ai-citizen-card { background: rgba(0, 97, 106, 0.1); border: 1px solid rgba(0, 255, 255, 0.22); border-radius: 8px; padding: 12px; transition: all 0.2s ease; }
+.ai-citizen-card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 6px rgba(0, 255, 255, 0.25); transform: translateY(-1px); }
+.ai-citizen-card h4 { color: #80deea; margin: 0 0 6px 0; font-size: 0.95em; }
+.ai-card-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* Region meter */
+.region-meter { display: flex; flex-direction: column; gap: 10px; padding: 6px; }
+.region-row { display: grid; grid-template-columns: 70px 1fr 48px; align-items: center; gap: 8px; font-size: 12px; color: #b0bec5; }
+.region-name { color: #e1bee7; }
+.region-bar { height: 10px; background: rgba(255, 255, 255, 0.06); border-radius: 5px; overflow: hidden; }
+.region-fill { height: 100%; background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple)); border-radius: 5px; transition: width 0.3s ease; }
+.region-count { text-align: right; color: #4dd0e1; }

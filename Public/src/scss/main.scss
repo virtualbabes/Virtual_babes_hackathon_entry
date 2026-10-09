@@ -11,6 +11,7 @@
 // Layouts (will be added later)
 @import 'layouts/main-layout';
 @import 'layouts/dashboard';
+@import 'layouts/app-shell'; // Single contained shell + unified main screen (consistency layer)
 
 // Components (will be added later)
 @import 'components/buttons';
@@ -25,5 +26,93 @@
 @import 'features/economy';
 @import 'features/social';
 @import 'features/criminality'; // Placeholder for future use
+@import 'features/justice';      // Justice Hegemony Dashboard (P2-A, Task 4007)
 @import 'features/territory';
+@import 'features/theme_dashboard'; // Theme Engine Visualizer
+@import 'features/world_dashboard'; // World Dashboard (orphaned routes)
+@import 'features/portfolio'; // PORTFOLIO — read-only analytics surface (categories → screens)
+@import 'features/bonded_branding'; // §23.5 Bonded Branding Studio (ecosphere theming; cards excluded)
+@import 'features/slide_theming'; // §10.6 app boot / main menu + World Dashboard slideshows
+@import 'features/lobby'; // Lobby mode: board hidden + action dropdown
 @import 'features/shops'; // Placeholder for future use
+@import 'features/investment';    // P7-A: Entity Investment Dashboard overlay
+@import 'features/seasonal';     // P7-B: Seasonal Events overlay
+@import 'features/creator-store'; // P7-C: Creator Storefront overlay
+@import 'features/ai-citizens';   // §15 v3: AI Citizens overlay (spawn / adopt / challenge / region meter)
+@import 'features/world-events'; // §26: Treasure Hunt + User Events overlay
+@import 'features/leaderboard-region'; // §25.9: Leaderboard Region gathering hub + mode switch
+@import 'features/rivalry-viewer'; // §25.10: Region/Territory rivalry matrix viewer
+@import 'features/life-assets'; // §26.4 Pets / §25.6 Vehicles / §25.7 World Content
+@import 'features/early-tasks'; // §25.5: Early-task tracker (new-player guidance)
+@import 'features/asset-viewer'; // §23.5: Presentation-asset (NFT) gallery
+@import 'features/industrial-loop'; // Industrial Loop overlay
+@import 'features/children-bots'; // Children Bots overlay
+@import 'features/faith_church'; // Faith Church storefront (marquee panel)
+@import 'features/pet-battle-arena'; // Pet Battle Arena (fun hook)
+@import 'features/governance'; // Governance panel
+@import 'features/wallet_modal'; // Wallet connection modal
+@import 'features/tx_modal'; // Transaction confirmation modal
+@import 'features/admin_panel'; // Admin controls panel
+@import 'features/constellation_hub'; // Constellation Hub (Living Nexus)
+@import 'features/constellation_spectate'; // Constellation Spectate (multi-player overview)
+@import 'features/game_systems'; // Achievements, Daily Challenges, Settings
+@import 'features/ux_enhancements'; // UX: empty states, loading, transitions, responsive
+@import 'features/error_handler'; // Error handling: banners, panel errors, retry
+@import 'features/theme_engine'; // ThemeEngine: dynamic colors, micro-interactions, parallax, bloom
+@import 'features/panels'; // Universal panel styles
+@import 'features/menu-constellation'; // Card-constellation lobby
+@import 'features/achievement_progress'; // Achievement tracking & badges
+@import 'features/pet_breeder'; // Pet breeding & genetics lab
+@import 'features/career_tree'; // Career tree visualization
+@import 'features/church_storefront'; // Faith economy & church management
+@import 'features/rivalry_challenge'; // Rivalry & PvP challenge
+@import 'features/report_history'; // Report & moderation history
+@import 'features/governance_chambers'; // Governance & elections
+@import 'features/treasure_map'; // Treasure hunt & exploration
+@import 'features/season_countdown'; // Season status & countdown
+@import 'features/seasonal_events'; // Seasonal events & rewards
+@import 'features/replay_viewer'; // Battle replay viewer
+@import 'features/identity_editor'; // Player identity & reputation
+@import 'features/dividend_yield'; // Dividend yield dashboard
+@import 'features/underworld_contracts'; // Criminal contract board
+@import 'features/black_market'; // Black market trading
+@import 'features/items_equip'; // Item equipment manager
+@import 'features/faction_shop'; // Faction Quartermaster (Careers & Factions leaf)
+@import 'features/events_arena'; // Event arena & competitions
+@import 'features/territory_map'; // Territory control & districts
+@import 'features/rewards_center'; // Rewards & progression
+@import 'features/match_arena'; // Match entry & spectate
+@import 'features/counterfeit_scanner'; // Counterfeit detection lab
+@import 'features/creator_studio'; // Creator economy studio
+@import 'features/faith_war_gambit'; // Faith coherence & war gambit
+@import 'features/match_creator'; // Match creation UI with rule toggles
+@import 'features/card_animations'; // Card flip & capture animations
+@import 'features/campaign_mode'; // Campaign mode UI
+@import 'features/deck_manager'; // Deck builder & collection manager
+@import 'features/equipment_system'; // Card equipment loadout
+@import 'features/card_progression'; // Training, fusion, upgrade
+@import 'features/game_board'; // Game board battle screen
+@import 'features/game_multiplayer'; // Real-time P2P multiplayer
+@import 'features/card_titles'; // Card titles & perks
+@import 'features/post_match_wagers'; // Post-match wager resolution
+@import 'features/game_locations'; // Game locations hub (arcade, casino, dive bar, lounge, underground)
+@import 'features/character_mood'; // NPC & citizen mood display
+@import 'features/remaining_tabs'; // Remaining tab UIs
+@import 'features/club_foundry'; // Club foundry & management
+@import 'features/tournament_brackets'; // Tournament brackets & registration
+@import 'features/justice_dashboard'; // Bounty board & justice missions
+@import 'features/loan_terms'; // Loan management & calculator
+@import 'features/amm_chart'; // AMM bonding curve visualization
+@import 'features/industrial_flow'; // Industrial loop visualization
+@import 'features/menu_customization'; // Menu button shapes, sizes, grids
+@import 'features/menu_customization_panel'; // Menu customization UI overlay
+@import 'features/controller_nav'; // Gamepad/keyboard/tilt navigation
+@import 'features/entity-market'; // Entity Market
+@import 'features/underworld'; // Underworld panel
+@import 'features/rivalry'; // Rivalry panel
+@import 'features/spectate'; // Spectate panel
+@import 'features/faucet_dashboard'; // Faucet Dashboard: dynamic scaling + anti-whale AMM
+@import 'features/tea_house';
+@import 'features/zen_garden';
+@import 'features/npc_taunts';
+@import 'features/game_modes';

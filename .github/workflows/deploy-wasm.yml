@@ -1,0 +1,31 @@
+name: Build and Deploy WASM Frontend
+
+on:
+  push:
+    branches: [ Dev2 ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Compile WASM
+        run: |
+          GOOS=js GOARCH=wasm go build -o Public/main.wasm .
+          CGO_ENABLED=0 go build -o server-bin .
+
+      - name: Verify Build
+        run: |
+          ls -la Public/main.wasm server-bin
+
+      - name: Deploy to Render
+        if: success()
+        run: |
+          echo "Build artifacts ready. Render auto-deploy handles the rest."

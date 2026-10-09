@@ -2,12 +2,18 @@ import { CONFIG } from './config.js';
 import { socket, myClientId } from './network.js';
 import { showToast, hideAllOverlays } from './ui.js';
 import { userAddress, walletProvider, signClient } from './wallet.js';
-import { getCachedEnvoiName, getNetworkConfig } from './utils.js';
+import { getCachedEnvoiName, getNetworkConfig, shortenAddress } from './utils.js';
+// The ONE integer-only micro-money formatter (tx_journal.js) — a second copy here would
+// eventually disagree with the journal about how 500 $VBV reads.
+import { formatMicro } from './tx_journal.js';
 import { globalClubs } from './admin.js';
 import { lastLobbyPlayers } from './game.js';
 
 export let rumorTimers = {};
 export let activeRumors = {};
+export let staffTrainingInterval = null;
+export let ghostProtocolInterval = null;
+export let allianceInviteInterval = null;
 let sabotageIntervals = {};
 
 const algosdk = window.algosdk;
@@ -113,6 +119,18 @@ export async function submitCourthouseFine() {
     btn.disabled = true;
     btn.innerText = "PROCESSING...";
 
+    // The note prefix is read from the SERVER's vocabulary — never re-typed here.
+    // A drifted prefix does not raise an error, it silently fails verification,
+    // so a refusal to read the vocabulary must stop the payment rather than
+    // proceed on a guess.
+    const fineNote = await window.NoteVocab.prepareNote('courthouse_fine', userAddress, Date.now());
+    if (!fineNote) {
+        btn.disabled = false;
+        btn.innerText = "PAY FINE & CLEAR NAME";
+        showToast(`❌ ${window.NoteVocab.state.error || 'Could not read the note vocabulary.'}`, "error");
+        return;
+    }
+
     try {
         showToast(`⚖️ Signing ${wanted * 100} $VBV Fine...`, "info");
         let txid = "";
@@ -128,15 +146,16 @@ export async function submitCourthouseFine() {
             txObj = {
                 from: userAddress, type: 'appl', appIndex: parseInt(assetId),
                 appArgs: [methodSelector, recipientAddr, amountArg],
-                // PILLAR 3: Bound Verification for Courthouse Fines
-                note: new TextEncoder().encode(`COURTHOUSE_FINE:${userAddress}:${Date.now()}`)
+                // PILLAR 3: Bound Verification for Courthouse Fines.
+                // Prefix owned by the server (note_vocabulary.go), read via
+                // window.NoteVocab — this file declares no prefix.
+                note: new TextEncoder().encode(fineNote)
             };
         } else {
             txObj = {
                 from: userAddress, to: CONFIG.VAULT_ADDRESS, type: 'axfer',
                 assetIndex: parseInt(assetId), amount: amountMicro,
-                // PILLAR 3: Bound Verification for Courthouse Fines
-                note: new TextEncoder().encode(`COURTHOUSE_FINE:${userAddress}:${Date.now()}`)
+                note: new TextEncoder().encode(fineNote)
             };
         }
 
@@ -166,6 +185,11 @@ export async function submitCourthouseFine() {
 
         if (!txid) throw new Error("Transaction cancelled or failed.");
 
+        // Journal the SIGNED transaction. It stays PENDING until the server
+        // confirms it — a signature is not a settlement, and this module never
+        // decides on its own that a payment succeeded.
+        window.VbtTxJournal.record({ purpose: 'courthouse_fine', txid: txid, amount_micro: amountMicro, note: fineNote });
+
         const response = await fetch(`${CONFIG.API_BASE}/api/courthouse/reset`, {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
@@ -174,12 +198,14 @@ export async function submitCourthouseFine() {
 
         if (response.ok) {
             const result = await response.json();
+            window.VbtTxJournal.markVerified(txid);
             showToast(`⚖️ ${result.message}`, "success");
             document.getElementById("courthouse-overlay")?.remove();
             if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, 0);
             window.syncUI();
         } else {
             const err = await response.text();
+            window.VbtTxJournal.markFailed(txid, err);
             showToast(`❌ Courthouse Error: ${err}`, "error");
         }
     } catch (err) {
@@ -201,6 +227,15 @@ export async function initiateBail(cardId, clubId) {
         const assetId = network === "VOI" ? CONFIG.VBV_ASSET_ID : CONFIG.AVOI_ASSET_ID;
 
         showToast(`⚖️ Signing Bail Payment for Card #${cardId}...`, "info");
+
+        // Prefix read from the SERVER's vocabulary (never re-typed here). The card
+        // id and wallet are BOUND into the note so the payment cannot be replayed
+        // against a different card or payer.
+        const bailNote = await window.NoteVocab.prepareNote('bail_payment', cardId, userAddress, Date.now());
+        if (!bailNote) {
+            showToast(`❌ ${window.NoteVocab.state.error || 'Could not read the note vocabulary.'}`, "error");
+            return;
+        }
         
         let txid = "";
         if (network === "VOI") {
@@ -213,8 +248,9 @@ export async function initiateBail(cardId, clubId) {
             const txObj = {
                 from: userAddress, type: 'appl', appIndex: parseInt(assetId),
                 appArgs: [methodSelector, recipientAddr, amountArg],
-                // PILLAR 3: Bound Verification for Underworld Bail
-                note: new TextEncoder().encode(`BAIL_PAYMENT:${cardId}:${userAddress}:${Date.now()}`)
+                // PILLAR 3: Bound Verification for Underworld Bail.
+                // Prefix owned by the server (note_vocabulary.go).
+                note: new TextEncoder().encode(bailNote)
             };
             
             if (walletProvider === 'nautilus') {
@@ -236,6 +272,11 @@ export async function initiateBail(cardId, clubId) {
         }
 
         if (!txid) throw new Error("Transaction verification failed.");
+
+        // Journal the SIGNED bail. It stays PENDING: this path reports over the
+        // WebSocket and the server's answer arrives on another channel, so the
+        // client must NOT settle it here. Only a server response may do that.
+        window.VbtTxJournal.record({ purpose: 'bail_payment', txid: txid, amount_micro: bailAmountMicro, note: bailNote });
 
         socket.send(JSON.stringify({
             type: "bail_card",
@@ -313,14 +354,27 @@ export function deployTrap(trapId) {
 let bountyBoardTicker = null;
 
 export async function openBountyBoard() {
+    if (typeof window.GetGameState !== 'function') {
+        showToast('Syncing bounty feeds…', 'info');
+        let tries = 0;
+        const retry = () => { if (typeof window.GetGameState === 'function') openBountyBoard(); else if (tries++ < 40) setTimeout(retry, 150); };
+        setTimeout(retry, 150);
+        return;
+    }
     const state = window.GetGameState();
     const myWanted = state.wanted_level || 0;
     const isHunter = myWanted <= 2;
     const hasDisruptor = (state.inventory && state.inventory["cloak_disruptor"] > 0);
+    const isIntel = state.job_role === "Intel-Agent";
+    const hasDecryptor = (state.inventory && state.inventory["deep_scan_decryptor"] > 0);
     
     // PILLAR 3: Cooldown Tracking
-    const cooldownAt = state.disruptor_cooldown_at ? new Date(state.disruptor_cooldown_at).getTime() : 0;
-    const isOnCooldown = cooldownAt > Date.now();
+    const disruptorCooldownAt = state.disruptor_cooldown_at ? new Date(state.disruptor_cooldown_at).getTime() : 0;
+    const disruptorOnCooldown = disruptorCooldownAt > Date.now();
+
+    const lastScan = state.last_deep_scan_at ? new Date(state.last_deep_scan_at).getTime() : 0;
+    const scanCooldownAt = lastScan + 300000;
+    const scanOnCooldown = scanCooldownAt > Date.now();
 
     // Clean up previous interval
     if (bountyBoardTicker) clearInterval(bountyBoardTicker);
@@ -373,10 +427,10 @@ export async function openBountyBoard() {
             <p class="font-size-0-8em opacity-7 mb-20">Hunters (Wanted ≤ 2) earn 50 $VBV per Wanted point on victory.</p>
             ${isHunter && hasDisruptor ? `
                 <div class="flex-row justify-center gap-10 mb-15">
-                    <button id="btn-disrupt-signal" class="outline btn-small border-neon-cyan text-neon-cyan ${isOnCooldown ? 'disabled' : ''}" 
-                            ${isOnCooldown ? 'disabled' : ''}
+                    <button id="btn-disrupt-signal" class="outline btn-small border-neon-cyan text-neon-cyan ${disruptorOnCooldown ? 'disabled' : ''}" 
+                            ${disruptorOnCooldown ? 'disabled' : ''}
                             onclick="initiateCloakDisruption()">
-                        ${isOnCooldown ? `RECALIBRATING (${Math.ceil((cooldownAt - Date.now())/1000)}s)` : 'DISRUPT SIGNAL'}
+                        ${disruptorOnCooldown ? `RECALIBRATING (${Math.ceil((disruptorCooldownAt - Date.now())/1000)}s)` : 'DISRUPT SIGNAL'}
                     </button>
                     <small class="opacity-5 font-size-0-7em">Requires Cloak Disruptor. Reveals Ghosted targets for 5 min.</small>
                 </div>
@@ -386,12 +440,12 @@ export async function openBountyBoard() {
         </div>`;
     document.body.appendChild(overlay);
 
-    if (isOnCooldown) {
+    if (disruptorOnCooldown) {
         bountyBoardTicker = setInterval(() => {
             const btn = document.getElementById("btn-disrupt-signal");
             const now = Date.now();
-            if (btn && cooldownAt > now) {
-                btn.innerText = `RECALIBRATING (${Math.ceil((cooldownAt - now)/1000)}s)`;
+            if (btn && disruptorCooldownAt > now) {
+                btn.innerText = `RECALIBRATING (${Math.ceil((disruptorCooldownAt - now)/1000)}s)`;
             } else if (btn) {
                 btn.innerText = "DISRUPT SIGNAL";
                 btn.classList.remove("disabled");
@@ -476,6 +530,14 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
         if (hasBlackout && window.playBlackoutSFX) window.playBlackoutSFX();
     }
 
+    // PILLAR 5: DOM Integrity. 
+    // Check for existing overlay to prevent duplicate stacks.
+    const existing = document.getElementById("social-hub-overlay");
+    if (existing) {
+        switchSocialTab(initialTab);
+        return;
+    }
+
     const overlay = document.createElement("div");
     overlay.id = "social-hub-overlay";
     overlay.className = "overlay";
@@ -497,7 +559,13 @@ export async function openSocialPanelOverlay(initialTab = 'alliances') {
             <div class="flex-row justify-center gap-10 mb-20">
                 <button id="social-tab-alliances" class="tab-btn" onclick="switchSocialTab('alliances')">🤝 ALLIANCES</button>
                 <button id="social-tab-career" class="tab-btn" onclick="switchSocialTab('career')">💼 CAREER</button>
+                <button id="social-tab-justice" class="tab-btn" onclick="switchSocialTab('justice')">⚖️ JUSTICE</button>
+                <!-- PILLAR 3: Underworld Contracts Integration -->
+                <button id="social-tab-underworld" class="tab-btn" onclick="switchSocialTab('underworld')">💀 UNDERWORLD</button>
                 <button id="social-tab-achievements" class="tab-btn" onclick="switchSocialTab('achievements')">🏆 VALOR</button>
+            </div>
+            <div class="flex-row justify-end mb-10 px-20">
+                <small class="text-neon-cyan pointer hover-opacity-1" style="font-size: 0.65em; letter-spacing: 1px;" onclick="window.openSignatureReconciliation()">[FORENSIC BREAKDOWN]</small>
             </div>
             <div id="social-content-hub" class="flex-col gap-15 max-h-400 overflow-y-auto"></div>
             <button class="outline mt-20 w-full" onclick="window.cleanupSocialHub(); document.getElementById('social-hub-overlay').remove()">CLOSE</button>
@@ -562,7 +630,6 @@ function renderStaffTrainingStatus(myClub) {
         </div>`;
 }
 
-let allianceInviteInterval = null;
 
 /**
  * startAllianceInviteTimer manages the real-time countdown for partnership proposals.
@@ -609,8 +676,6 @@ function renderGhostProtocolStatus(state) {
         </div>`;
 }
 
-let ghostProtocolInterval = null;
-
 /**
  * startGhostProtocolTimer manages the real-time countdown for signal scrambling.
  */
@@ -634,8 +699,6 @@ function startGhostProtocolTimer(expiresAt) {
     update();
     ghostProtocolInterval = setInterval(update, 1000);
 }
-
-let staffTrainingInterval = null;
 
 /**
  * startStaffTrainingTimer manages the real-time countdown for active mutation buffs.
@@ -836,7 +899,824 @@ export async function switchSocialTab(tab) {
             </div>`;
         }).join('')}</div>`;
     }
+    else if (tab === 'justice') {
+        renderJusticeDashboard(container);
+    }
+    else if (tab === 'underworld') {
+        fetchUnderworldContractsAndRender(container);
+    }
 }
+
+/**
+ * openLaunderingTerminal provides an interface for Launderers to reduce Wanted Level.
+ * PILLAR 3: Career Path Actions.
+ */
+export function openLaunderingTerminal() {
+    const overlay = document.createElement("div");
+    overlay.id = "laundering-terminal-overlay";
+    overlay.className = "overlay";
+
+    overlay.innerHTML = `
+        <div class="criminality-panel glass-panel w-400 border-neon-purple">
+            <h2 class="text-neon-purple">🧼 LAUNDERING TERMINAL</h2>
+            <p class="opacity-7 font-size-0-85em">Process hot capital to scrub your digital signature.<br>Fee: <b class="text-neon-green">1,000 $VBV</b> | Reduction: <b class="text-neon-cyan">-3 Wanted Level</b></p>
+            <div class="flex-col gap-10 mt-20">
+                <button class="w-full bg-neon-purple text-white font-bold" onclick="window.submitLaunderRequest()">EXECUTE SCRUB</button>
+                <button class="outline w-full mt-10" onclick="document.getElementById('laundering-terminal-overlay').remove()">ABORT</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+window.openLaunderingTerminal = openLaunderingTerminal;
+// ── THE CRIMINALITY HUB ─────────────────────────────────────────────────────
+// The World Dashboard's Criminality leaf used to BE openCourthouse, which returns
+// early when the player has no Wanted Level — so for a clean player the leaf did
+// NOTHING: a button that silently no-ops. The hub always opens and STATES the
+// status, and the courthouse is one of its sections, beside the bounty board and the
+// Intel-Agent intercept.
+
+export function openCriminality() {
+    hideAllOverlays();
+    const state = (typeof window.GetGameState === 'function') ? window.GetGameState() : {};
+    const wanted = state.wanted_level || 0;
+    const owed = wanted > 0;
+
+    const overlay = document.createElement("div");
+    overlay.id = "criminality-hub-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="criminality-panel glass-panel">
+            <h2 class="text-error">⚖️ CRIMINALITY</h2>
+            <p class="infamy-status">Infamy Status: <b>LEVEL ${wanted}</b><br>${owed
+                ? 'The High Council has flagged you for criminal activities.'
+                : 'You are clean — the courthouse has nothing to collect.'}</p>
+            <div class="flex-col gap-10 mt-20">
+                <button class="outline w-full" ${owed ? 'onclick="window.openCourthouse()"' : 'disabled'}>
+                    🏛️ ARENA COURTHOUSE ${owed ? `— SETTLE ${wanted * 100} $VBV` : '(NOTHING OWED)'}
+                </button>
+                <button class="outline w-full" onclick="window.openBountyBoard()">🎯 BOUNTY BOARD</button>
+                <button class="outline w-full" onclick="window.openCyberIntercept()">🛰️ INTEL-AGENT CYBER-INTERCEPT</button>
+            </div>
+            <button class="outline w-full mt-10" onclick="document.getElementById('criminality-hub-overlay').remove()">CLOSE</button>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+window.openCriminality = openCriminality;
+window.openCourthouse = openCourthouse;
+window.openBountyBoard = openBountyBoard;
+
+// ── INTEL-AGENT CYBER-INTERCEPT ─────────────────────────────────────────────
+// The ONE client of /api/criminality/cyber-intercept. It sends the wallet the way
+// every door resolves it (X-Wallet-Address, the header getWalletFromRequest reads)
+// and paints ONLY what the server answered: a refusal is the server's own reason.
+// The role gate and the price are the server's, so this UI asserts neither.
+
+export function openCyberIntercept() {
+    hideAllOverlays();
+    const overlay = document.createElement("div");
+    overlay.id = "cyber-intercept-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+        <div class="criminality-panel glass-panel">
+            <h2 class="text-neon-cyan">🛰️ CYBER-INTERCEPT</h2>
+            <p class="opacity-7 font-size-0-85em">Scan for obscured signals. An Intel-Agent career is required
+            (the server decides), the scan is priced by the server, and the signal strength scales with your
+            career tier.</p>
+            <div id="cyber-intercept-result" class="mt-15"></div>
+            <div class="flex-col gap-10 mt-20">
+                <button id="cyber-intercept-scan" class="w-full bg-neon-cyan text-black font-bold" onclick="window.submitCyberIntercept()">SCAN FOR SIGNALS</button>
+                <button class="outline w-full" onclick="document.getElementById('cyber-intercept-overlay').remove()">CLOSE</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+
+export async function submitCyberIntercept() {
+    const out = document.getElementById("cyber-intercept-result");
+    const btn = document.getElementById("cyber-intercept-scan");
+    if (btn) { btn.disabled = true; btn.innerText = "SCANNING..."; }
+
+    const wallet = userAddress
+        || (typeof window.getActiveWallet === 'function' ? window.getActiveWallet() : '') || '';
+    if (!wallet) {
+        if (out) out.innerHTML = `<div class="text-error font-size-0-85em">❌ Connect a wallet first — the scan is charged to it.</div>`;
+        if (btn) { btn.disabled = false; btn.innerText = "SCAN FOR SIGNALS"; }
+        return;
+    }
+
+    try {
+        const res = await fetch(`${CONFIG.API_BASE}/api/criminality/cyber-intercept?wallet=${encodeURIComponent(wallet)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Wallet-Address': wallet },
+            body: JSON.stringify({})
+        });
+        let data = {};
+        try { data = await res.json(); } catch (e) { data = {}; }
+
+        if (!res.ok) {
+            // The server's own reason, stated — never a fabricated success.
+            if (out) out.innerHTML = `<div class="text-error font-size-0-85em">❌ ${data.error || ('The scan was refused (HTTP ' + res.status + ').')}</div>`;
+            return;
+        }
+
+        const permille = Number(data.decrypt_bonus_permille || 1000);
+        if (out) out.innerHTML = `
+            <div class="glass-panel p-10 font-size-0-8em">
+                <div>📡 Signal intercepted: <b class="text-neon-cyan">${data.event_id || '—'}</b></div>
+                <div>Strength: <b>${data.signal_strength == null ? '—' : data.signal_strength}</b> · Career tier: <b>${data.tier == null ? '—' : data.tier}</b></div>
+                <div>Paid: <b>${formatMicro(data.cost_micro || 0)} $VBV</b> · XP: <b class="text-neon-green">+${data.xp_awarded || 0}</b></div>
+                <div class="opacity-6">$VBV gate: ×${(permille / 1000).toFixed(2)} (${permille}‰) — the integer form the XP award uses.</div>
+            </div>`;
+        showToast(`🛰️ Signal intercepted (+${data.xp_awarded || 0} XP)`, "success");
+    } catch (err) {
+        if (out) out.innerHTML = `<div class="text-error font-size-0-85em">❌ The scan could not be sent: ${err.message}</div>`;
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerText = "SCAN FOR SIGNALS"; }
+    }
+}
+window.openCyberIntercept = openCyberIntercept;
+window.submitCyberIntercept = submitCyberIntercept;
+
+window.submitLaunderRequest = () => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 1000) return showToast("❌ Insufficient rewards for laundering.", "error");
+    if (state.job_role !== "Launderer") return showToast("❌ Career Path: Launderer Required.", "error");
+
+    showToast("🧼 Initiating capital scrubbing protocol...", "info");
+    socket.send(JSON.stringify({
+        type: "launder_capital",
+        payload: { fee_micro: 1000 * 1000000 }
+    }));
+    document.getElementById("laundering-terminal-overlay")?.remove();
+};
+
+/**
+ * renderJusticeDashboard populates the Justice Tier Bounty Center with real-time sector intel.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+function renderJusticeDashboard(container) {
+    const state = window.GetGameState();
+
+    // PILLAR 3: Justice Path Authorization.
+    // Identify roles aligned with the Justice faction according to the Expansion Plan trajectories.
+    const justiceRoles = ["Intel-Agent", "Bounty Hunter", "Armed-Offender-Squad (AOS)", "Justice Recruiter", "Justice Commissioner", "Judge", "Warden", "Forensic Analyst", "Tax Auditor", "Sector Peacekeeper"];
+    const isJusticeAligned = justiceRoles.includes(state.job_role);
+
+    const isMission001Active = state.active_justice_mission_id === "MISSION-001";
+    const isMission007Active = state.active_justice_mission_id === "MISSION-007";
+    const isMission008Active = state.active_justice_mission_id === "MISSION-008";
+    const isMission012Active = state.active_justice_mission_id === "MISSION-012";
+    const isMission013Active = state.active_justice_mission_id === "MISSION-013";
+    const isMission014Active = state.active_justice_mission_id === "MISSION-014";
+    const isMission016Active = state.active_justice_mission_id === "MISSION-016";
+    const isMission021Active = state.active_justice_mission_id === "MISSION-021";
+    const isMission020Active = state.active_justice_mission_id === "MISSION-020";
+    const isMission019Active = state.active_justice_mission_id === "MISSION-019";
+    const isMission018Active = state.active_justice_mission_id === "MISSION-018";
+    const isMission015Active = state.active_justice_mission_id === "MISSION-015";
+    const isMission022Active = state.active_justice_mission_id === "MISSION-022";
+    const isMission023Active = state.active_justice_mission_id === "MISSION-023";
+    const isMission025Active = state.active_justice_mission_id === "MISSION-025";
+    const isMission026Active = state.active_justice_mission_id === "MISSION-026";
+    const isMission027Active = state.active_justice_mission_id === "MISSION-027";
+
+    const arenaCenterClub = Object.values(globalClubs).find(c => (c.territories || []).includes("arena_center"));
+    const arenaCenterOwner = arenaCenterClub ? arenaCenterClub.owner_wallet?.toLowerCase() : null;
+
+    const licenseExpiry = state.bounty_hunter_license_expires_at ? new Date(state.bounty_hunter_license_expires_at) : null;
+    const hasActiveLicense = licenseExpiry && licenseExpiry > Date.now();
+
+    const outlaws = lastLobbyPlayers.filter(p => (p.wanted_level || 0) >= 10);
+    
+    container.innerHTML = `
+        <div class="glass-panel p-20 m-0 border-neon-cyan">
+            <div id="license-status-banner" class="glass-panel p-10 m-0 mb-15 flex-row justify-between align-center ${hasActiveLicense ? 'border-neon-cyan' : 'expired'}" style="background: rgba(0, 242, 254, 0.05);">
+                <div class="text-left">
+                    <small class="opacity-5 block mb-2 letter-spacing-1">ENFORCEMENT LICENSE</small>
+                    <b class="${hasActiveLicense ? 'text-neon-green' : 'text-error'} font-size-0-9em">${hasActiveLicense ? 'STATUS: VALID' : 'STATUS: EXPIRED / NONE'}</b>
+                </div>
+                ${hasActiveLicense ? 
+                    `<small class="text-neon-cyan font-mono">${licenseExpiry.toLocaleDateString()}</small>` : 
+                    `<button class="outline success btn-small" onclick="window.purchaseBountyHunterLicense()">BUY (50 $VBV)</button>`
+                }
+            </div>
+
+            <h3 class="text-neon-cyan mb-10">JUSTICE TIER BOUNTY CENTER</h3>
+            <p class="opacity-7 font-size-0-85em mb-15">
+                Sector-wide tracking active. Monitoring high-infamy signatures for enforcement eligibility.
+            </p>
+            
+            <div class="flex-col gap-10">
+                <div class="section-label opacity-5 font-size-0-7em letter-spacing-1">REAL-TIME TRACKING GRID</div>
+                <div id="justice-tracking-grid" class="flex-col gap-5 max-h-200 overflow-y-auto p-10 bg-dark-overlay rounded">
+                    ${outlaws.length === 0 ? 
+                        '<div class="opacity-3 italic text-center py-20 font-size-0-85em">No high-infamy targets detected in sector.</div>' :
+                        outlaws.map(p => {
+                            const isGhost = p.ghost_protocol_expires_at && new Date(p.ghost_protocol_expires_at) > Date.now();
+                            const isHost = Object.keys(p.kidnapped_cards || {}).length > 0;
+                            const isTargetFor001 = isMission001Active && (p.wanted_level || 0) >= 15 && !isGhost;
+                            const isTargetFor007 = isMission007Active && (p.wanted_level || 0) >= 15 && !isGhost;
+
+                            // MISSION-008 & MISSION-012: Regional Governor's status.
+                            const isGovernor = p.employer_id && globalClubs[p.employer_id]?.owner_wallet?.toLowerCase() === p.wallet?.toLowerCase() && 
+                                               ((globalClubs[p.employer_id]?.territories?.length || 0) + 
+                                                (globalClubs[p.employer_id]?.allied_club_id ? (globalClubs[globalClubs[p.employer_id].allied_club_id]?.territories?.length || 0) : 0)) >= 2;
+                            const isTargetFor008 = isMission008Active && isGovernor && !isGhost;
+                            const isTargetFor012 = isMission012Active && isGovernor && !isGhost;
+                            
+                            const uniqueVictims = new Set(Object.values(p.kidnapped_cards || {}));
+                            const isTargetFor013 = isMission013Active && (p.wanted_level || 0) >= 25 && uniqueVictims.size >= 2 && !isGhost;
+                            const isTargetFor014 = isMission014Active && isGovernor && (p.wanted_level || 0) >= 15 && Object.keys(p.kidnapped_cards || {}).length >= 2 && !isGhost;
+                            const isTargetFor015 = isMission015Active && (p.wanted_level || 0) >= 30 && !isGhost && p.match_history?.some(h => h.underworld_contract_id === "CONTRACT-018" && h.is_underworld_contract_success);
+                            const isTargetFor016 = isMission016Active && p.wallet && arenaCenterOwner === p.wallet.toLowerCase() && (p.wanted_level || 0) >= 35 && !isGhost;
+                            const isTargetFor017 = isMission017Active && (p.wanted_level || 0) >= 40 && !isGhost && p.match_history?.some(h => h.underworld_contract_id === "CONTRACT-019" && h.is_underworld_contract_success);                            
+                            const isTargetFor021 = isMission021Active && (p.wanted_level || 0) >= 60 && Object.keys(p.kidnapped_cards || {}).length >= 3 && !isGhost;
+                            
+                            let isTargetFor020 = false;
+                            if (isMission020Active && (p.wanted_level || 0) >= 50 && !isGhost && p.match_history) {
+                                const executed018 = p.match_history.some(h => h.underworld_contract_id === "CONTRACT-018" && h.is_underworld_contract_success);
+                                const executed019 = p.match_history.some(h => h.underworld_contract_id === "CONTRACT-019" && h.is_underworld_contract_success);
+                                if (executed018 && executed019) {
+                                    isTargetFor020 = true;
+                                }
+                            }
+
+                            let isTargetFor026 = false;
+                            if (isMission026Active && (p.wanted_level || 0) >= 15 && !isGhost) {
+                                const playerClub = Object.values(globalClubs).find(c => c.owner_wallet?.toLowerCase() === p.wallet?.toLowerCase());
+                                if (playerClub) {
+                                    const hasKidnapperStaff = Object.values(playerClub.staff || {}).some(role => role === "Kidnapper");
+                                    if (hasKidnapperStaff) {
+                                        isTargetFor026 = true;
+                                    }
+                                }
+                            }
+
+                            let isTargetFor027 = false;
+                            if (isMission027Active && state.job_role === "Intel-Agent" && (p.wanted_level || 0) >= 40 && !isGhost && p.match_history) {
+                                const heistedArenaCenter = p.match_history.some(h => (h.underworld_contract_id === "CONTRACT-015" || h.underworld_contract_id === "CONTRACT-023") && h.is_underworld_contract_success);
+                                if (heistedArenaCenter) {
+                                    isTargetFor027 = true;
+                                }
+                            }
+
+                            let isTargetFor022 = false;
+                            if (isMission022Active && (p.wanted_level || 0) >= 70 && !isGhost && p.match_history) {
+                                const executed022 = p.match_history.some(h => h.underworld_contract_id === "CONTRACT-022" && h.is_underworld_contract_success);
+                                if (executed022) {
+                                    isTargetFor022 = true;
+                                }
+                            }
+
+                            let isTargetFor023 = false;
+                            if (isMission023Active && (p.wanted_level || 0) >= 80 && !isGhost && p.match_history) {
+                                const executed021 = p.match_history.some(h => h.underworld_contract_id === "CONTRACT-021" && h.is_underworld_contract_success);
+                                const executed022 = p.match_history.some(h => h.underworld_contract_id === "CONTRACT-022" && h.is_underworld_contract_success);
+                                if (executed021 && executed022) {
+                                    isTargetFor023 = true;
+                                }
+                            }
+
+                            let isTargetFor025 = false;
+                            if (isMission025Active && state.job_role === "Tax Auditor" && !isGhost) {
+                                const ownedClub = Object.values(globalClubs).find(c => c.owner_wallet?.toLowerCase() === p.wallet?.toLowerCase());
+                                if (ownedClub && ownedClub.treasury >= 10000) {
+                                    isTargetFor025 = true;
+                                }
+                            }
+
+                            let isTargetFor018 = false;
+                            if (isMission018Active && (p.wanted_level || 0) >= 20 && !isGhost) {
+                                const playerClub = Object.values(globalClubs).find(c => c.owner_wallet?.toLowerCase() === p.wallet?.toLowerCase());
+                                if (playerClub) {
+                                    const hasCriminalStaff = Object.values(playerClub.staff || {}).some(role => role === "Criminal");
+                                    if (hasCriminalStaff) {
+                                        isTargetFor018 = true;
+                                    }
+                                }
+                            }
+                            
+                            let isTargetFor019 = false;
+                            if (isMission019Active && (p.wanted_level || 0) >= 25 && !isGhost) {
+                                const playerClub = Object.values(globalClubs).find(c => c.owner_wallet?.toLowerCase() === p.wallet?.toLowerCase());
+                                if (playerClub) {
+                                    const hasLaundererStaff = Object.values(playerClub.staff || {}).some(role => role === "Launderer");
+                                    if (hasLaundererStaff) {
+                                        isTargetFor019 = true;
+                                    }
+                                }
+                            }
+
+                            const isPriorityTarget = isTargetFor001 || isTargetFor007 || isTargetFor008 || isTargetFor012 || isTargetFor013 || isTargetFor014 || isTargetFor015 || isTargetFor016 || isTargetFor017 || isTargetFor018 || isTargetFor019 || isTargetFor020 || isTargetFor021 || isTargetFor022 || isTargetFor023 || isTargetFor025 || isTargetFor026 || isTargetFor027;
+
+                            let targetBadge = '';
+                            if (isTargetFor001) targetBadge = '<div class="text-neon-cyan font-bold font-size-0-7em mb-2">PRIORITY TARGET</div>';
+                            else if (isTargetFor007) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2">OUTLAW ASSET</div>';
+                            else if (isTargetFor008) targetBadge = '<div class="text-gold font-bold font-size-0-7em mb-2">GOVERNOR ASSET</div>';
+                            else if (isTargetFor012) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ CORRUPTION SIG</div>';
+                            else if (isTargetFor013) targetBadge = '<div class="text-warning font-bold font-size-0-7em mb-2 pulse">⚠️ KINGPIN SIG</div>';
+                            else if (isTargetFor014) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ GOVERNOR SIG</div>';
+                            else if (isTargetFor015 || isTargetFor016) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ HEGEMONY SIG</div>';
+                            else if (isTargetFor017) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ CHAOS SIG</div>';
+                            else if (isTargetFor018 || isTargetFor021) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ SYNDICATE SIG</div>';
+                            else if (isTargetFor019) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ LAUNDRY SIG</div>';
+                            else if (isTargetFor020) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ APEX SIG</div>';
+                            else if (isTargetFor022) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ SOVEREIGN SIG</div>';
+                            else if (isTargetFor023) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ ULTIMATE SIG</div>';
+                            else if (isTargetFor026) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ KIDNAPPER SIG</div>';
+                            else if (isTargetFor027) targetBadge = '<div class="text-error font-bold font-size-0-7em mb-2 pulse">⚠️ BREACH SIG</div>';
+                            else if (isTargetFor025) targetBadge = '<div class="text-neon-cyan font-bold font-size-0-7em mb-2 pulse">⚠️ AUDIT SIG</div>';
+
+                            return `
+                                <div class="flex-row justify-between align-center p-8 border-bottom-glass ${isPriorityTarget ? 'priority-target-row' : ''}">
+                                    <div class="flex-col">
+                                        <b class="${isGhost ? 'text-neon-purple' : 'text-error'}">${isGhost ? 'SIG: [SCRAMBLED]' : getCachedEnvoiName(p.wallet)}</b>
+                                        <small class="opacity-5">Last Seen: ${p.last_seen_district || 'Sector Unknown'}</small><br>
+                                        ${!isGhost ? (isJusticeAligned ? 
+                                            `<div class="flex-row gap-5 mt-5">
+                                                <button class="outline btn-small border-neon-cyan text-neon-cyan btn-flag-signature" onclick="flagPlayerForReview('${p.wallet}')">FLAG</button>
+                                                ${state.job_role === 'Tax Auditor' && (p.wanted_level || 0) > 30 ? 
+                                                    `<button class="outline btn-small border-error text-error" onclick="window.freezeDividends('${p.wallet}')">FREEZE</button>` : ''}
+                                                ${isHost && state.job_role === 'Armed-Offender-Squad' ? 
+                                                    `<button class="outline btn-small border-neon-purple text-neon-purple" onclick="window.initiateAOSRaid('${p.wallet}')">RAID HOST</button>` : ''}
+                                            </div>` : 
+                                            `<button class="outline btn-small border-grey text-grey mt-5 opacity-4" style="cursor: not-allowed; font-size: 8px;" disabled title="Justice Career Path Required">FLAG SIGNATURE</button>`
+                                        ) : ''}
+                                    </div>
+                                    <div class="text-right">
+                                        ${targetBadge}
+                                        <span class="text-error font-mono font-bold">L-INF: ${p.wanted_level}</span>
+                                        ${isGhost ? '<div class="font-size-0-6em text-neon-purple font-bold">GHOST ACTIVE</div>' : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')
+                    }
+                </div>
+
+                <div class="section-label opacity-5 font-size-0-7em letter-spacing-1 mt-10">ACTIVE JUSTICE MISSIONS</div>
+                <div id="justice-missions-list" class="flex-col gap-10">
+                    <div class="glass-panel p-15 m-0 border-warning italic opacity-5 text-center font-size-0-8em">
+                        Decrypting mission dossier...
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    fetchJusticeMissionsAndRender();
+}
+
+window.purchaseBountyHunterLicense = () => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 50) return showToast("❌ Insufficient rewards for license.", "error");
+    
+    showToast("⚖️ Maintaining enforcement status...", "info");
+    socket.send(JSON.stringify({ type: "purchase_bounty_license", payload: {} }));
+};
+
+window.initiateAOSRaid = (targetWallet) => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 1500) return showToast("❌ Raid Failed: 1,500 $VBV Tactical Fee required.", "error");
+    
+    if (!confirm(`Deploy Armed Offender Squad to strike ${getCachedEnvoiName(targetWallet)}?\n\nTeammates from your club join automatically. Success chance based on team size.`)) return;
+
+    showToast("🎯 Deploying AOS tactical team...", "warning");
+    socket.send(JSON.stringify({ type: "aos_raid", payload: { target_wallet: targetWallet } }));
+    window.cleanupSocialHub();
+    document.getElementById("social-hub-overlay")?.remove();
+};
+
+/**
+ * purchaseRaidInsurance allows a Hostage Host to secure their vault.
+ * PILLAR 1: VBV Sinks.
+ */
+window.purchaseRaidInsurance = () => {
+    const state = window.GetGameState();
+    if (state.job_role !== "Hostage Host") return showToast("❌ Career Path: Hostage Host required.", "error");
+    if (state.virtual_balance < 3000) return showToast("❌ Insufficient rewards for premium (3,000 $VBV).", "error");
+
+    if (!confirm("🛡️ PURCHASE RAID INSURANCE?\n\nCost: 3,000 $VBV\nDuration: 24 Hours\nCoverage: Blocks 1 successful AOS Raid strike.\n\nProceed with activation?")) return;
+
+    showToast("🛡️ Activating safehouse insurance protocols...", "info");
+    socket.send(JSON.stringify({ type: "purchase_raid_insurance", payload: {} }));
+};
+
+/**
+ * freezeDividends allows a Tax Auditor to disrupt an outlaw's capital flow.
+ * PILLAR 3: Justice path.
+ */
+window.freezeDividends = (targetWallet) => {
+    const state = window.GetGameState();
+    if (state.job_role !== "Tax Auditor") return showToast("❌ Career Path: Tax Auditor required.", "error");
+    
+    const targetName = getCachedEnvoiName(targetWallet);
+    if (!confirm(`⚖️ INITIATE DIVIDEND FREEZE?\n\nTarget: ${targetName}\n\nDivert future organizational yield to the Faucet?`)) return;
+
+    showToast(`⚖️ Dispatched Regulatory Alert: Freezing ${targetName}...`, "warning");
+    socket.send(JSON.stringify({ type: "freeze_dividends", payload: { target_wallet: targetWallet } }));
+};
+
+/**
+ * purchaseBountyBond allows a player to escrow a security deposit for high-tier missions.
+ * PILLAR 1: Industrial Loop (Capital Commitment).
+ */
+window.purchaseBountyBond = () => {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 1000) return showToast("❌ Insufficient rewards for security bond (1,000 $VBV required).", "error");
+    if ((state.bounty_hunter_bond_micro || 0) > 0) return showToast("⚠️ Security bond already deposited.", "warning");
+
+    if (!confirm("⚖️ DEPOSIT SECURITY BOND?\n\nCost: 1,000 $VBV (Escrowed)\nBenefit: Unlocks high-tier Justice missions.\n\nDeposit is refundable upon clean retirement (Wanted Level ≤ 2). Proceed?")) return;
+
+    showToast("⚖️ Securing bounty hunter bond...", "info");
+    socket.send(JSON.stringify({ type: "purchase_bounty_bond", payload: {} }));
+};
+
+/**
+ * refundBountyBond allows a clean player to retrieve their security deposit.
+ * PILLAR 1: Industrial Loop (Capital Retrieval).
+ */
+window.refundBountyBond = () => {
+    const state = window.GetGameState();
+    if ((state.bounty_hunter_bond_micro || 0) === 0) return showToast("❌ No active bond found for retrieval.", "error");
+
+    // PILLAR 3: Tactical Warning. Infamy denies the refund protocol.
+    if (state.wanted_level > 2) {
+        return showToast("❌ <b>REFUND DENIED:</b> Your signature is currently flagged for infamy. Visit the Courthouse to rehabilitate first.", "error");
+    }
+
+    if (!confirm("⚖️ REFUND SECURITY BOND?\n\nAction: Returns 1,000 $VBV to your liquid balance.\nConsequence: High-tier Justice status will be revoked.\n\nProceed with retrieval?")) return;
+
+    showToast("⚖️ Requesting bond retrieval...", "info");
+    socket.send(JSON.stringify({ type: "refund_bounty_bond", payload: {} }));
+};
+
+/**
+ * openSignatureReconciliation provides a forensic breakdown of the player's Reputation Standing.
+ * PILLAR 3: Identity & Modular Authority.
+ */
+window.openSignatureReconciliation = () => {
+    const state = window.GetGameState();
+    const overlay = document.createElement("div");
+    overlay.id = "sig-reconciliation-overlay";
+    overlay.className = "overlay";
+
+    // DERIVE REPUTATION COMPONENTS (Synced with economy_service.go weights)
+    const baseStanding = 100;
+    const victoryBonus = (state.wins || 0) * 10;
+    const wantedPenalty = (state.wanted_level || 0) * -10;
+    const jailPenalty = Object.keys(state.jailed_cards || {}).length * -50;
+    const mojoBonus = Math.floor((state.mojo || 0) / 5);
+    
+    const achWeights = {
+        "GOVERNOR": 150, "ARENA_LEGEND": 200, "FIRST_VICTORY": 50,
+        "ART_COLLECTOR": 100, "REHABILITATED": 75, "HEIST_SABOTEUR": 75,
+        "CORPORATE_ESPIONAGE": 100
+    };
+    let achTotal = 0;
+    const achList = (state.achievements || []).map(id => {
+        const val = achWeights[id] || 0;
+        achTotal += val;
+        return val > 0 ? `<div class="flex-row justify-between opacity-7 font-size-0-8em"><span>${id.replace(/_/g,' ')}</span><b class="text-neon-cyan">+${val}</b></div>` : '';
+    }).join('');
+
+    const myClub = globalClubs[state.employer_id];
+    const isSabotaged = myClub?.buff_expirations?.["SABOTAGE"] && new Date(myClub.buff_expirations["SABOTAGE"]) > Date.now();
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-450 border-neon-cyan">
+            <div class="market-header">
+                <span class="market-title">⚖️ SIGNATURE RECONCILIATION</span>
+                <div class="access-level">FORENSIC STANDING ANALYSIS</div>
+            </div>
+            <div class="p-20">
+                <div class="flex-col gap-10 mb-20 border-bottom-glass pb-15">
+                    <div class="flex-row justify-between"><span>BASE STANDING</span><b>${baseStanding}</b></div>
+                    <div class="flex-row justify-between"><span>VICTORY BONUS (${state.wins} WINS)</span><b class="text-neon-green">+${victoryBonus}</b></div>
+                    <div class="flex-row justify-between"><span>MOJO INFLUENCE</span><b class="text-neon-purple">+${mojoBonus}</b></div>
+                    ${achList}
+                    <div class="flex-row justify-between mt-5"><span>INFAMY PENALTY (L-${state.wanted_level})</span><b class="text-error">${wantedPenalty}</b></div>
+                    <div class="flex-row justify-between"><span>JAIL CUSTODY PENALTY</span><b class="text-error">${jailPenalty}</b></div>
+                </div>
+
+                <div class="flex-row justify-between align-center mb-15 p-10 bg-dark-overlay rounded">
+                    <span class="font-bold letter-spacing-1">TOTAL REPUTATION</span>
+                    <b class="text-neon-cyan font-size-1-5em" style="text-shadow: 0 0 10px var(--neon-cyan);">${state.reputation || 0}</b>
+                </div>
+
+                <div class="flex-col gap-5 mb-20">
+                    <div class="flex-row justify-between font-size-0-85em">
+                        <span>REGIONAL MULTIPLIER</span>
+                        <b class="${state.job_role === 'Governor' ? 'text-gold' : 'opacity-5'}">${state.job_role === 'Governor' ? '1.25x' : '1.00x'}</b>
+                    </div>
+                    <div class="flex-row justify-between font-size-0-85em">
+                        <span>SABOTAGE DISRUPTION</span>
+                        <b class="${isSabotaged ? 'text-error' : 'opacity-5'}">${isSabotaged ? '0.80x' : '1.00x'}</b>
+                    </div>
+                </div>
+
+                ${isSabotaged ? `<div class="text-error font-size-0-8em italic text-center mb-15">⚠️ WARNING: Sabotage is suppressing active multipliers.</div>` : ''}
+                <button class="outline w-full" onclick="document.getElementById('sig-reconciliation-overlay').remove()">CLOSE ANALYSIS</button>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+};
+window.openSignatureReconciliation = window.openSignatureReconciliation;
+
+/**
+ * fetchJusticeMissionsAndRender retrieves available objectives for law-enforcement players.
+ * PILLAR 3: Justice Path.
+ */
+export async function fetchJusticeMissionsAndRender() {
+    const container = document.getElementById("justice-missions-list");
+    if (!container) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/justice/missions`);
+        if (!response.ok) throw new Error(await response.text());
+        const missions = await response.json();
+
+        const state = window.GetGameState();
+        const activeMissionId = state.active_justice_mission_id;
+
+        if (missions.length === 0) {
+            container.innerHTML = `<div class="opacity-3 py-20 italic text-center font-size-0-85em">No priority enforcement missions active.</div>`;
+            return;
+        }
+
+        container.innerHTML = missions.map(m => {
+            const isActive = activeMissionId === m.id;
+            const isCorruptionTarget = m.id === "MISSION-012";
+            const isAuditTarget = m.id === "MISSION-025";
+            const isKidnapperTarget = m.id === "MISSION-026";
+            const isBreachTarget = m.id === "MISSION-027";
+            const isKingpinTarget = m.id === "MISSION-013";
+            const isHighStakesAudit = m.id === "MISSION-014";
+            const isHegemonyTarget = m.id === "MISSION-015" || m.id === "MISSION-016";
+            const isChaosTarget = m.id === "MISSION-017";
+            const isWorkforceTarget = m.id === "MISSION-018";
+            const isFinancialTarget = m.id === "MISSION-019";
+            const isApexTarget = m.id === "MISSION-020" || m.id === "MISSION-024";
+            const isSyndicateTarget = m.id === "MISSION-021";
+            const isSovereignTarget = m.id === "MISSION-022";
+            const isUltimateTarget = m.id === "MISSION-023";
+            const badgeHtml = isCorruptionTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ CORRUPTION TARGET</div>` : 
+                             isKingpinTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ KINGPIN TARGET</div>` :
+                             isHighStakesAudit ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ HIGH-STAKES AUDIT</div>` :
+                             isHegemonyTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ HEGEMONY TARGET</div>` : 
+                             isChaosTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ CHAOS TARGET</div>` :
+                             isWorkforceTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ WORKFORCE TARGET</div>` :
+                             isFinancialTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ FINANCIAL TARGET</div>` :
+                             isApexTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ APEX TARGET</div>` :
+                             isSyndicateTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ SYNDICATE TARGET</div>` :
+                             isSovereignTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ SOVEREIGN TARGET</div>` :
+                             isUltimateTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ ULTIMATE TARGET</div>` :
+                             isAuditTarget ? `<div class="text-neon-cyan font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ AUDIT TARGET</div>` :
+                             isKidnapperTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ KIDNAPPER TARGET</div>` :
+                             isBreachTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ BREACH TARGET</div>` : "";
+
+            return `
+            <div class="glass-panel p-10 m-0 border-neon-cyan flex-col gap-5">
+                ${badgeHtml}
+                <div class="flex-row justify-between align-center">
+                    <b class="text-neon-cyan">${m.title} ${isActive ? '<small class="ml-5 text-neon-cyan pulse">[ACTIVE]</small>' : ''}</b>
+                    <span class="text-neon-green font-bold">${(m.reward_micro / 1000000).toFixed(2)} $VBV</span>
+                </div>
+                <small class="opacity-7 font-size-0-85em">${m.description}</small>
+                ${isActive ? 
+                    `<div class="flex-row gap-5">
+                        ${m.id === "MISSION-005" || m.id === "MISSION-007" || m.id === "MISSION-008" ? `<button class="outline border-neon-cyan text-neon-cyan btn-small mt-5 flex-1" onclick="performForensicAudit('${m.id}')">PERFORM AUDIT</button>` : ''}
+                        <button class="outline border-error text-error btn-small mt-5 flex-1" onclick="abortJusticeMission('${m.id}')">ABORT MISSION</button>
+                    </div>` :
+                    `<button class="outline ${activeMissionId ? 'border-grey text-grey' : 'border-neon-cyan text-neon-cyan'} btn-small mt-5" ${activeMissionId ? 'disabled' : ''} onclick="acceptJusticeMission('${m.id}')">
+                        ${activeMissionId ? 'LOCKED' : 'ACCEPT MISSION'}
+                    </button>`
+                }
+            </div>
+        `}).join('');
+    } catch (err) {
+        console.error("[JUSTICE] Mission fetch failed:", err);
+        container.innerHTML = `<div class="text-error py-20 text-center font-size-0-85em">Failed to load enforcement dossier.</div>`;
+    }
+}
+window.fetchJusticeMissionsAndRender = fetchJusticeMissionsAndRender;
+
+/**
+ * acceptJusticeMission dispatches a request to the backend to initiate a pro-social mission.
+ * PILLAR 3: Justice Path.
+ */
+export function acceptJusticeMission(missionId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    showToast(`⚖️ <b>AUTHORIZING:</b> Mission ${missionId} dossier is being synchronized...`, "info");
+    socket.send(JSON.stringify({ type: "accept_justice_mission", payload: { mission_id: missionId } }));
+}
+window.acceptJusticeMission = acceptJusticeMission;
+
+/**
+ * abortJusticeMission requests the backend to terminate the active law-enforcement mission.
+ * PILLAR 3: Justice Path.
+ */
+export function abortJusticeMission(missionId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    if (!confirm("⚠️ ABORT MISSION: This will incur a Reputation penalty. Proceed?")) return;
+    
+    showToast(`⚖️ <b>ABORTING:</b> Terminating mission ${missionId}...`, "warning");
+    socket.send(JSON.stringify({ type: "abort_justice_mission", payload: { mission_id: missionId } }));
+}
+window.abortJusticeMission = abortJusticeMission;
+
+/**
+ * performForensicAudit dispatches a request to the backend to use a Forensic Audit Kit on a target card.
+ * PILLAR 3: Justice Path.
+ */
+export function performForensicAudit(missionId) {
+    const cardId = prompt("Enter the ID of the card to audit:");
+    if (!cardId) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    showToast(`⚖️ <b>AUDITING:</b> Initiating forensic scan on Card #${cardId}...`, "info");
+    socket.send(JSON.stringify({ type: "use_item", payload: { item_id: "forensic_audit_kit", target_card_id: parseInt(cardId) } }));
+}
+
+/**
+ * flagPlayerForReview triggers the Justice Terminal flagging protocol for a target outlaw.
+ * PILLAR 3: Criminality & Intelligence.
+ */
+export function flagPlayerForReview(targetWallet) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    if (!confirm(`Flag high-infamy outlaw ${getCachedEnvoiName(targetWallet)} for priority administrative review?`)) return;
+    showToast(`⚖️ <b>TERMINAL:</b> Flagging signature ${shortenAddress(targetWallet)}...`, "info");
+    socket.send(JSON.stringify({ type: "justice_flag_player", payload: { target_wallet: targetWallet } }));
+}
+window.flagPlayerForReview = flagPlayerForReview;
+
+/**
+ * fetchUnderworldContractsAndRender fetches available underworld contracts from the backend
+ * and renders them into the social hub.
+ * PILLAR 3: Underworld Contracts Integration.
+ */
+// Dynamic difficulty scaling for underworld contracts — $VBV-gated by player career tier
+let currentDifficultyMultiplier = 1.0;
+
+/**
+ * computeContractDifficultyRating returns a human-readable difficulty label based on scaled multiplier.
+ */
+function getDifficultyLabel(multiplier) {
+    if (multiplier <= 0.75) return "EASY";
+    if (multiplier <= 1.25) return "MODERATE";
+    if (multiplier <= 2.0) return "HARD";
+    return "ELITE";
+}
+
+function getDifficultyColor(multiplier) {
+    if (multiplier <= 0.75) return "text-neon-green";
+    if (multiplier <= 1.25) return "text-warning";
+    if (multiplier <= 2.0) return "text-error";
+    return "text-gold pulse";
+}
+
+async function fetchUnderworldContractsAndRender(container) {
+    container.innerHTML = `
+        <div class="glass-panel p-20 m-0 border-error">
+            <h3 class="text-error mb-10">UNDERWORLD CONTRACTS</h3>
+            <p class="opacity-7 font-size-0-85em mb-15">
+                Accept illicit contracts, manage black market operations, and expand criminal influence.
+            </p>
+            <div id="underworld-contracts-list" class="flex-col gap-10 max-h-300 overflow-y-auto">
+                <div class="glass-input w-full text-center opacity-5">Scanning for available contracts...</div>
+            </div>
+            <button class="w-full outline border-error text-error mt-15">VIEW UNDERWORLD MISSIONS</button>
+        </div>`;
+
+    const contractsListEl = document.getElementById("underworld-contracts-list");
+    if (!contractsListEl) return;
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/api/underworld/contracts`);
+        if (!response.ok) throw new Error(await response.text());
+        const contracts = await response.json();
+
+        const state = window.GetGameState();
+        const activeContractId = state.active_underworld_contract_id;
+
+        // Compute dynamic difficulty multiplier from player's $VBV-gated career tier + Cunning level
+        const vbvMultiplier = state.vbv_gating_multiplier || 1.0;
+        const cunningBonus = Math.min(0.5, (state.cunning || 0) / 200);
+        currentDifficultyMultiplier = Math.max(0.3, vbvMultiplier * (1 - cunningBonus));
+
+        if (contracts.length === 0) {
+            contractsListEl.innerHTML = `<div class="opacity-3 py-20 italic text-center">No active underworld contracts available.</div>`;
+            return;
+        }
+
+        contractsListEl.innerHTML = contracts.map(contract => {
+            const isActive = activeContractId === contract.id;
+            const isGovTarget = contract.id === "CONTRACT-010";
+            const isTitanTarget = contract.id === "CONTRACT-011";
+            const isStabilizerTarget = contract.id === "CONTRACT-012";
+            const isPremierTarget = contract.id === "CONTRACT-013";
+            const isSovereignTarget = contract.id === "CONTRACT-014" || contract.id === "CONTRACT-022";
+            const isHegemonyTarget = contract.id === "CONTRACT-015" || contract.id === "CONTRACT-016"; // Hegemony covers both heist and sabotage
+            const isEliteLiberationTarget = contract.id === "CONTRACT-017";
+            const isFortressTarget = contract.id === "CONTRACT-018";
+            const isChaosTarget = contract.id === "CONTRACT-019";
+            const isApexTarget = contract.id === "CONTRACT-020" || contract.id === "CONTRACT-023";
+            const isSyndicateTarget = contract.id === "CONTRACT-021";
+            const isFenceTarget = contract.id === "CONTRACT-024";
+            const isKidnapperTarget = contract.id === "CONTRACT-025";
+            const isSmugglerTarget = contract.id === "CONTRACT-027";
+            const badgeHtml = isGovTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1">⚠️ GOVERNOR TARGET</div>` : 
+                             isTitanTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1">⚠️ TITAN TARGET</div>` : 
+                             isStabilizerTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1">⚠️ STABILIZER TARGET</div>` : 
+                             isPremierTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ PREMIER TARGET</div>` : 
+                             isSovereignTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ SOVEREIGN TARGET</div>` : 
+                             isHegemonyTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ HEGEMONY TARGET</div>` :
+                             isEliteLiberationTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ ELITE LIBERATION</div>` :
+                             isFortressTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ FORTRESS TARGET</div>` :
+                             isChaosTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ CHAOS TARGET</div>` :
+                             isApexTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ APEX TARGET</div>` :
+                             isSyndicateTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ SYNDICATE TARGET</div>` :
+                             isFenceTarget ? `<div class="text-warning font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ FENCING TARGET</div>` :
+                             isKidnapperTarget ? `<div class="text-error font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ KIDNAPPER SIG</div>` :
+                             isSmugglerTarget ? `<div class="text-warning font-bold font-size-0-7em mb-2 letter-spacing-1 pulse">⚠️ SMUGGLER SIG</div>` : "";
+
+            const baseReward = contract.reward_micro / 1000000;
+            const scaledReward = baseReward * currentRewardRatio;
+
+            // Compute difficulty rating for this contract based on player scaling
+            const diffLabel = getDifficultyLabel(currentDifficultyMultiplier);
+            const diffColor = getDifficultyColor(currentDifficultyMultiplier);
+
+            return `
+            <div class="glass-panel p-10 m-0 ${isActive ? 'border-neon-green' : 'border-warning'} flex-col gap-5">
+                ${badgeHtml}
+                <!-- PILLAR 3: Dynamic Difficulty Indicator -->
+                <div class="flex-row justify-between align-center mb-5">
+                    <span class="font-size-0-7em letter-spacing-1 ${diffColor}" style="text-shadow: 0 0 6px currentColor;">⚠️ DIFFICULTY: ${diffLabel}</span>
+                    ${currentRewardRatio < 1.0 ? `<small class="opacity-5 font-size-0-6em">Scaling ×${(1/currentDifficultyMultiplier).toFixed(2)}</small>` : ''}
+                </div>
+                <div class="flex-row justify-between align-center">
+                    <b class="${isActive ? 'text-neon-green' : 'text-warning'}">${contract.title} ${isActive ? '<small class="ml-5 text-neon-green pulse">[ACTIVE]</small>' : ''}</b>
+                    <div class="flex-col align-end">
+                        <span class="text-neon-green font-bold">${scaledReward.toFixed(2)} $VBV</span>
+                        ${currentRewardRatio < 1.0 ? `<small class="opacity-5 font-size-0-6em">Target: ${baseReward.toFixed(0)}</small>` : ''}
+                    </div>
+                </div>
+                <small class="opacity-7">${contract.description}</small>
+                ${isActive ? 
+                    `<button class="outline border-error text-error btn-small mt-5" onclick="abortUnderworldContract('${contract.id}')">ABORT CONTRACT</button>` :
+                    `<button class="outline ${activeContractId ? 'border-grey text-grey' : 'border-warning text-warning'} btn-small mt-5" ${activeContractId ? 'disabled' : ''} onclick="acceptUnderworldContract('${contract.id}')">
+                        ${activeContractId ? 'LOCKED' : 'ACCEPT CONTRACT'}
+                    </button>`
+                }
+            </div>
+        `}).join('');
+
+    } catch (err) {
+        console.error("[UNDERWORLD] Failed to fetch contracts:", err);
+        contractsListEl.innerHTML = `<div class="text-error py-20 text-center">Failed to load contracts.</div>`;
+    }
+}
+
+/**
+ * acceptUnderworldContract dispatches a request to the backend to initiate a criminal mission.
+ * PILLAR 3: Underworld Contracts.
+ */
+export function acceptUnderworldContract(contractId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    showToast(`💀 <b>NEGOTIATING:</b> Contract ${contractId} is being finalized...`, "info");
+    socket.send(JSON.stringify({ type: "accept_underworld_contract", payload: { contract_id: contractId } }));
+}
+window.acceptUnderworldContract = acceptUnderworldContract;
+
+/**
+ * abortUnderworldContract requests the backend to terminate the active criminal mission.
+ * PILLAR 3: Underworld Contracts.
+ */
+export function abortUnderworldContract(contractId) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        showToast("❌ Connection lost. Re-linking to sector network...", "error");
+        return;
+    }
+    if (!confirm("⚠️ ABORT CONTRACT: This will incur a Reputation penalty. Proceed?")) return;
+    
+    showToast(`💀 <b>ABORTING:</b> Terminating contract ${contractId}...`, "warning");
+    socket.send(JSON.stringify({ type: "abort_underworld_contract", payload: { contract_id: contractId } }));
+}
+window.abortUnderworldContract = abortUnderworldContract;
 
 export function openHeistPlanningOverlay() {
     const state = window.GetGameState();
@@ -894,9 +1774,28 @@ export function updateHeistRiskAssessment(clubId) {
 
     const successChance = Math.min(0.95, Math.max(0.05, 0.50 + (state.cunning - securityLevel) / 100 + trapPenalty));
     fill.style.width = `${(1 - successChance) * 100}%`;
-    text.innerHTML = `ESTIMATED SUCCESS: <b class="text-neon-green">${(successChance * 100).toFixed(0)}%</b>`;
+
+    // PILLAR 1: Surcharge Visibility.
+    const targetOwner = lastLobbyPlayers.find(p => p.wallet?.toLowerCase() === club.owner_wallet?.toLowerCase());
+    const reps = targetOwner?.reparations_received_count || 0;
+    const surchargePercent = Math.floor(reps / 5) * 10;
+
+    text.innerHTML = `
+        ESTIMATED SUCCESS: <b class="text-neon-green">${(successChance * 100).toFixed(0)}%</b>
+        ${surchargePercent > 0 ? `<div class="text-warning mt-5 font-size-0-8em" style="letter-spacing: 1px;">🛡️ HARDENED TARGET: +${surchargePercent}% Sabotage Surcharge</div>` : ''}`;
+    
     btn.onclick = () => executeHeistStrike(clubId);
 }
+
+/**
+ * sendHeistRequest provides a clean functional hook for heist initiation.
+ * PILLAR 3: Functional Wiring.
+ */
+export function sendHeistRequest(targetClubId) {
+    showToast("🔪 Operatives deployed...", "warning");
+    socket.send(JSON.stringify({ type: "heist", payload: { target_club_id: targetClubId } }));
+}
+window.sendHeistRequest = sendHeistRequest;
 
 export function executeHeistStrike(clubId) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
@@ -1080,39 +1979,28 @@ export async function reportPlayer(targetWallet) {
     }
 }
 
+export function handleContractCompleted(payload) {
+    showToast(`✅ <b>CONTRACT COMPLETED:</b><br>${payload.contract_title || payload.id} — Earned ${(payload.reward_micro / 1000000).toFixed(2)} $VBV + ${payload.xp_awarded || 0} CareerXP`, "success", 6000);
+    // Refresh the contracts list if social hub is visible
+    const container = document.getElementById("underworld-contracts-list");
+    if (container) fetchUnderworldContractsAndRender(container.parentElement?.parentElement || container);
+}
+
+window.freezeDividends = window.freezeDividends;
+
 /**
- * window.cleanupSocialHub purges all active intervals to prevent memory leaks.
- * PILLAR 5: Separation of Concerns.
+ * cleanupSocialHub is the ONE teardown for the social hub. The hub's CLOSE button calls
+ * `window.cleanupSocialHub()` — a name published by NOTHING — so the call threw BEFORE the
+ * `.remove()` beside it and the hub could not be closed at all. It stops the ticker the hub's
+ * bounty view owns; removing the overlay stays with the caller that asked for the cleanup.
  */
-window.cleanupSocialHub = () => {
-    if (staffTrainingInterval) clearInterval(staffTrainingInterval);
-    if (ghostProtocolInterval) clearInterval(ghostProtocolInterval);
-    if (allianceInviteInterval) clearInterval(allianceInviteInterval);
-    Object.keys(sabotageIntervals).forEach(k => clearInterval(sabotageIntervals[k]));
-    sabotageIntervals = {};
+window.cleanupSocialHub = function cleanupSocialHub() {
+    if (bountyBoardTicker) { clearInterval(bountyBoardTicker); bountyBoardTicker = null; }
 };
 
-window.sendAllianceInvite = sendAllianceInvite;
-window.acceptAlliance = acceptAlliance;
-window.dissolveAlliance = dissolveAlliance;
-window.openCourthouse = openCourthouse;
-window.submitCourthouseFine = submitCourthouseFine;
-window.initiateBail = initiateBail;
-window.openSecuritySentry = openSecuritySentry;
-window.deployTrap = deployTrap;
-window.openBountyBoard = openBountyBoard;
-window.openRumorMill = openRumorMill;
-window.spreadRumor = spreadRumor;
-window.openTrophyView = openTrophyView;
-window.openSocialPanelOverlay = openSocialPanelOverlay;
-window.switchSocialTab = switchSocialTab;
-window.openHeistPlanningOverlay = openHeistPlanningOverlay;
-window.updateHeistRiskAssessment = updateHeistRiskAssessment;
-window.executeHeistStrike = executeHeistStrike;
-window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
-window.executeKidnap = executeKidnap;
-window.showKidnapOverlay = showKidnapOverlay;
-window.payRansom = payRansom;
+// Two handler names this module's OWN rendered markup uses (the mission board's PERFORM AUDIT button
+// and the bounty board's cloak-disruptor control). An inline handler resolves its name on `window`
+// and both functions are module-scoped, so both buttons were inert until they were published.
+window.performForensicAudit = performForensicAudit;
 window.initiateCloakDisruption = initiateCloakDisruption;
-window.reportPlayer = reportPlayer;
-window.releaseHostage = releaseHostage;
+

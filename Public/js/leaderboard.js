@@ -100,7 +100,7 @@ export async function fetchTournamentHistory(page = 1) {
                     });
                 }
             });
-            await Promise.all(Array.from(wallets).filter(w => w && w.length > 50).map(w => resolveEnvoiName(w)));
+            await Promise.all(Array.from(wallets).filter(w => w && (w?.length ?? 0) > 50).map(w => resolveEnvoiName(w)));
 
             container.innerHTML = data.history.map(t => `
                 <div class="tournament-item glass-panel">
@@ -111,7 +111,7 @@ export async function fetchTournamentHistory(page = 1) {
                     </div>
                     <div class="flex-row justify-between">
                         <span>Winner: <b class="text-gold">${getCachedEnvoiName(t.winner)}</b></span>
-                        <span>Pot: <b class="text-neon-green">${t.pot} $VBV</b></span>
+                        <span>Pot: <b class="text-neon-green">${(t.pot_micro / 1000000).toFixed(2)} $VBV</b></span>
                     </div>
                     <button class="outline x-small mt-10" onclick="toggleTournamentDetails('${t.id}')">VIEW BRACKET</button>
                     <div id="details-${t.id}" class="hidden mt-10 pt-10 border-top-glass">
@@ -170,7 +170,7 @@ function renderSeasonHistory(seasonsToRender) {
     };
 
     container.innerHTML = seasonsToRender.map(s => {
-        const highlightsHTML = s.highlights && s.highlights.length > 0 ? `
+        const highlightsHTML = s.highlights && (s.highlights?.length ?? 0) > 0 ? `
             <div class="season-highlights mb-20">
                 <div class="highlight-label font-size-0-7em opacity-5 mb-10 letter-spacing-1">HALL OF VALOR</div>
                 <div class="flex-col gap-10">

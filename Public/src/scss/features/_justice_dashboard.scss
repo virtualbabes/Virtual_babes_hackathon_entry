@@ -1,0 +1,222 @@
+/* === Justice Dashboard === */
+.justice-dashboard-container { padding: 8px 0; }
+
+.justice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(63, 81, 181, 0.05));
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.justice-badge {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.justice-badge-icon {
+    font-size: 32px;
+    color: #2196f3;
+}
+
+.justice-badge-info { display: flex; flex-direction: column; }
+
+.justice-badge-tier { font-size: 16px; font-weight: 700; color: #e5e7eb; }
+
+.justice-badge-bonus { font-size: 11px; color: #2196f3; font-weight: 600; }
+
+.justice-stats-row { display: flex; gap: 16px; }
+
+.justice-stat {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.justice-stat-val { display: block; font-size: 18px; font-weight: 700; color: #e5e7eb; }
+
+.justice-stat-label { font-size: 9px; color: #90a4ae; text-transform: uppercase; }
+
+/* Bounty section */
+.bounty-section { margin-bottom: 16px; }
+
+.bounty-section h4 { margin: 0 0 12px; }
+
+.bounty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.bounty-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.bounty-card:hover {
+    transform: translateY(-2px);
+    border-color: #f44336;
+}
+
+.bounty-card.danger-extreme {
+    border-color: rgba(244, 67, 54, 0.4);
+    background: rgba(244, 67, 54, 0.05);
+}
+
+.bounty-card.danger-high {
+    border-color: rgba(255, 152, 0, 0.4);
+    background: rgba(255, 152, 0, 0.05);
+}
+
+.bounty-card.danger-medium {
+    border-color: rgba(255, 193, 7, 0.4);
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.bounty-card.danger-low {
+    border-color: rgba(76, 175, 80, 0.4);
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.bounty-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.bounty-danger-badge {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.danger-extreme .bounty-danger-badge { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.danger-high .bounty-danger-badge { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+.danger-medium .bounty-danger-badge { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.danger-low .bounty-danger-badge { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+
+.bounty-wanted-stars { font-size: 10px; }
+
+.bounty-card-body { margin-bottom: 8px; }
+
+.bounty-target-name { display: block; font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.bounty-target-id { display: block; font-size: 9px; color: #607d8b; }
+
+.bounty-card-details { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+
+.bounty-detail { font-size: 9px; color: #90a4ae; }
+
+.bounty-card-actions { display: flex; gap: 6px; }
+
+.bounty-claim-btn { flex: 1; }
+
+.bounty-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.bounty-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.bounty-empty p { color: #90a4ae; font-size: 11px; margin: 0; }
+
+/* Missions */
+.missions-section { margin-bottom: 16px; }
+
+.missions-section h4 { margin: 0 0 12px; }
+
+.missions-list { display: flex; flex-direction: column; gap: 8px; }
+
+.mission-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.mission-card.status-active { border-color: rgba(76, 175, 80, 0.3); }
+
+.mission-card.status-completed { border-color: rgba(33, 150, 243, 0.3); opacity: 0.7; }
+
+.mission-card.status-expired { border-color: rgba(158, 158, 158, 0.3); opacity: 0.5; }
+
+.mission-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.mission-title { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.mission-status {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-active { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.status-completed { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+.status-expired { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+
+.mission-card-body {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.mission-target { font-size: 10px; color: #90a4ae; }
+
+.mission-reward { font-size: 10px; color: #ff9800; font-weight: 600; }
+
+.mission-expiry { font-size: 9px; color: #607d8b; margin-bottom: 8px; }
+
+.mission-actions { display: flex; gap: 6px; }
+
+/* Justice actions */
+.justice-actions-section h4 { margin: 0 0 12px; }
+
+.justice-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.justice-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.justice-action-btn:hover {
+    background: rgba(33, 150, 243, 0.1);
+    border-color: #2196f3;
+    transform: translateY(-2px);
+}
+
+.justice-action-icon { font-size: 24px; }
+
+.justice-action-label { font-size: 10px; color: #e5e7eb; font-weight: 600; }

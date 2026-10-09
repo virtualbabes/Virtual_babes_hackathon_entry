@@ -1,130 +1,48 @@
-Version: 2.1
-Status: Stable
-Last Amended: 2026-06-22
+Version: 4.0
+Status: Current
+Last Amended: 2026-09-20
 
 # KEY 4 — WAIT
 
-> Preserve repository awareness while awaiting further instruction or continuing autonomous execution.
+> Preserve repository awareness while awaiting instruction, or continue authorised autonomous execution.
 
 ---
 
 # OBJECTIVE
-
-The current phase has concluded.
-
-Remain synchronized.
-
-Maintain Repository Truth.
-
-Await Brendan's instruction or continue the approved autonomous workflow.
+The phase has concluded. Stay synchronized; maintain Repository Truth; await Brendan or continue the approved workflow.
 
 ---
 
 # WAIT STATE
+- Hold/pause recorded → the recommendation is PENDING: do not infer approval, do not begin implementation, clarify.
+- `yolo=true` (or no hold + active tasks in `AI-Brain/ToDo.md`) → review `.clinerules/Session-Handoff.md` and
+  `AI-Brain/ToDo.md`; if authorised work remains, return to KEY 3 / KEY 3.5. Do not re-assess what was just assessed.
 
-If the current handoff explicitly records a hold or pause:
+# AUTONOMOUS FLOW (YOLO)
+Authorised work remains → KEY 3 / KEY 3.5. None remains → loop KEY 1 → 2 → 3 → 3.5 → 4.
+The operationalised loop lives in the `nft-seduction-design-workflow` skill (present at the repository root —
+`.\nft-seduction-design-workflow\`; **verified to exist 2026-09-20**, unlike the `pre-impl-dup-check` skill the Keys
+used to name, which does not).
 
-* Treat the current recommendation as pending.
-* Do not assume approval.
-* Do not infer intent.
-* Do not begin implementation.
-* Clarify when uncertain.
-
-If the current handoff explicitly records `yolo=true` authorization, or if there is no explicit hold and `AI-Brain\ToDo.md` contains active tasks:
-
-* Review `.clinerules\Session-Handoff.md`.
-* Review `AI-Brain\ToDo.md` for active tasks.
-* Determine whether approved work remains.
-* If approved work remains, proceed immediately to KEY 3 — RECOMMEND or KEY 3.5 — IMPLEMENT as appropriate.
-* Do not reassess unless required.
-
----
-
-# AUTONOMOUS FLOW
-
-If the current handoff explicitly records `yolo=true` authorization, or if there is no explicit hold and `AI-Brain\ToDo.md` contains active tasks:
-
-If approved recommendations remain:
-
-Return to:
-
-* `.clinerules\Keys\3-Recommend.md`
-
-If no approved recommendations remain:
-
-Continue the repository workflow:
-
-* `.clinerules\Keys\1-Synchronize.md`
-* `.clinerules\Keys\2-Assess.md`
-* `.clinerules\Keys\3-Recommend.md`
-* `.clinerules\Keys\3.5-Implement.md`
-* `.clinerules\Keys\4-Wait.md`
-
-* If `.clinerules\Session-Handoff.md` records `yolo=true` authorization or `AI-Brain\ToDo.md` contains active open tasks, return immediately to KEY 1 and continue the approved autonomous cycle.
-
----
+# THE HEARTBEAT MUST BE TRUE
+`workflow_state.md` names the CURRENT KEY and its subject. Update it at every transition, because a heartbeat that names
+a finished phase is the same defect class as a document naming a missing file — and this one is 1238 lines, so treat it
+as: update the header, append the position, never read it end to end. **Measured example of the failure:** at
+2026-09-20 it still read `Current KEY: KEY 3.5 — B2 SIGNATURE AUTHORITY · STOPPED ON REQUEST` several units after that
+work had closed.
 
 # PRESERVE
+Awareness of: repository state · the current recommendation · active priorities · known blockers · the standing
+operator constraints (`RECORDS_DISPATCH` OFF · placeholders refuse real value · console has no admin entry point · the
+capped USDC rail · manual Nautilus · **GIT PUSH is Brendan's**). Avoid re-analysis: the sweep is on disk and gated.
 
-Maintain awareness of:
-
-* Repository state
-* Current recommendation
-* Active priorities
-* Known blockers
-
-Avoid unnecessary re-analysis.
-
-Repository Truth remains authoritative.
-
----
-
-# REASSESS
-
-If Brendan provides:
-
-* New requirements
-* Repository changes
-* Documentation updates
-* Implementation results
-* Architectural feedback
-
-Determine whether Repository Truth may have changed.
-
-If so:
-
-Return to **KEY 1 — SYNCHRONIZE**.
-
----
+# REASSESS — return to KEY 1 when
+new requirements arrive · the repository changes outside this session · a document is corrected in a way that changes
+the position · a gate starts failing · or the position recorded in the handoff no longer matches what you measure.
 
 # COMMUNICATION
-
-Remain concise.
-
-Respond only to:
-
-* New instructions
-* Requested clarification
-
-Do not repeat completed analysis or recommendations.
-
----
-
-# TRANSITION
-
-If the current session handoff explicitly records a hold or pause:
-
-Await Brendan's instruction.
-
-If the current session handoff explicitly records `yolo=true` authorization, or if no explicit hold exists and `AI-Brain\ToDo.md` contains active tasks:
-
-Continue the autonomous workflow until:
-
-* No approved work remains.
-* Repository Truth becomes uncertain.
-* Human judgement is required.
-* Verification fails.
-* Constitutional conflict is encountered.
+Concise. Answer the new instruction or the requested clarification. Do not restate completed analysis, and do not
+report a gate result you did not run.
 
 ---
 

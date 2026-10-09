@@ -1,0 +1,98 @@
+/* === Counterfeit Scanner */
+.counterfeit-scanner-container { padding: 8px 0; }
+
+.scanner-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.05));
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.scanner-icon { font-size: 32px; }
+
+.scanner-info { flex: 1; }
+
+.scanner-detected { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 8px 16px; }
+
+.scanner-detected-num { display: block; font-size: 18px; font-weight: 700; color: #4caf50; }
+
+.scanner-detected-label { font-size: 9px; color: #90a4ae; }
+
+.scanner-display {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scanner-scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(76, 175, 80, 0.8);
+    animation: scanline 2s linear infinite;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+@keyframes scanline {
+    0% { top: 0; }
+    100% { top: 100%; }
+}
+
+.scanner-screen { text-align: center; }
+
+.scanner-screen-text {
+    font-size: 12px;
+    color: #4caf50;
+    font-family: monospace;
+    text-shadow: 0 0 5px rgba(76, 175, 80, 0.5);
+}
+
+.scanner-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+
+.scanner-actions button { flex: 1; }
+
+.scanner-history-section h4 { margin: 0 0 12px; }
+
+.scanner-history-list { display: flex; flex-direction: column; gap: 6px; }
+
+.scanner-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+.scanner-history-item.authentic { border-color: rgba(76, 175, 80, 0.3); }
+
+.scanner-history-item.counterfeit { border-color: rgba(244, 67, 54, 0.3); }
+
+.scanner-history-icon { font-size: 14px; }
+
+.scanner-history-item.authentic .scanner-history-icon { color: #4caf50; }
+
+.scanner-history-item.counterfeit .scanner-history-icon { color: #f44336; }
+
+.scanner-history-name { flex: 1; font-size: 10px; color: #e5e7eb; }
+
+.scanner-history-result { font-size: 9px; font-weight: 700; }
+
+.scanner-history-item.authentic .scanner-history-result { color: #4caf50; }
+
+.scanner-history-item.counterfeit .scanner-history-result { color: #f44336; }

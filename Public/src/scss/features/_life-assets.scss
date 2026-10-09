@@ -1,0 +1,19 @@
+// Public\src\scss\features\_life-assets.scss
+// §26.4 Pets / §25.6 Vehicles / §25.7 World Content — combined menu panel
+
+.life-assets-panel { grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 8px; min-height: 520px; }
+
+#life-assets-overlay label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #b0bec5; margin-bottom: 7px; }
+#life-assets-overlay input, #life-assets-overlay select {
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(0, 255, 255, 0.2);
+    color: #e0f7fa; border-radius: 6px; padding: 6px 8px; font-size: 13px;
+}
+#life-assets-overlay input:focus, #life-assets-overlay select:focus { outline: none; border-color: var(--neon-cyan); }
+#life-assets-overlay .panel-pets, #life-assets-overlay .panel-veh, #life-assets-overlay .panel-world {
+    max-height: 440px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+}
+
+.la-grid { display: flex; flex-direction: column; gap: 8px; padding: 6px; }
+.la-card { background: rgba(0, 97, 106, 0.1); border: 1px solid rgba(0, 255, 255, 0.22); border-radius: 8px; padding: 10px; }
+.la-card h4 { color: #80deea; margin: 0 0 4px 0; font-size: 0.9em; }
+.ai-status { grid-column: span 3; color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }

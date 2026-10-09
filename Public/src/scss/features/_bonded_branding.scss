@@ -1,0 +1,284 @@
+// ============================================================================
+// §23.5 BONDED BRANDING STUDIO
+// ----------------------------------------------------------------------------
+// The studio is a CONTAINED overlay (`.overlay.vbt-overlay` supplies position:fixed;
+// inset:0), so this partial only styles the PANEL's interior — the scroll container is
+// `.bb-panel`, never the page. Cards are excluded from branding by the server, so no
+// card styling belongs here.
+// ============================================================================
+
+#bonded-branding-overlay {
+    align-items: center;
+    justify-content: center;
+    z-index: 9600;
+}
+
+.bb-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(1180px, 94vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    position: relative;
+
+    h2 small { font-size: 12px; opacity: .6; font-weight: 400; }
+
+    .bb-rule {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #b0bec5;
+        border-left: 3px solid #00bcd4;
+        padding-left: 10px;
+    }
+}
+
+.bb-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+    gap: 14px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .bb-grid { grid-template-columns: 1fr; }
+}
+
+.bb-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+
+    h3 {
+        margin: 4px 0 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #80deea;
+    }
+}
+
+.bb-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    label {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: #90a4ae;
+    }
+
+    input, select {
+        background: rgba(0, 0, 0, .35);
+        border: 1px solid rgba(0, 188, 212, .35);
+        border-radius: 4px;
+        color: #eceff1;
+        padding: 5px 7px;
+        font-size: 13px;
+        text-transform: none;
+        letter-spacing: normal;
+    }
+}
+
+.bb-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.bb-kindbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.bb-kind-btn {
+    background: rgba(0, 188, 212, .08);
+    border: 1px solid rgba(0, 188, 212, .3);
+    color: #80deea;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+
+    &.active, &:hover { background: rgba(0, 188, 212, .28); color: #fff; }
+}
+
+.bb-asset, .bb-target {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(255, 255, 255, .03);
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.bb-target { flex-direction: column; }
+
+.bb-target-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    small { color: #90a4ae; font-size: 11px; }
+}
+
+.bb-asset-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    small { color: #90a4ae; font-size: 11px; }
+    .bb-where { color: #b0bec5; }
+}
+
+.bb-thumb {
+    width: 54px;
+    height: 54px;
+    object-fit: cover;
+    border-radius: 5px;
+    border: 1px solid rgba(0, 188, 212, .35);
+    background: rgba(0, 0, 0, .4);
+}
+
+.bb-thumb-uri {
+    display: inline-block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    color: #80deea;
+}
+
+.bb-nomedia, .bb-empty {
+    font-size: 11px;
+    color: #78909c;
+    font-style: italic;
+}
+
+.bb-worn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bb-worn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, .25);
+    border-radius: 6px;
+    padding: 4px 6px;
+
+    small { font-size: 10px; color: #b0bec5; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+.bb-x {
+    background: transparent;
+    border: none;
+    color: #ff8a80;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.bb-target-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+
+    select {
+        flex: 1;
+        min-width: 0;
+        background: rgba(0, 0, 0, .35);
+        border: 1px solid rgba(0, 188, 212, .35);
+        border-radius: 4px;
+        color: #eceff1;
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+}
+
+// ── §23.5.5 VIEWER-SCOPED CARD DISPLAY ────────────────────────────────────────
+// A PAINTED CARD SURFACE: the viewer's own art covers the face and the engine's placeholder
+// glyph ("?") is hidden so the art reads cleanly. No card rule lives here — cards are excluded
+// from bonded assets, and this is a per-viewer display layer only.
+.bb-cvs {
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+    padding-top: 8px;
+
+    h3 small { margin-left: 6px; text-transform: none; letter-spacing: normal; opacity: .65; }
+}
+
+// §10.6 App slides + the placeholder pack — the same separated-section treatment as .bb-cvs.
+.bb-slides {
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+    padding-top: 8px;
+
+    h3 small { margin-left: 6px; text-transform: none; letter-spacing: normal; opacity: .65; }
+
+    // A slide row is wide (art + asset select + two buttons): wrap instead of overflowing.
+    .bb-target-actions { flex-wrap: wrap; }
+    .bb-worn-row img { max-width: 180px; max-height: 90px; object-fit: cover; }
+}
+
+.bb-hint {
+    margin: 0;
+    font-size: 11px;
+    color: #90a4ae;
+
+    .bb-thumb { vertical-align: middle; margin-left: 6px; }
+}
+
+// A refusal is STATED, never styled as success. Used by the §27.6 theme-slot controls.
+.bb-hint.bad { color: #ef9a9a; }
+
+// §27.6 theme slots: the two controls that had no UI anywhere in the client.
+.bb-themeslots .bb-target-actions {
+    flex-wrap: wrap;
+
+    input[type="text"] {
+        flex: 1 1 140px;
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 11px;
+        color: #e5e7eb;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+}
+
+// §23.5.1 capacity: the chest's creation budget (card/deck NFT supply) - shown, never inferred.
+.bb-cap {
+    margin: 0 0 6px;
+    font-size: 11px;
+    color: #ffd54f;
+}
+
+.bb-cap-inline {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    color: #ffd54f;
+}
+
+.cvs-art {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: transparent !important;
+    text-shadow: none;
+}

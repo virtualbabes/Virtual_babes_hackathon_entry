@@ -26,8 +26,6 @@ projects:
         sync: false
       - key: ADMIN_WALLETS
         sync: false
-      - key: ADMIN_KEY
-        sync: false
       - key: MIN_REPUTATION_FOR_REWARD
         sync: false
       - key: BASE_REWARD
@@ -50,37 +48,9 @@ projects:
         sync: false
       - key: VAULT_ADDRESS
         sync: false
-      - key: FLOW_INDEXER_URL
-        sync: false
-      - key: FLOW_NODE_URL
-        sync: false
-      - key: WAX_INDEXER_URL
-        sync: false
-      - key: WAX_NODE_URL
-        sync: false
-      - key: BITCOIN_NODE_URL
-        sync: false
-      - key: SOLANA_INDEXER_URL
-        sync: false
-      - key: SOLANA_NODE_URL
-        sync: false
-      - key: POLYGON_INDEXER_URL
-        sync: false
-      - key: POLYGON_NODE_URL
-        sync: false
-      - key: ETH_INDEXER_URL
-        sync: false
-      - key: ETH_NODE_URL
-        sync: false
-      - key: INDEXER_URL_VOI
-        sync: false
       - key: ALGOD_TOKEN_VOI
         sync: false
-      - key: ALGOD_URL_VOI
-        sync: false
-      - key: INDEXER_URL_ALGO
-        sync: false
-      - key: ALGOD_URL_ALGO
+      - key: ALGOD_TOKEN_ALGO
         sync: false
       - key: DATA_DIR
         sync: false

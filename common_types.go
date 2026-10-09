@@ -1,3 +1,5 @@
+//go:build !js && !wasm
+
 package main
 
 import (
@@ -5,8 +7,16 @@ import (
 	"time"
 )
 
+type BoardStateHash [32]byte
+
 // Global constants for resilience
 const indexerTimeout = 10 * time.Second
+
+// PILLAR 2: Economic Safety Caps.
+const MaxSinglePayoutMicro = 1000 * 1000000
+const MaxAdminNotificationAmountMicro = 5000 * 1000000 // Cap admin notifications at 5,000 VBV
+const MaxAdminRewardAmountMicro = 5000 * 1000000       // Cap admin-set reward amounts at 5,000 VBV
+const MaxGovPayoutMicro = 2000 * 1000000               // 2,000 $VBV Cap for Dividends
 
 // GlobalSentiment aggregates playstyle data for NPC commentary
 type GlobalSentiment struct {
@@ -18,29 +28,56 @@ type GlobalSentiment struct {
 
 // Club represents a player-owned organization with specialized shops.
 type Club struct {
-	ID                   string               `json:"id"`
-	Name                 string               `json:"name"`
-	OwnerWallet          string               `json:"owner_wallet"`
-	Type                 string               `json:"type"`
-	Territories          []string             `json:"territories"`
-	RegionName           string               `json:"region_name,omitempty"`
-	Treasury             float64              `json:"treasury"`
-	Commission           float64              `json:"commission_rate"`
-	Inventory            map[string]int       `json:"inventory"`
-	Staff                map[string]string    `json:"staff"`
-	ActiveBuffs          map[string]string    `json:"active_buffs"`
-	BuffExpirations      map[string]time.Time `json:"buff_expirations"`
-	Members              map[string]time.Time `json:"members"`
-	Leases               map[string]*Lease    `json:"leases"`
-	Mojo                 int                  `json:"club_mojo"`
-	Jail                 map[int]ServerCard   `json:"jail"`
-	LastActivity         time.Time            `json:"last_activity"`
-	MojoStartOf24hWindow int                  `json:"mojo_start_of_24h_window"` // Mojo value at the start of the current 24h window
-	MojoWindowStartTime  time.Time            `json:"mojo_window_start_time"`   // Timestamp when the current 24h window began
-	LastHeistAt          time.Time            `json:"last_heist_at"`
-	CreatedAt            time.Time            `json:"created_at"`
-	AlliedClubID         string               `json:"allied_club_id,omitempty"`     // ID of the allied club
-	AllianceInviteID     string               `json:"alliance_invite_id,omitempty"` // ID of club that sent an invitation
+	ID                      string               `json:"id"`
+	Name                    string               `json:"name"`
+	OwnerWallet             string               `json:"owner_wallet"`
+	Type                    string               `json:"type"`
+	Territories             []string             `json:"territories"`
+	RegionName              string               `json:"region_name,omitempty"`
+	TreasuryMicro           uint64               `json:"treasury_micro"` // PILLAR 2: Integer Supremacy
+	Treasury                float64              `json:"treasury"`       // PILLAR 3: Floating point for display UI ONLY
+	Commission              float64              `json:"commission_rate"`
+	Inventory               map[string]int       `json:"inventory"`
+	Staff                   map[string]string    `json:"staff"`
+	ActiveBuffs             map[string]string    `json:"active_buffs"`
+	BuffExpirations         map[string]time.Time `json:"buff_expirations"`
+	Members                 map[string]time.Time `json:"members"`
+	Leases                  map[string]*Lease    `json:"leases"`
+	Mojo                    int                  `json:"club_mojo"`
+	Jail                    map[int]ServerCard   `json:"jail"`
+	LastActivity            time.Time            `json:"last_activity"`
+	MojoStartOf24hWindow    int                  `json:"mojo_start_of_24h_window"`  // Mojo value at the start of the current 24h window
+	MojoWindowStartTime     time.Time            `json:"mojo_window_start_time"`    // Timestamp when the current 24h window began
+	LastBailoutAt           time.Time            `json:"last_bailout_at,omitempty"` // PILLAR 1: stimulus tracking
+	LastHeistAt             time.Time            `json:"last_heist_at"`
+	CreatedAt               time.Time            `json:"created_at"`
+	AlliedClubID            string               `json:"allied_club_id,omitempty"`             // ID of the allied club
+	AllianceInviteID        string               `json:"alliance_invite_id,omitempty"`         // ID of club that sent an invitation
+	TaxHavenExpiresAt       time.Time            `json:"tax_haven_expires_at,omitempty"`       // PILLAR 1: Political Influence
+	AllianceInviteExpiresAt time.Time            `json:"alliance_invite_expires_at,omitempty"` // PILLAR 1: Invitation TTL
+	MutationSuccesses       int                  `json:"mutation_successes"`
+	MutationFailures        int                  `json:"mutation_failures"`            // PILLAR 6: Mutation failures
+	MutationHistory         []string             `json:"mutation_history"`             // Tracks mutation events
+	CommissionHistory       []CommissionEvent    `json:"commission_history,omitempty"` // PILLAR 1: Alliance dividend logs
+	// §32 Faith: a Club may be a faith (Type=="Faith") — envelops world activity, dictates faith.
+	DogmaTag    string `json:"dogma_tag,omitempty"`    // canonical dogma identifier
+	RitualsDone uint64 `json:"rituals_done,omitempty"` // faith rituals performed by the club
+
+	// EMPLOYER-INITIATED UPGRADE REQUESTS, keyed `<RoleKey(staffWallet)>:<RoleKey(role)>`. The VALUE
+	// carries the staff wallet and the role's PROPER spelling, because a fold cannot be reversed (the
+	// RoleKey lesson). It lives HERE — on the employment record, beside `Staff` — and NOT on the staff
+	// member's career record, because a request is the EMPLOYER's own note that an employee is
+	// unlocked to upgrade. It NEVER writes that employee's `PromotedRoles`/`JobRole`: the upgrade
+	// stays theirs to take (`career_path.go` §7.5, "unlocked, never forced").
+	StaffUpgradeRequests map[string]CareerStaffUpgradeRequest `json:"staff_upgrade_requests,omitempty"`
+}
+
+// CommissionEvent records a dividend payout from an alliance partner.
+type CommissionEvent struct {
+	Timestamp  int64   `json:"timestamp"`
+	SourceClub string  `json:"source_club"`
+	Type       string  `json:"type"`   // "VECTOR", "MOOD", "LOYALTY"
+	Amount     float64 `json:"amount"` // Base $VBV
 }
 
 // Lease represents a card available for temporary use within a club.
@@ -69,6 +106,7 @@ type QueueEntry struct {
 type LinkedWallet struct {
 	Address   string    `json:"address"`
 	Chain     string    `json:"chain"` // e.g., "ETH", "POLY", "SOL"
+	Platform  string    `json:"platform,omitempty"`
 	Verified  bool      `json:"verified"`
 	Timestamp time.Time `json:"timestamp"` // When it was linked/verified
 }
@@ -94,7 +132,7 @@ type FaceplateStats struct {
 }
 
 // FaceplateRegistry maps legacy cosmetic IDs to functional social simulation bonuses.
-var FaceplateRegistry = map[string]FaceplateStats{
+var FaceplateRegistry = map[string]FaceplateStats{ // PILLAR 5: Isomorphic Parity. Shared registry.
 	"faceplate_neon_vibe":   {MojoBonus: 15, CunningBonus: 5},
 	"faceplate_shadow":      {MojoBonus: 5, CunningBonus: 20},
 	"faceplate_governor":    {MojoBonus: 50, CunningBonus: 10},
@@ -134,6 +172,7 @@ type UseItemData struct {
 	TargetCardID    int    `json:"target_card_id,omitempty"`    // For card-specific buffs (e.g., Stim, Pledge)
 	TargetGridIndex int    `json:"target_grid_index,omitempty"` // For board-specific buffs (e.g., Mood Catalyst)
 	TargetClubID    string `json:"target_club_id,omitempty"`    // For organizational intelligence (e.g., Cyber-Audit)
+	TargetWallet    string `json:"target_wallet,omitempty"`     // PILLAR 3: Targeted Intelligence (e.g., Cloak Disruptor)
 }
 
 // BailCardData defines the payload for the "bail_card" WebSocket message.
@@ -154,19 +193,21 @@ type Envelope struct {
 
 // ChallengeData handles the matchmaking handshake.
 type ChallengeData struct {
-	Action string          `json:"action"` // "invite", "accept", "decline", "sync_back"
-	Deck   []int           `json:"deck,omitempty"`
-	Avatar string          `json:"avatar,omitempty"`
-	Gloat  string          `json:"gloat,omitempty"`
-	Rules  map[string]bool `json:"rules,omitempty"`
-	Wanted int             `json:"wanted_level,omitempty"`
+	Action    string          `json:"action"` // "invite", "accept", "decline", "sync_back"
+	Deck      []int           `json:"deck,omitempty"`
+	Avatar    string          `json:"avatar,omitempty"`
+	Gloat     string          `json:"gloat,omitempty"`
+	Rules     map[string]bool `json:"rules,omitempty"`
+	Wanted    int             `json:"wanted_level,omitempty"`
+	Faceplate string          `json:"faceplate,omitempty"` // PILLAR 4: Handshake sync
 }
 
 // MoveData synchronizes gameplay actions between two human players.
 type MoveData struct {
-	GridIndex int    `json:"grid_index"`
-	CardID    int    `json:"card_id"`
-	Power     [4]int `json:"power"`
+	GridIndex   int    `json:"grid_index"`
+	CardID      int    `json:"card_id"`
+	Power       [4]int `json:"power"`
+	PlayerIndex int    `json:"player_index"` // 0 or 1
 }
 
 // ReportGloatData captures information about a reported gloat message.
@@ -190,6 +231,7 @@ type NetworkConfig struct {
 	IPFSGatewayURL string            `json:"ipfs_gateway_url"` // Custom IPFS gateway for metadata
 	IPFSAPIKey     string            `json:"ipfs_api_key"`     // API key for authenticated gateways
 	IPFSHeaders    map[string]string `json:"ipfs_headers"`     // Custom headers for IPFS requests
+	AlgodToken     string            `json:"algod_token"`      // API token for local/authenticated algod nodes (Voi/Algo)
 }
 
 // ServerCard mirrors the client Card for verification logic.
@@ -206,13 +248,21 @@ type ServerCard struct {
 	LastUpdated   time.Time `json:"last_updated"`   // TTL tracking for cache refresh
 	MetadataValid bool      `json:"metadata_valid"` // Indicates if metadata was successfully parsed
 	Mood          string    `json:"mood"`           // Volatile, Serene, Spirited, Grounded
+	Fallen        bool      `json:"fallen"`         // Pillar 7: Underworld status
+	Scars         []string  `json:"scars"`          // PILLAR 6: Procedure failure history
+	EquippedItems []string  `json:"equipped_items"` // PILLAR 5: Hardware trap/item overlay indicators
+	// §32.3 Religious Leader Card: a card adopts a religious position (DogmaTag-bound, reuses §32)
+	// and carries it across modes. Rival-faith cards get a +power blessing; same-faith cards on
+	// the field get a −power orthodoxy purge. Serializable to the client (UI shows the faith badge).
+	Religion          string `json:"religion,omitempty"`           // dogma tag (§32 DogmaTag)
+	IsReligiousLeader bool   `json:"is_religious_leader,omitempty"`
 }
 
 // TournamentSummary represents a finalized tournament for archival.
 type TournamentSummary struct {
 	ID               string            `json:"id"`
 	Timestamp        time.Time         `json:"timestamp"`
-	Pot              float64           `json:"pot"`
+	PotMicro         uint64            `json:"pot_micro"` // PILLAR 2: Integer Supremacy
 	Winner           string            `json:"winner"`
 	IsVerified       bool              `json:"is_verified"`            // Indicates successful blockchain reconstruction
 	ReceiptsVerified bool              `json:"receipts_verified"`      // Indicates VBT_WIN receipts were found for all matches
@@ -239,9 +289,9 @@ type MatchState struct {
 	P2ID              string          `json:"p2_id"`
 	P1Wallet          string          `json:"p1_wallet"` // Snapshotted for penalty calculation stability
 	P2Wallet          string          `json:"p2_wallet"`
-	TournamentID      string          `json:"tournament_id,omitempty"`       // Instance ID of the tournament
-	TournamentMatchID string          `json:"tournament_match_id,omitempty"` // Link to tournament bracket
-	P1Deck            []int           `json:"p1_deck"`                       // Card IDs in P1's deck
+	TournamentID      string          `json:"tournament_id,omitempty"` // Instance ID of the tournament
+	TournamentMatchID string          `json:"match_id,omitempty"`      // PILLAR 3: Standardized match indexing
+	P1Deck            []int           `json:"p1_deck"`                 // Card IDs in P1's deck
 	P1Avatar          string          `json:"p1_avatar"`
 	P1Gloat           string          `json:"p1_gloat"`
 	P2Deck            []int           `json:"p2_deck"` // Card IDs in P2's deck
@@ -265,12 +315,38 @@ type MatchState struct {
 	P2RegionalBoost   bool            `json:"p2_regional_boost"`
 	P1CoalitionBoost  bool            `json:"p1_coalition_boost"`
 	P2CoalitionBoost  bool            `json:"p2_coalition_boost"`
+	// §26.4.3/§25.6.2 Bonded-asset deck-card bonus: percentage power granted to a player's
+	// cards by the pets + vehicles that player owns. Integer percent, snapshotted at match
+	// start so both engines apply an identical constant (determinism across Server/WASM).
+	P1BondedBoostPct  int             `json:"p1_bonded_boost_pct"`
+	P2BondedBoostPct  int             `json:"p2_bonded_boost_pct"`
 	FinalScores       [2]int
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"` // Tracking for jailing
 	Round             int                       `json:"round"`                    // Match round (isolation for Sudden Death)
 	TerritoryID       string                    `json:"territory_id,omitempty"`   // The territory where the match is played
 	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs"`        // PlayerID -> ItemID -> MatchesRemaining
 	IsBountyMatch     bool
+	WagersMicro       uint64         `json:"wagers_micro"` // PILLAR 2: Spectator wagering pool
+	BoardStateHash    BoardStateHash // PILLAR 4: Deterministic Sync.
+	// §32.3 Religious Leader Card: per-faith composition of the field, computed at match start
+	// (map dogma-tag -> count of cards on board with that religion). Lets applyReligiousModifiers
+	// grant rival-faith blessing (+) / same-faith orthodoxy purge (−).
+	FaithComposition map[string]int `json:"faith_composition,omitempty"`
+}
+
+// AuthoritativeFrame represents the full authoritative state update sent to the client.
+type AuthoritativeFrame struct {
+	SequenceID uint64         `json:"sequence_id"`
+	MoveIntent MoveData       `json:"move_intent"` // The actual move data
+	StateHash  BoardStateHash `json:"state_hash"`  // Hash of the board state after the move
+}
+
+// MutationEvent records a single gene-editing action for forensic auditing.
+type MutationEvent struct {
+	Timestamp int64  `json:"timestamp"`
+	Type      string `json:"type"` // "VECTOR", "MOOD", "LOYALTY", "SCAR"
+	CardID    int    `json:"card_id"`
+	Details   string `json:"details"`
 }
 
 // CapturedCardInfo tracks details of a card that was flipped during a match.
@@ -294,7 +370,7 @@ type MatchHistory struct {
 	Timestamp         time.Time                 `json:"timestamp"`
 	WinnerIndex       int                       `json:"winner_index"` // 0 for P1, 1 for P2
 	IsBountyMatch     bool                      `json:"is_bounty_match,omitempty"`
-	BountyReward      float64                   `json:"bounty_reward,omitempty"`
+	BountyRewardMicro uint64                    `json:"bounty_reward_micro,omitempty"`
 	P1WantedLevel     int                       `json:"p1_wanted_level"`
 	P2WantedLevel     int                       `json:"p2_wanted_level"`
 	P1Cunning         int                       `json:"p1_cunning"`
@@ -303,55 +379,147 @@ type MatchHistory struct {
 	P2Nurturing       int                       `json:"p2_nurturing"`
 	ActiveItemBuffs   map[string]map[string]int `json:"active_item_buffs,omitempty"`
 	CapturedCards     []CapturedCardInfo        `json:"captured_cards,omitempty"`
+	// Reconciled fields (mechanical reconciliation)
+	UnderworldContractID           string `json:"underworld_contract_id,omitempty"`
+	IsUnderworldContractSuccess    bool   `json:"is_underworld_contract_success,omitempty"`
 }
 
 // PlayerStats tracks the performance and reliability of a player.
 type PlayerStats struct {
-	Wallet            string             `json:"wallet"`
-	Wins              int                `json:"wins"`
-	DNFs              int                `json:"dnfs"`
-	DisconnectStreak  int                `json:"disconnect_streak"`
-	BanExpires        time.Time          `json:"ban_expires"`
-	GloatBannedUntil  time.Time          `json:"gloat_banned_until"`
-	EquippedFaceplate string             `json:"equipped_faceplate"`
-	Reputation        int                `json:"reputation"`
-	Mojo              int                `json:"mojo"`                // Social standing for Club unlocks
-	SocialRank        string             `json:"social_rank"`         // e.g., "Nobody", "Regular", "Icon"
-	JobRole           string             `json:"job_role"`            // Manager, Security, Clerk, Freelancer
-	EmployerClubID    string             `json:"employer_id"`         // The club currently paying this user
-	Salary            uint64             `json:"salary"`              // Micro-units of $VBV per payment cycle
-	AuctionsWon       int                `json:"auctions_won"`        // Total Art Gallery victories
-	LastSalaryPayment time.Time          `json:"last_salary_payment"` // Timestamp of last payment
-	Inventory         map[string]int     `json:"inventory"`           // ItemID -> Quantity
-	History           []MatchHistory     `json:"match_history"`       // Historical records from blockchain
-	MarketTokens      uint64             `json:"market_tokens"`       // Equity from liquidated loans
-	Relationships     map[string]int     `json:"relationships"`       // Character Name -> Score (0-100)
-	BestRating        string             `json:"best_rating"`
-	Achievements      []string           `json:"achievements"`   // List of unlocked IDs
-	Portfolio         map[string]float64 `json:"portfolio"`      // EntityID -> Shares
-	WantedLevel       int                `json:"wanted_level"`   // Risk factor for heists
-	HeistAttempts     int                `json:"heist_attempts"` // Number of times player attempted a heist
-	Cunning           int                `json:"cunning"`        // Success modifier for criminal actions
-	Nurturing         int                `json:"nurturing"`      // Success modifier for garden/donations
-	JailedCards       map[int]string     `json:"jailed_cards"`   // CardID -> ClubID (cards currently in jail)
-	// New fields for Kidnap Gambit
-	FavoriteCardID           int             `json:"favorite_card_id"`            // The card ID the player has designated as their favorite
-	KidnappedCards           map[int]string  `json:"kidnapped_cards"`             // CardID -> VictimWallet (cards player has kidnapped)
-	HeldHostageCards         map[int]string  `json:"held_hostage_cards"`          // CardID -> KidnapperWallet (cards player has lost to kidnapping)
-	GhostProtocolExpiresAt   time.Time       `json:"ghost_protocol_expires_at"`   // Signal scrambling duration
-	DistrictScannerExpiresAt time.Time       `json:"district_scanner_expires_at"` // Active scanning duration
-	HasCyberJammer           bool            `json:"has_cyber_jammer"`            // Suppresses Sabotage Warning
-	HeistAlarmsJammerCount   int             `json:"heist_alarms_jammer_count"`   // Count of successful jammer uses
-	AuditedClubs             map[string]bool `json:"audited_clubs"`               // Unique clubs targeted by Cyber-Audit
-	// New fields for Collective NPC Intelligence
-	RumorCount      int                 `json:"rumor_count"`       // Number of rumors spread by this player
-	Aggressiveness  float64             `json:"aggressiveness"`    // 0-1 scale of aggressive play
-	RiskTolerance   float64             `json:"risk_tolerance"`    // 0-1 scale of risk-taking
-	PreferredRules  map[string]int      `json:"preferred_rules"`   // Rule name -> usage count
-	Moods           map[string]int      `json:"moods"`             // Mood -> count (e.g., "aggressive", "defensive")
-	Playstyle       PlaystyleTendencies `json:"playstyle"`         // Observed playstyle tendencies
-	ActiveItemBuffs map[string]int      `json:"active_item_buffs"` // ItemID -> MatchesRemaining
+	Wallet                       string              `json:"wallet"`
+	Wins                         int                 `json:"wins"`
+	DNFs                         int                 `json:"dnfs"`
+	DisconnectStreak             int                 `json:"disconnect_streak"`
+	BanExpires                   time.Time           `json:"ban_expires"`
+	GloatBannedUntil             time.Time           `json:"gloat_banned_until"`
+	EquippedFaceplate            string              `json:"equipped_faceplate"`
+	Reputation                   int                 `json:"reputation"`
+	Mojo                         int                 `json:"mojo"`                // Social standing for Club unlocks
+	SocialRank                   string              `json:"social_rank"`         // e.g., "Nobody", "Regular", "Icon"
+	JobRole                      string              `json:"job_role"`            // Manager, Security, Clerk, Freelancer
+	EmployerClubID               string              `json:"employer_id"`         // PILLAR 3: Standardized Org ID
+	Salary                       uint64              `json:"salary"`              // Micro-units of $VBV per payment cycle
+	AuctionsWon                  int                 `json:"auctions_won"`        // Total Art Gallery victories
+	LastSalaryPayment            time.Time           `json:"last_salary_payment"` // Timestamp of last payment
+	Inventory                    map[string]int      `json:"inventory"`           // ItemID -> Quantity
+	History                      []MatchHistory      `json:"match_history"`       // Historical records from blockchain
+	MarketTokens                 uint64              `json:"market_tokens"`       // Equity from liquidated loans
+	Relationships                map[string]int      `json:"relationships"`       // Character Name -> Score (0-100)
+	BestRating                   string              `json:"best_rating"`
+	Achievements                 []string            `json:"achievements"`     // List of unlocked IDs
+	Portfolio                    map[string]uint64   `json:"portfolio"`        // EntityID -> Shares (in micro-shares)
+	WantedLevel                  int                 `json:"wanted_level"`     // Risk factor for heists
+	HeistAttempts                int                 `json:"heist_attempts"`   // Number of times player attempted a heist
+	Cunning                      int                 `json:"cunning"`          // Success modifier for criminal actions
+	Nurturing                    int                 `json:"nurturing"`        // Success modifier for garden/donations
+	JailedCards                  map[int]string      `json:"jailed_cards"`     // CardID -> ClubID (cards currently in jail)
+	CapturedOutlaws              map[string]bool     `json:"captured_outlaws"` // PILLAR 3: Unique bounty tracking
+	FavoriteCardID               int                 `json:"favorite_card_id"` // The card ID designated as favorite
+	KidnappedCards               map[int]string      `json:"kidnapped_cards"`  // CardID -> VictimWallet
+	HeldHostageCards             map[int]string      `json:"held_hostage_cards"`
+	LastClaimedYield             map[string]uint64   `json:"last_claimed_yield"`          // PILLAR 1: Dividend tracking
+	GhostProtocolExpiresAt       time.Time           `json:"ghost_protocol_expires_at"`   // Signal scrambling duration
+	LastDeepScanAt               time.Time           `json:"last_deep_scan_at"`           // PILLAR 3: Intel-Agent cooldown
+	DistrictScannerExpiresAt     time.Time           `json:"district_scanner_expires_at"` // Active scanning duration
+	DisruptorCooldownAt          time.Time           `json:"disruptor_cooldown_at"`       // PILLAR 3: Hunter item cooldown
+	CloakDisruptedUntil          time.Time           `json:"cloak_disrupted_until"`       // PILLAR 3: Temporarily revealed by hunter
+	HasCyberJammer               bool                `json:"has_cyber_jammer"`            // Suppresses Sabotage Warning
+	HeistAlarmsJammerCount       int                 `json:"heist_alarms_jammer_count"`   // Count of successful jammer uses
+	HasMutationInsurance         bool                `json:"has_mutation_insurance"`      // PILLAR 6: 100% Mutation Success
+	AuditedClubs                 map[string]bool     `json:"audited_clubs"`               // Unique clubs targeted by Cyber-Audit
+	RumorCount                   int                 `json:"rumor_count"`                 // Number of rumors spread by this player
+	Aggressiveness               float64             `json:"aggressiveness"`              // 0-1 scale of aggressive play
+	RiskTolerance                float64             `json:"risk_tolerance"`              // 0-1 scale of risk-taking
+	PreferredRules               map[string]int      `json:"preferred_rules"`             // Rule name -> usage count
+	Moods                        map[string]int      `json:"moods"`                       // Mood -> count
+	Playstyle                    PlaystyleTendencies `json:"playstyle"`                   // Observed playstyle tendencies
+	ActiveItemBuffs              map[string]int      `json:"active_item_buffs"`           // ItemID -> MatchesRemaining
+	TotalDonated                 uint64              `json:"total_donated"`               // PILLAR 1: Philanthropy tracking
+	ReparationsReceivedCount     int                 `json:"reparations_received_count"`
+	IsMojoStabilizerActive       bool                `json:"is_mojo_stabilizer_active"`
+	MojoDecayRate                float64             `json:"mojo_decay_rate"`
+	RaidInsuranceExpiresAt       time.Time           `json:"raid_insurance_expires_at"`
+	RaidInsuranceClaimsRemaining int                 `json:"raid_insurance_claims_remaining"`
+	BountyHunterBondMicro        uint64              `json:"bounty_hunter_bond_micro"` // PILLAR 1: Locked Deposit
+	BountyHunterLicenseExpiresAt time.Time           `json:"bounty_hunter_license_expires_at"`
+	ArenaVouchers                uint64              `json:"arena_vouchers"` // PILLAR 2: Console reward representation
+	ActiveUnderworldContractID   string              `json:"active_underworld_contract_id"`
+	RecoveryChallengeCardID      int                 `json:"recovery_challenge_card_id"`
+	RecoveryChallengeWins        int                 `json:"recovery_challenge_wins"`
+	RecoveryBounties             map[int]uint64      `json:"recovery_bounties"`   // CardID -> MicroVBV reward
+	MarketFrozenUntil            time.Time           `json:"market_frozen_until"` // PILLAR 3: Justice Layer
+
+	// MutationHistory captures forensic mutation events for deterministic replay & achievements.
+	MutationHistory []MutationEvent `json:"mutation_history"`
+
+	// Pillar 12-13: Career progression and rivalry system fields
+	CareerXP            *CareerXP      `json:"career_xp,omitempty"`      // XP tracking across career roles
+	CareerLevel         map[string]int `json:"career_level,omitempty"`   // Per-role career level (Pillar 13 promotion tiers)
+	Rivalry             *RivalryState  `json:"rivalry,omitempty"`        // Rivalry engine state (solo hunter, info broker)
+	BountyLicenseActive bool           `json:"bounty_license_active"`    // Pillar 12: Active bounty hunter license flag
+	ArcNetActive        bool           `json:"arc_net_active,omitempty"` // Pillar 12: Active Arc-Net spy vision
+
+	// PILLAR 13: $VBV Sustained Liquidity Tracking for Career XP
+	// Tracks average balance over time to determine career tier eligibility
+	LiquiditySamples   []uint64  `json:"liquidity_samples,omitempty"`   // Recent balance snapshots (micro-$VBV)
+	LiquidityWindowMin int       `json:"liquidity_window_min"`          // Sliding window duration in minutes
+	DemotionWarningAt  time.Time `json:"demotion_warning_at,omitempty"` // When demotion warning was issued (0 = none)
+	AvgSustainedMicro  uint64    `json:"avg_sustained_micro"`           // Computed from samples (micro-$VBV)
+
+	// Justice Layer active mission tracking
+	ActiveJusticeMissionID string `json:"active_justice_mission_id,omitempty"` // Current Justice Layer mission ID
+
+	// Buff tracking for various game mechanics (e.g., fenced rate, rep shield)
+	Buffs map[string]bool `json:"buffs,omitempty"` // Active buff flags
+
+	// --- Reconciled fields (KEY 3.5 mechanical reconciliation: re-added where no in-repo replacement existed) ---
+	Name                      string            `json:"name,omitempty"`            // Display name (Envoi-resolved or alias)
+	ID                        string            `json:"id,omitempty"`              // Stable player identifier (wallet-derived)
+	Credits                   uint64            `json:"credits,omitempty"`          // Legacy micro-credit balance (display/UI)
+	VBVBalance                uint64            `json:"vbv_balance,omitempty"`       // Per-player $VBV balance mirror (authoritative = playerBalances map on Lobby)
+	TotalDividendClaimedMicro uint64            `json:"total_dividend_claimed_micro,omitempty"`
+	SectorTiles               map[string]bool   `json:"sector_tiles,omitempty"`
+	Alliances                 map[string]string `json:"alliances,omitempty"`         // allyClubID -> relation
+	ActiveAllianceID          string            `json:"active_alliance_id,omitempty"`
+	Career                    string            `json:"career,omitempty"`            // Legacy primary career label
+	CareerTier                int               `json:"career_tier,omitempty"`       // Legacy career tier
+	ActiveBuffs               map[string]string `json:"active_buffs,omitempty"`      // Item/rep buff flags (string-valued)
+	Wanted                    map[string]bool   `json:"wanted,omitempty"`             // Active warrants by club/agency (nilable)
+	LastActivity              time.Time         `json:"last_activity,omitempty"`     // Last seen timestamp
+	ActiveHostageCount        int               `json:"active_hostage_count,omitempty"` // Active hostage situations involving player
 }
+
+// ItemDef is the base definition for all purchasable shop items.
+type ItemDef struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	CostMicro     uint64 `json:"cost_micro"`
+	Category      string `json:"category"`
+	MaxStack      int    `json:"max_stack"`
+	Recurring     bool   `json:"recurring"`
+	RecurringDays int    `json:"recurring_days"`
+}
+
+// JusticeItem is a JUSTICE-category shop item (reconciled type).
+type JusticeItem struct {
+	ItemDef     ItemDef         `json:"item_def"`
+	JusticeBonus map[string]int `json:"justice_bonus"`
+	DurationMin  int            `json:"duration_min"`
+}
+
+// UnderworldItem is an UNDERWORLD-category shop item (reconciled type).
+type UnderworldItem struct {
+	ItemDef         ItemDef         `json:"item_def"`
+	UnderworldBonus map[string]int `json:"underworld_bonus"`
+	DurationMin     int            `json:"duration_min"`
+}
+
+// JusticeCategory and UnderworldCategory are shop category constants.
+const (
+	JusticeCategory    = "JUSTICE"
+	UnderworldCategory = "UNDERWORLD"
+)
 
 // PlaystyleTendencies captures observed player behaviors for Collective Intelligence.
 type PlaystyleTendencies struct {
@@ -363,6 +531,24 @@ type PlaystyleTendencies struct {
 	PreferredItems     map[string]float64 `json:"preferred_items"`      // ItemID -> Weighted Usage Score
 }
 
+// ConsolePlatform defines supported hardware ecosystems for the Phase 4 expansion.
+type ConsolePlatform string
+
+const (
+	PlatformXbox        ConsolePlatform = "XBOX_SERIES_X"
+	PlatformPlayStation ConsolePlatform = "PLAYSTATION_5"
+	PlatformNintendo    ConsolePlatform = "NINTENDO_SWITCH_NEXT"
+)
+
+// ConsoleAssetReceipt represents a secure purchase or lease confirmation from an external platform.
+type ConsoleAssetReceipt struct {
+	PlatformRef    ConsolePlatform `json:"platform_ref"`
+	ConsoleUID     string          `json:"console_user_uid"`
+	DlcProductCode string          `json:"dlc_product_code"`
+	IsLeaseAction  bool            `json:"is_lease_action"`
+	LeaseDuration  int64           `json:"lease_duration_blocks"`
+}
+
 // CardBundle represents a set of items listed together in an auction.
 type CardBundle struct {
 	CardID      int    `json:"card_id"`
@@ -372,15 +558,16 @@ type CardBundle struct {
 
 // Auction represents a live listing in the Art Gallery.
 type Auction struct {
-	ID                string     `json:"id"`
-	SellerWallet      string     `json:"seller_wallet"`
-	SellerName        string     `json:"seller_name"` // Pre-resolved Envoi name
-	Bundle            CardBundle `json:"bundle"`
-	CurrentBid        uint64     `json:"current_bid"` // Micro-units of $VBV
-	HighestBidder     string     `json:"highest_bidder"`
-	HighestBidderName string     `json:"highest_bidder_name"` // Pre-resolved Envoi name
-	EndsAt            time.Time  `json:"ends_at"`
-	TerritoryID       string     `json:"territory_id"` // For commission distribution
+	ID                   string     `json:"id"`
+	SellerWallet         string     `json:"seller_wallet"`
+	SellerName           string     `json:"seller_name"` // Pre-resolved Envoi name
+	Bundle               CardBundle `json:"bundle"`
+	CurrentBid           uint64     `json:"current_bid"` // Micro-units of $VBV
+	HighestBidder        string     `json:"highest_bidder"`
+	HighestBidderName    string     `json:"highest_bidder_name"` // Pre-resolved Envoi name
+	EndsAt               time.Time  `json:"ends_at"`
+	TerritoryID          string     `json:"territory_id"`            // For commission distribution
+	HighestBidIsApproved bool       `json:"highest_bid_is_approved"` // PILLAR 2: Non-custodial tracking
 }
 
 // Loan represents a collateralized loan from the Second-Hand Store.
@@ -404,6 +591,13 @@ type Rumor struct {
 	Type           string    `json:"type"`     // "positive", "negative"
 	Strength       float64   `json:"strength"` // Multiplier (e.g., 1.1 for +10%, 0.9 for -10%)
 	ExpiresAt      time.Time `json:"expires_at"`
+	// Reconciled fields (mechanical reconciliation)
+	Title        string    `json:"title,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	RewardMicro  uint64    `json:"reward_micro,omitempty"`
+	Target       string    `json:"target,omitempty"`   // Legacy target label
+	Faction      string    `json:"faction,omitempty"`  // Affected faction
+	RewardRatio  float64   `json:"reward_ratio,omitempty"`
 }
 
 // KidnapState tracks the details of an active kidnapping for recovery logic.
@@ -415,9 +609,9 @@ type KidnapState struct {
 
 // TournamentMatch represents a single duel within the bracket.
 type TournamentMatch struct {
-	ID          string `json:"id"`
-	P1          string `json:"p1"` // Wallet Address
-	P2          string `json:"p2"` // Wallet Address
+	ID          string `json:"match_id"` // PILLAR 3: Standardized match indexing
+	P1          string `json:"p1"`       // Wallet Address
+	P2          string `json:"p2"`       // Wallet Address
 	Winner      string `json:"winner,omitempty"`
 	Round       int    `json:"round"`
 	ReceiptTxID string `json:"receipt_txid,omitempty"` // On-chain VBT_WIN receipt ID
@@ -430,9 +624,12 @@ type TournamentState struct {
 	Matches      []TournamentMatch `json:"matches"`
 	CurrentRound int               `json:"current_round"`
 	Participants []string          `json:"participants"`
-	Pot          float64           `json:"pot"`
-	BuyInAmount  float64           `json:"buy_in_amount"`
+	PotMicro     uint64            `json:"pot_micro"`    // PILLAR 2: Integer Supremacy
+	BuyInMicro   uint64            `json:"buy_in_micro"` // PILLAR 2: Integer Supremacy
 	IsBuyInMode  bool              `json:"is_buy_in_mode"`
 	OpenTime     time.Time         `json:"open_time"` // Registration window start
 	Winner       string            `json:"winner"`
+	// Reconciled alias fields (mechanical reconciliation)
+	BuyInAmount  uint64 `json:"buy_in_amount,omitempty"` // legacy alias for BuyInMicro
+	Pot          uint64 `json:"pot,omitempty"`           // legacy alias for PotMicro
 }

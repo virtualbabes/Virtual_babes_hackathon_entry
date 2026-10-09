@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch Feed — NFT-Seduction</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --border: #1f2937;
+    --accent: #6366f1;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+  .header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .header h1 {
+    font-size: 16px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .menu {
+    flex-shrink: 0;
+    display: flex;
+    gap: 4px;
+    padding: 8px 20px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .menu-item {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .menu-item:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .menu-item.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .menu-item .icon {
+    font-size: 14px;
+  }
+  .feed-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .feed-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+    min-height: 0;
+  }
+  .feed-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .feed-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(99, 102, 241, 0.05);
+  }
+  .feed-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .feed-status {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .feed-status.online {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--green);
+  }
+  .feed-status.offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red);
+  }
+  .feed-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    position: relative;
+    min-height: 0;
+  }
+  .feed-body iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    min-height: 0;
+  }
+  .feed-body .placeholder {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .feed-body .placeholder .icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  .pip-mode .feed-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: 100%;
+  }
+  .pip-mode .feed-panel {
+    min-height: 0;
+  }
+  .pip-mode .feed-body iframe {
+    min-height: 0;
+    height: 100%;
+  }
+  .view-full {
+    padding: 4px 8px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .view-full:hover { background: #4f46e5; }
+  .controls {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    padding: 8px 20px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+  }
+  .ctrl-btn {
+    padding: 6px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); }
+  .ctrl-btn.active { background: var(--accent); border-color: var(--accent); }
+  .feed-selector {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📺 Watch Feed</h1>
+    <div class="subtitle">Multi-view monitoring for NFT-Seduction</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span id="connectionBadge" style="font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;">
+      <span class="status-dot offline" id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--red);"></span>
+      <span id="statusText" style="color:var(--muted);">Checking...</span>
+    </span>
+  </div>
+</div>
+
+<div class="menu" id="menuBar">
+  <div class="menu-item active" onclick="switchView('dashboard')">
+    <span class="icon">📊</span> Dashboard
+  </div>
+  <div class="menu-item" onclick="switchView('spectate')">
+    <span class="icon">🎮</span> 3D Spectate
+  </div>
+  <div class="menu-item" onclick="switchView('game')">
+    <span class="icon">🕹️</span> Game
+  </div>
+  <div class="menu-item" onclick="switchView('manuals')">
+    <span class="icon">📚</span> Manuals
+  </div>
+  <div class="menu-item" onclick="switchView('tutorials')">
+    <span class="icon">🎓</span> Tutorials
+  </div>
+  <div class="menu-item" onclick="switchView('api')">
+    <span class="icon">🔧</span> API Tester
+  </div>
+  <div class="menu-item" onclick="switchView('pip')">
+    <span class="icon">📺</span> PiP Mode
+  </div>
+</div>
+
+<div class="feed-container" id="feedContainer">
+  <div class="feed-grid" id="feedGrid">
+    <!-- Panels injected by JS -->
+  </div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" onclick="refreshAll()">⟳ Refresh All</button>
+  <button class="ctrl-btn" onclick="togglePiP()">📺 Toggle PiP</button>
+  <div class="feed-selector">
+    <button class="ctrl-btn" onclick="addPanel()">+ Add Panel</button>
+    <button class="ctrl-btn" onclick="removePanel()">- Remove</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:8090';
+
+const PANELS = {
+  dashboard: {
+    title: '📊 Dashboard',
+    url: '/dashboard',
+    status: 'online'
+  },
+  spectate: {
+    title: '🎮 3D Spectate',
+    url: '/spectate',
+    status: 'online'
+  },
+  game: {
+    title: '🕹️ Game',
+    url: '/',
+    status: 'online'
+  },
+  manuals: {
+    title: '📚 Manuals',
+    url: '/manuals/README.md',
+    status: 'online'
+  },
+  tutorials: {
+    title: '🎓 Tutorials',
+    url: '/tutorials/TUTORIAL-GUIDANCE.md',
+    status: 'online'
+  },
+  api: {
+    title: '🔧 API Tester',
+    url: '/dashboard',
+    status: 'online'
+  }
+};
+
+let activeView = 'dashboard';
+let isPiP = false;
+let panels = ['dashboard', 'spectate'];
+
+function switchView(view) {
+  activeView = view;
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+  event.target.classList.add('active');
+
+  if (view === 'pip') {
+    togglePiP();
+    return;
+  }
+
+  panels = [view];
+  renderPanels();
+}
+
+function renderPanels() {
+  const grid = document.getElementById('feedGrid');
+  grid.innerHTML = panels.map(id => {
+    const panel = PANELS[id];
+    return `
+      <div class="feed-panel" id="panel-${id}">
+        <div class="feed-header">
+          <span class="feed-title">${panel.title}</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="feed-status ${panel.status}">${panel.status}</span>
+            <a href="${API_BASE}${panel.url}" target="_blank" class="view-full">Full</a>
+          </div>
+        </div>
+        <div class="feed-body">
+          <iframe src="${API_BASE}${panel.url}" sandbox="allow-same-origin allow-scripts"></iframe>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function togglePiP() {
+  isPiP = !isPiP;
+  const container = document.getElementById('feedContainer');
+  if (isPiP) {
+    container.classList.add('pip-mode');
+    panels = ['dashboard', 'spectate', 'game', 'api'];
+  } else {
+    container.classList.remove('pip-mode');
+    panels = [activeView];
+  }
+  renderPanels();
+}
+
+function refreshAll() {
+  document.querySelectorAll('iframe').forEach(f => {
+    f.src = f.src;
+  });
+}
+
+function addPanel() {
+  const available = Object.keys(PANELS).filter(p => !panels.includes(p));
+  if (available.length === 0) return;
+  panels.push(available[0]);
+  renderPanels();
+}
+
+function removePanel() {
+  if (panels.length <= 1) return;
+  panels.pop();
+  renderPanels();
+}
+
+async function checkConnection() {
+  try {
+    const res = await fetch(API_BASE + '/api/replay/state');
+    if (res.ok) {
+      document.getElementById('statusDot').className = 'status-dot online';
+      document.getElementById('statusDot').style.background = 'var(--green)';
+      document.getElementById('statusText').textContent = 'Connected';
+      document.getElementById('statusText').style.color = 'var(--green)';
+    }
+  } catch (e) {
+    document.getElementById('statusDot').className = 'status-dot offline';
+    document.getElementById('statusDot').style.background = 'var(--red)';
+    document.getElementById('statusText').textContent = 'Offline';
+    document.getElementById('statusText').style.color = 'var(--red)';
+  }
+}
+
+// Initial render
+renderPanels();
+checkConnection();
+setInterval(checkConnection, 5000);
+</script>
+</body>
+</html>

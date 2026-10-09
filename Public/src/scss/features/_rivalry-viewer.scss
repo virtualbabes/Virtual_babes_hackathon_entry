@@ -1,0 +1,17 @@
+// Public\src\scss\features\_rivalry-viewer.scss
+// §25.10: Region / Territory rivalry matrix viewer
+
+.rivalry-panel { grid-template-columns: 1fr; gap: 14px; padding: 8px; min-height: 420px; }
+.rivalry-actions { display: flex; gap: 10px; }
+#rivalry-overlay .panel-rivalries { max-height: 420px; overflow-y: auto; }
+
+.rv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; padding: 6px; }
+.rv-card { background: rgba(106, 27, 154, 0.12); border: 1px solid rgba(186, 104, 200, 0.3); border-radius: 10px; padding: 12px; }
+.rv-card.rv-resolved { opacity: 0.6; }
+.rv-head { display: flex; justify-content: space-between; font-size: 11px; color: #ce93d8; margin-bottom: 6px; }
+.rv-class { color: #80deea; }
+.rv-sides { display: grid; grid-template-columns: 1fr auto 1fr; gap: 6px; align-items: center; font-size: 13px; color: #f3e5f5; }
+.rv-vs { color: #ff8a65; font-weight: bold; }
+.rv-score { text-align: center; font-size: 16px; font-weight: bold; color: #4dd0e1; margin: 8px 0; }
+.rv-foot { font-size: 11px; color: #b0bec5; margin-bottom: 8px; }
+.ai-status { color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }

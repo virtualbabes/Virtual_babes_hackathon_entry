@@ -1,0 +1,174 @@
+/* === Identity Editor === */
+.identity-editor-container { padding: 8px 0; }
+
+.passport-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1), rgba(63, 81, 181, 0.05));
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.passport-hologram {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hologram-seal {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #2196f3, #4caf50, #ff9800);
+    border-radius: 50%;
+    animation: hologram-rotate 4s linear infinite;
+    box-shadow: 0 0 15px rgba(33, 150, 243, 0.5);
+}
+
+@keyframes hologram-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.passport-info { flex: 1; }
+
+.passport-tier {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.passport-tier.citizen { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+.passport-tier.noble { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.passport-tier.elite { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+.passport-tier.legendary { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+.passport-reputation {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.reputation-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.reputation-value { font-size: 24px; font-weight: 700; color: #2196f3; }
+
+/* Identity form */
+.identity-form-section { margin-bottom: 16px; }
+
+.identity-form-section h4 { margin: 0 0 12px; }
+
+.identity-form {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.identity-form-row { margin-bottom: 12px; }
+
+.identity-form-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.identity-form-row input,
+.identity-form-row textarea {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+/* Reputation breakdown */
+.reputation-breakdown-section { margin-bottom: 16px; }
+
+.reputation-breakdown-section h4 { margin: 0 0 12px; }
+
+.reputation-bars {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.reputation-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.reputation-bar-label { font-size: 10px; color: #90a4ae; min-width: 60px; }
+
+.reputation-bar-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.reputation-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2196f3, #4caf50);
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.reputation-bar-val { font-size: 10px; color: #e5e7eb; min-width: 30px; text-align: right; }
+
+/* History timeline */
+.history-timeline-section h4 { margin: 0 0 12px; }
+
+.history-timeline {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.history-event {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+    padding-left: 12px;
+    margin-left: 6px;
+}
+
+.history-event:last-child {
+    border-left-color: transparent;
+}
+
+.history-event-dot {
+    width: 10px;
+    height: 10px;
+    background: #2196f3;
+    border-radius: 50%;
+    margin-left: -17px;
+    margin-top: 4px;
+    box-shadow: 0 0 6px rgba(33, 150, 243, 0.5);
+}
+
+.history-event-info { display: flex; flex-direction: column; }
+
+.history-event-title { font-size: 11px; color: #e5e7eb; font-weight: 600; }
+
+.history-event-date { font-size: 9px; color: #607d8b; }

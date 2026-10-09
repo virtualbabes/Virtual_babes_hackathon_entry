@@ -1,0 +1,623 @@
+// ============================================================================
+// Menu Customization Panel — UI overlay
+// ============================================================================
+
+.menu-customization-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(13, 16, 37, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 2000;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        h3 {
+            color: #e5e7eb;
+            margin: 0;
+            font-size: 18px;
+        }
+    }
+
+    .panel-close {
+        background: none;
+        border: none;
+        color: #90a4ae;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s;
+
+        &:hover {
+            color: #ff4d4d;
+            background: rgba(255, 77, 77, 0.1);
+        }
+    }
+
+    .panel-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 8px;
+    }
+
+    .panel-tab {
+        background: none;
+        border: none;
+        color: #78909c;
+        padding: 8px 16px;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.2s;
+        font-family: 'Orbitron', sans-serif;
+
+        &:hover {
+            color: #b0bec5;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        &.active {
+            color: #00f2fe;
+            background: rgba(0, 242, 254, 0.1);
+        }
+    }
+
+    .panel-tab-content {
+        display: none;
+
+        &.active {
+            display: block;
+        }
+    }
+
+    .customization-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .customization-label {
+        color: #90a4ae;
+        font-size: 12px;
+        min-width: 80px;
+    }
+
+    select, input[type="range"] {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #e5e7eb;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        flex: 1;
+    }
+
+    .shape-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+        margin: 12px 0;
+    }
+
+    .shape-preview-btn {
+        width: 32px;
+        height: 32px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        &.selected {
+            background: rgba(0, 242, 254, 0.2);
+            border-color: #00f2fe;
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+        }
+    }
+
+    .size-preview-row {
+        display: flex;
+        gap: 8px;
+        margin: 12px 0;
+    }
+
+    .size-preview-btn {
+        flex: 1;
+        height: 48px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        &.selected {
+            background: rgba(0, 242, 254, 0.2);
+            border-color: #00f2fe;
+        }
+    }
+
+    .size-preview-icon {
+        font-size: 14px;
+        font-weight: 700;
+        color: #90a4ae;
+    }
+
+    .shape-info, .size-info, .grid-info {
+        font-size: 11px;
+        color: #607d8b;
+        margin-top: 8px;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+
+    .grid-preview-diagram {
+        margin: 12px 0;
+    }
+
+    .perbutton-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .perbutton-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        &.selected {
+            background: rgba(0, 242, 254, 0.1);
+            border-color: #00f2fe;
+        }
+    }
+
+    .perbutton-icon {
+        font-size: 16px;
+    }
+
+    .perbutton-label {
+        flex: 1;
+        font-size: 12px;
+        color: #e5e7eb;
+    }
+
+    .perbutton-override {
+        font-size: 10px;
+        color: #607d8b;
+    }
+
+    .preview-grid {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        min-height: 200px;
+        margin: 12px 0;
+        position: relative;
+        background: rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+    }
+
+    .preview-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--btn-color, #ffd700);
+        color: #e5e7eb;
+        font-family: 'Orbitron', sans-serif;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 15px var(--btn-color, #ffd700);
+        }
+    }
+
+    .preview-icon, .preview-label {
+        pointer-events: none;
+    }
+
+    .panel-footer {
+        display: flex;
+        gap: 8px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+}
+
+// Customization button in main menu
+// A PILL, not a bare 48px circle: the settings lived behind an unlabelled 🎨 in the
+// corner, which is why the (80%-built) wheel read as "not there". The label is part
+// of the button, so the affordance is legible without hovering.
+.customize-menu-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    min-width: 48px;
+    height: 48px;
+    padding: 0 16px;
+    gap: 8px;
+    border-radius: 24px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #90a4ae;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    .customize-menu-btn-label {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 11px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    &:hover {
+        color: #00f2fe;
+        border-color: #00f2fe;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+    }
+}
+
+/* Controller Scheme Picker */
+.mc-controller-scheme-picker {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.mc-scheme-btn {
+    flex: 1;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+
+    &:hover {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.1);
+    }
+
+    &.active {
+        border-color: #00f2fe;
+        background: rgba(0, 242, 254, 0.2);
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+    }
+}
+
+.mc-scheme-icon {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+.mc-scheme-name {
+    display: block;
+    font-size: 11px;
+    color: #e5e7eb;
+    font-weight: 600;
+}
+
+/* Controller Mapping List */
+.mc-mapping-list {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.mc-mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+.mc-mapping-button {
+    min-width: 60px;
+    padding: 4px 8px;
+    background: rgba(0, 242, 254, 0.1);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #00f2fe;
+    text-align: center;
+}
+
+.mc-mapping-arrow {
+    color: #90a4ae;
+    font-size: 12px;
+}
+
+.mc-mapping-action {
+    font-size: 11px;
+    color: #e5e7eb;
+    font-weight: 600;
+}
+
+.mc-test-controller-btn {
+    width: 100%;
+}
+
+// ============================================================================
+// THE SHAPE / GRID / BUTTONS TABS WERE NEVER STYLED
+// ----------------------------------------------------------------------------
+// Only the controller tab above had rules. Every element below (tabs, shape and
+// size pickers, the GRID picker, the option rows, the live preview, the hint) was
+// rendered as bare stacked markup — which is the concrete reason the (already
+// 80%-built) menu wheel read as "not there". Styled here so the panel that owns the
+// wheel is legible.
+// ============================================================================
+.mc-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 12px 0 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mc-tab {
+    flex: 1;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #90a4ae;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+
+    &:hover { color: #e5e7eb; }
+    &.active {
+        color: #00f2fe;
+        border-bottom-color: #00f2fe;
+    }
+}
+
+.mc-tab-content.hidden { display: none; }
+
+.mc-section {
+    margin-bottom: 20px;
+
+    h3 {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #b0bec5;
+        margin-bottom: 10px;
+    }
+}
+
+.mc-shape-picker,
+.mc-size-picker,
+.mc-grid-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mc-shape-option,
+.mc-size-option,
+.mc-grid-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 62px;
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #90a4ae;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+
+    &:hover { border-color: rgba(0, 242, 254, 0.5); }
+
+    &.selected {
+        border-color: #00f2fe;
+        color: #00f2fe;
+        background: rgba(0, 242, 254, 0.08);
+    }
+}
+
+.mc-shape-name,
+.mc-size-name,
+.mc-grid-name {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.mc-shape-preview {
+    width: 26px;
+    height: 26px;
+    background: rgba(0, 242, 254, 0.25);
+}
+
+.mc-size-preview {
+    background: rgba(0, 242, 254, 0.25);
+    border-radius: 4px;
+}
+
+.mc-size-option.size-xs .mc-size-preview { width: 10px; height: 10px; }
+.mc-size-option.size-sm .mc-size-preview { width: 14px; height: 14px; }
+.mc-size-option.size-md .mc-size-preview { width: 18px; height: 18px; }
+.mc-size-option.size-lg .mc-size-preview { width: 22px; height: 22px; }
+.mc-size-option.size-xl .mc-size-preview { width: 26px; height: 26px; }
+.mc-size-option.size-xxl .mc-size-preview { width: 30px; height: 30px; }
+
+// One glyph per layout id — a blank square and the raw id ("spokes") said nothing
+// about what the layout does.
+.mc-grid-preview {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(0, 242, 254, 0.1);
+    border: 1px solid rgba(0, 242, 254, 0.25);
+    font-size: 14px;
+    line-height: 1;
+
+    &::before { content: '▦'; }
+}
+
+.grid-icon-grid::before      { content: '▦'; }
+.grid-icon-circle::before    { content: '◯'; }
+.grid-icon-spokes::before    { content: '✳'; }
+.grid-icon-arc::before       { content: '◡'; }
+.grid-icon-triangle::before  { content: '▲'; }
+.grid-icon-cross::before     { content: '✚'; }
+.grid-icon-diamond::before   { content: '◆'; }
+.grid-icon-linearH::before   { content: '↔'; }
+.grid-icon-linearV::before   { content: '↕'; }
+.grid-icon-freeform::before  { content: '✦'; }
+
+.mc-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+
+    label {
+        min-width: 70px;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+        color: #90a4ae;
+    }
+
+    input[type="range"] {
+        flex: 1;
+        accent-color: #00f2fe;
+    }
+
+    span {
+        min-width: 44px;
+        font-size: 11px;
+        color: #00f2fe;
+        text-align: right;
+    }
+}
+
+.mc-spin-reset {
+    padding: 4px 10px;
+    font-size: 10px;
+}
+
+.mc-hint {
+    font-size: 11px;
+    color: #90a4ae;
+    line-height: 1.5;
+}
+
+#mc-preview {
+    border: 1px dashed rgba(0, 242, 254, 0.25);
+    border-radius: 10px;
+    padding: 10px;
+    transform-origin: center center;
+}
+
+.mc-preview-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #e5e7eb;
+    cursor: default;
+}
+
+.mc-overrides {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mc-override-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+
+    select {
+        background: rgba(0, 0, 0, 0.5);
+        color: #e5e7eb;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 3px 6px;
+        font-size: 11px;
+    }
+}
+
+.mc-override-label {
+    flex: 1;
+    font-size: 12px;
+    color: #b0bec5;
+}

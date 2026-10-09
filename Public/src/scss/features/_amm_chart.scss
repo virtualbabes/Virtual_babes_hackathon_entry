@@ -1,0 +1,230 @@
+/* === AMM Chart === */
+.amm-chart-container { padding: 8px 0; }
+
+.amm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.amm-market-status {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+
+.amm-market-status.market-open {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.amm-market-status.market-closed {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+}
+
+/* Market tabs */
+.amm-market-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 8px;
+}
+
+.amm-market-tab {
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: #90a4ae;
+    cursor: pointer;
+    font-size: 11px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.amm-market-tab:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e7eb;
+}
+
+.amm-market-tab.active {
+    background: rgba(0, 188, 212, 0.15);
+    color: #00bcd4;
+}
+
+/* AMM curve */
+.amm-curve-section { margin-bottom: 16px; }
+
+.amm-curve-section h4 { margin: 0 0 12px; }
+
+.amm-curve-container {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.amm-curve-canvas {
+    height: 150px;
+    margin-bottom: 8px;
+}
+
+.amm-curve-svg { width: 100%; height: 100%; }
+
+.amm-curve-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #607d8b;
+}
+
+/* Listings */
+.amm-listings-section { margin-bottom: 16px; }
+
+.amm-listings-section h4 { margin: 0 0 12px; }
+
+.amm-listings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.amm-listing-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.amm-listing-card:hover {
+    border-color: #00bcd4;
+    transform: translateY(-2px);
+}
+
+.amm-listing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.amm-listing-name { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.amm-listing-price { font-size: 11px; color: #00bcd4; font-weight: 600; }
+
+.amm-listing-details { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+.amm-listing-detail { font-size: 9px; color: #90a4ae; }
+
+.amm-listing-buy { width: 100%; }
+
+/* Trade panel */
+.amm-trade-section h4 { margin: 0 0 12px; }
+
+.amm-trade-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.amm-trade-row { margin-bottom: 12px; }
+
+.amm-trade-row label {
+    display: block;
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.amm-trade-row input,
+.amm-trade-row select {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.amm-trade-summary {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.amm-trade-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 11px;
+}
+
+.amm-trade-item span:first-child { color: #90a4ae; }
+
+.amm-trade-item span:last-child { color: #e5e7eb; font-weight: 600; }
+
+.amm-trade-actions { display: flex; gap: 8px; }
+
+.amm-trade-actions button { flex: 1; }
+
+/* Auctions */
+.amm-auctions-grid, .amm-bm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+}
+
+.amm-auction-card, .amm-bm-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.amm-auction-header, .amm-bm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.amm-auction-name, .amm-bm-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.amm-auction-bid, .amm-bm-price { font-size: 12px; color: #ff9800; font-weight: 600; }
+
+.amm-auction-time { font-size: 10px; color: #90a4ae; margin-bottom: 8px; }
+
+.amm-bm-badge {
+    font-size: 8px;
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: inline-block;
+}
+
+.amm-auction-bid, .amm-bm-buy { width: 100%; }
+
+/* Empty states */
+.amm-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.amm-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.amm-empty p { color: #90a4ae; font-size: 11px; margin: 0; }

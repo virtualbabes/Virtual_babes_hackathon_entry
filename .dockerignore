@@ -1,5 +1,6 @@
 # Build Artifacts
 server-bin
+server-bin.exe
 Public/main.wasm
 Public/styles.css
 Public/wasm_exec.js
@@ -7,10 +8,14 @@ Public/wasm_exec.js
 # Local Development
 node_modules/
 .env
+.env.*
 *.log
-test_data/
+devdata/
+data/
+.clineignore
 
 # Git & Tooling
 .git/
 .vscode/
 ai_exclude
+start_zap_matrix_server.bat

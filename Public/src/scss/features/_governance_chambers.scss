@@ -1,0 +1,138 @@
+/* === Governance Chambers === */
+.governance-chambers-container { padding: 8px 0; }
+
+.senate-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(33, 150, 243, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.senate-icon { font-size: 32px; }
+
+.senate-info { flex: 1; }
+
+.senate-power {
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+}
+
+.senate-power-label { display: block; font-size: 9px; color: #90a4ae; }
+
+.senate-power-value { font-size: 24px; font-weight: 700; color: #9c27b0; }
+
+/* Radar */
+.gov-radar-section { margin-bottom: 16px; }
+
+.gov-radar-section h4 { margin: 0 0 12px; }
+
+.gov-radar-container {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 250px;
+    margin: 0 auto;
+}
+
+.gov-radar-svg { width: 100%; height: auto; }
+
+/* Dimensions */
+.gov-dimensions-section { margin-bottom: 16px; }
+
+.gov-dimensions-section h4 { margin: 0 0 12px; }
+
+.gov-dimensions-list { display: flex; flex-direction: column; gap: 6px; }
+
+.gov-dimension-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 3px solid var(--dim-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+
+.gov-dimension-icon { font-size: 20px; }
+
+.gov-dimension-info { flex: 1; }
+
+.gov-dimension-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.gov-dimension-desc { display: block; font-size: 9px; color: #90a4ae; }
+
+.gov-dimension-bar {
+    width: 60px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.gov-dimension-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.gov-dimension-score { font-size: 11px; font-weight: 600; color: #00bcd4; min-width: 30px; text-align: right; }
+
+/* Elections */
+.gov-election-section { margin-bottom: 16px; }
+
+.gov-election-section h4 { margin: 0 0 12px; }
+
+.gov-election-actions { display: flex; gap: 8px; }
+
+.gov-election-actions button { flex: 1; }
+
+/* Proposals */
+.gov-proposals-section h4 { margin: 0 0 12px; }
+
+.gov-proposals-list { display: flex; flex-direction: column; gap: 8px; }
+
+.gov-proposal-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.gov-proposal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.gov-proposal-title { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.gov-proposal-status {
+    font-size: 8px;
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.gov-proposal-votes {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.gov-vote-yes { font-size: 10px; color: #4caf50; }
+
+.gov-vote-no { font-size: 10px; color: #f44336; }
+
+.gov-proposal-actions { display: flex; gap: 6px; }
+
+.gov-proposal-actions button { flex: 1; font-size: 9px; padding: 4px; }

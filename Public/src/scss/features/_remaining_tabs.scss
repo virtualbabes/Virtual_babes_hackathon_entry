@@ -1,0 +1,75 @@
+/* === Remaining Tabs */
+.launchpad-container, .ads-container, .vehicles-container, .stats-overlay-container,
+.worldcontent-container, .gamingos-container, .localmodel-container, .governor-container,
+.leaderboard-container, .compliance-container, .maintenance-container, .systemmsg-container,
+.orphans-container, .regions-container { padding: 8px 0; }
+
+.launchpad-header, .ads-header, .vehicles-header, .stats-header,
+.worldcontent-header, .gamingos-header, .localmodel-header, .governor-header,
+.leaderboard-header, .compliance-header, .maintenance-header, .systemmsg-header,
+.orphans-header, .regions-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.launchpad-icon, .ads-icon, .vehicles-icon, .stats-icon,
+.worldcontent-icon, .gamingos-icon, .localmodel-icon, .governor-icon,
+.leaderboard-icon, .compliance-icon, .maintenance-icon, .systemmsg-icon,
+.orphans-icon, .regions-icon { font-size: 32px; }
+
+.launchpad-grid, .ads-grid, .vehicles-grid, .stats-grid,
+.worldcontent-grid, .gamingos-grid, .localmodel-grid, .governor-stats,
+.leaderboard-list, .compliance-list, .maintenance-status, .systemmsg-list,
+.orphans-actions, .regions-list {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.launch-card, .ad-card, .vehicle-card, .stat-card,
+.content-card, .module-card, .model-card, .gov-stat,
+.lb-entry, .record-entry, .msg-entry, .region-entry {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 6px;
+}
+
+.launch-status.status-active, .ad-status, .vehicle-status, .module-status, .content-status {
+    font-size: 9px;
+    color: #4caf50;
+    text-transform: uppercase;
+}
+
+.stat-label, .gov-stat-label { font-size: 10px; color: #90a4ae; }
+
+.stat-val, .gov-stat-val { font-size: 14px; font-weight: 700; color: #e5e7eb; }
+
+.lb-rank { font-weight: 700; color: #ffc107; margin-right: 8px; }
+
+.lb-name { flex: 1; font-size: 11px; color: #e5e7eb; }
+
+.lb-score { font-size: 11px; color: #90a4ae; }
+
+.maintenance-status { display: flex; align-items: center; gap: 8px; }
+
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #4caf50;
+}
+
+.status-indicator.active { background: #4caf50; }
+
+.status-text { font-size: 11px; color: #e5e7eb; }
+
+.orphans-actions { display: flex; gap: 8px; }

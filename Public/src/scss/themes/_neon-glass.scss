@@ -14,7 +14,7 @@
 @mixin neon-glass-panel {
     background: $glass-bg-color;
     -webkit-backdrop-filter: blur($glass-blur);
-    backdrop-filter: blur($glass-blur);
+    -webkit-backdrop-filter: blur($glass-blur);
     border: 1px solid var(--arena-mood-color, #{$glass-border-color});
     border-radius: 16px;
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6), 

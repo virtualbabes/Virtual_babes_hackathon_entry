@@ -1,0 +1,14 @@
+// Public\src\scss\features\_leaderboard-region.scss
+// §25.9: Leaderboard Region gathering hub + mode switch
+
+.leaderboard-region-panel { grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 8px; min-height: 420px; }
+
+#leaderboard-region-overlay .panel-standings { grid-column: span 1; max-height: 380px; overflow-y: auto; }
+#leaderboard-region-overlay .panel-switch { grid-column: span 1; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+
+.lb-grid { display: flex; flex-direction: column; gap: 4px; padding: 6px; }
+.lb-row { display: grid; grid-template-columns: 28px 1fr 60px; align-items: center; gap: 8px; font-size: 12px; color: #b0bec5; padding: 4px 6px; border-radius: 6px; background: rgba(0,0,0,0.2); }
+.lb-rank { color: var(--neon-purple); font-weight: bold; }
+.lb-name { color: #e1bee7; }
+.lb-rep { text-align: right; color: #4dd0e1; }
+.ai-status { grid-column: span 2; color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }

@@ -1,0 +1,141 @@
+// Public\src\scss\layouts\_app-shell.scss
+// Single source of truth for the contained application shell + main screen.
+// The window NEVER scrolls (contained). Only inner regions scroll.
+@import '../base/variables';
+
+// ---------------------------------------------------------------------------
+// APP SHELL — the fixed, non-scrolling window
+// ---------------------------------------------------------------------------
+.app-shell {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;           // contained: nothing escapes to the page
+    background:
+        radial-gradient(1200px 600px at 50% -10%, rgba($color-neon-cyan, 0.08), transparent 60%),
+        radial-gradient(900px 500px at 100% 110%, rgba($color-neon-purple, 0.08), transparent 60%),
+        $color-bg-dark;
+}
+
+// ---------------------------------------------------------------------------
+// MAIN SCREEN — ONE unified glass surface (replaces the old 3-column .dashboard)
+// ---------------------------------------------------------------------------
+.main-screen {
+    @include neon-glass-panel;          // the single glass panel you asked for
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-width: 1400px;
+    margin: $spacing-md auto;
+    padding: $spacing-lg;
+    border-radius: $border-radius-xl;
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) 1fr minmax(320px, 420px);
+    grid-template-rows: 1fr;
+    gap: $spacing-lg;
+    align-items: stretch;
+
+    // Subtle dividers keep the three regions readable WITHOUT splitting the panel
+    > .region + .region {
+        border-left: 1px solid rgba($color-neon-cyan, 0.12);
+        padding-left: $spacing-lg;
+    }
+
+    @media (max-width: $breakpoint-lg) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        overflow-y: auto;            // only the main screen scrolls on small screens
+        > .region + .region {
+            border-left: none;
+            padding-left: 0;
+            border-top: 1px solid rgba($color-neon-cyan, 0.12);
+            padding-top: $spacing-md;
+        }
+    }
+}
+
+// Each region is a seamless section of the one panel (no own glass border)
+.region {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    min-height: 0;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+// ---------------------------------------------------------------------------
+// ARENA STAGE — board / spectate / replay / lobby placeholder (center region)
+// ---------------------------------------------------------------------------
+.arena-stage {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+}
+
+.arena-stage .arena-header {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-xs;
+}
+
+// ---------------------------------------------------------------------------
+// SIDE RAIL — matchmaking + live lobby chat (left region)
+// ---------------------------------------------------------------------------
+.side-rail {
+    .arena-side-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: $spacing-sm;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ACTION DOCK — the dropdown / category buttons (right region)
+// ---------------------------------------------------------------------------
+.action-dock {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;            // allow internal scroll
+    overflow: hidden;        // the dock itself never grows the page
+    .action-dropdown-toggle { margin-bottom: $spacing-sm; flex: 0 0 auto; }
+}
+
+// Reusable contained dropdown (used by action-dock)
+.action-dropdown {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;          // take remaining dock height
+}
+
+.action-dropdown-list {
+    display: none;
+    min-height: 0;
+    overflow-y: auto;        // expanded list scrolls INSIDE the dock, never off-screen
+    flex: 1 1 auto;
+    &.open { display: flex; }
+}
+
+// ---------------------------------------------------------------------------
+// OVERLAY SYSTEM — owned by `components/_overlays.scss` (imported AFTER this file
+// in main.scss, so it is the cascade-winning `.overlay`/`.overlay-content` base).
+// Every panel/territory surface uses `.overlay.hidden` + an inner `.overlay-content`
+// (which scrolls internally; the window never scrolls — contained mandate).
+// Kept here only as a forward-reference so future regions can rely on one source.
+// ---------------------------------------------------------------------------

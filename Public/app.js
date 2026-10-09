@@ -3,6 +3,7 @@
 // and exposing it to the global window scope for index.html accessibility.
 
 import { CONFIG } from './js/config.js';
+import './js/portfolio.js'; // PORTFOLIO — read-only analytics surface (binds window.openPortfolio)
 import { initWebSocket, handleServerMessage, sendPing, requestMatchSync } from './js/network.js';
 import { 
     hideAllOverlays, updateDynamicArenaFloor, renderCardHTML, syncBoardParticles, 
@@ -14,26 +15,210 @@ import {
     updateAvatarIdentityStyle, updateMoodCatalystVisuals, updateStaffTrainingVisuals
 } from './js/ui.js';
 import { initWalletConnect, handleWalletAction, updateWalletUI, openPayoutSettings, savePayoutAddress, userAddress, connectWith, updatePayoutUI, closeWalletSelector, addXChainWallet, submitLinkWallet } from './js/wallet.js';
-import { fetchLeaderboard, registerForTournament, fetchTournamentHistory, fetchSeasonHistory, filterSeasonHistory } from './js/leaderboard.js';
-import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, acceptChallenge, declineChallenge, triggerToggleNetwork, sendSpectate, showPowerTooltip, rejoinActiveMatch, setPendingQuickCastId } from './js/game.js';
+import { fetchLeaderboard, fetchTournamentHistory, fetchSeasonHistory, filterSeasonHistory } from './js/leaderboard.js';
+import { buildEmptyBoard, toggleMatchmakingQueue, sendChatMessage, handleChatKey, proceedToWarRoom, sendChallenge, selectCard, clickGrid, executeQuickCast, acceptChallenge, declineChallenge, triggerToggleNetwork, sendSpectate, showPowerTooltip, rejoinActiveMatch, setPendingQuickCastId, spectatorMatchState } from './js/game.js';
 import { openDeckManager, closeDeckManager, renderDeckManager, setupCropEvents, applyAvatarFilters, selectAvatar, refreshInventory, renderAvatarGrid } from './js/deck.js';
 import { 
     globalClubs,
-    adminRefillVault, adminAddReward, adminRemoveReward, adminAddNetwork, 
+    adminAddReward, adminRemoveReward, adminAddNetwork, 
     adminBroadcast, adminUpdateRules, adminBanWallet, adminUpdatePowerScaling, adminSimulateMutationSuccess, adminSimulateMutationFailure,
     adminToggleMaintenance, adminToggleDevMode, adminResetStats, adminSimulateTournament, adminAssetForfeiture, adminForcePayout, adminSimulateMojoDecay, adminCyberSecurityAudit,
-    onAdminNetworkSelectChange, adminSetActiveNetwork, adminSeasonRollover, adminExportAuditLog, adminCommissionAudit, adminTaxAudit
+    onAdminNetworkSelectChange, adminSetActiveNetwork, adminSeasonRollover, adminExportAuditLog, adminCommissionAudit, adminTaxAudit, adminRestockDLC, adminDistrictTaxAudit,
+    updateAdminRewardRegistry, toMicro
 } from './js/admin.js'; // Note: adminDistrictTaxAudit should be added here
-import { openShopsOverlay, buyClubItem, openClubFoundry, submitClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, buyBlackMarketItem, openClubLeaseBoard, switchPortfolioTab, takeLease, openCreateLeaseOverlay, submitCreateLease, openMutationHistoryOverlay, openVaultInteraction, submitDistrictTax } from './js/economy.js';
-import { openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer, sendAllianceInvite, acceptAlliance, dissolveAlliance, openTrophyView, reportPlayer } from './js/criminality.js';
+import { openShopsOverlay, buyClubItem, openClubFoundry, submitClubFoundry, openArtGalleryOverlay, openConsignmentOverlay, selectConsignmentItem, submitConsignment, promptBid, openPortfolioView, tradeShares, openBlackMarket, buyBlackMarketItem, openClubLeaseBoard, switchPortfolioTab, takeLease, openCreateLeaseOverlay, submitCreateLease, openMutationHistoryOverlay, openVaultInteraction, submitDistrictTax, openRecoveryBountyOverlay, adjustMutationVector, submitVectorRealignment, submitMoodRecalibration, submitMutationLoyaltySynthesis, submitBid, switchFoundryTab, switchShopCategory } from './js/economy.js';
+import { openCourthouse, submitCourthouseFine, initiateBail, openSecuritySentry, deployTrap, openBountyBoard, openRumorMill, spreadRumor, openSocialPanelOverlay, switchSocialTab, openHeistPlanningOverlay, updateHeistRiskAssessment, executeHeistStrike, openKidnapSelectionOverlay, executeKidnap, releaseHostage, payRansom, showKidnapOverlay, startRecoveryTimer, sendAllianceInvite, acceptAlliance, dissolveAlliance, openTrophyView, reportPlayer, openLaunderingTerminal, sendHeistRequest, initiateRegionalSabotage } from './js/criminality.js';
 import { 
-    playProcedureInterruptedSFX, playLongWarningSFX, playCloakFailureSFX, playCloakDisruptorSFX, playMutationSoundscape, stopMutationSoundscape, playMutationSuccessSFX, playEcosystemAlertSFX
+    playProcedureInterruptedSFX, playLongWarningSFX, playCloakFailureSFX, playCloakDisruptorSFX, playMutationSoundscape, stopMutationSoundscape, playMutationSuccessSFX, playEcosystemAlertSFX, toggleMuteMusic, toggleMuteMaster, toggleMuteSfx, updateMasterVolume, updateMusicVolume, updateSfxVolume
 } from './js/audio.js';
+import { initAudioContextManager, getAudioContextManager } from './js/audio_context.js';
+import { RivalryEngine } from './js/rivalry.js';
 import { 
     initParticleSystem, triggerCaptureParticles, triggerGlobalKidnapEffect, 
     triggerMutationScarEffect, triggerCloakFailureParticles, triggerCloakDisruptorParticles
 } from './js/particles.js';
 import { getAssetSymbol, getCachedEnvoiName, resolveEnvoiName, reportGloat, shortenAddress, resolveAssetSymbol, getNetworkConfig } from './js/utils.js'; // Removed playMutationSoundscape, stopMutationSoundscape
+
+// --- Menu & Controller System (PILLAR 5: UI Orchestration) ---
+import { init as initControllerNav, STATE as ControllerState, CONTROLLER_TYPES, handleAction as handleControllerAction, setFocus as setControllerFocus, showFocusRing, hideFocusRing, hapticFeedback, injectConsoleHints, getConsoleHint, enable as enableController, disable as disableController, isActive as isControllerActive, getType as getControllerType, getFocusIndex, getActiveGamepad, detectControllerType } from './js/controller_nav.js';
+import { SHAPES, SIZES, GRIDS, PATHWAY_SHAPES, SYSTEM_SHAPES, CONTROLLER_MAP, getShapeForSystem, getPathwayShape, getSize, getGrid, computePositions, getClipPath, getControllerNav, getAllShapeIds, getAllGridIds, getAllSizeIds, RADIAL_GRIDS, isRadialGrid, FLOW_GRIDS, isPositionedGrid } from './js/menu_customization.js';
+import { PATHWAYS, calculateTier, getTierProgress, getCSSVariables, injectAnimationStyles, getPathway, getAllPathways } from './js/pathway_avenues.js';
+import { get as getUserPrefs, onChange as onUserPrefsChange, isStarred, toggleStar, getStarred, getStarredByTab, reorderStarred, unstar, bindAsset, getBoundAsset, getAllBoundAssets, getLayout, setLayout, getMainMenu, setMainMenu, getMenuLayout, setMenuLayout, getButtonOverride, setButtonOverride, removeButtonOverride, getDefaultShape, getDefaultSize, setDefaultShape, setDefaultSize, getGridType, setGridType, exportPrefs, importPrefs, resetAll, syncFromWasm, syncToWasm } from './js/user_preferences.js';
+import { open as openMenuCustomization, close as closeMenuCustomization, switchTab as switchCustomTab, selectShape, selectSize, onGridChange, setControllerScheme, testController, selectPerButton, onPerButtonShapeChange, onPerButtonSizeChange, removePerButtonOverride, saveMenuCustomization, resetMenuCustomization, exportMenuCustomization, importMenuCustomization, renderPreview as renderMenuPreview, renderPerButtonList, renderControllerTab, renderGridDiagram } from './js/menu_customization_panel.js';
+import { init as initMenuConstellation, renderStarredItems, openQuickPlay, closeQuickPlay, acceptMatch, openTutorial, closeTutorial, playVideo } from './js/menu-constellation.js';
+import { renderGameScreen } from './js/game_screen.js'; // Dynamic board/game screen (was static in index.html)
+
+// --- World Dashboard Tab UIs (PILLAR 5: UI Orchestration) ---
+import { initCareerTree } from './js/career_tree.js';
+import { initClubFoundry } from './js/club_foundry.js';
+import { initTournamentBrackets } from './js/tournament_brackets.js';
+import { initJusticeDashboard } from './js/justice_dashboard.js';
+import { initLoanTerms } from './js/loan_terms.js';
+import { initAmmChart } from './js/amm_chart.js';
+import { initPetBreeder } from './js/pet_breeder.js';
+import './js/bonded_branding.js'; // §23.5 Branding Studio (binds window.openBondedBranding)
+import './js/card_view_skins.js'; // §23.5.5 viewer-scoped card display (binds window.CardViewSkins)
+import './js/slide_theming.js'; // §10.6 slide theming: boot/main-menu + WD backgrounds (binds window.SlideTheming)
+import './js/note_vocabulary.js'; // note vocabulary: the client's read-only view of the server's note prefixes (binds window.NoteVocab)
+import './js/tx_journal.js'; // memo of this browser's OWN transactions; pending is never shown as settled (binds window.VbtTxJournal)
+import './js/theme_engine.js'; // §27 client half: sets --theme-accent* from the player's element (binds window.themeEngine). _theme_engine.scss + _variables.scss already consume those tokens, so until this import existed the CSS contract was INERT. Default element is 'fire', which is exactly the token default the compiled :root already ships — so composing it changes nothing until setElement() is called.
+import { initChurchStorefront } from './js/church_storefront.js';
+import { initRivalryChallenge } from './js/rivalry_challenge.js';
+import { initAchievementProgress } from './js/achievement_progress.js';
+import { initReportHistory } from './js/report_history.js';
+import { initGovernanceChambers } from './js/governance_chambers.js';
+import { initTreasureMap } from './js/treasure_map.js';
+import { initSeasonalEvents } from './js/seasonal_events.js';
+import { initSeasonCountdown } from './js/season_countdown.js';
+import { initReplayViewer } from './js/replay_viewer.js';
+import { initIdentityEditor } from './js/identity_editor.js';
+import { initDividendYield } from './js/dividend_yield.js';
+import { initUnderworldContracts } from './js/underworld_contracts.js';
+import { initBlackMarket } from './js/black_market.js';
+import { initItemsEquip } from './js/items_equip.js';
+// The Faction Quartermaster: owner of /api/faction/shop + /api/faction/shop/buy, which had no UI
+// anywhere in the client. Placed as a Careers & Factions leaf because the engine gates buying on
+// the caller's career role.
+import './js/faction_shop.js';
+import { initEventsArena } from './js/events_arena.js';
+import { initTerritoryMap } from './js/territory_map.js';
+import { initRewardsCenter } from './js/rewards_center.js';
+
+import { initCounterfeitScanner } from './js/counterfeit_scanner.js';
+import { initCreatorStudio } from './js/creator_studio.js';
+import { initFaithWarGambit } from './js/faith_war_gambit.js';
+import { initIndustrialFlow } from './js/industrial_flow.js';
+import { initMatchCreator } from './js/match_creator.js';
+import { initCardAnimations } from './js/card_animations.js';
+import { initCampaignMode } from './js/campaign_mode.js';
+import { initDeckManager } from './js/deck_manager.js';
+import { initEquipmentSystem } from './js/equipment_system.js';
+import { initCardProgression } from './js/card_progression.js';
+import { initGameBoard } from './js/game_board.js';
+import { initGameMultiplayer } from './js/game_multiplayer.js';
+import { initCardTitles } from './js/card_titles.js';
+import { initPostMatchWagers } from './js/post_match_wagers.js';
+import { initCharacterMood } from './js/character_mood.js';
+import { initTeaHouse } from './js/tea_house.js';
+import { initZenGarden } from './js/zen_garden.js';
+import { initNpcTaunts } from './js/npc_taunts.js';
+import { initGameModes } from './js/game_modes.js';
+import { initGameLocations } from './js/game_locations.js';
+import { initTutorialSystem } from './js/tutorial_system.js';
+import { initLaunchpad, initAds, initVehicles, initStatsOverlay, initWorldContent, initGamingOS, initLocalModel, initGovernor, initLeaderboard, initCompliance, initMaintenance, initSystemMsg, initOrphans, initRegions } from './js/remaining_tabs.js';
+// Orphan Cleaner — standalone overlay reached from the World Dashboard
+// (WD_ROUTES.orphan = 'openOrphanCleaner'). The module existed on disk but was
+// never composed into the app, so that route was DEAD: the dashboard's
+// typeof-guard silently fell back to embedding `initOrphans` and the intended
+// surface was unreachable. Importing it (it is a lazy, self-contained IIFE that
+// only binds window.* at load) completes the Single-Entry contract and revives
+// the route.
+import './js/orphan_cleaner.js';
+// ============================================================================
+// UI MODULE IMPORTS — SINGLE-ENTRY MANDATE
+// ----------------------------------------------------------------------------
+// index.html is a PURE SHELL: wasm_exec.js + third-party vendor bundles +
+// app.js. Every first-party script is imported HERE so there is exactly ONE
+// composition root and ONE boot order, with wasm_exec as the glue.
+//
+// These were previously <script src="js/*.js"> tags inside index.html, which
+// caused every module to be evaluated twice (once classic, once as a module)
+// and produced two competing UI stacks — the World Dashboard and the Player
+// Profile hub behaving like separate apps.
+//
+// Every file below is a self-contained IIFE that binds its public API to
+// window, so import order is not load-bearing beyond app_bridge.js (which must
+// define window.WasmWalletBridge before the WASM engine calls into JS).
+// ============================================================================
+
+// --- Shell glue (defines window.WasmWalletBridge / UnifiedAlertSystem) ---
+import './js/app_bridge.js';
+
+// --- Constellation / lobby shell ---
+import './js/constellation_hub.js';
+import './js/constellation_spectate.js';
+import './js/constellation_tutorial.js';
+import './js/placeholder_assets.js';
+
+// --- World Dashboard: the single navigation surface for all gameplay UI ---
+import './js/world_dashboard.js';
+import './js/theme_dashboard.js';
+import './js/system_dashboard.js';
+import './js/owner_stats.js';
+import './js/community_dashboard.js';
+import './js/utilities_dashboard.js';
+import './js/security_dashboard.js';
+import './js/extended_dashboard.js';
+// The admin surface: ONE signature-gated console (opens the Admin Suite panel). The four
+// competing dashboards (admin_dashboard / operations_dashboard / final_dashboard / admin_panel)
+// were deleted — they were never mounted, never called, and one of them authenticated with a
+// hard-coded password.
+import './js/admin_console.js';
+// The Admin Suite's CONTROLS. The panel's markup used to carry inline `onclick="adminX()"`
+// handlers, which resolve on `window` — and eight of those functions had no publisher, so those
+// controls were inert. The markup now declares `data-admin-action` and this module binds them.
+import { bindAdminSuiteControls } from './js/admin_suite.js';
+
+// --- Living-world feature modules (World Dashboard destinations) ---
+import './js/investment_dashboard.js';
+import './js/creator_store.js';
+import './js/creator_storefront.js';
+import './js/ai_citizens.js';
+import './js/world_events.js';
+import './js/leaderboard_region.js';
+import './js/rivalry_viewer.js';
+import './js/life_assets.js';
+import './js/early_tasks.js';
+import './js/combined_events.js';
+import './js/religion_governance.js';
+import './js/stat_overlay.js';
+import './js/industrial_loop.js';
+import './js/faith_system.js';
+import './js/children_bots.js';
+import './js/entity_market.js';
+import './js/pet_battle_arena.js';
+import './js/persistent_identity.js';
+import './js/entity_shares.js';
+import './js/infrastructure_lease.js';
+import './js/governance.js';
+import './js/bridge_router.js';
+import './js/creator_economy.js';
+import './js/faith_church.js';
+import './js/launchpad.js';
+import './js/advertising.js';
+import './js/gaming_os.js';
+import './js/asset_viewer.js';
+import './js/dev_game_hub.js';
+
+// --- Criminality / bounty (immersive underworld layer) ---
+import './js/underworld.js';
+import './js/bounty_tracker.js'; // Live bounty overlay + Bounty Hunter tier tracking buffs
+
+// --- Wallet / transaction surfaces ---
+import './js/wallet_state.js';
+import './js/wallet_modal.js';
+import './js/tx_modal.js';
+import './js/faucet_dashboard.js';
+
+// --- Match / spectate surfaces ---
+import './js/spectate.js';
+import './js/match_arena.js';
+
+// --- Player surfaces ---
+import './js/achievements.js';
+import './js/daily_challenges.js';
+import './js/settings_panel.js';
+
+// --- §25 Web-3D client (registers window.enter3DWorld / window.enterMenuWorld) ---
+import './js/world3d.js';
+
+// --- Platform services / utilities ---
+import './js/panel_manager.js';
+import './js/audio_engine.js';
+import './js/error_handler.js';
+import './js/first_run.js';
+
+
 
 // --- Global Bridge: index.html event mapping ---
 window.handleWalletAction = handleWalletAction;
@@ -51,6 +236,7 @@ window.toggleMuteSfx = toggleMuteSfx;
 window.setMasterVolume = updateMasterVolume;
 window.playMutationSuccessSFX = playMutationSuccessSFX;
 window.playCloakDisruptorSFX = playCloakDisruptorSFX;
+window.toggleContextualAmbients = toggleContextualAmbients;
 window.playProcedureInterruptedSFX = playProcedureInterruptedSFX;
 window.playCloakFailureSFX = playCloakFailureSFX;
 window.playLongWarningSFX = playLongWarningSFX;
@@ -61,7 +247,6 @@ window.sendChatMessage = sendChatMessage;
 window.playMutationSoundscape = playMutationSoundscape; // Expose new audio function
 window.stopMutationSoundscape = stopMutationSoundscape; // Expose new audio function
 window.handleChatKey = handleChatKey;
-window.registerForTournament = registerForTournament;
 window.filterSeasonHistory = filterSeasonHistory;
 window.openTournamentBracket = openTournamentBracket;
 window.closeTournamentBracket = closeTournamentBracket;
@@ -91,10 +276,16 @@ window.adjustMapZoom = adjustMapZoom;
 window.openSocialPanelOverlay = openSocialPanelOverlay;
 window.switchSocialTab = switchSocialTab;
 window.openPortfolioView = openPortfolioView;
+window.openLaunderingTerminal = openLaunderingTerminal;
+window.openRecoveryBountyOverlay = openRecoveryBountyOverlay;
 window.switchPortfolioTab = switchPortfolioTab;
 window.openVaultInteraction = openVaultInteraction;
 window.tradeShares = tradeShares;
 window.openMutationHistoryOverlay = openMutationHistoryOverlay;
+window.adjustMutationVector = adjustMutationVector;
+window.submitVectorRealignment = submitVectorRealignment;
+window.submitMoodRecalibration = submitMoodRecalibration;
+window.submitMutationLoyaltySynthesis = submitMutationLoyaltySynthesis;
 window.submitDistrictTax = submitDistrictTax;
 window.openBlackMarket = openBlackMarket;
 window.buyBlackMarketItem = buyBlackMarketItem;
@@ -109,6 +300,7 @@ window.submitLinkWallet = submitLinkWallet;
 window.openClubLeaseBoard = openClubLeaseBoard;
 window.openCreateLeaseOverlay = openCreateLeaseOverlay;
 window.submitCreateLease = submitCreateLease;
+window.switchFoundryTab = switchFoundryTab; // PILLAR 4: Expose for inline HTML calls
 window.takeLease = takeLease;
 window.openCourthouse = openCourthouse;
 window.submitCourthouseFine = submitCourthouseFine;
@@ -121,6 +313,7 @@ window.spreadRumor = spreadRumor;
 window.openHeistPlanningOverlay = openHeistPlanningOverlay;
 window.updateHeistRiskAssessment = updateHeistRiskAssessment;
 window.executeHeistStrike = executeHeistStrike;
+window.sendHeistRequest = sendHeistRequest;
 window.openKidnapSelectionOverlay = openKidnapSelectionOverlay;
 window.executeKidnap = executeKidnap;
 window.payRansom = payRansom;
@@ -135,6 +328,7 @@ window.shareTournamentVictory = shareTournamentVictory;
 window.adminSeasonRollover = adminSeasonRollover;
 window.initiateRegionalSabotage = initiateRegionalSabotage; // New: Regional Warfare
 window.adminExportAuditLog = adminExportAuditLog;
+window.adminRestockDLC = adminRestockDLC;
 window.adminSimulateMutationSuccess = adminSimulateMutationSuccess;
 window.adminSimulateMutationFailure = adminSimulateMutationFailure;
 window.adminSimulateTournament = adminSimulateTournament;
@@ -152,16 +346,184 @@ window.adminUpdateRules = adminUpdateRules;
 window.adminBroadcast = adminBroadcast;
 window.adminAddReward = adminAddReward;
 window.adminRemoveReward = adminRemoveReward;
-window.adminRefillVault = adminRefillVault;
+window.updateAdminRewardRegistry = updateAdminRewardRegistry;
 window.adminSetActiveNetwork = adminSetActiveNetwork;
+window.adminAddNetwork = adminAddNetwork; // Network registry upsert: sets the indexer/node base(s) the server reads through
 window.onAdminNetworkSelectChange = onAdminNetworkSelectChange;
 window.selectCard = selectCard;
 window.showMutationStabilityTooltip = showMutationStabilityTooltip;
 window.hidePowerTooltip = hidePowerTooltip;
+window.hideAllOverlays = hideAllOverlays;
+window.toggleActionDropdown = function () {
+    const dd = document.getElementById('action-dropdown');
+    if (dd) dd.classList.toggle('open');
+};
+window.switchShopCategory = switchShopCategory;
 window.clickGrid = clickGrid;
 window.executeQuickCast = executeQuickCast;
 
-// --- Bootstrapping Lifecycle ---
+// --- Menu & Controller Bridge ---
+window.ControllerNav = {
+    init: initControllerNav,
+    STATE: ControllerState,
+    CONTROLLER_TYPES,
+    handleAction: handleControllerAction,
+    setFocus: setControllerFocus,
+    showFocusRing,
+    hideFocusRing,
+    hapticFeedback,
+    injectConsoleHints,
+    getConsoleHint,
+    enable: enableController,
+    disable: disableController,
+    isActive: isControllerActive,
+    getType: getControllerType,
+    getFocusIndex,
+    getActiveGamepad,
+    detectControllerType,
+};
+window.MenuCustomization = {
+    SHAPES,
+    SIZES,
+    GRIDS,
+    RADIAL_GRIDS,
+    FLOW_GRIDS,
+    PATHWAY_SHAPES,
+    SYSTEM_SHAPES,
+    CONTROLLER_MAP,
+    getShapeForSystem,
+    getPathwayShape,
+    getSize,
+    getGrid,
+    computePositions,
+    getClipPath,
+    getControllerNav,
+    getAllShapeIds,
+    getAllGridIds,
+    getAllSizeIds,
+    isRadialGrid,
+    isPositionedGrid,
+};
+window.PathwayAvenues = {
+    PATHWAYS,
+    calculateTier,
+    getTierProgress,
+    getCSSVariables,
+    injectAnimationStyles,
+    getPathway,
+    getAllPathways,
+};
+// --- World Dashboard Tab UI Bridge ---
+window.initCareerTree = initCareerTree;
+window.initClubFoundry = initClubFoundry;
+window.initTournamentBrackets = initTournamentBrackets;
+window.initJusticeDashboard = initJusticeDashboard;
+window.initLoanTerms = initLoanTerms;
+window.initAmmChart = initAmmChart;
+window.initPetBreeder = initPetBreeder;
+window.initChurchStorefront = initChurchStorefront;
+window.initRivalryChallenge = initRivalryChallenge;
+window.initAchievementProgress = initAchievementProgress;
+window.initReportHistory = initReportHistory;
+window.initGovernanceChambers = initGovernanceChambers;
+window.initTreasureMap = initTreasureMap;
+window.initSeasonCountdown = initSeasonCountdown;
+window.initReplayViewer = initReplayViewer;
+window.initIdentityEditor = initIdentityEditor;
+window.initDividendYield = initDividendYield;
+window.initUnderworldContracts = initUnderworldContracts;
+window.initBlackMarket = initBlackMarket;
+window.initItemsEquip = initItemsEquip;
+window.initEventsArena = initEventsArena;
+window.initTerritoryMap = initTerritoryMap;
+window.initRewardsCenter = initRewardsCenter;
+window.initMatchArena = window.openMatchArena || function () {};
+window.initCounterfeitScanner = initCounterfeitScanner;
+window.initCreatorStudio = initCreatorStudio;
+window.initFaithWarGambit = initFaithWarGambit;
+window.initIndustrialFlow = initIndustrialFlow;
+window.initMatchCreator = initMatchCreator;
+window.initCardAnimations = initCardAnimations;
+window.initCampaignMode = initCampaignMode;
+window.initLaunchpad = initLaunchpad;
+window.initDeckManager = initDeckManager;
+window.initEquipmentSystem = initEquipmentSystem;
+window.initCardProgression = initCardProgression;
+window.initGameBoard = initGameBoard;
+window.initAds = initAds;
+window.initVehicles = initVehicles;
+window.initStatsOverlay = initStatsOverlay;
+window.initWorldContent = initWorldContent;
+window.initGamingOS = initGamingOS;
+window.initLocalModel = initLocalModel;
+window.initGovernor = initGovernor;
+window.initLeaderboard = initLeaderboard;
+window.initCompliance = initCompliance;
+window.initMaintenance = initMaintenance;
+window.initSystemMsg = initSystemMsg;
+window.initOrphans = initOrphans;
+window.initRegions = initRegions;
+window.UserPreferences = {
+    get: getUserPrefs,
+    onChange: onUserPrefsChange,
+    isStarred,
+    toggleStar,
+    getStarred,
+    getStarredByTab,
+    reorderStarred,
+    unstar,
+    bindAsset,
+    getBoundAsset,
+    getAllBoundAssets,
+    getLayout,
+    setLayout,
+    getMainMenu,
+    setMainMenu,
+    getMenuLayout,
+    setMenuLayout,
+    getButtonOverride,
+    setButtonOverride,
+    removeButtonOverride,
+    getDefaultShape,
+    getDefaultSize,
+    setDefaultShape,
+    setDefaultSize,
+    getGridType,
+    setGridType,
+    exportPrefs,
+    importPrefs,
+    resetAll,
+    syncFromWasm,
+    syncToWasm,
+};
+window.openMenuCustomization = openMenuCustomization;
+window.closeMenuCustomization = closeMenuCustomization;
+window.switchCustomTab = switchCustomTab;
+window.selectShape = selectShape;
+window.selectSize = selectSize;
+window.onGridChange = onGridChange;
+window.setControllerScheme = setControllerScheme;
+window.testController = testController;
+window.selectPerButton = selectPerButton;
+window.onPerButtonShapeChange = onPerButtonShapeChange;
+window.onPerButtonSizeChange = onPerButtonSizeChange;
+window.removePerButtonOverride = removePerButtonOverride;
+window.saveMenuCustomization = saveMenuCustomization;
+window.resetMenuCustomization = resetMenuCustomization;
+window.exportMenuCustomization = exportMenuCustomization;
+window.importMenuCustomization = importMenuCustomization;
+window.renderMenuPreview = renderMenuPreview;
+window.renderPerButtonList = renderPerButtonList;
+window.renderControllerTab = renderControllerTab;
+window.renderGridDiagram = renderGridDiagram;
+window.renderStarredItems = renderStarredItems;
+window.openQuickPlay = openQuickPlay;
+window.closeQuickPlay = closeQuickPlay;
+window.acceptMatch = acceptMatch;
+window.openTutorial = openTutorial;
+window.closeTutorial = closeTutorial;
+window.playVideo = playVideo;
+window.initMenuConstellation = initMenuConstellation;
 window.onload = async () => {
     console.log("[ARENA] Initiating Neural Uplink...");
     
@@ -170,6 +532,15 @@ window.onload = async () => {
         const result = await WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject);
         go.run(result.instance);
         console.log("[ARENA] WASM Engine ACTIVE.");
+        renderGameScreen(); // Build the board/game screen DOM (replaces static index.html markup)
+        // Bind the Admin Suite's controls. The shell markup declares WHAT each control does
+        // (`data-admin-action`); this is the ONE place that says HOW, so no control depends on an
+        // inline handler resolving a global.
+        bindAdminSuiteControls();
+
+        // §23.5.5: read the viewer's OWN card-display preference once the engine is up. It is a
+        // no-op without a wallet (and the board/quick-play paths re-check lazily afterwards).
+        if (window.CardViewSkins) window.CardViewSkins.refresh();
 
         // PILLAR 6: Client Beacon Recovery (Warm Start).
         // Immediately prime the engine with the last known "Push" state from the server.
@@ -177,6 +548,13 @@ window.onload = async () => {
         if (cachedBeacon) {
             try {
                 const beacon = JSON.parse(cachedBeacon);
+
+                // PILLAR 4: Session Identity Restoration.
+                // Must restore player index before syncing profile to ensure correct slot hydration.
+                if (beacon.local_player_index !== undefined && window.SetLocalPlayerIndex) {
+                    window.SetLocalPlayerIndex(beacon.local_player_index);
+                }
+
                 if (window.SyncFullProfile) window.SyncFullProfile(beacon.profile);
                 // PILLAR 4: Sequence Restoration.
                 // Restore the Replay Engine sequence count to enable seamless catch-up.
@@ -217,7 +595,11 @@ window.onload = async () => {
         
         window.syncUI();
 
-        // PILLAR 4: Warm-Boot Restoration.
+    // PILLAR 6: AudioContextManager initialization.
+        // Initialize contextual audio after WASM is active to ensure it has the audio module reference.
+        // We'll set it up once the WebSocket handshake completes and first syncUI fires.
+        
+    // PILLAR 4: Warm-Boot Restoration.
         // If the beacon restored an 'Active' state, trigger the catch-up protocol.
         const postSyncState = window.GetGameState("combat");
         if (postSyncState && postSyncState.phase === "Active") {
@@ -226,8 +608,33 @@ window.onload = async () => {
     } catch (err) {
         console.error("[BOOT ERROR] Engine initialization failed:", err);
         showToast("❌ Critical Error: Neural Uplink Failed. Please refresh.", "error", 0);
+     }
+ };
+
+/**
+ * handlePhaseMusicTransition - Bridges syncUI phase changes to AudioContextManager.
+ * PILLAR 6: Phase-Based Atmosphere. Dispatches game_phase_change events for context-aware music.
+ */
+function handlePhaseMusicTransition(state) {
+    const phaseToContext = {
+        "DISCONNECTED": "menu",
+        "Setup": "lobby",
+        "Lobby": "lobby",
+        "PreGame": "casual_2p",
+        "Active_Casual": "casual_2p",
+        "Active_Quick": "quick_play",
+        "Active_Tournament": "tournament",
+        "Active": "combat",
+        "TournamentLobby": "tournament_lobby",
+        "Finished": "finished"
+    };
+    
+    const context = phaseToContext[state.phase] || null;
+    if (context && context !== window._lastAudioContext) {
+        window._lastAudioContext = context;
+        window.dispatchEvent(new CustomEvent('game_phase_change', { detail: { context, reason: 'syncUI' } }));
     }
-};
+}
 
 // --- UI Performance Layer ---
 const UI_CACHE = new Map();
@@ -314,6 +721,61 @@ function updateVolumeSlidersUI() {
     if (mv) mv.value = localStorage.getItem('masterVolume') || 0.5;
     if (mu) mu.value = localStorage.getItem('musicVolume') || 0.5;
     if (sf) sf.value = localStorage.getItem('sfxVolume') || 0.5;
+    
+    // Update contextual ambients toggle status
+    updateAmbientsToggleUI();
+}
+
+/**
+ * updateAmbientsToggleUI updates the contextual ambients button/icon based on persisted state.
+ * PILLAR 6: Audio Context Manager.
+ */
+function updateAmbientsToggleUI() {
+    const statusEl = getEl("ambients-status");
+    const btnEl = getEl("ambients-toggle-btn");
+    
+    if (!statusEl || !btnEl) return;
+    
+    const isEnabled = localStorage.getItem('contextualAmbients') === 'true';
+    
+    statusEl.innerText = isEnabled ? "ON" : "OFF";
+    statusEl.style.color = isEnabled ? "var(--neon-green)" : "var(--opacity-6, rgba(255,255,255,0.6))";
+    btnEl.innerText = isEnabled ? "🎙️" : "⏺️"; // Active mic vs inactive
+    
+    // Add subtle glow if enabled
+    if (isEnabled) {
+        btnEl.style.boxShadow = "0 0 8px var(--neon-green)";
+        btnEl.style.borderColor = "var(--neon-green)";
+    } else {
+        btnEl.style.boxShadow = "";
+        btnEl.style.borderColor = "";
+    }
+}
+
+/**
+ * toggleContextualAmbients toggles the contextual ambients feature on/off.
+ * PILLAR 6: Audio Context Manager.
+ */
+function toggleContextualAmbients() {
+    const audioCtx = getAudioContextManager();
+    if (!audioCtx) {
+        showToast("Audio context not yet initialized. Try again in a moment.", "warning");
+        return;
+    }
+    
+    const isEnabled = localStorage.getItem('contextualAmbients') === 'true';
+    const newState = !isEnabled;
+    
+    localStorage.setItem('contextualAmbients', String(newState));
+    
+    // Apply to audio context manager
+    audioCtx.setAmbientEnabled(newState);
+    
+    // Update UI immediately
+    updateAmbientsToggleUI();
+    
+    // Log the change for audit purposes
+    console.log(`[Audio Context] Contextual ambients ${newState ? 'enabled' : 'disabled'}`);
 }
 
 /**
@@ -531,38 +993,6 @@ function updateBountyHunterHUD(state) {
 }
 
 /**
- * updateStaffTrainingVisuals applies a pulsing cyan glow to the avatar if the buff is active.
- * PILLAR 6: Specialized Gene-Editing Feedback.
- */
-function updateStaffTrainingVisuals(state) {
-    const avatarFrame = getEl("p1-avatar");
-    if (!avatarFrame) return;
-
-    const myClub = globalClubs[state.employer_id];
-    const isTrainingActive = myClub?.buff_expirations?.["STAFF_TRAINING"] && new Date(myClub.buff_expirations["STAFF_TRAINING"]) > Date.now();
-
-    avatarFrame.classList.toggle("buff-training-active", isTrainingActive);
-    
-    // Ensure the animation style is injected into the document head
-    if (!document.getElementById("staff-training-glow-style")) {
-        const style = document.createElement("style");
-        style.id = "staff-training-glow-style";
-        style.innerHTML = `
-            @keyframes pulse-cyan-glow {
-                0% { box-shadow: 0 0 5px var(--neon-cyan); }
-                50% { box-shadow: 0 0 15px var(--neon-cyan), 0 0 25px var(--neon-cyan); }
-                100% { box-shadow: 0 0 5px var(--neon-cyan); }
-            }
-            .buff-training-active {
-                animation: pulse-cyan-glow 2s infinite !important;
-                border-color: var(--neon-cyan) !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-}
-
-/**
  * updateDistrictStabilizerVisuals triggers the shimmering grid effect if the buff is active.
  * PILLAR 1: Infrastructure Prestige.
  */
@@ -577,65 +1007,6 @@ function updateDistrictStabilizerVisuals(state) {
     // PILLAR 1: Infrastructure Audio.
     if (isStabilizerActive) { if (window.playDistrictStabilizerThrum) window.playDistrictStabilizerThrum(); }
     else { if (window.stopDistrictStabilizerThrum) window.stopDistrictStabilizerThrum(); }
-}
-
-/**
- * updateMojoDecayStatus displays the current Mojo decay rate if a stabilizer is active.
- * PILLAR 1: Infrastructure Prestige.
- */
-function updateMojoDecayStatus(state) {
-    const container = getEl("mojo-decay-status-hud");
-    if (!container) return;
-
-    const isStabilizerActive = state.is_mojo_stabilizer_active;
-    const decayRate = state.mojo_decay_rate;
-
-    if (!isStabilizerActive || decayRate === 0) {
-        container.classList.add("hidden");
-        return;
-    }
-
-    container.innerHTML = `
-        <div class="glass-panel p-5-10 border-neon-cyan flex-row align-center gap-5 accelerated" 
-             style="background: rgba(0, 242, 254, 0.1); height: 32px;"
-             title="MOJO DECAY MITIGATION ACTIVE">
-            <span class="text-neon-cyan font-bold font-size-0-7em letter-spacing-1">📉 DECAY:</span>
-            <b class="text-white font-mono font-size-0-8em">${(decayRate * 100).toFixed(1)}%</b>
-        </div>`;
-    container.classList.remove("hidden");
-}
-
-/**
- * updateMoodCatalystVisuals applies an elemental tint to the avatar frame.
- * PILLAR 6: Specialized Gene-Editing Feedback.
- */
-function updateMoodCatalystVisuals(state) {
-    const avatarFrame = getEl("p1-avatar");
-    if (!avatarFrame) return;
-
-    // Reset styles to default glass state
-    avatarFrame.style.boxShadow = "";
-    avatarFrame.style.borderColor = "";
-
-    // PILLAR 6: Mood Catalyst Feedback.
-    const isCatalystActive = state.profile_buffs?.["mood_catalyst"] > 0;
-    if (!isCatalystActive || !state.favorite_card_id) return;
-
-    const favCard = (state.inventory || []).find(c => c.id === state.favorite_card_id);
-    if (!favCard || !favCard.mood || favCard.mood === "Neutral") return;
-
-    const moodColors = {
-        "Volatile": "var(--error-red)",
-        "Serene": "var(--neon-blue)",
-        "Spirited": "var(--warning-orange)",
-        "Grounded": "var(--neon-green)"
-    };
-
-    const color = moodColors[favCard.mood];
-    if (color) {
-        avatarFrame.style.boxShadow = `0 0 15px ${color}`;
-        avatarFrame.style.borderColor = color;
-    }
 }
 
 /**
@@ -728,6 +1099,46 @@ window.syncUI = (scope = "all", overrideData = null) => {
     }
     dashboardCache.stateKey = currentStateKey;
     dashboardCache.lastBalance = state.faucet;
+
+    // --- Board visibility: the game board must ONLY show during an Active match,
+    //     a live spectate session, or replay catch-up. In the lobby/menu it is hidden
+    //     and a lobby placeholder takes its place (operator mandate). ---
+    const isSpectating = spectatorMatchState !== null;
+    const isReplay = !!(state.replay_state && state.replay_state !== "SYNCHRONIZED");
+    const boardVisible = state.phase === "Active" || isSpectating || isReplay;
+    const boardEl = document.getElementById("board-container");
+    const p2El = document.getElementById("p2-info");
+    const p1El = document.getElementById("p1-info");
+    const thinkEl = document.getElementById("ai-thinking-indicator");
+    const lobbyEl = document.getElementById("lobby-placeholder");
+    if (boardEl) boardEl.classList.toggle("hidden", !boardVisible);
+    if (p2El) p2El.classList.toggle("hidden", !boardVisible);
+    if (p1El) p1El.classList.toggle("hidden", !boardVisible);
+    if (thinkEl) thinkEl.classList.toggle("hidden", !boardVisible);
+    if (lobbyEl) lobbyEl.classList.toggle("hidden", boardVisible);
+    document.body.classList.toggle("lobby-mode", !boardVisible);
+    // Constellation hub is the main screen in the lobby; reveal the (app.js-rendered)
+    // game screen only when an Active match / spectate / replay is showing.
+    if (boardVisible) document.body.classList.remove("nexus-lobby-active");
+
+    // PILLAR 6: Audio Context Transitions.
+    if (scope === "all" || scope === "meta") {
+        handlePhaseMusicTransition(state);
+        
+        // Dispatch game phase change event for AudioContextManager
+        initAudioContextManager(window.AudioModuleInstance);
+        const audioCtx = getAudioContextManager();
+        if (audioCtx) {
+            const contextMap = {
+                'Lobby': 'lobby',
+                'Active': 'combat',
+                'TournamentLobby': 'tournament',
+                'PreGame': 'casual_2p'
+            };
+            const contextKey = contextMap[state.phase] || 'menu';
+            audioCtx.transitionToContext(contextKey, 'syncUI');
+        }
+    }
 
     // PILLAR 4: Critical Alerts.
     // The native VOI 'gas_warning' toast is handled by the 'admin_notification'
@@ -914,6 +1325,7 @@ window.syncUI = (scope = "all", overrideData = null) => {
     if (scope === "all" && (state.phase === "Lobby" || state.phase === "Active") && userAddress) {
         const beaconData = {
             profile: state,
+            local_player_index: state.local_player_index, // PILLAR 4: Maintain identity across refreshes
             vault_balance: state.faucet, // PILLAR 2: Synchronize with WASM export key
             maintenance_priority: state.maintenance_priority, // PILLAR 4: Critical Alert state preservation
             match_id: state.match_id, // PILLAR 3: Standardized identification persistence
@@ -924,3 +1336,51 @@ window.syncUI = (scope = "all", overrideData = null) => {
         localStorage.setItem("vbabes_state_beacon", JSON.stringify(beaconData));
     }
 };
+
+// ── Dev diagnostics: auto-report client errors to the server (no console paste needed) ──
+(function installClientErrorReporter() {
+    // Parse "file:line:col" out of a stack string; returns {src,line,col} or null.
+    function parseStackFrame(stack) {
+        if (!stack) return null;
+        // Match "something.js:LINE:COL". \S+ may grab a leading "(" from "at (http://...)"
+        // — trim it so the src is a clean URL/path.
+        const m = String(stack).match(/\(?(\S+\.js):(\d+):(\d+)\)?/);
+        if (!m) return null;
+        return { src: m[1].replace(/^\(/, ""), line: parseInt(m[2], 10) || 0, col: parseInt(m[3], 10) || 0 };
+    }
+    function report(msg, src, line, col, stack) {
+        try {
+            // Fallback: if the browser gave us no line (lineno 0 / empty src),
+            // extract the real file:line:col from the stack trace.
+            if ((!line || line === 0 || !src) && stack) {
+                const fr = parseStackFrame(stack);
+                if (fr) {
+                    if (!src) src = fr.src;
+                    if (!line || line === 0) line = fr.line;
+                    if (!col || col === 0) col = fr.col;
+                }
+            }
+            const wallet = (typeof userAddress !== "undefined" && userAddress) ? String(userAddress) : "";
+            fetch("/api/client-error", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ msg: String(msg || ""), src: src || "", line: line || 0, col: col || 0, stack: stack || "", wallet: wallet }),
+                keepalive: true
+            }).catch(() => {});
+        } catch (_) {}
+    }
+    window.addEventListener("error", function (e) {
+        const er = e.error || {};
+        report(e.message, e.filename, e.lineno, e.colno, er.stack || (e.message + ""));
+    });
+    window.addEventListener("unhandledrejection", function (e) {
+        const r = e.reason || {};
+        const stack = r.stack || (typeof r === "string" ? r : "");
+        // Parse the real source/line from the rejection stack instead of hardcoding 0.
+        const fr = parseStackFrame(stack);
+        const src = (fr && fr.src) ? fr.src : ((stack || "").split("\n")[0]) || "unhandledrejection";
+        const line = fr ? fr.line : 0;
+        const col = fr ? fr.col : 0;
+        report(r.message || r, src, line, col, stack);
+    });
+})();

@@ -1,0 +1,111 @@
+// ============================================================================
+// Constellation Tutorial — Anya/Vbabes onboarding guide
+// ============================================================================
+
+.constellation-tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: transparent;
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.tutorial-dialog {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    background: rgba(15, 18, 30, 0.95);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 12px;
+    -webkit-backdrop-filter: blur(10px);
+    min-width: 400px;
+    max-width: 500px;
+    pointer-events: all;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+}
+
+.tutorial-npc-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.tutorial-content { flex: 1; }
+
+.tutorial-npc-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--theme-accent);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+/* Tutorial step indicator */
+.tutorial-step-indicator {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.3);
+    transition: all 0.2s ease;
+}
+
+.step-dot.active {
+    background: var(--theme-accent);
+    box-shadow: 0 0 8px var(--theme-accent);
+}
+
+.step-dot.done {
+    background: #10b981;
+}
+
+.tutorial-message {
+    font-size: 13px;
+    color: #e0e0e0;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.tutorial-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.tutorial-highlight-ring {
+    position: absolute;
+    border: 2px solid #ffd700;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+    pointer-events: none;
+    display: none;
+    animation: highlight-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes highlight-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 0 40px rgba(255, 215, 0, 0.7); }
+}

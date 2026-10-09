@@ -1,0 +1,63 @@
+// ============================================================================
+// faction_shop.scss — Faction Quartermaster (Careers & Factions leaf)
+// ----------------------------------------------------------------------------
+// Styles for the leaf that owns /api/faction/shop + /api/faction/shop/buy. New because the
+// capability had NO surface at all in the client, so there was nothing to reuse.
+// ============================================================================
+
+.faction-shop-container { display: flex; flex-direction: column; gap: 10px; }
+
+.faction-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.faction-icon { font-size: 22px; }
+
+.faction-tabs {
+    display: flex;
+    gap: 6px;
+
+    .faction-tab {
+        padding: 5px 12px;
+        font-size: 11px;
+        color: #cfd8dc;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+
+        &.active {
+            color: #fff;
+            background: rgba(255, 152, 0, 0.22);
+            border-color: rgba(255, 152, 0, 0.5);
+        }
+    }
+}
+
+.faction-list { display: flex; flex-direction: column; gap: 6px; }
+
+.faction-item {
+    display: grid;
+    grid-template-columns: 1.4fr 2fr 0.8fr 0.6fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+}
+
+.faction-item-name { font-size: 11px; font-weight: 700; color: #e5e7eb; }
+.faction-item-desc { font-size: 10px; color: #90a4ae; }
+.faction-item-cost { font-size: 11px; color: #ffd54f; }
+.faction-item-stack { font-size: 10px; color: #90a4ae; }
+
+.faction-item .faction-buy { font-size: 10px; padding: 4px 10px; }
+
+.faction-note {
+    margin: 0;
+    font-size: 10px;
+    color: #90a4ae;
+}

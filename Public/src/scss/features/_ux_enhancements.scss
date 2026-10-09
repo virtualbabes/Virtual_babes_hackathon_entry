@@ -1,0 +1,193 @@
+// ============================================================================
+// UX Enhancements — Empty states, Loading, Transitions, Responsive, Intensity
+// ============================================================================
+
+/* === 1. EMPTY STATES === */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+}
+
+.empty-state-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #90a4ae;
+    margin-bottom: 4px;
+}
+
+.empty-state-message {
+    font-size: 12px;
+    color: #6e7681;
+    max-width: 280px;
+}
+
+.empty-state-action {
+    margin-top: 16px;
+}
+
+/* === 2. LOADING SKELETON === */
+.skeleton {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.05) 25%, rgba(99, 102, 241, 0.15) 50%, rgba(99, 102, 241, 0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton-card {
+    height: 120px;
+    margin-bottom: 12px;
+}
+
+.skeleton-list {
+    height: 40px;
+    margin-bottom: 8px;
+}
+
+.skeleton-stat {
+    height: 24px;
+    width: 60px;
+}
+
+.skeleton-text {
+    height: 12px;
+    margin-bottom: 6px;
+    &.width-sm { width: 40%; }
+    &.width-md { width: 60%; }
+    &.width-lg { width: 80%; }
+}
+
+/* === 3. PANEL TRANSITIONS */
+.panel-enter {
+    animation: panel-enter 0.2s ease-out forwards;
+}
+
+.panel-exit {
+    animation: panel-exit 0.2s ease-out forwards;
+}
+
+@keyframes panel-enter {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes panel-exit {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-20px); }
+}
+
+/* Tab content transition */
+.tab-content {
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.tab-content.switching {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+/* === 4. RESPONSIVE BREAKPOINTS */
+@media (max-width: 1199px) {
+    .ch-card { flex: 1 1 calc(50% - 16px); max-width: calc(50% - 16px); }
+    .ch-region-grid { grid-template-columns: repeat(2, 1fr); }
+    .pba-pet-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+@media (max-width: 768px) {
+    /* Single column panels */
+    .ch-card { flex: 1 1 100%; max-width: 100%; }
+    .ch-region-grid { grid-template-columns: repeat(2, 1fr); }
+    
+    /* Horizontal scrolling tabs */
+    .ch-tabs, .pba-tabs, .gv-tabs, .il-tabs, .cb-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .ch-tab, .pba-tab, .gv-tab, .il-tab, .cb-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    
+    /* Full-width cards */
+    .spectate-grid { grid-template-columns: 1fr; }
+    .pba-faction-grid { grid-template-columns: 1fr; }
+    
+    /* Wallet address hidden behind hamburger */
+    .wallet-address-display { display: none; }
+    .wallet-hamburger { display: flex; }
+    
+    /* Constellation hub mobile: vertical scroll */
+    .constellation-container {
+        overflow-y: auto;
+    }
+    
+    .constellation-canvas {
+        transform: scale(0.5);
+        transform-origin: top center;
+    }
+}
+
+@media (max-width: 480px) {
+    .ch-region-grid { grid-template-columns: 1fr; }
+    .constellation-canvas { transform: scale(0.35); }
+}
+
+/* Hamburger menu */
+.wallet-hamburger {
+    display: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    color: #e0e0e0;
+}
+
+/* === 5. THEME INTENSITY */
+.constellation-shell,
+.spectate-shell,
+.wallet-modal,
+.tx-modal {
+    transition: background 4s ease, filter 4s ease;
+}
+
+/* Low intensity: darker, slower, quieter */
+.theme-intensity-low .constellation-shell {
+    background: radial-gradient(ellipse at center, #060818 0%, #030408 70%);
+}
+
+.theme-intensity-low .bg-stars { opacity: 0.5; }
+.theme-intensity-low .bg-nebula { opacity: 0.3; }
+
+/* High intensity: brighter, faster, saturated */
+.theme-intensity-high .constellation-shell {
+    background: radial-gradient(ellipse at center, #101835 0%, #0a0e1f 70%);
+}
+
+.theme-intensity-high .bg-stars { opacity: 1; }
+.theme-intensity-high .bg-nebula { opacity: 1; }
+.theme-intensity-high .constellation-line { stroke-width: 1.5; }
+
+/* Particle speed modifier */
+.theme-intensity-low #constellation-particle-canvas { opacity: 0.4; }
+.theme-intensity-high #constellation-particle-canvas { opacity: 1; }

@@ -6,7 +6,7 @@ import { updateWalletUI, disconnectUserWallet, initWalletConnect } from './walle
 import { setSeasonEnd } from './leaderboard.js'; // Removed handleTournamentUI and startSeasonTimer from here
 import { updatePlayerList, handleMatchmakingUpdate } from './game.js';
 import { updateMarketTicker, updateBountyTicker, buyBlackMarketItem } from './economy.js';
-import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs } from './admin.js';
+import { updateAdminNetworkUI, setAvailableNetworks, setGlobalClubs, setAdminFocusNetwork, fetchAdminLogs, globalClubs } from './admin.js';
 import { updateActiveRumors, handleHeistResult, showKidnapOverlay, startRecoveryTimer } from './criminality.js';
 
 export let socket = null;
@@ -18,6 +18,10 @@ export let identitySyncTimeout = null;
 export let lastPingTime = null;
 export let currentLatency = null;
 
+// WS resilience (not exported): reconnect backoff grows on repeated drops and
+// resets on a successful identity sync. We never give up permanently.
+let reconnectBackoff = 3000;
+
 export const setMyClientId = (id) => { myClientId = id; };
 export const setNonceResolver = (resolver) => { nonceResolver = resolver; };
 export const setReconnectAttempts = (attempts) => { reconnectAttempts = attempts; };
@@ -26,6 +30,16 @@ export const setLastPingTime = (time) => { lastPingTime = time; };
 export const setCurrentLatency = (latency) => { currentLatency = latency; };
 
 export const getNonceResolver = () => nonceResolver;
+
+// WS consumer (flow-doc §12.3): the nonce push is what actually resolves the pending
+// wallet/admin nonce promise (the identity message does NOT call the resolver).
+window.onNonceResponse = function (payload) {
+    if (payload && payload.nonce && nonceResolver) {
+        const r = nonceResolver;
+        nonceResolver = null;
+        r(payload.nonce);
+    }
+};
 export const getReconnectAttempts = () => reconnectAttempts;
 export const getIdentitySyncTimeout = () => identitySyncTimeout;
 export const getLastPingTime = () => lastPingTime;
@@ -52,15 +66,12 @@ export function initWebSocket(messageHandler) {
         if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
         identitySyncTimeout = setTimeout(() => {
             if (!myClientId) {
-                if (reconnectAttempts < 3) {
-                    reconnectAttempts++;
-                    console.warn(`[WS] Identity sync timeout reached. Attempting reconnect ${reconnectAttempts}/3...`);
-                    showToast(`⚠️ Sync failed. Retrying connection (${reconnectAttempts}/3)...`, "warning", 3000);
-                    socket.close(); // Force close to trigger onclose and re-init
-                } else {
-                    console.error("[WS] Identity sync timeout reached after multiple attempts.");
-                    showToast("⚠️ <b>SYNC FAILURE:</b> Arena configuration not received after multiple attempts. Faucet payouts and tournament registrations may be unavailable. Please refresh.", "error", 0);
+                reconnectAttempts++;
+                if (reconnectAttempts === 1) {
+                    console.warn('[WS] Identity sync timeout reached. Reconnecting...');
+                    showToast('⚠️ Sync delayed. Reconnecting...', 'warning', 3000);
                 }
+                socket.close(); // Force close to trigger onclose and re-init
             }
         }, 5000);
     };
@@ -73,14 +84,17 @@ export function initWebSocket(messageHandler) {
     socket.onclose = () => {
         console.warn("[WS] Disconnected. Retrying...");
         if (identitySyncTimeout) clearTimeout(identitySyncTimeout);
+        identitySyncTimeout = null;
 
         // Notify parent HUD
         window.parent.postMessage({ spectatorStatus: "OFFLINE • Reconnecting…" }, "*");
 
-        // Only attempt immediate reconnect if not due to identity sync timeout already handling it
-        if (identitySyncTimeout && reconnectAttempts < 3) {
-            setTimeout(() => initWebSocket(messageHandler), 3000);
-        }
+        // Resilient reconnect with capped exponential backoff. The server sends
+        // the identity envelope on every successful connect, so retrying always
+        // recovers the socket (and therefore faucet payouts / tournament flows).
+        const delay = Math.min(reconnectBackoff, 15000);
+        reconnectBackoff = Math.min(reconnectBackoff * 2, 15000);
+        setTimeout(() => initWebSocket(messageHandler), delay);
     };
 }
 
@@ -89,6 +103,7 @@ export function sendPing() {
     lastPingTime = Date.now();
     socket.send(JSON.stringify({ type: "ping" }));
 }
+window.sendPing = sendPing;
 
 /**
  * requestMatchSync dispatches a catch-up request to the backend.
@@ -102,6 +117,7 @@ export function requestMatchSync() {
     const lastSeq = state ? (state.last_sequence_id || 0) : 0;
     
     socket.send(JSON.stringify({ type: "sync_request", payload: { last_sequence_id: lastSeq } }));
+window.requestMatchSync = requestMatchSync;
 }
 
 let syncScheduled = false;
@@ -144,6 +160,7 @@ export function handleServerMessage(msg) {
                 clearTimeout(identitySyncTimeout);
                 identitySyncTimeout = null;
                 reconnectAttempts = 0;
+                reconnectBackoff = 3000;
             }
             if (msg.payload) {
                 CONFIG.VAULT_ADDRESS = msg.payload.vault;
@@ -161,6 +178,10 @@ export function handleServerMessage(msg) {
             updatePlayerList(msg.payload.players);
             updateMarketTicker(msg.payload.players);
             updateBountyTicker(msg.payload.players);
+            // §25: feed live lobby players to the 3D world spectator auto-cycle (no-op if not mounted)
+            if (typeof window.__setWorld3DLobbyPlayers === 'function') {
+                window.__setWorld3DLobbyPlayers(msg.payload.players);
+            }
 
             const state = window.GetGameState("combat"); // Check phase with minimal overhead
             // TACTICAL SYNC: If server altered our profile (Moderation), update local engine
@@ -182,6 +203,11 @@ export function handleServerMessage(msg) {
                 window.SyncSolvency(msg.payload.faucet_balance_micro || 0, msg.payload.total_virtual_liability);
             }
             if (msg.payload.reward_stack !== undefined) window.SyncRewards(msg.payload.reward_stack);
+            // The reward-token REGISTRY (role/source/amounts) is rendered from the served view,
+            // never reconstructed on the client.
+            if (msg.payload.reward_tokens !== undefined && typeof window.updateAdminRewardRegistry === 'function') {
+                window.updateAdminRewardRegistry(msg.payload.reward_tokens);
+            }
             if (window.SyncClubs) window.SyncClubs(msg.payload.clubs);
             
             if (msg.payload.available_networks) {
@@ -189,6 +215,9 @@ export function handleServerMessage(msg) {
                 setGlobalClubs(msg.payload.clubs || {});
                 setAdminFocusNetwork(msg.payload.admin_focus_network);
                 updateAdminNetworkUI();
+            }
+            if (msg.payload.RewardRatio !== undefined) {
+                currentRewardRatio = msg.payload.RewardRatio; // PILLAR 2: Update global for scaled payouts
             }
             updateActiveRumors(msg.payload.rumors);
 
@@ -208,7 +237,18 @@ export function handleServerMessage(msg) {
             break;
         case "matchmaking_status":
             handleMatchmakingUpdate(msg.payload);
+            // Also route to multiplayer module
+            if (window.handleMultiplayerMessage) window.handleMultiplayerMessage(msg);
             requestBatchedSync("all");
+            break;
+        case "mp_move":
+        case "mp_chat":
+        case "mp_forfeit":
+        case "mp_opponent_disconnected":
+        case "mp_opponent_reconnected":
+        case "mp_game_over":
+            // Route multiplayer messages to the multiplayer module
+            if (window.handleMultiplayerMessage) window.handleMultiplayerMessage(msg);
             break;
         case "portfolio_update":
             if (window.SyncPortfolio) window.SyncPortfolio(msg.payload); // SyncPortfolio is a WASM call
@@ -228,7 +268,7 @@ export function handleServerMessage(msg) {
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(0);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(0);
-                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(1, msg.payload.avatar || "", msg.payload.gloat || "", msg.payload.faceplate || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(1, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(1, msg.payload.deck);
                 if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
@@ -252,7 +292,7 @@ export function handleServerMessage(msg) {
                 setCurrentOpponentId(msg.from_id);
                 setMyPlayerIndex(1);
                 if (window.SetLocalPlayerIndex) window.SetLocalPlayerIndex(1);
-                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "");
+                if (window.SyncOpponentProfile) window.SyncOpponentProfile(0, msg.payload.avatar || "", msg.payload.gloat || "", msg.payload.faceplate || "");
                 if (window.SyncOpponentWanted) window.SyncOpponentWanted(0, msg.payload.wanted_level || 0);
                 window.SyncOpponentDeck(0, msg.payload.deck);
                 if (window.SyncMatchMetadata) window.SyncMatchMetadata(msg.payload);
@@ -306,7 +346,7 @@ export function handleServerMessage(msg) {
             break;
         case "sync_response":
             if (msg.payload.frames && window.PushReplayFrame) {
-                if (msg.payload.frames.length > 0) {
+                if (msg.payload.frames?.length ?? 0 > 0) {
                     msg.payload.frames.forEach(frame => {
                         window.PushReplayFrame(JSON.stringify(frame));
                     });
@@ -333,8 +373,8 @@ export function handleServerMessage(msg) {
             }
             break;
         case "vault_update":
-            console.log("[WS] Vault balance update received:", msg.payload.balance);
-            window.SyncVaultBalance(msg.payload.balance);
+            console.log("[WS] Vault balance update received:", msg.payload?.balance);
+            window.SyncVaultBalance(msg.payload?.balance);
             break;
         case "rules_update":
             console.log("[WS] Global rules update received:", msg.payload);
@@ -382,5 +422,121 @@ export function handleServerMessage(msg) {
                 updateActiveRumors(msg.payload.rumor);
             }
             break;
+        case "achievement_unlock":
+            handleAchievementUnlock(msg.payload);
+            break;
+        // Justice Dashboard WebSocket events
+        case "justice_card_awarded":
+            if (window.onJusticeCardAwarded) window.onJusticeCardAwarded(msg.payload);
+            showToast(`⚖️ <b>JUSTICE CARD AWARDED:</b><br>${msg.payload.card_type || msg.payload.type} (+${msg.payload.power_bonus || 0}% bonus)`, "success", 5000);
+            break;
+        case "truth_serum_applied":
+            if (window.onTruthSerumApplied) window.onTruthSerumApplied(msg.payload);
+            showToast(`🧪 <b>TRUTH SERUM:</b><br>Target ${msg.payload.targetWallet || 'unknown'} revealed for ${msg.payload.duration || 30}s`, "info", 4000);
+            break;
+        case "shield_active":
+            if (window.onShieldActive) window.onShieldActive(msg.payload);
+            showToast(`🛡️ <b>SHIELD:</b><br>${msg.payload.remaining}/${msg.payload.capacity} remaining`, "info", 3000);
+            break;
+        case "dashboard_refresh":
+            if (window.onDashboardRefresh) window.onDashboardRefresh();
+            break;
+        case "bounty_updated":
+            if (window.onBountyUpdated) window.onBountyUpdated(msg.payload);
+            showToast(`🎯 <b>BOUNTY UPDATED:</b><br>${msg.payload.targetWallet || 'target'} — Wanted: ${msg.payload.wantedLevel}, Reward: ${(msg.reward || 0).toLocaleString()}`, "success", 4000);
+            break;
+        // PILLAR 3: Underworld Contract WS events
+        case "underworld_contract_assigned":
+            if (window.onContractAssigned) window.onContractAssigned(msg.payload);
+            showToast(`💀 <b>CONTRACT ASSIGNED:</b><br>${msg.payload.contract_title || msg.payload.id} — Reward: ${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV`, "warning", 6000);
+            break;
+        case "underworld_contract_completed":
+            if (window.onContractCompleted) window.onContractCompleted(msg.payload);
+            showToast(`✅ <b>CONTRACT COMPLETED:</b><br>${msg.payload.contract_title || msg.payload.id} — Earned ${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV + ${msg.payload.xp_awarded || 0} CareerXP`, "success", 6000);
+            break;
+        // Seasonal Event WS events (P7-B Task 7103)
+        case "seasonal_event_joined":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventJoined) {
+                window.SeasonalEvents.onEventJoined(msg.payload);
+            }
+            showToast(`🎯 <b>EVENT JOINED:</b><br>${msg.payload.event_title || msg.payload.event_id}`, "success", 4000);
+            break;
+        case "seasonal_event_created":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventCreated) {
+                window.SeasonalEvents.onEventCreated(msg.payload);
+            }
+            showToast(`🌸 <b>NEW SEASONAL EVENT:</b><br>${msg.payload.title || msg.payload.event_id}`, "info", 5000);
+            break;
+        case "seasonal_event_reward":
+            if (window.SeasonalEvents && window.SeasonalEvents.onRewardReceived) {
+                window.SeasonalEvents.onRewardReceived(msg.payload);
+            }
+            showToast(`🎁 <b>REWARD CLAIMED:</b><br>+${(msg.payload.reward_micro / 1000000).toFixed(2)} $VBV`, "success", 4000);
+            break;
+        case "seasonal_event_pool_updated":
+            if (window.SeasonalEvents && window.SeasonalEvents.onPoolUpdated) {
+                window.SeasonalEvents.onPoolUpdated(msg.payload);
+            }
+            requestBatchedSync("all"); // Refresh event cards with new budget amounts
+            break;
+        case "seasonal_event_expired":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventExpired) {
+                window.SeasonalEvents.onEventExpired(msg.payload);
+            }
+            showToast(`⏰ <b>EVENT ENDED:</b><br>${msg.payload.title || msg.payload.event_id}`, "info", 3000);
+            requestBatchedSync("all"); // Refresh to remove expired event from grid
+            break;
+        case "seasonal_event_activated":
+            if (window.SeasonalEvents && window.SeasonalEvents.onEventActivated) {
+                window.SeasonalEvents.onEventActivated(msg.payload);
+            }
+            showToast(`⭐ <b>EVENT ACTIVE:</b><br>${msg.payload.title || msg.payload.event_id} — Join now!`, "success", 5000);
+            requestBatchedSync("all"); // Refresh to show newly active event
+            break;
+
+        // ----- Wired WS consumers (flow-doc §12.3 fix, 2026-09-09) -----
+        // These backend-emitted events previously had NO case and NO default → silently dropped.
+        // They now route to the conventional window.on<Event> handler if the module defines one.
+        case "rivalry_update":
+            if (window.onRivalryUpdate) window.onRivalryUpdate(msg.payload); break;
+        case "investment_confirmed":
+            if (window.onInvestmentConfirmed) window.onInvestmentConfirmed(msg.payload); break;
+        case "investment_update":
+            if (window.onInvestmentUpdate) window.onInvestmentUpdate(msg.payload); break;
+        case "dividend_claimed":
+            if (window.onDividendClaimed) window.onDividendClaimed(msg.payload); break;
+        case "creator_royalty_paid":
+            if (window.onCreatorRoyaltyPaid) window.onCreatorRoyaltyPaid(msg.payload); break;
+        case "creator_royalty_received":
+            if (window.onCreatorRoyaltyReceived) window.onCreatorRoyaltyReceived(msg.payload); break;
+        case "career_tier_demoted":
+            if (window.onCareerTierDemoted) window.onCareerTierDemoted(msg.payload); break;
+        case "link_wallet_response":
+            if (window.onLinkWalletResponse) window.onLinkWalletResponse(msg.payload); break;
+        case "nonce_response":
+            if (window.onNonceResponse) window.onNonceResponse(msg.payload); break;
+        default:
+            // Forward any unhandled event to a generic hook to prevent silent drops.
+            if (typeof window.__vbtWsDispatch === "function") window.__vbtWsDispatch(msg);
+            else if (window.console) console.debug("[WS] unhandled event:", msg.type);
+
     }
+}
+
+/**
+ * handleAchievementUnlock processes server-pushed achievement notifications.
+ * Displays a styled toast and pushes to the global achievement log.
+ */
+let lastAchievementId = ""; // Dedup guard
+function handleAchievementUnlock(payload) {
+    if (!payload || !payload.achievement_id) return;
+    
+    // Deduplicate rapid-fire unlocks of the same achievement
+    if (payload.achievement_id === lastAchievementId) return;
+    lastAchievementId = payload.achievement_id;
+    setTimeout(() => { lastAchievementId = ""; }, 2000);
+
+    const toastMessage = `🏆 <b>ACHIEVEMENT UNLOCKED:</b><br>${payload.title || "Unknown Achievement"}${payload.progress_text ? "<br>" + payload.progress_text : ""}`;
+    
+    showToast(toastMessage, "success", 6000);
 }

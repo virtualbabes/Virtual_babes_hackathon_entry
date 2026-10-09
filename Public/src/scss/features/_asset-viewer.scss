@@ -1,0 +1,17 @@
+// Public\src\scss\features\_asset-viewer.scss
+// §23.5: Presentation-asset (NFT) gallery
+
+.asset-viewer-panel { grid-template-columns: 1fr; gap: 14px; padding: 8px; min-height: 480px; }
+
+.av-grid { display: flex; flex-direction: column; gap: 18px; max-height: 460px; overflow-y: auto; padding: 6px; }
+.av-cat { border: 1px solid rgba(186,104,200,0.25); border-radius: 10px; padding: 12px; background: rgba(106,27,154,0.08); }
+.av-cat h3 { color: #ce93d8; margin: 0 0 2px 0; }
+.av-note { color: #b0bec5; font-size: 11px; margin: 0 0 10px 0; }
+.av-thumbs { display: flex; flex-wrap: wrap; gap: 10px; }
+.av-thumb { width: 96px; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.av-thumb img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(0,255,255,0.2); background: #000; }
+.av-thumb small { color: #90a4ae; font-size: 9px; text-align: center; word-break: break-all; }
+.av-audio { justify-content: flex-start; }
+.av-audio span { font-size: 24px; }
+.av-audio audio { width: 96px; height: 28px; }
+.ai-status { color: var(--neon-cyan); font-size: 13px; min-height: 18px; margin: 4px 0 0 8px; }

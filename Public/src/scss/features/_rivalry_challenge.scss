@@ -1,0 +1,172 @@
+/* === Rivalry Challenge === */
+.rivalry-container { padding: 8px 0; }
+
+.rivalry-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.rivalry-arena-icon { font-size: 32px; }
+
+.rivalry-header-info { flex: 1; }
+
+.rivalry-record {
+    display: flex;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
+.rivalry-wins { color: #4caf50; font-weight: 700; font-size: 14px; }
+
+.rivalry-losses { color: #f44336; font-weight: 700; font-size: 14px; }
+
+/* Rivalry actions */
+.rivalry-actions-section {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.rivalry-actions-section button { flex: 1; }
+
+/* Pending invites */
+.rivalry-pending-section { margin-bottom: 16px; }
+
+.rivalry-pending-section h4 { margin: 0 0 12px; }
+
+.rivalry-pending-list { display: flex; flex-direction: column; gap: 8px; }
+
+.rivalry-pending-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.rivalry-pending-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.rivalry-pending-name { font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.rivalry-pending-time { font-size: 9px; color: #90a4ae; }
+
+.rivalry-pending-actions { display: flex; gap: 6px; }
+
+.rivalry-pending-actions button { flex: 1; font-size: 10px; }
+
+/* Active rivalries */
+.rivalry-active-section h4 { margin: 0 0 12px; }
+
+.rivalry-active-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.rivalry-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.rivalry-card:hover {
+    border-color: #f44336;
+    transform: translateY(-2px);
+}
+
+.rivalry-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.rivalry-card-title { font-size: 11px; color: #90a4ae; }
+
+.rivalry-card-status {
+    font-size: 8px;
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rivalry-matchup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.rivalry-player {
+    flex: 1;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.rivalry-player.player-leading {
+    border: 1px solid #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.rivalry-player-name { display: block; font-size: 10px; color: #e5e7eb; font-weight: 600; }
+
+.rivalry-player-score { font-size: 20px; font-weight: 700; color: #e5e7eb; }
+
+.rivalry-vs { font-size: 12px; color: #f44336; font-weight: 700; }
+
+.rivalry-progress {
+    margin-bottom: 8px;
+}
+
+.rivalry-progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+}
+
+.rivalry-progress-side-a {
+    height: 100%;
+    background: #f44336;
+    transition: width 0.3s;
+}
+
+.rivalry-progress-side-b {
+    height: 100%;
+    background: #2196f3;
+    transition: width 0.3s;
+}
+
+.rivalry-rematch-btn { width: 100%; font-size: 9px; padding: 4px; }
+
+/* Empty state */
+.rivalry-empty {
+    text-align: center;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.rivalry-empty-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.rivalry-empty p { color: #90a4ae; font-size: 11px; margin: 0; }

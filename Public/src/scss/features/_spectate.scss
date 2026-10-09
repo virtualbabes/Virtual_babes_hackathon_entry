@@ -1,0 +1,83 @@
+// ============================================================================
+// Spectate Panel Styles
+// ============================================================================
+
+.spectate-panel {
+  max-width: 900px;
+  width: 95%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.sp-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.sp-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #90a4ae;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &.active, &:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #e5e7eb;
+  }
+}
+
+.sp-live, .sp-replays, .sp-search {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.sp-match-card, .sp-replay-card, .sp-result-card {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(99, 102, 241, 0.1);
+  }
+}
+
+.sp-match-name, .sp-replay-name, .sp-result-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.sp-match-turn, .sp-replay-date, .sp-result-stats {
+  font-size: 12px;
+  color: #90a4ae;
+  margin-bottom: 12px;
+}
+
+.sp-search-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  input {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #e5e7eb;
+    font-size: 14px;
+  }
+}

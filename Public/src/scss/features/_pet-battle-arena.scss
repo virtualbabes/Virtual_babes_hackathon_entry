@@ -1,0 +1,591 @@
+// ============================================================================
+// pet_battle_arena.scss — Pet Battle Arena Styles (FULL EXPANSION)
+// ============================================================================
+
+.pet-battle-panel {
+  max-width: 960px;
+  width: 95%;
+  max-height: 88vh;
+  overflow-y: auto;
+  border-color: rgba(255, 75, 75, 0.3);
+  box-shadow: 0 0 40px rgba(255, 75, 75, 0.1);
+}
+
+.pba-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 75, 75, 0.1);
+  padding-bottom: 12px;
+  overflow-x: auto;
+}
+
+.pba-tab {
+  padding: 10px 20px;
+  background: rgba(255, 75, 75, 0.05);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 999px;
+  color: #b0bec5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 75, 75, 0.1);
+    border-color: rgba(255, 75, 75, 0.3);
+  }
+
+  &.active {
+    background: rgba(255, 75, 75, 0.2);
+    border-color: rgba(255, 75, 75, 0.5);
+    color: #ff4b4b;
+    box-shadow: 0 0 12px rgba(255, 75, 75, 0.3);
+  }
+}
+
+.pba-pet-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pba-pet-card {
+  position: relative;
+  padding: 16px;
+  background: rgba(15, 18, 30, 0.85);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('/Assets/Images/Effects/Biological-corruption.webp');
+    background-size: cover;
+    opacity: 0.08;
+    pointer-events: none;
+  }
+
+  &:hover {
+    border-color: rgba(255, 75, 75, 0.4);
+    box-shadow: 0 0 20px rgba(255, 75, 75, 0.15);
+    transform: translateY(-2px);
+  }
+
+  &.selected {
+    border-color: rgba(255, 75, 75, 0.5);
+    box-shadow: 0 0 24px rgba(255, 75, 75, 0.2);
+  }
+}
+
+.pba-battling-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 75, 75, 0.2);
+  border-radius: 999px;
+  font-size: 10px;
+  color: #ff4b4b;
+  z-index: 1;
+}
+
+.pba-pet-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.pba-pet-element {
+  font-size: 18px;
+}
+
+.pba-pet-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #ff4b4b;
+  font-weight: 600;
+}
+
+.pba-pet-rarity {
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.pba-rarity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pba-pet-level {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.pba-pet-stats {
+  position: relative;
+  z-index: 1;
+}
+
+.pba-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: #90a4ae;
+
+  span:first-child { width: 30px; }
+  span:last-child { width: 25px; text-align: right; }
+}
+
+.pba-stat-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pba-stat-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+
+  &.atk { background: linear-gradient(90deg, #ef4444, #f87171); }
+  &.def { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+  &.spd { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  &.hp { background: linear-gradient(90deg, #10b981, #34d399); }
+}
+
+.pba-challenge-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.pba-find-match {
+  position: relative;
+
+  &.searching {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+// Battle Arena
+.pba-battle-arena {
+  padding: 20px;
+}
+
+.pba-battle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pba-turn-counter {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  color: #ff4b4b;
+}
+
+.pba-battle-wager {
+  font-size: 13px;
+  color: #ffd700;
+}
+
+.pba-round-timer {
+  padding: 4px 12px;
+  background: rgba(255, 75, 75, 0.15);
+  border-radius: 999px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 12px;
+  color: #ff4b4b;
+}
+
+.pba-battle-arena-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  margin-bottom: 24px;
+}
+
+.pba-battle-side {
+  flex: 1;
+  text-align: center;
+}
+
+.pba-battle-pet-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  color: #e5e7eb;
+  margin-bottom: 8px;
+}
+
+.pba-battle-element {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.pba-battle-hp-bar {
+  position: relative;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.pba-hp-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s;
+}
+
+.pba-hp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.pba-battle-stats {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 11px;
+  color: #90a4ae;
+}
+
+.pba-battle-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pba-vs-badge {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 24px;
+  color: #ff4b4b;
+  text-shadow: 0 0 12px rgba(255, 75, 75, 0.5);
+}
+
+.pba-battle-log {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.pba-log-entry {
+  font-size: 11px;
+  color: #90a4ae;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pba-battle-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pba-attack-btn {
+  &.ready {
+    animation: special-ready 1s ease-in-out infinite;
+  }
+
+  &.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+@keyframes special-ready {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 75, 75, 0); }
+  50% { box-shadow: 0 0 16px rgba(255, 75, 75, 0.4); }
+}
+
+.pba-battle-waiting {
+  text-align: center;
+  padding: 20px;
+  font-size: 13px;
+  color: #90a4ae;
+}
+
+.pba-battle-result {
+  text-align: center;
+  padding: 40px;
+
+  &.win .pba-result-title { color: #ffd700; }
+  &.lose .pba-result-title { color: #ef4444; }
+}
+
+.pba-result-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.pba-result-reward {
+  font-size: 18px;
+  color: #ffd700;
+  margin-bottom: 8px;
+}
+
+.pba-result-xp {
+  font-size: 14px;
+  color: #90a4ae;
+  margin-bottom: 24px;
+}
+
+// Breeding
+.pba-breeding-area {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pba-breeding-slots {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.pba-breeding-slot {
+  flex: 1;
+  padding: 20px;
+  background: rgba(255, 75, 75, 0.05);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.pba-slot-label {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-bottom: 8px;
+}
+
+.pba-slot-empty {
+  font-size: 13px;
+  color: #ff4b4b;
+}
+
+.pba-breeding-symbol {
+  font-size: 24px;
+  color: #ff4b4b;
+}
+
+.pba-breeding-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.breeding-pet {
+  padding: 8px 16px;
+  background: rgba(255, 75, 75, 0.1);
+  border: 1px solid rgba(255, 75, 75, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
+  color: #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 75, 75, 0.2);
+    border-color: rgba(255, 75, 75, 0.4);
+  }
+}
+
+.pba-breed-btn {
+  align-self: center;
+}
+
+// Training
+.pba-training-area {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.pba-training-card {
+  padding: 16px;
+  background: rgba(255, 75, 75, 0.05);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 12px;
+}
+
+.pba-training-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #ff4b4b;
+  margin-bottom: 12px;
+}
+
+.pba-training-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+// Tournaments
+.pba-tournament-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.pba-tournament-card {
+  padding: 16px;
+  background: rgba(255, 75, 75, 0.05);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 12px;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: rgba(255, 75, 75, 0.3);
+    background: rgba(255, 75, 75, 0.08);
+  }
+
+  &.full {
+    opacity: 0.5;
+  }
+}
+
+.pba-tournament-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #ff4b4b;
+  margin-bottom: 8px;
+}
+
+.pba-tournament-prize {
+  font-size: 14px;
+  color: #ffd700;
+  margin-bottom: 4px;
+}
+
+.pba-tournament-entries {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-bottom: 4px;
+}
+
+.pba-tournament-time {
+  font-size: 11px;
+  color: #f59e0b;
+  margin-bottom: 12px;
+}
+
+// Factions
+.pba-faction-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.pba-faction-card {
+  padding: 16px;
+  background: rgba(255, 75, 75, 0.05);
+  border: 1px solid rgba(255, 75, 75, 0.15);
+  border-radius: 12px;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: rgba(255, 75, 75, 0.3);
+    background: rgba(255, 75, 75, 0.08);
+  }
+
+  &.my-faction {
+    border-color: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.1);
+  }
+}
+
+.pba-faction-emblem {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.pba-faction-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  color: #ff4b4b;
+  margin-bottom: 4px;
+}
+
+.pba-faction-record {
+  font-size: 12px;
+  color: #ffd700;
+  margin-bottom: 4px;
+}
+
+.pba-faction-territory, .pba-faction-members {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-bottom: 4px;
+}
+
+.pba-faction-leaderboard {
+  margin: 12px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.pba-faction-leader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #90a4ae;
+  padding: 4px 0;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .pba-battle-arena-inner {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .pba-breeding-slots {
+    flex-direction: column;
+  }
+
+  .pba-pet-roster {
+    grid-template-columns: 1fr;
+  }
+
+  .pba-battle-actions {
+    flex-direction: column;
+  }
+}

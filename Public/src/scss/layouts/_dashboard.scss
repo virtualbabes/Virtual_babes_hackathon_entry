@@ -1,29 +1,36 @@
 // Public\src\scss\layouts\_dashboard.scss
 @import '../base/variables';
 
-// Dashboard Container
+// Dashboard Container — ONE unified main screen (single glass-panel, not 3 split panels)
 .dashboard {
+    // The dashboard itself IS the glass panel; inner columns are now seamless sections.
+    @include neon-glass-panel;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    align-items: stretch;
     flex-grow: 1;
     width: 100%;
     max-width: 1400px;
     gap: $spacing-lg;
+    padding: $spacing-xl;
     margin: $spacing-lg 0;
+    border-radius: $border-radius-xl;
 
     @media (max-width: $breakpoint-lg) {
         gap: $spacing-md;
+        padding: $spacing-lg;
         margin: $spacing-md 0;
     }
 
     @media (max-width: $breakpoint-md) {
         flex-direction: column;
         gap: $spacing-sm;
+        padding: $spacing-md;
     }
 }
 
-// Column Layout
+// Column Layout (general — used by deck-manager, avatar preview, etc.)
 .column {
     flex: 1;
     min-width: 320px;
@@ -35,6 +42,41 @@
     @media (max-width: $breakpoint-md) {
         min-width: auto;
         max-width: none;
+    }
+}
+
+// Columns inside the MAIN dashboard are seamless sections of the one panel (no own glass border)
+.dashboard > .column {
+    flex: 1 1 320px;
+    min-width: 0;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+    // Neutralise the per-column glass-panel so the whole dashboard reads as one screen
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    border-radius: 0;
+
+    // A subtle divider between sections keeps them readable without splitting the panel
+    & + .column {
+        border-left: 1px solid rgba($color-neon-cyan, 0.12);
+        padding-left: $spacing-lg;
+    }
+
+    @media (max-width: $breakpoint-md) {
+        min-width: auto;
+        max-width: none;
+        & + .column {
+            border-left: none;
+            padding-left: 0;
+            border-top: 1px solid rgba($color-neon-cyan, 0.12);
+            padding-top: $spacing-md;
+        }
     }
 }
 
@@ -118,7 +160,7 @@
     border: 1px solid $glass-border-color;
     overflow: hidden;
     -webkit-backdrop-filter: blur($glass-blur);
-    backdrop-filter: blur($glass-blur);
+    -webkit-backdrop-filter: blur($glass-blur);
 
     @media (max-width: $breakpoint-md) {
         height: 250px;
@@ -166,6 +208,33 @@
         border-left: 3px solid $color-error-red;
         color: $color-error-red;
     }
+
+    // PILLAR 5: Consistent Padding for Specialized Chat Messages.
+    // Centrally managed themes for economic enforcement events.
+    &.stagnation-fee {
+        padding: $spacing-xs $spacing-sm;
+        margin-top: $spacing-xs;
+        color: $color-warning-orange;
+        text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+        border-left: 3px solid $color-warning-orange;
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    &.ghost-reclaim {
+        padding: $spacing-xs $spacing-sm;
+        margin-top: $spacing-xs;
+        color: $color-neon-cyan;
+        text-shadow: 0 0 10px rgba(0, 242, 254, 0.6), 0 0 20px rgba(0, 242, 254, 0.3);
+        border-left: 3px solid $color-neon-cyan;
+        background: linear-gradient(90deg, rgba(0, 242, 254, 0.1), transparent);
+        animation: ethereal-pulse 3s ease-in-out infinite;
+    }
+}
+
+@keyframes ethereal-pulse {
+    0% { text-shadow: 0 0 8px rgba(0, 242, 254, 0.4); opacity: 0.85; }
+    50% { text-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 0 0 25px rgba(0, 242, 254, 0.4); opacity: 1; }
+    100% { text-shadow: 0 0 8px rgba(0, 242, 254, 0.4); opacity: 0.85; }
 }
 
 .chat-input-area {
@@ -210,7 +279,7 @@
     font-size: $font-size-sm;
     transition: border-color $transition-fast, box-shadow $transition-fast, background-color $transition-fast;
     -webkit-backdrop-filter: blur($glass-blur);
-    backdrop-filter: blur($glass-blur);
+    -webkit-backdrop-filter: blur($glass-blur);
 
     &:focus {
         outline: none;

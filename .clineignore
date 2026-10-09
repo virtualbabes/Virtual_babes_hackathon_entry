@@ -8,3 +8,8 @@ AI-Brain\Rules.md
 Public\LICENSE
 node_modules
 .dockerignore
+setup_custom_quant.bat
+llama_tools
+node_modules
+start_zap_matrix_server.bat
+.env

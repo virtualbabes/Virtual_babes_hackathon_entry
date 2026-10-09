@@ -1,0 +1,1 @@
+An extensive digital civilisation drawing in users with a card game slowly turning them into valuable digital entities that can be utilized as ecconomy for the world wraping the card game, a real living breathing digital ecosystem  launch hub

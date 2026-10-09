@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <title>NFT-Seduction Architecture — Interactive</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'JetBrains Mono', monospace; background: #020617; color: white; min-height: 100vh; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .tab { padding: 0.5rem 1rem; background: rgba(30, 41, 59, 0.5); border: 1px solid #1e293b; border-radius: 0.5rem; color: #94a3b8; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; }
+    .tab:hover { border-color: #22d3ee; color: #22d3ee; }
+    .tab.active { background: rgba(8, 51, 68, 0.4); border-color: #22d3ee; color: #22d3ee; }
+
+    .sub-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .sub-tab { padding: 0.25rem 0.75rem; background: rgba(30, 41, 59, 0.3); border: 1px solid #1e293b; border-radius: 0.375rem; color: #64748b; cursor: pointer; font-size: 0.625rem; transition: all 0.2s; }
+    .sub-tab:hover { border-color: #94a3b8; color: #94a3b8; }
+    .sub-tab.active { background: rgba(30, 41, 59, 0.5); border-color: #94a3b8; color: #e2e8f0; }
+
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 0;
+      overflow: hidden;
+      position: relative;
+      height: calc(100vh - 280px);
+      min-height: 520px;
+      cursor: grab;
+      touch-action: none;
+    }
+    .diagram-container.is-panning { cursor: grabbing; }
+    svg { width: 100%; height: 100%; display: block; min-width: 0; user-select: none; }
+
+    .zoom-hud {
+      position: absolute;
+      right: 0.85rem;
+      bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: rgba(2, 6, 23, 0.88);
+      border: 1px solid #1e293b;
+      border-radius: 0.5rem;
+      padding: 0.3rem;
+      z-index: 5;
+      backdrop-filter: blur(8px);
+    }
+    .zoom-hud button {
+      width: 28px; height: 28px;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid #1e293b;
+      border-radius: 0.375rem;
+      color: #e2e8f0;
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .zoom-hud button:hover { border-color: #22d3ee; color: #22d3ee; }
+    .zoom-hud .zoom-label {
+      min-width: 52px;
+      text-align: center;
+      font-size: 0.7rem;
+      color: #94a3b8;
+      padding: 0 0.25rem;
+    }
+    .zoom-hint {
+      position: absolute;
+      left: 0.85rem;
+      bottom: 0.85rem;
+      font-size: 0.625rem;
+      color: #64748b;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .node { cursor: pointer; transition: all 0.2s; }
+    .node:hover { filter: brightness(1.3); }
+    .connection { fill: none; stroke-width: 1.5; transition: all 0.3s; }
+    .connection.dashed { stroke-dasharray: 5,5; }
+    .connection.highlight { stroke: #22d3ee !important; stroke-width: 3 !important; filter: drop-shadow(0 0 6px #22d3ee); }
+    .connection.dim { opacity: 0.1; }
+    .node.highlight { stroke: #22d3ee !important; stroke-width: 3 !important; filter: drop-shadow(0 0 8px #22d3ee); }
+    .node.dim { opacity: 0.2; }
+
+    .tooltip { position: fixed; background: rgba(15, 23, 42, 0.95); border: 1px solid #1e293b; border-radius: 0.5rem; padding: 1rem; max-width: 300px; z-index: 1000; display: none; pointer-events: none; }
+    .tooltip h4 { font-size: 0.875rem; margin-bottom: 0.5rem; color: #22d3ee; }
+    .tooltip p { font-size: 0.75rem; color: #94a3b8; line-height: 1.4; }
+
+    .legend { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: #94a3b8; }
+    .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .stat { background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem; border: 1px solid #1e293b; padding: 0.75rem; text-align: center; }
+    .stat-value { font-size: 1.25rem; font-weight: 700; color: #22d3ee; }
+    .stat-label { font-size: 0.625rem; color: #94a3b8; margin-top: 0.25rem; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem; border: 1px solid #1e293b; padding: 1rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .card-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card h3 { font-size: 0.75rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.625rem; }
+    .card li { margin-bottom: 0.25rem; }
+
+    .drill-panel { position: fixed; top: 0; right: -350px; width: 350px; height: 100vh; background: rgba(15, 23, 42, 0.98); border-left: 1px solid #1e293b; z-index: 2000; transition: right 0.3s ease; overflow-y: auto; padding: 1.25rem; }
+    .drill-panel.open { right: 0; }
+    .drill-panel h3 { font-size: 0.875rem; color: #22d3ee; margin-bottom: 0.75rem; }
+    .drill-panel .close-btn { position: absolute; top: 0.75rem; right: 0.75rem; background: none; border: none; color: #94a3b8; font-size: 1.25rem; cursor: pointer; }
+    .drill-section { margin-bottom: 1rem; }
+    .drill-section h4 { font-size: 0.625rem; color: #64748b; margin-bottom: 0.25rem; text-transform: uppercase; }
+    .drill-section .value { font-size: 1rem; font-weight: 700; color: white; }
+    .drill-list { list-style: none; }
+    .drill-list li { padding: 0.375rem; background: rgba(30, 41, 59, 0.5); border-radius: 0.25rem; margin-bottom: 0.2rem; font-size: 0.625rem; color: #94a3b8; }
+
+    .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+    .chart-container { background: rgba(15, 23, 42, 0.5); border-radius: 0.5rem; border: 1px solid #1e293b; padding: 0.75rem; text-align: center; }
+    .chart-container h4 { font-size: 0.625rem; color: #94a3b8; margin-bottom: 0.5rem; }
+
+    .health-bar { width: 100%; height: 6px; background: rgba(30, 41, 59, 0.5); border-radius: 3px; overflow: hidden; margin-top: 0.5rem; }
+    .health-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+    .view-title { font-size: 1rem; font-weight: 600; color: white; margin-bottom: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>NFT-Seduction Architecture</h1>
+      </div>
+      <p class="subtitle">Scroll to zoom · drag to pan · click nodes to drill · double-click to fit</p>
+    </div>
+
+    <div class="stats" id="stats-bar">
+      <div class="stat"><div class="stat-value" id="stat-bridge">0</div><div class="stat-label">Bridge Functions</div></div>
+      <div class="stat"><div class="stat-value" id="stat-es">0</div><div class="stat-label">ES Modules</div></div>
+      <div class="stat"><div class="stat-value" id="stat-exports">0</div><div class="stat-label">Exports</div></div>
+      <div class="stat"><div class="stat-value" id="stat-imports">0</div><div class="stat-label">Imports</div></div>
+      <div class="stat"><div class="stat-value" id="stat-health">0%</div><div class="stat-label">Health</div></div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-view="full">Full System</button>
+      <button class="tab" data-view="server">Server</button>
+      <button class="tab" data-view="wasm">WASM Bridge</button>
+      <button class="tab" data-view="js">JavaScript</button>
+      <button class="tab" data-view="css">CSS/SCSS</button>
+      <button class="tab" data-view="data">Data Flow</button>
+      <button class="tab" data-view="analytics">📊 Analytics</button>
+    </div>
+
+    <div id="sub-tab-container"></div>
+
+    <div class="diagram-container" id="diagram-container">
+      <svg id="diagram" viewBox="0 0 1100 700"></svg>
+      <div class="zoom-hint">wheel zoom · drag pan</div>
+      <div class="zoom-hud" id="zoom-hud">
+        <button type="button" id="zoom-out" title="Zoom out">−</button>
+        <div class="zoom-label" id="zoom-label">100%</div>
+        <button type="button" id="zoom-in" title="Zoom in">+</button>
+        <button type="button" id="zoom-reset" title="Fit view">⌂</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-color" style="background: #34d399;"></div>Go</div>
+      <div class="legend-item"><div class="legend-color" style="background: #22d3ee;"></div>JavaScript</div>
+      <div class="legend-item"><div class="legend-color" style="background: #a78bfa;"></div>WASM Bridge</div>
+      <div class="legend-item"><div class="legend-color" style="background: #fbbf24;"></div>CSS</div>
+      <div class="legend-item"><div class="legend-color" style="background: #fb7185;"></div>WebSocket</div>
+    </div>
+
+    <div class="tooltip" id="tooltip"><h4 id="tt-title"></h4><p id="tt-desc"></p></div>
+    <div class="drill-panel" id="drill-panel"><button class="close-btn" onclick="closeDrill()">×</button><h3 id="drill-title"></h3><div id="drill-content"></div></div>
+  </div>
+
+  <script>
+  // ===== DATA (embedded from server-side render) =====
+  const MANIFEST_DATA = __MANIFEST_DATA__;
+  const WIRED_DATA = __WIRED_DATA__;
+  const ANALYTICS_DATA = __ANALYTICS_DATA__;
+
+  const svg = document.getElementById('diagram');
+  const tooltip = document.getElementById('tooltip');
+  const drillPanel = document.getElementById('drill-panel');
+  const subTabContainer = document.getElementById('sub-tab-container');
+  const diagramContainer = document.getElementById('diagram-container');
+  const zoomLabel = document.getElementById('zoom-label');
+  const views = {};
+  let currentView = 'full';
+  let currentAnalyticsTab = 'overview';
+  window.svg = svg;
+  window.views = views;
+
+  function makeRect(x, y, w, h, fill, stroke, rx, id) {
+    if (rx === undefined) rx = 6;
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', x); r.setAttribute('y', y);
+    r.setAttribute('width', w); r.setAttribute('height', h);
+    r.setAttribute('rx', rx); r.setAttribute('fill', fill);
+    r.setAttribute('stroke', stroke); r.setAttribute('stroke-width', '1.5');
+    if (id) r.setAttribute('id', id);
+    r.classList.add('node');
+    return r;
+  }
+
+  function makeText(x, y, text, size, fill, weight, anchor) {
+    if (size === undefined) size = 10;
+    if (fill === undefined) fill = 'white';
+    if (weight === undefined) weight = '600';
+    if (anchor === undefined) anchor = 'middle';
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', x); t.setAttribute('y', y);
+    t.setAttribute('font-size', size); t.setAttribute('fill', fill);
+    t.setAttribute('font-weight', weight); t.setAttribute('text-anchor', anchor);
+    t.textContent = text;
+    return t;
+  }
+
+  function makeLine(x1, y1, x2, y2, color, id, dashed) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', color); l.setAttribute('stroke-width', '1.5');
+    if (dashed) l.setAttribute('stroke-dasharray', '5,5');
+    if (id) l.setAttribute('id', id);
+    l.classList.add('connection');
+    if (dashed) l.classList.add('dashed');
+    return l;
+  }
+
+  function makePie(data, size) {
+    if (size === undefined) size = 100;
+    const cx = size / 2, cy = size / 2, r = size / 2 - 4;
+    let total = data.reduce((s, d) => s + d.value, 0), angle = -Math.PI / 2;
+    if (total === 0) total = 1;
+    return data.map(d => {
+      const sa = (d.value / total) * 2 * Math.PI;
+      const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+      const x2 = cx + r * Math.cos(angle + sa), y2 = cy + r * Math.sin(angle + sa);
+      const la = sa > Math.PI ? 1 : 0;
+      angle += sa;
+      return `<path d="M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${la} 1 ${x2} ${y2} Z" fill="${d.color}" stroke="#020617" stroke-width="1"><title>${d.label}: ${d.value}</title></path>`;
+    }).join('');
+  }
+
+  function addNode(group, x, y, w, h, fill, stroke, label, sublabel, tip, conns, drill) {
+    if (conns === undefined) conns = [];
+    const rect = makeRect(x, y, w, h, fill, stroke, 6, label ? label.replace(/[^a-zA-Z0-9]/g, '_') : '');
+    rect.addEventListener('mouseenter', e => showTooltip(e, label, tip, conns));
+    rect.addEventListener('mouseleave', hideTooltip);
+    rect.addEventListener('click', e => { e.stopPropagation(); if (drill) openDrill(label, drill); highlightNode(rect, conns); });
+    group.appendChild(rect);
+    if (label) group.appendChild(makeText(x + w / 2, y + h / 2 - 4, label));
+    if (sublabel) group.appendChild(makeText(x + w / 2, y + h / 2 + 10, sublabel, 8, '#94a3b8'));
+  }
+
+  function showTooltip(e, title, desc) {
+    document.getElementById('tt-title').textContent = title;
+    document.getElementById('tt-desc').textContent = desc;
+    tooltip.style.display = 'block';
+    tooltip.style.left = e.pageX + 10 + 'px';
+    tooltip.style.top = e.pageY + 10 + 'px';
+  }
+
+  function hideTooltip() { tooltip.style.display = 'none'; }
+
+  function highlightNode(node, conns) {
+    document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight', 'dim'));
+    document.querySelectorAll('.connection').forEach(c => c.classList.remove('highlight', 'dim'));
+    node.classList.add('highlight');
+    conns.forEach(id => { const c = document.getElementById(id); if (c) c.classList.add('highlight'); });
+    document.querySelectorAll('.node').forEach(n => { if (!n.classList.contains('highlight')) n.classList.add('dim'); });
+    document.querySelectorAll('.connection').forEach(c => { if (!c.classList.contains('highlight')) c.classList.add('dim'); });
+  }
+
+  function openDrill(title, data) {
+    document.getElementById('drill-title').textContent = title;
+    document.getElementById('drill-content').innerHTML = data || '<p style="color:#94a3b8;font-size:0.75rem;">No data</p>';
+    drillPanel.classList.add('open');
+  }
+
+  function closeDrill() { drillPanel.classList.remove('open'); }
+  window.closeDrill = closeDrill;
+
+  function clearSVG() { svg.innerHTML = ''; }
+
+  // ===== VIEWS =====
+  __VIEW_DEFINITIONS__
+
+  // ===== TAB HANDLING + CAMERA =====
+  const camera = {
+    x: 0, y: 0, w: 1100, h: 700,
+    home: { x: 0, y: 0, w: 1100, h: 700 },
+    apply() {
+      svg.setAttribute('viewBox', this.x + ' ' + this.y + ' ' + this.w + ' ' + this.h);
+      const pct = Math.round((this.home.w / Math.max(this.w, 0.001)) * 100);
+      zoomLabel.textContent = pct + '%';
+    },
+    captureHome() {
+      const vb = svg.viewBox.baseVal;
+      this.home = { x: vb.x, y: vb.y, w: vb.width || 1100, h: vb.height || 700 };
+      this.x = this.home.x;
+      this.y = this.home.y;
+      this.w = this.home.w;
+      this.h = this.home.h;
+      this.apply();
+    },
+    zoomAt(clientX, clientY, factor) {
+      const minW = this.home.w / 4;
+      const maxW = this.home.w * 2.5;
+      const nextW = Math.min(maxW, Math.max(minW, this.w * factor));
+      const k = nextW / this.w;
+      const pt = svg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+      const p = pt.matrixTransform(ctm.inverse());
+      this.x = p.x - (p.x - this.x) * k;
+      this.y = p.y - (p.y - this.y) * k;
+      this.h = this.h * k;
+      this.w = nextW;
+      this.apply();
+    },
+    pan(dxPx, dyPx) {
+      this.x -= dxPx * (this.w / Math.max(svg.clientWidth, 1));
+      this.y -= dyPx * (this.h / Math.max(svg.clientHeight, 1));
+      this.apply();
+    },
+    reset() {
+      this.x = this.home.x;
+      this.y = this.home.y;
+      this.w = this.home.w;
+      this.h = this.home.h;
+      this.apply();
+    }
+  };
+
+  function renderView(name) {
+    currentView = name;
+    subTabContainer.innerHTML = '';
+    svg.innerHTML = '';
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.appendChild(g);
+    views[name](g, {});
+    camera.captureHome();
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderView(tab.dataset.view);
+    });
+  });
+
+  document.addEventListener('click', e => {
+    if (!drillPanel.contains(e.target) && drillPanel.classList.contains('open')) closeDrill();
+  });
+
+  document.getElementById('stat-bridge').textContent = ANALYTICS_DATA.summary.bridgeFunctions;
+  document.getElementById('stat-es').textContent = ANALYTICS_DATA.summary.esModules;
+  document.getElementById('stat-exports').textContent = ANALYTICS_DATA.totalExports;
+  document.getElementById('stat-imports').textContent = ANALYTICS_DATA.totalImports;
+  document.getElementById('stat-health').textContent = ANALYTICS_DATA.healthScore + '%';
+
+  let isDragging = false;
+  let startPoint = { x: 0, y: 0 };
+
+  function isHud(el) {
+    return !!(el && el.closest && el.closest('#zoom-hud'));
+  }
+
+  svg.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    camera.zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.12 : 0.88);
+  }, { passive: false });
+
+  svg.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || isHud(e.target)) return;
+    const t = e.target;
+    if (t && (t.classList.contains('node') || t.tagName === 'text')) return;
+    isDragging = true;
+    startPoint = { x: e.clientX, y: e.clientY };
+    diagramContainer.classList.add('is-panning');
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    camera.pan(e.clientX - startPoint.x, e.clientY - startPoint.y);
+    startPoint = { x: e.clientX, y: e.clientY };
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    diagramContainer.classList.remove('is-panning');
+  });
+
+  svg.addEventListener('dblclick', (e) => {
+    if (isHud(e.target)) return;
+    e.preventDefault();
+    camera.reset();
+  });
+
+  document.getElementById('zoom-in').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const r = svg.getBoundingClientRect();
+    camera.zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0.85);
+  });
+  document.getElementById('zoom-out').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const r = svg.getBoundingClientRect();
+    camera.zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.18);
+  });
+  document.getElementById('zoom-reset').addEventListener('click', (e) => {
+    e.stopPropagation();
+    camera.reset();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); camera.reset(); }
+    if ((e.key === '=' || e.key === '+') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const r = svg.getBoundingClientRect();
+      camera.zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0.85);
+    }
+    if (e.key === '-' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      const r = svg.getBoundingClientRect();
+      camera.zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.18);
+    }
+  });
+
+  renderView('full');
+  </script>
+</body>
+</html>

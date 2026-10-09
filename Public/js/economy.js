@@ -1,13 +1,17 @@
 import { CONFIG } from './config.js';
 import { socket, myClientId } from './network.js';
 import { showToast, hideAllOverlays, renderCardHTML } from './ui.js';
-import { collectiveIntelligence } from '../collective-intelligence.js'; 
+import { collectiveIntelligence } from './collective-intelligence.js';
 import { userAddress, walletProvider, signClient } from './wallet.js';
 import { getCachedEnvoiName, getNetworkConfig, resolveEnvoiName, assetCache, resolveAssetSymbol } from './utils.js';
 import { globalClubs, availableNetworks, fetchAdminLogs } from './admin.js';
 import { lastLobbyPlayers } from './game.js';
 
 const algosdk = window.algosdk;
+
+// Self-contained fallback image (inline SVG) — used where a real asset is absent.
+// Avoids a missing-file 404 for Assets/Images/portraits/placeholder.webp.
+const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='120'%20height='120'%3E%3Crect%20width='120'%20height='120'%20fill='%2310141f'/%3E%3Ctext%20x='50%25'%20y='50%25'%20fill='%2300f2fe'%20font-size='48'%20text-anchor='middle'%20dominant-baseline='central'%3E%3F%3C/text%3E%3C/svg%3E";
 
 // --- Industrial Constants ---
 export const TERRITORY_MAP = [
@@ -31,7 +35,20 @@ export const MOOD_EMOJI_MAP = {
     "Volatile": "🔥", "Serene": "💧", "Spirited": "⚡", "Grounded": "⛰️"
 };
 
-// --- Item Registry (Mirrors shop_registry.go) ---
+// --- Shop -> Token resolver (VBV-SINGLE-TOKEN MILESTONE) ------------------
+// PHASED MANDATE: $VBV is the ONLY in-game token until $UNIT and $NUGGET are
+// implemented with on-chain settlement on Algorand and Voi. Backend
+// HandlePurchaseItem currently settles $VBV only — so EVERY shop resolves to
+// '$VBV' today, regardless of category or admin presets. When the multi-token
+// milestone lands (backend settlement + $UNIT/$NUGGET deployments), re-enable
+// the preset path below:
+//   const presets = (typeof window !== 'undefined' && window.__shopTokenPresets) || {};
+//   if (presets[category]) return presets[category];
+//   if (category === 'Nugget') return 'NUGGET';
+//   if (category === 'Unit') return 'UNIT';
+export function resolveShopToken(category) {
+    return 'VBV'; // single-token milestone — every shop prices in $VBV today
+}
 export const GlobalShopRegistry = {
     "mood_catalyst": { name: "Mood Catalyst", desc: "+50 Mood Bonus (3 Matches)", price: 100, ClubType: "Elemental" },
     "grounded_shield": { name: "Grounded Shield", desc: "Immunity to Mood Penalties (5 Matches)", price: 250, ClubType: "Elemental", requiredMojo: 100 },
@@ -97,6 +114,32 @@ window.submitVaultDonation = () => {
     document.getElementById("vault-interaction-overlay")?.remove();
 };
 
+// PILLAR 6: Mutation Foundry State Management.
+let foundryPendingPower = [0, 0, 0, 0];
+let foundryOriginalSum = 0;
+let foundryActiveCard = null;
+let foundryActiveClub = null;
+let foundryHasInsurance = false;
+
+/**
+ * switchFoundryTab orchestrates the display of different sections within the Mutation Foundry.
+ * PILLAR 4: Modular Authority. Expose to window for inline HTML calls.
+ */
+export function switchFoundryTab(tab) {
+    const mutationContent = document.getElementById("foundry-mutation-content");
+    const commissionContent = document.getElementById("foundry-commission-content");
+    const mutationTab = document.getElementById("foundry-tab-mutation");
+    const commissionTab = document.getElementById("foundry-tab-commission");
+
+    mutationContent.classList.toggle("hidden", tab !== 'mutation');
+    commissionContent.classList.toggle("hidden", tab !== 'commission');
+    mutationTab.classList.toggle("active", tab === 'mutation');
+    commissionTab.classList.toggle("active", tab === 'commission');
+
+    if (window.triggerMutationInsuranceEffect) window.triggerMutationInsuranceEffect(tab === 'mutation' && foundryHasInsurance);
+}
+window.switchFoundryTab = switchFoundryTab; // Expose globally
+
 /**
  * openMutationHistoryOverlay allows players to review the gene-editing history of their cards.
  * PILLAR 6: Forensic Auditing.
@@ -121,7 +164,7 @@ export function openMutationHistoryOverlay(cardID = null) {
     // Resolve names from current inventory for the summary
     Object.keys(stats).forEach(id => {
         const card = state.inventory.find(c => c.id === parseInt(id));
-        if (card) stats[id].name = card.name;
+        if (card) stats[id].name = card?.name;
     });
 
     const getMutationGrade = (s, b) => {
@@ -151,7 +194,7 @@ export function openMutationHistoryOverlay(cardID = null) {
                     <div><div class="font-xs opacity-5 uppercase letter-spacing-1">BOTCHES</div><b class="text-error font-size-1-2em">${s.scars}</b></div>
                 </div>
             </div>`;
-    } else if (Object.keys(stats).length > 0) {
+    } else if ((Object.keys(stats)?.length ?? 0) > 0) {
         summaryHTML = `
             <div class="glass-panel m-0 mb-20 p-15 border-neon-purple" style="background: rgba(155, 81, 224, 0.05);">
                 <small class="section-label opacity-5 mb-10 block letter-spacing-1">GENETIC STABILITY SUMMARY</small>
@@ -160,7 +203,7 @@ export function openMutationHistoryOverlay(cardID = null) {
                         const grade = getMutationGrade(s.success, s.scars);
                         return `
                         <div class="flex-row justify-between align-center font-size-0-85em">
-                            <span class="text-white flex-1">${s.name.toUpperCase()}</span>
+                            <span class="text-white flex-1">${s?.name.toUpperCase()}</span>
                             <span class="font-mono flex-row align-center gap-10">
                                 <b style="color: ${grade.color}; font-size: 1.1em;">[${grade.label}]</b>
                                 <span class="opacity-5">${s.success}S / ${s.scars}B</span>
@@ -203,7 +246,7 @@ export function openMutationHistoryOverlay(cardID = null) {
                                         <small class="opacity-5 font-mono" style="font-size: 0.7em;">${date}</small>
                                     </div>
                                     <div class="font-size-0-85em text-white mb-5">${event.details}</div>
-                                    ${!cardID ? `<div class="text-neon-cyan font-bold font-xs">Asset: ${card ? card.name : 'Unknown Babe'}</div>` : ''}
+                                    ${!cardID ? `<div class="text-neon-cyan font-bold font-xs">Asset: ${card ? card?.name : 'Unknown Babe'}</div>` : ''}
                                 </div>
                             </div>`;
                     }).join('')}
@@ -228,21 +271,25 @@ export function openMutationFoundryOverlay(cardID) {
     if (!myClub || (myClub.type !== "Vitality" && myClub.type !== "Elemental")) {
         return showToast("❌ Access Denied: Mutation Foundry requires a Vitality Lab or Elemental Forge.", "error");
     }
+    
+    foundryActiveCard = card;
+    foundryActiveClub = myClub;
+    foundryPendingPower = [...card.power];
+    foundryOriginalSum = card.power.reduce((a, b) => a + b, 0);
+    foundryHasInsurance = state.has_mutation_insurance;
 
     const overlay = document.createElement("div");
     window.playMutationSoundscape(); // Start soundscape when overlay opens
     overlay.id = "mutation-foundry-overlay";
     overlay.className = "overlay";
 
-    const originalSum = card.power.reduce((a, b) => a + b, 0);
-    let pendingPower = [...card.power];
     const catalystCount = state.inventory["mood_catalyst"] || 0;
-    const hasInsurance = state.has_mutation_insurance;
+    const hasInsurance = foundryHasInsurance;
     const mojo = myClub.club_mojo || 0;
-    const staffCount = Object.keys(myClub.staff || {}).length;
+    const staffCount = Object.keys(myClub.staff || {})?.length ?? 0;
     
     // PILLAR 1 & 3: Environment Assessment.
-    const isGovernor = (myClub.territories?.length || 0) + (myClub.allied_club_id ? (globalClubs[myClub.allied_club_id]?.territories?.length || 0) : 0) >= 2;
+    const isGovernor = ((myClub.territories?.length ?? 0) || 0) + (myClub.allied_club_id ? ((globalClubs[myClub.allied_club_id]?.territories?.length ?? 0) || 0) : 0) >= 2;
     const isSabotaged = myClub.buff_expirations?.["SABOTAGE"] && new Date(myClub.buff_expirations["SABOTAGE"]) > Date.now();
     const isTrainingActive = myClub.buff_expirations?.["STAFF_TRAINING"] && new Date(myClub.buff_expirations["STAFF_TRAINING"]) > Date.now();
 
@@ -276,7 +323,7 @@ export function openMutationFoundryOverlay(cardID) {
         <div class="economy-panel glass-panel large animate-modal w-600">
             <div class="market-header">
                 <span class="market-title">🧬 MUTATION FOUNDRY</span>
-                <div class="access-level">${myClub.name.toUpperCase()} TERMINAL</div>
+                <div class="access-level">${myClub?.name.toUpperCase()} TERMINAL</div>
             </div>
             
             <div class="display-flex ab-mutation" class="tab-btn active" onclick="window.switchFoundryTab('mutation')">🛠️ MUTATION</button>
@@ -343,7 +390,7 @@ export function openMutationFoundryOverlay(cardID) {
                 </div>
             </div>
 
-            <div id="foundry-commission-content" class="hidden p-20 flex-col gap-10 max-h-400 overflow-y-auto">
+            <div id="foundry-commission-content" class="hidden p-20 flex-col gap-10" style="max-height: 400px; overflow-y: auto;">
                 <small class="section-label opacity-5">ALLIANCE DIVIDEND LOG</small>
                 ${(myClub.commission_history || []).length === 0 ? 
                     '<div class="opacity-3 italic text-center py-40">No dividends received from alliance partners yet.</div>' : 
@@ -369,93 +416,88 @@ export function openMutationFoundryOverlay(cardID) {
     `;
 
     document.body.appendChild(overlay);
+    
+    // Default to mutation tab
+    window.switchFoundryTab('mutation');
+}
 
-    // --- Tab Orchestration ---
-    window.switchFoundryTab = (tab) => {
-        const mutationContent = document.getElementById("foundry-mutation-content");
-        const commissionContent = document.getElementById("foundry-commission-content");
-        const mutationTab = document.getElementById("foundry-tab-mutation");
-        const commissionTab = document.getElementById("foundry-tab-commission");
-
-        mutationContent.classList.toggle("hidden", tab !== 'mutation');
-        commissionContent.classList.toggle("hidden", tab !== 'commission');
-        mutationTab.classList.toggle("active", tab === 'mutation');
-        commissionTab.classList.toggle("active", tab === 'commission');
-
-        // Hide card preview if in commission view
-        if (window.triggerMutationInsuranceEffect) window.triggerMutationInsuranceEffect(tab === 'mutation' && hasInsurance);
-    };
-
-    // --- Internal Logic ---
-    window.adjustMutationVector = (idx, val) => {
-        const newVal = parseInt(val);
-        // PILLAR 5: Input Validation. Ensure numeric input and minimum power floor.
-        if (isNaN(newVal) || newVal < 5) {
-            showToast("❌ Power value must be a number and at least 5.", "error");
-            return;
-        }
-        pendingPower[idx] = newVal;
-        document.querySelector(`.vector-val-${idx}`).innerText = newVal;
-        
-        const currentSum = pendingPower.reduce((a, b) => a + b, 0);
-        const delta = originalSum - currentSum;
-        
-        const deltaEl = document.getElementById("vector-sum-delta");
+/**
+ * adjustMutationVector handles slider input for power re-allocation.
+ */
+export function adjustMutationVector(idx, val) {
+    const newVal = parseInt(val);
+    if (isNaN(newVal) || newVal < 5) {
+        showToast("❌ Power value must be a number and at least 5.", "error");
+        return;
+    }
+    foundryPendingPower[idx] = newVal;
+    const valEl = document.querySelector(`.vector-val-${idx}`);
+    if (valEl) valEl.innerText = newVal;
+    
+    const currentSum = foundryPendingPower.reduce((a, b) => a + b, 0);
+    const delta = foundryOriginalSum - currentSum;
+    
+    const deltaEl = document.getElementById("vector-sum-delta");
+    if (deltaEl) {
         deltaEl.innerText = delta > 0 ? `+${delta}` : delta;
         deltaEl.className = delta === 0 ? "text-neon-green" : "text-error";
-        
-        document.getElementById("commit-realignment-btn").disabled = delta !== 0;
-        
-        // Update preview dynamically
-        const previewCard = {...card, power: pendingPower};
-        document.getElementById("mutation-card-preview").innerHTML = renderCardHTML(previewCard);
-    };
-
-    window.submitVectorRealignment = async (id) => {
-        const state = window.GetGameState();
-        if (state.virtual_balance < 500) return showToast("❌ Insufficient $VBV rewards.", "error");
-        
-        const currentSum = pendingPower.reduce((a, b) => a + b, 0);
-        if (currentSum !== originalSum) return showToast("❌ Power budget mismatch.", "error");
-
-        showToast("🧬 Initiating vector realignment...", "info");
-        socket.send(JSON.stringify({
-            type: "vector_realignment",
-            payload: {
-                card_id: id,
-                club_id: state.employer_id,
-                new_power: pendingPower
-            }
-        }));
-        window.stopMutationSoundscape(); // Stop soundscape on commit
-        document.getElementById("mutation-foundry-overlay").remove();
-    };
-
-    window.submitMoodRecalibration = async (id, mood) => {
-        const state = window.GetGameState();
-        if (state.virtual_balance < 250) return showToast("❌ Insufficient $VBV rewards.", "error");
-        if (!state.inventory["mood_catalyst"]) return showToast("❌ Mood Catalyst required.", "error");
-
-        if (!confirm(`Permanently align this babe with the ${mood} element for 250 $VBV + 1x Catalyst?`)) return;
-
-        showToast("🧬 Recalibrating elemental alignment...", "info");
-        socket.send(JSON.stringify({
-            type: "mood_recalibration",
-            payload: {
-                card_id: id,
-                club_id: state.employer_id,
-                new_mood: mood
-            }
-        }));
-        window.stopMutationSoundscape(); // Stop soundscape on commit
-        document.getElementById("mutation-foundry-overlay").remove();
-    };
+    }
+    
+    const btn = document.getElementById("commit-realignment-btn");
+    if (btn) btn.disabled = delta !== 0;
+    
+    const preview = document.getElementById("mutation-card-preview");
+    if (preview && foundryActiveCard) {
+        const previewCard = {...foundryActiveCard, power: foundryPendingPower};
+        preview.innerHTML = renderCardHTML(previewCard);
+    }
 }
+window.adjustMutationVector = adjustMutationVector;
+
+/**
+ * submitVectorRealignment dispatches the re-allocation request.
+ */
+export async function submitVectorRealignment(id) {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 500) return showToast("❌ Insufficient $VBV rewards.", "error");
+    
+    const currentSum = foundryPendingPower.reduce((a, b) => a + b, 0);
+    if (currentSum !== foundryOriginalSum) return showToast("❌ Power budget mismatch.", "error");
+
+    showToast("🧬 Initiating vector realignment...", "info");
+    socket.send(JSON.stringify({
+        type: "vector_realignment",
+        payload: { card_id: id, club_id: state.employer_id, new_power: foundryPendingPower }
+    }));
+    if (window.stopMutationSoundscape) window.stopMutationSoundscape();
+    document.getElementById("mutation-foundry-overlay")?.remove();
+}
+window.submitVectorRealignment = submitVectorRealignment;
+
+/**
+ * submitMoodRecalibration dispatches the element shift request.
+ */
+export async function submitMoodRecalibration(id, mood) {
+    const state = window.GetGameState();
+    if (state.virtual_balance < 250) return showToast("❌ Insufficient $VBV rewards.", "error");
+    if (!state.inventory["mood_catalyst"]) return showToast("❌ Mood Catalyst required.", "error");
+
+    if (!confirm(`Permanently align this babe with the ${mood} element for 250 $VBV + 1x Catalyst?`)) return;
+
+    showToast("🧬 Recalibrating elemental alignment...", "info");
+    socket.send(JSON.stringify({
+        type: "mood_recalibration",
+        payload: { card_id: id, club_id: state.employer_id, new_mood: mood }
+    }));
+    if (window.stopMutationSoundscape) window.stopMutationSoundscape();
+    document.getElementById("mutation-foundry-overlay")?.remove();
+}
+window.submitMoodRecalibration = submitMoodRecalibration;
 
 /**
  * window.submitMutationLoyaltySynthesis initiates the soul-bonding protocol.
  */
-window.submitMutationLoyaltySynthesis = (cardID) => {
+export function submitMutationLoyaltySynthesis(cardID) {
     const state = window.GetGameState();
     if (state.virtual_balance < 1000) return showToast("❌ Insufficient $VBV rewards.", "error");
     
@@ -466,7 +508,8 @@ window.submitMutationLoyaltySynthesis = (cardID) => {
             club_id: state.employer_id
         }
     }));
-};
+}
+window.submitMutationLoyaltySynthesis = submitMutationLoyaltySynthesis;
 
 /**
  * Populates and displays the lease board overlay using global club data.
@@ -592,18 +635,80 @@ export function submitCreateLease() {
     }));
     document.getElementById("create-lease-overlay")?.remove();
 }
+
+/**
+ * initiateRecoveryChallenge triggers the 3-win streak protocol for a fenced asset.
+ * PILLAR 7: Underworld Recovery.
+ */
+export function initiateRecoveryChallenge(cardID) {
+    const state = window.GetGameState();
+    if (state.phase === "Active") return showToast("❌ Cannot initiate retrieval during active combat.", "error");
+
+    if (!confirm(`Initiate 3-win retrieval challenge for BABE #${cardID}?\n\nFailure to maintain the streak resets progress.`)) return;
+
+    showToast(`🏴‍☠️ SILKROAD: Retrieval protocol active for Asset #${cardID}.`, "info");
+    socket.send(JSON.stringify({
+        type: "initiate_recovery",
+        payload: { card_id: cardID }
+    }));
+    
+    hideAllOverlays();
+}
+window.initiateRecoveryChallenge = initiateRecoveryChallenge;
+
+/**
+ * openRecoveryBountyOverlay allows players to post rewards for their fenced cards.
+ * PILLAR 7: Underworld Recovery.
+ */
+export function openRecoveryBountyOverlay(cardID) {
+    const overlay = document.createElement("div");
+    overlay.id = "recovery-bounty-overlay";
+    overlay.className = "overlay";
+
+    overlay.innerHTML = `
+        <div class="economy-panel glass-panel medium animate-modal w-400 border-gold">
+            <div class="market-header">
+                <span class="market-title text-gold">🏴‍☠️ RECOVERY BOUNTY</span>
+                <div class="access-level">SILKROAD LIQUIDITY PROTOCOL</div>
+            </div>
+            <div class="p-20 text-center">
+                <p class="opacity-7 mb-20 font-size-0-85em">Post a $VBV reward to incentivize the retrieval of <b>BABE #${cardID}</b> from the Black Market.</p>
+                <input type="number" id="bounty-amount-input" class="glass-input w-full text-center font-size-1-5em mb-20" placeholder="0.00" step="10">
+                <div class="flex-row gap-10">
+                    <button class="outline w-full" onclick="document.getElementById('recovery-bounty-overlay').remove()">ABORT</button>
+                    <button class="w-full bg-neon-green text-dark font-bold" onclick="window.submitRecoveryBounty(${cardID})">POST BOUNTY</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+}
+window.openRecoveryBountyOverlay = openRecoveryBountyOverlay;
+
+window.submitRecoveryBounty = (cardID) => {
+    const amount = parseFloat(document.getElementById("bounty-amount-input")?.value);
+    if (isNaN(amount) || amount <= 0) return showToast("❌ Invalid bounty amount.", "error");
+
+    showToast(`🏴‍☠️ Posting ${amount.toFixed(2)} $VBV retrieval bounty...`, "info");
+    socket.send(JSON.stringify({
+        type: "list_recovery_bounty",
+        payload: { card_id: cardID, bounty_micro: Math.round(amount * 1000000) }
+    }));
+    document.getElementById("recovery-bounty-overlay")?.remove();
+};
+
 /**
  * Populates and displays the district shops overlay using synchronized club inventory.
  * Utilizes the high-fidelity _shops.scss styles and category filtering.
  */
 export async function openShopsOverlay(initialCategory = 'Elemental') {
+    if (typeof window.hideAllOverlays === 'function') window.hideAllOverlays();
     const overlay = document.getElementById("shops-overlay");
     if (!overlay) return;
     overlay.classList.remove("hidden");
     switchShopCategory(initialCategory);
 }
 
-export function switchShopCategory(category) {
+export function switchShopCategory(category, _tries = 0) {
     const container = document.getElementById("shops-container");
     if (!container) return;
 
@@ -614,21 +719,33 @@ export function switchShopCategory(category) {
 
     container.innerHTML = `<div class="grid-span-all opacity-5 py-40 italic">Scanning district stock for ${category} hardware...</div>`;
 
+    // PILLAR 4 (per Problems.md §1615): existence guard for the WASM bridge.
+    // switchShopCategory can be invoked before main.wasm finishes instantiating
+    // (e.g. the user opens District Shops during boot). If GetGameState is not
+    // registered yet, paint the placeholder and retry shortly instead of throwing.
+    if (typeof window.GetGameState !== 'function') {
+        if (_tries < 40) setTimeout(() => switchShopCategory(category, _tries + 1), 150);
+        return;
+    }
+
     const state = window.GetGameState();
     const userRole = state.job_role || "";
+    const token = resolveShopToken(category);
 
-    const clubs = Object.values(globalClubs).filter(c => c.type === category);
+    // Dev-sim fallback: when the live module data is empty, read seeded dev state.
+    const _clubsSrc = (globalClubs && (Object.keys(globalClubs)?.length ?? 0)) ? globalClubs : (window.__devClubs || {});
+    const clubs = Object.values(_clubsSrc).filter(c => c.type === category);
     let itemsHTML = "";
 
     clubs.forEach(club => {
         Object.entries(club.inventory || {}).forEach(([itemId, qty]) => {
             if (qty <= 0) return;
-            const meta = GlobalShopRegistry[itemId] || { name: itemId.replace(/_/g, ' '), desc: "Tactical Enhancement", price: 100 };
+            const meta = (GlobalShopRegistry[itemId] || (window.__devShopRegistry && window.__devShopRegistry[itemId]) || { name: itemId.replace(/_/g, ' '), desc: "Tactical Enhancement", price: 100 });
 
             // TACTICAL EVALUATION: Check if player/club meets unlock criteria
             const meetsMojo = (club.mojo || 0) >= (meta.requiredMojo || 0);
             const meetsRole = !meta.requiredRole || userRole === meta.requiredRole;
-            const meetsMaster = !meta.isMasterTier || (club.territories && club.territories.length >= 2);
+            const meetsMaster = !meta.isMasterTier || (club.territories && (club.territories?.length ?? 0) >= 2);
             const isLocked = !meetsMojo || !meetsRole || !meetsMaster;
 
             let reqLabels = [];
@@ -638,15 +755,15 @@ export function switchShopCategory(category) {
             
             itemsHTML += `
                 <div class="shop-item animate-slide-up ${meta.isMasterTier ? 'master-tier' : ''} ${isLocked ? 'locked-item' : ''}" 
-                     onclick="${isLocked ? '' : `buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}')`}">
+                     onclick="${isLocked ? '' : `buyClubItem('${club.id}', '${itemId}', ${meta.price}, '${club.territories[0]}', '${token}')`}">
                     <div class="item-image">
-                        <img src="Assets/Images/portraits/placeholder.webp" alt="Hardware">
-                        <div class="item-badge">${club.name}</div>
+                        <img src="${PLACEHOLDER_IMG}" alt="Hardware">
+                        <div class="item-badge">${club?.name}</div>
                     </div>
                     <div class="item-info">
-                        <div class="item-title">${meta.name.toUpperCase()}</div>
+                        <div class="item-title">${meta?.name.toUpperCase()}</div>
                         <div class="item-description">${meta.desc}</div>
-                        ${reqLabels.length > 0 ? `<div class="item-requirements" style="font-size: 0.7em; margin-top: 5px; font-weight: bold; letter-spacing: 1px;">${reqLabels.join(' • ')}</div>` : ''}
+                        ${(reqLabels?.length ?? 0) > 0 ? `<div class="item-requirements" style="font-size: 0.7em; margin-top: 5px; font-weight: bold; letter-spacing: 1px;">${reqLabels.join(' • ')}</div>` : ''}
                         <div class="item-stats">
                             <div class="stat">
                                 <div class="stat-label">STOCK</div>
@@ -655,7 +772,7 @@ export function switchShopCategory(category) {
                         </div>
                     </div>
                     <div class="item-footer">
-                        <div class="item-price">${meta.price}</div>
+                        <div class="item-price">${meta.price} <span class="token-badge token-${token.toLowerCase()}">${token}</span></div>
                         <button class="buy-button" ${isLocked ? 'disabled' : ''}>${isLocked ? 'LOCKED' : 'PURCHASE'}</button>
                     </div>
                 </div>
@@ -690,18 +807,31 @@ export async function submitDistrictTax(territoryId) {
     document.getElementById("territory-view-overlay")?.remove();
 }
 
-export async function buyClubItem(clubId, itemId, price, territoryId) {
+export async function buyClubItem(clubId, itemId, price, territoryId, token = 'VBV') {
     if (!userAddress) return showToast("Connect wallet first", "error");
-    
+    // Token-locking enforcement: the shop render already resolved the category to its
+    // locked token via resolveShopToken(category) and passes that resolved token here.
+    // Use it directly — do NOT re-resolve (token is a value e.g. 'NUGGET', not a category key).
+    if (!token) token = 'VBV';
+    // If the active wallet has no balance for a non-VBV token, warn (off-chain, no spend).
+    if (token !== 'VBV') {
+        const gs = (typeof window.GetGameState === 'function') ? window.GetGameState() : null;
+        const bal = gs && gs.tokenBalances ? gs.tokenBalances[token] : (gs && gs[token.toLowerCase() + 'Balance']);
+        if (bal !== undefined && bal <= 0) {
+            return showToast(`No ${token} balance — this shop is locked to ${token} only.`, "error");
+        }
+    }
+
     try {
-        showToast(`Purchasing ${itemId} for ${price} $VBV...`, "info");
-        
+        showToast(`Purchasing ${itemId} for ${price} ${token}...`, "info");
+
         socket.send(JSON.stringify({
             type: "purchase_item",
             payload: {
                 item_id: itemId,
                 territory_id: territoryId,
-                price: price * 1000000 // Convert to micro-units
+                price: price * 1000000, // Convert to micro-units
+                token: token // locked to the shop's preset token
             }
         }));
 
@@ -716,6 +846,26 @@ export async function buyClubItem(clubId, itemId, price, territoryId) {
         showToast(`Purchase Failed: ${err.message}`, "error");
     }
 }
+
+/**
+ * claimDividends dispatches the harvest request for a specific entity.
+ * PILLAR 1: Yield-Bearing Assets.
+ */
+window.claimDividends = (entityId) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    showToast("💰 Harvesting organization yield...", "info");
+    socket.send(JSON.stringify({ type: "claim_dividends", payload: { entity_id: entityId } }));
+};
+
+/**
+ * harvestAllDividends dispatches the bulk harvest request for the entire portfolio.
+ * PILLAR 1: Yield-Bearing Assets.
+ */
+window.harvestAllDividends = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    showToast("💰 Initiating bulk yield harvest...", "info");
+    socket.send(JSON.stringify({ type: "harvest_all_dividends", payload: {} }));
+};
 
 /**
  * Art Gallery Interface: Consignment and Auctions.
@@ -757,9 +907,11 @@ export async function loadGalleryItems() {
 
     try {
         const response = await fetch(`${CONFIG.API_BASE}/api/auctions`);
-        const auctions = await response.json();
+        const payload = await response.json();
+        // ONE envelope from the server; the array tolerance keeps older payloads readable.
+        const auctions = Array.isArray(payload) ? payload : (payload.auctions || []);
 
-        if (!auctions || auctions.length === 0) {
+        if (auctions.length === 0) {
             container.innerHTML = `<div style="grid-column: 1/-1;" class="opacity-5 py-40 italic text-center">The gallery floor is currently vacant. Check back during peak match hours.</div>`;
             return;
         }
@@ -772,7 +924,7 @@ export async function loadGalleryItems() {
             return `
                 <div class="gallery-grid__item-bundle animate-slide-up">
                     <div class="item-image">
-                        <img src="Assets/Images/portraits/placeholder.webp" alt="Exhibit">
+                        <img src="${PLACEHOLDER_IMG}" alt="Exhibit">
                     </div>
                     <div class="item-info text-left">
                         <div class="item-title font-bold text-neon-cyan">${a.bundle.weapon_id ? a.bundle.weapon_id.replace(/_/g, ' ') : 'Tactical Artifact'}</div>
@@ -942,7 +1094,7 @@ export async function submitConsignment() {
     showToast("⚡ Authorizing consignment protocol...", "info");
     
     try {
-        const response = await fetch(`${CONFIG.API_BASE}/api/auctions/create`, {
+        const response = await fetch(`${CONFIG.API_BASE}/api/auctions`, {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -967,35 +1119,6 @@ export async function submitConsignment() {
 }
 
 
-    const newItems = [];
-    newItems.push({ symbol: "MKT TOKEN", val: "0.80 $VBV", trend: "▲", color: "#3fb950" });
-
-    topPerformers.forEach(p => {
-        const basePrice = (p.wins * 10) + (p.reputation / 2) + 100;
-        const finalPrice = basePrice + (p.id.charCodeAt(p.id.length - 1) % 5);
-        newItems.push({
-            symbol: getCachedEnvoiName(p.wallet),
-            badge: (p.achievements && p.achievements.length > 0) ? "🏆" : "",
-            val: finalPrice.toFixed(2),
-            trend: (p.wins > 0) ? "▲" : "─",
-            color: (p.wins > 0) ? "#3fb950" : "#888",
-            isNPC: (collectiveIntelligence.personalities && collectiveIntelligence.personalities[p.id] !== undefined) || p.id === "Vbabe Bot"
-        });
-    });
-
-    const canvas = document.getElementById("market-ticker-canvas");
-    const ctx = canvas ? canvas.getContext('2d') : null;
-    if (ctx) {
-        tickerItems = newItems.map(item => {
-            ctx.font = item.isNPC ? "italic bold 12px 'Rajdhani', sans-serif" : "bold 12px 'Rajdhani', sans-serif";
-            const str = `${item.symbol}${item.badge ? ' ' + item.badge : ''} ${item.val} ${item.trend}`;
-            item.width = ctx.measureText(str).width + spacing;
-            return item;
-        });
-    }
-
-    if (!tickerAnimId) startTickerAnimation();
-{}
 
 export function startTickerAnimation() {
     const canvas = document.getElementById("market-ticker-canvas");
@@ -1142,7 +1265,7 @@ export function openClubFoundry() {
                 <input type="text" id="foundry-club-name" class="glass-input w-full" placeholder="Enter Club Name" maxlength="20">
                 <select id="foundry-shop-type" class="glass-input w-full"><option value="Elemental">Elemental Forge</option><option value="Tactical">Tactical Syndicate</option><option value="Vitality">Vitality Lab</option></select>
                 <select id="foundry-territory" class="glass-input w-full" ${available.length === 0 ? 'disabled' : ''}>
-                    ${available.length > 0 ? available.map(t => `<option value="${t.id}">${t.name}</option>`).join('') : '<option value="">NO DISTRICTS AVAILABLE</option>'}
+                    ${(available?.length ?? 0) > 0 ? available.map(t => `<option value="${t.id}">${t?.name}</option>`).join('') : '<option value="">NO DISTRICTS AVAILABLE</option>'}
                 </select>
             </div>
             <div class="mt-20 flex-row justify-center gap-15">
@@ -1155,9 +1278,9 @@ export function openClubFoundry() {
 }
 
 export async function submitClubFoundry() {
-    const name = document.getElementById("foundry-club-name").value.trim();
-    const type = document.getElementById("foundry-shop-type").value;
-    const territory = document.getElementById("foundry-territory").value;
+    const name = document.getElementById("foundry-club-name")?.value.trim();
+    const type = document.getElementById("foundry-shop-type")?.value;
+    const territory = document.getElementById("foundry-territory")?.value;
     if (!name || !userAddress) return;
 
     try {
@@ -1167,6 +1290,22 @@ export async function submitClubFoundry() {
         document.getElementById("club-foundry-overlay").remove();
         if (window.triggerFoundryFusion) window.triggerFoundryFusion(type);
     } catch (err) { showToast(`Founding Failed: ${err.message}`, "error"); }
+}
+
+// submitTerritoryPurchase — expand a club's territory by acquiring an unclaimed district.
+// Mirrors submitClubFoundry: sends the purchase_territory WS action with a txid + network;
+// the backend (HandlePurchaseTerritory) verifies the 2,500 $VBV on-chain payment, rejects
+// already-claimed districts, appends the territory, and auto-grants Governor at 2 territories.
+export async function submitTerritoryPurchase(clubId, territoryId) {
+    if (!clubId || !territoryId || !userAddress) return;
+    try {
+        const state = window.GetGameState();
+        let txid = "SIM_TX_" + Date.now();
+        socket.send(JSON.stringify({ type: "purchase_territory", payload: { club_id: clubId, territory_id: territoryId, txid, network: state.network } }));
+        showToast(`🗺️ Acquiring ${territoryId.replace(/_/g, ' ')}…`, "info");
+        const view = document.getElementById("territory-view-overlay");
+        if (view) view.remove();
+    } catch (err) { showToast(`Territory Purchase Failed: ${err.message}`, "error"); }
 }
 
 export async function openPortfolioView(initialTab = 'portfolio') {
@@ -1189,18 +1328,52 @@ export async function switchPortfolioTab(tab) {
             return;
         }
         await Promise.all(entries.map(([w]) => resolveEnvoiName(w)));
+
+        let totalClaimable = 0;
+        entries.forEach(([id, amt]) => {
+            const node = state.market_nodes ? state.market_nodes[id] : null;
+            const lastClaimed = state.last_claimed_yield ? (state.last_claimed_yield[id] || 0) : 0;
+            const yieldDelta = node ? (node.cumulative_yield_per_share - lastClaimed) : 0;
+            const claimableVBV = node ? (yieldDelta * (amt * 100)) / 1000000000000 : 0;
+            totalClaimable += claimableVBV;
+        });
+
         container.innerHTML = `
+            ${totalClaimable > 0.01 ? `
+                <div class="glass-panel p-10 m-0 mb-15 flex-row justify-between align-center border-neon-green" style="background: rgba(63, 185, 80, 0.1);">
+                    <div class="text-left">
+                        <small class="opacity-5 block mb-2 letter-spacing-1">TOTAL CLAIMABLE YIELD</small>
+                        <b class="text-neon-green" style="font-size: 1.1em;">${totalClaimable.toFixed(2)} $VBV</b>
+                    </div>
+                    <button class="success btn-small" onclick="window.harvestAllDividends()">HARVEST ALL</button>
+                </div>` : ''}
             <div class="portfolio-grid" style="display: grid; grid-template-columns: 1fr; gap: 10px;">
                 ${entries.map(([id, amt]) => {
                     const p = lastLobbyPlayers.find(pl => pl.wallet?.toLowerCase() === id.toLowerCase());
                     const price = p ? ((p.wins * 10) + (p.reputation / 2) + 100) : 100;
+                    
+                    // PILLAR 1: Yield Estimation.
+                    const node = state.market_nodes ? state.market_nodes[id] : null;
+                    const lastClaimed = state.last_claimed_yield ? (state.last_claimed_yield[id] || 0) : 0;
+                    const yieldDelta = node ? (node.cumulative_yield_per_share - lastClaimed) : 0;
+                    const claimableVBV = node ? (yieldDelta * (amt * 100)) / 1000000000000 : 0;
+                    
+                    // PILLAR 1: Stimulus Logic (Recent = Last 24h)
+                    const club = Object.values(globalClubs).find(c => c.owner_wallet?.toLowerCase() === id.toLowerCase());
+                    const hasRecentBailout = club?.last_bailout_at && (Date.now() - new Date(club.last_bailout_at).getTime()) < 86400000;
+
                     return `
                         <div class="portfolio-item glass-panel m-0 flex-row justify-between align-center p-15">
                             <div class="text-left">
                                 <b class="text-neon-cyan">${getCachedEnvoiName(id)}</b>
+                                ${hasRecentBailout ? `<div class="text-gold font-bold font-size-0-7em mt-2" title="Stimulus Package Received (Last 24h)">🏛️ STIMULUS</div>` : ''}
                                 <div class="font-size-0-75em opacity-5">${amt.toFixed(2)} SHARES</div>
                             </div>
                             <div class="text-right">
+                                ${claimableVBV > 0.01 ? `
+                                    <div class="text-neon-cyan font-bold font-size-0-8em mb-2" style="cursor: pointer;" onclick="claimDividends('${id}')">
+                                        💰 CLAIM: ${claimableVBV.toFixed(2)} VBV
+                                    </div>` : ''}
                                 <div class="text-neon-green font-bold">${(amt * price).toFixed(1)} $VBV</div>
                                 <button class="outline x-small border-error mt-5" onclick="tradeShares('${id}', 'sell', ${amt})">LIQUIDATE</button>
                             </div>
@@ -1210,7 +1383,7 @@ export async function switchPortfolioTab(tab) {
     } else if (tab === 'jailed') {
         const jailed = state.jailed_cards || {};
         const entries = Object.entries(jailed);
-        container.innerHTML = entries.length ? entries.map(([cardId, clubId]) => `
+        container.innerHTML = entries?.length ?? 0 ? entries.map(([cardId, clubId]) => `
             <div class="player-item border-error p-15">
                 <div class="text-left">
                     <b class="text-error">CARD #${cardId}</b>
@@ -1221,8 +1394,8 @@ export async function switchPortfolioTab(tab) {
     } else if (tab === 'kidnapped') {
         const kidnapped = state.kidnapped_cards || {};
         const entries = Object.entries(kidnapped);
-        if (entries.length > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
-        container.innerHTML = entries.length ? entries.map(([cardId, victimWallet]) => `
+        if (entries?.length ?? 0 > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
+        container.innerHTML = entries?.length ?? 0 ? entries.map(([cardId, victimWallet]) => `
             <div class="player-item border-warning p-15" style="border-color: #ffa500;">
                 <div class="text-left">
                     <b style="color: #ffa500;">CARD #${cardId}</b>
@@ -1233,8 +1406,8 @@ export async function switchPortfolioTab(tab) {
     } else if (tab === 'hostage') {
         const heldHostage = state.held_hostage_cards || {};
         const entries = Object.entries(heldHostage);
-        if (entries.length > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
-        container.innerHTML = entries.length ? entries.map(([cardId, perpWallet]) => `
+        if (entries?.length ?? 0 > 0) await Promise.all(entries.map(([_, w]) => resolveEnvoiName(w)));
+        container.innerHTML = entries?.length ?? 0 ? entries.map(([cardId, perpWallet]) => `
             <div class="player-item border-gold p-15">
                 <div class="text-left">
                     <b class="text-gold">CARD #${cardId}</b>
@@ -1262,27 +1435,31 @@ export function renderRegionalAllianceWidget(myClubID) {
     const isOwner = isPlayerOwned && userAddress && myClub.owner_wallet.toLowerCase() === userAddress.toLowerCase();
     let allianceHtml = "";
 
+    // PILLAR 1: Political Influence - Tax Haven Visuals
+    const isMyHaven = myClub.tax_haven_expires_at && new Date(myClub.tax_haven_expires_at) > Date.now();
+    const havenIcon = isMyHaven ? ' <span title="Tax Haven Active" style="filter: drop-shadow(0 0 5px gold); cursor: help;">🏦</span>' : '';
+
     if (!isPlayerOwned) {
         // Case: System Managed Club
         allianceHtml = `
             <div class="alliance-status glass-panel border-cyan mb-10 p-15 accelerated">
                 <div class="text-neon-cyan font-bold mb-5" style="letter-spacing: 1px;">🤖 SYSTEM MANAGED CLUB</div>
                 <div class="text-left">
-                    <b class="text-neon-purple">${myClub.name.toUpperCase()}</b><br>
-                    <small class="opacity-7">Districts: ${myClub.territories ? myClub.territories.length : 0}</small><br>
+                    <b class="text-neon-purple">${myClub?.name.toUpperCase()}</b>${havenIcon}<br>
+                    <small class="opacity-7">Districts: ${myClub.territories ? myClub.territories?.length ?? 0 : 0}</small><br>
                     <small class="font-xs italic opacity-5">This club is managed by Arena AI. Alliance actions are not available.</small>
                 </div>
             </div>`;
     } else if (myClub.allied_club_id) {
         const ally = globalClubs[myClub.allied_club_id];
-        const combinedTerritories = (myClub.territories ? myClub.territories.length : 0) + (ally && ally.territories ? ally.territories.length : 0);
+        const combinedTerritories = (myClub.territories ? myClub.territories?.length ?? 0 : 0) + (ally && ally.territories ? ally.territories?.length ?? 0 : 0);
         const isGovernor = combinedTerritories >= 2;
         allianceHtml = `
             <div class="alliance-status glass-panel ${isGovernor ? 'border-gold governor-highlight' : 'border-cyan'} mb-10 p-15 accelerated">
                 <div class="${isGovernor ? 'text-gold' : 'text-neon-cyan'} font-bold mb-5" style="letter-spacing: 1px;">🤝 ${isGovernor ? 'REGIONAL GOVERNOR ALLIANCE' : 'ACTIVE ALLIANCE'}</div>
                 <div class="flex-row justify-between align-center">
                     <div class="text-left">
-                        <b class="text-neon-purple">${ally ? ally.name.toUpperCase() : 'UNKNOWN COALITION'}</b><br>
+                        <b class="text-neon-purple">${ally ? ally?.name.toUpperCase() : 'UNKNOWN COALITION'}</b>${isAllyHaven ? ' <span title="Tax Haven Active">🏦</span>' : ''}<br>
                         <small class="opacity-7">Allied Districts: ${combinedTerritories}</small>
                     </div>
                     ${isOwner ? `<button class="outline danger btn-small" onclick="window.dissolveAlliance('${myClub.id}')">DISSOLVE</button>` : ''}
@@ -1295,7 +1472,7 @@ export function renderRegionalAllianceWidget(myClubID) {
                 <div class="text-warning font-bold mb-5" style="letter-spacing: 1px;">✉️ ALLIANCE PROPOSAL</div>
                 <div class="flex-row justify-between align-center">
                     <div class="text-left">
-                        <b>${requester ? requester.name : 'Unknown Club'}</b><br>
+                        <b>${requester ? requester?.name : 'Unknown Club'}</b><br>
                         <small>Owner: ${getCachedEnvoiName(requester ? requester.owner_wallet : '')}</small>
                     </div>
                     <div id="alliance-invite-timer" class="font-mono font-xs text-warning">
@@ -1310,20 +1487,20 @@ export function renderRegionalAllianceWidget(myClubID) {
     } else {
         // PILLAR 1: Independent Status Reset.
         // This view is triggered when no alliance is active or pending.
-        const isGovernor = (myClub.territories ? myClub.territories.length : 0) >= 2;
+        const isGovernor = (myClub.territories ? myClub.territories?.length ?? 0 : 0) >= 2;
         if (isOwner) {
             const otherClubs = Object.values(globalClubs).filter(c => c.id !== myClub.id && !c.allied_club_id);
             allianceHtml = `
                 <div class="alliance-status glass-panel ${isGovernor ? 'border-gold governor-highlight' : 'border-cyan'} mb-10 p-15 accelerated">
                     <div class="${isGovernor ? 'text-gold' : 'text-neon-cyan'} font-bold mb-5" style="letter-spacing: 1px;">${isGovernor ? '👑 REGIONAL GOVERNOR' : '⚔️ INDEPENDENT STATUS'}</div>
                     <div class="text-left mb-15">
-                        <b>${myClub.name.toUpperCase()}</b> is currently operating without external coalitions.
+                        <b>${myClub?.name.toUpperCase()}</b>${havenIcon} is currently operating without external coalitions.
                     </div>
                     <small class="section-label opacity-5">PROPOSE COALITION</small>
                     <div class="flex-col gap-5 mt-10 max-h-200 overflow-y-auto">
                         ${otherClubs.map(c => `
                             <div class="player-item p-10 m-0">
-                                <div class="text-left"><b>${c.name}</b><br><small>Districts: ${c.territories ? c.territories.length : 0}</small></div>
+                                <div class="text-left"><b>${c?.name}</b><br><small>Districts: ${c.territories ? c.territories?.length ?? 0 : 0}</small></div>
                                 <button class="outline btn-small border-cyan" onclick="window.sendAllianceInvite('${myClub.id}', '${c.id}')">INVITE</button>
                             </div>`).join('') || '<div class="opacity-3 italic text-center py-10 font-xs">No independent clubs available for alliance.</div>'}
                     </div>
@@ -1333,8 +1510,8 @@ export function renderRegionalAllianceWidget(myClubID) {
                 <div class="alliance-status glass-panel ${isGovernor ? 'border-gold governor-highlight' : 'border-cyan'} mb-10 p-15 accelerated">
                     <div class="${isGovernor ? 'text-gold' : 'text-neon-cyan'} font-bold mb-5" style="letter-spacing: 1px;">${isGovernor ? '🛡️ REGIONAL GOVERNOR' : '🛡️ INDEPENDENT STATUS'}</div>
                     <div class="text-left">
-                        <b class="text-neon-purple">${myClub.name.toUpperCase()}</b><br>
-                        <small class="opacity-7">Districts: ${myClub.territories ? myClub.territories.length : 0}</small><br>
+                        <b class="text-neon-purple">${myClub?.name.toUpperCase()}</b>${havenIcon}<br>
+                        <small class="opacity-7">Districts: ${myClub.territories ? myClub.territories?.length ?? 0 : 0}</small><br>
                         <small class="font-xs italic opacity-5">Your organization is currently independent. Alliance coordination is restricted to the CEO.</small>
                     </div>
                 </div>`;
@@ -1441,7 +1618,7 @@ window.updateTradeImpact = (action) => {
  * confirmTrade executes the final WebSocket dispatch after user approval.
  */
 window.confirmTrade = (entityId, action) => {
-    const amount = parseFloat(document.getElementById("trade-amount-input").value);
+    const amount = parseFloat(document.getElementById("trade-amount-input")?.value);
     executeTradeShares(entityId, action, amount);
     document.getElementById("trade-confirmation-overlay")?.remove();
 };
@@ -1571,9 +1748,6 @@ export async function buyBlackMarketItem(loanId, price) {
 let tickerItems = [];
 let tickerOffset = 0;
 let tickerAnimId = null;
-let bountyItems = [];
-let bountyOffset = 0;
-let bountyAnimId = null;
 
 export function updateMarketTicker(players) {
     const spacing = 60;
@@ -1588,7 +1762,7 @@ export function updateMarketTicker(players) {
         `;
         document.body.prepend(tickerContainer);
 
-        const canvas = document.getElementById("market-ticker-canvas"); // This is a local variable, not a re-declaration
+        const canvas = document.getElementById("market-ticker-canvas");
         const resize = () => {
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.getBoundingClientRect();
@@ -1611,8 +1785,8 @@ export function updateMarketTicker(players) {
         const basePrice = (p.wins * 10) + (p.reputation / 2) + 100;
         newItems.push({
             symbol: getCachedEnvoiName(p.wallet),
-            badge: (p.achievements && p.achievements.length > 0) ? "🏆" : "",
-            val: (basePrice + (p.id.charCodeAt(p.id.length - 1) % 5)).toFixed(2),
+            badge: (p.achievements && (p.achievements?.length ?? 0) > 0) ? "🏆" : "",
+            val: (basePrice + (p.id.charCodeAt(p.id?.length ?? 0 - 1) % 5)).toFixed(2),
             trend: (p.wins > 0) ? "▲" : "─",
             color: (p.wins > 0) ? "#3fb950" : "#888",
             isNPC: (collectiveIntelligence.personalities && collectiveIntelligence.personalities[p.id] !== undefined) || p.id === "Vbabe Bot"
@@ -1620,7 +1794,7 @@ export function updateMarketTicker(players) {
     });
 
     const canvas = document.getElementById("market-ticker-canvas");
-    const ctx = canvas ? canvas.getContext('2d') : null; // This is a local variable, not a re-declaration
+    const ctx = canvas ? canvas.getContext('2d') : null;
     if (ctx) {
         tickerItems = newItems.map(item => {
             ctx.font = item.isNPC ? "italic bold 12px 'Rajdhani', sans-serif" : "bold 12px 'Rajdhani', sans-serif";
@@ -1632,121 +1806,12 @@ export function updateMarketTicker(players) {
     if (!tickerAnimId) startTickerAnimation();
 }
 
-export function startTickerAnimation() {
-    const canvas = document.getElementById("market-ticker-canvas");
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d'); // This is a local variable, not a re-declaration
+let bountyItems = [];
+let bountyOffset = 0;
+let bountyAnimId = null;
 
-    const animate = () => {
-        if (tickerItems.length === 0) { tickerAnimId = requestAnimationFrame(animate); return; }
-        const width = canvas.width / (window.devicePixelRatio || 1);
-        const height = 30;
-        ctx.clearRect(0, 0, width, height);
-        ctx.textBaseline = "middle";
-
-        const totalContentWidth = tickerItems.reduce((sum, item) => sum + (item.width || 0), 0);
-        if (totalContentWidth <= 0) { tickerAnimId = requestAnimationFrame(animate); return; }
-
-        tickerOffset = (tickerOffset + 0.8) % totalContentWidth;
-
-        let x = -tickerOffset;
-        while (x < width) {
-            tickerItems.forEach(item => {
-                if (x + item.width > 0 && x < width) {
-                    ctx.font = item.isNPC ? "italic bold 12px 'Rajdhani', sans-serif" : "bold 12px 'Rajdhani', sans-serif";
-                    ctx.fillStyle = item.isNPC ? "#9b51e0" : "#00f2fe";
-                    ctx.fillText(item.symbol, x, height / 2);
-                    let curX = x + ctx.measureText(item.symbol).width;
-                    if (item.badge) { ctx.fillStyle = "#ffd700"; ctx.fillText(" " + item.badge, curX, height / 2); curX += ctx.measureText(" " + item.badge).width; }
-                    ctx.font = "bold 12px 'Rajdhani', sans-serif";
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillText(" " + item.val, curX, height / 2);
-                    curX += ctx.measureText(" " + item.val).width;
-                    ctx.fillStyle = item.color;
-                    ctx.fillText(" " + item.trend, curX, height / 2);
-                }
-                x += item.width;
-            });
-        }
-        tickerAnimId = requestAnimationFrame(animate);
-    };
-    tickerAnimId = requestAnimationFrame(animate);
-}
-
-/**
- * Bounty Ticker: Scrolls live rewards for hunting high-Wanted outlaws.
- */
-export function updateBountyTicker(players) {
-    const spacing = 80;
-    let tickerContainer = document.getElementById("bounty-ticker");
-    if (!tickerContainer) { // This is a local variable, not a re-declaration
-        tickerContainer = document.createElement("div");
-        tickerContainer.id = "bounty-ticker";
-        tickerContainer.className = "market-ticker-container";
-        tickerContainer.style.top = "30px";
-        tickerContainer.innerHTML = `
-            <div class="ticker-label" style="background: #ff4b4b; color: #fff;">WANTED:</div>
-            <canvas id="bounty-ticker-canvas" style="flex: 1; height: 30px; cursor: default;"></canvas>
-        `;
-        const marketTicker = document.getElementById("market-ticker");
-        if (marketTicker) marketTicker.after(tickerContainer);
-        else document.body.prepend(tickerContainer);
-
-        const canvas = document.getElementById("bounty-ticker-canvas");
-        const resize = () => { // This is a local variable, not a re-declaration
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = 30 * dpr;
-            canvas.getContext('2d').scale(dpr, dpr);
-        };
-        window.addEventListener('resize', resize);
-        resize();
-    }
-
-    const outlaws = players.filter(p => (p.wanted_level || 0) >= 10).sort((a, b) => b.wanted_level - a.wanted_level);
-    const newItems = outlaws.length === 0 ? 
-        [{ symbol: "SECTOR SECURE", val: "No active bounties.", color: "#3fb950" }] :
-        outlaws.map(p => ({
-            symbol: getCachedEnvoiName(p.wallet),
-            val: `REWARD: ${(p.wanted_level * 50).toFixed(0)} $VBV`,
-            color: "#ffd700"
-        }));
-
-    const ctx = document.getElementById("bounty-ticker-canvas").getContext('2d');
-    bountyItems = newItems.map(item => {
-        ctx.font = "bold 12px 'Rajdhani', sans-serif";
-        item.width = ctx.measureText(`${item.symbol} ${item.val}`).width + spacing;
-        return item;
-    });
-
-    if (!bountyAnimId) startBountyAnimation();
-}
-
-export function startBountyAnimation() {
-    const canvas = document.getElementById("bounty-ticker-canvas");
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d'); // This is a local variable, not a re-declaration
-    const animate = () => {
-        const width = canvas.width / (window.devicePixelRatio || 1);
-        const totalWidth = bountyItems.reduce((s, i) => s + i.width, 0);
-        if (totalWidth <= 0) { bountyAnimId = requestAnimationFrame(animate); return; }
-        bountyOffset = (bountyOffset + 0.6) % totalWidth;
-        ctx.clearRect(0, 0, width, 30);
-        ctx.textBaseline = "middle";
-        let x = -bountyOffset;
-        while (x < width) {
-            bountyItems.forEach(item => {
-                if (x + item.width > 0 && x < width) {
-                    ctx.fillStyle = item.color || "#ffd700";
-                    ctx.fillText(item.symbol, x, 15);
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillText(" " + item.val, x + ctx.measureText(item.symbol).width, 15);
-                }
-                x += item.width;
-            });
-        }
-        bountyAnimId = requestAnimationFrame(animate);
-    };
-    bountyAnimId = requestAnimationFrame(animate);
-}
+// The territory view's PURCHASE button calls `submitTerritoryPurchase(...)` BARE, and an inline
+// handler resolves that name on `window` — the function is a module export with no global binding,
+// so the guard around it (`if(window.submitTerritoryPurchase)`) was false and territory acquisition
+// could not be triggered from the UI at all.
+window.submitTerritoryPurchase = submitTerritoryPurchase;

@@ -1,0 +1,14 @@
+economy_bootstrap.go:125:16: range var node copies lock: virtualbabestt.EntityMarketNode contains sync.RWMutex
+economy_bootstrap.go:126:19: assignment copies lock value to capturedNode: virtualbabestt.EntityMarketNode contains sync.RWMutex
+economy_persistence.go:151:31: assignment copies lock value to snapshot.MarketNodes[id]: virtualbabestt.EntityMarketNode contains sync.RWMutex
+economy_service.go:143:28: assignment copies lock value to state.MarketNodes[id]: virtualbabestt.EntityMarketNode contains sync.RWMutex
+lobby_manager.go:699:12: range var node copies lock: virtualbabestt.EntityMarketNode contains sync.RWMutex
+lobby_manager.go:700:17: assignment copies lock value to captured: virtualbabestt.EntityMarketNode contains sync.RWMutex
+lobby_manager.go:759:46: assignment copies lock value to marketNodesSnapshot[id]: virtualbabestt.EntityMarketNode contains sync.RWMutex
+ai_citizen_engine.go:521:56: log.Printf format %03d has arg contract.Template.ID of wrong type string
+battle_service.go:790:159: fmt.Sprintf format %d has arg trackingBonus of wrong type float64
+battle_service.go:802:107: fmt.Sprintf format %s reads arg #2, but call has 1 arg
+bonded_asset_registry.go:68:2: struct field assets has json tag but is not exported
+bonded_asset_registry.go:69:2: struct field bindings has json tag but is not exported
+server_main.go:738:8: struct field Y repeats json tag "x" also at server_main.go:738
+server_main.go:738:11: struct field Z repeats json tag "x" also at server_main.go:738

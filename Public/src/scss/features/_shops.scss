@@ -300,6 +300,23 @@
                     content: '💰';
                     font-size: $font-size-sm;
                 }
+
+                .token-badge {
+                    display: inline-block;
+                    padding: 2px 8px;
+                    border-radius: $border-radius-sm;
+                    font-size: $font-size-xs;
+                    font-weight: bold;
+                    letter-spacing: 1px;
+                    text-transform: uppercase;
+                    background: rgba($color-neon-cyan, 0.15);
+                    border: 1px solid rgba($color-neon-cyan, 0.5);
+                    color: $color-neon-cyan;
+
+                    &.token-vbv { background: rgba($color-neon-green, 0.15); border-color: rgba($color-neon-green, 0.5); color: $color-neon-green; }
+                    &.token-nugget { background: rgba(255, 179, 71, 0.15); border-color: rgba(255, 179, 71, 0.5); color: #ffb347; }
+                    &.token-unit { background: rgba(144, 202, 249, 0.15); border-color: rgba(144, 202, 249, 0.5); color: #90caf9; }
+                }
             }
 
             .buy-button {

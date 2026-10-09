@@ -1,0 +1,97 @@
+// ============================================================================
+// Slide theming (§10.6) — app boot / main menu + World Dashboard slideshows
+// ----------------------------------------------------------------------------
+// A show is a stack of layers; each layer is a background image and only the
+// active one has opacity 1, so the CSS transition IS the gentle fade. Decoration
+// only: pointer-events are off so a slide can never intercept a control.
+// ============================================================================
+
+.slide-theme {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+
+  .slide-theme-layer {
+    position: absolute;
+    inset: 0;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 1200ms ease-in-out;
+    will-change: opacity;
+
+    &.is-active { opacity: 1; }
+  }
+}
+
+// App boot / main menu: inserted BEHIND the nebula + star layers and dimmed, so the
+// menu stays legible over the art.
+.constellation-bg .slide-theme {
+  opacity: 0.42;
+  filter: saturate(0.9);
+}
+
+// World Dashboard: a full-bleed backdrop behind the glass panel.
+.wd-bg-slides {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+
+  .slide-theme { opacity: 0.3; }
+}
+
+// The dashboard panel must sit ABOVE its own backdrop (it was a static flex item).
+.world-dashboard-panel {
+  position: relative;
+  z-index: 1;
+}
+
+// A user who asked their OS for less motion gets a still slide, not a pulsing one.
+@media (prefers-reduced-motion: reduce) {
+  .slide-theme .slide-theme-layer { transition: none; }
+}
+
+// ============================================================================
+// §10.7 UI-TREE ART — one unique placeholder frame per World Dashboard tree
+// ----------------------------------------------------------------------------
+// The server assigns each tree (category and feature) a frame of its own
+// (ui_tree_theming.go) and the renderer sets `--wd-tree-art` on the marked
+// button. The layer is DECORATION: pointer-events are off, and the button's own
+// content is lifted above it so a label is never covered. A tree with no art
+// simply has no custom property and renders exactly as before.
+// ============================================================================
+.wd-cat-btn,
+.wd-feature-btn {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--wd-tree-art, none);
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    opacity: 0.22;
+    filter: saturate(0.85);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  // Lift the real content above the decorative layer.
+  > span {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+// A pinned tree (rewards / achievements → Crypto-seraph, §10.7) keeps a touch
+// more of its art visible, since the rule names the character deliberately.
+.wd-feature-btn[data-wd-tree-pinned]::after { opacity: 0.3; }
+

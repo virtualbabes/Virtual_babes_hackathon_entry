@@ -1,0 +1,143 @@
+<script>
+  // ===== DATA (embedded from server-side render) =====
+  const MANIFEST_DATA = __MANIFEST_DATA__;
+  const WIRED_DATA = __WIRED_DATA__;
+  const ANALYTICS_DATA = __ANALYTICS_DATA__;
+
+  window.onload = () => {
+    // ===== SVG HELPERS =====
+    const svg = document.getElementById('diagram');
+    const tooltip = document.getElementById('tooltip');
+    const drillPanel = document.getElementById('drill-panel');
+    const subTabContainer = document.getElementById('sub-tab-container');
+    const views = {};
+    let currentView = 'full';
+    let currentAnalyticsTab = 'overview';
+
+    window.svg = svg;
+    window.views = views;
+
+    function makeRect(x, y, w, h, fill, stroke, rx, id) {
+      if (rx === undefined) rx = 6;
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', x); r.setAttribute('y', y);
+      r.setAttribute('width', w); r.setAttribute('height', h);
+      r.setAttribute('rx', rx); r.setAttribute('fill', fill);
+      r.setAttribute('stroke', stroke); r.setAttribute('stroke-width', '1.5');
+      if (id) r.setAttribute('id', id);
+      r.classList.add('node');
+      return r;
+    }
+
+    function makeText(x, y, text, size, fill, weight, anchor) {
+      if (size === undefined) size = 10;
+      if (fill === undefined) fill = 'white';
+      if (weight === undefined) weight = '600';
+      if (anchor === undefined) anchor = 'middle';
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', x); t.setAttribute('y', y);
+      t.setAttribute('font-size', size); t.setAttribute('fill', fill);
+      t.setAttribute('font-weight', weight); t.setAttribute('text-anchor', anchor);
+      t.textContent = text;
+      return t;
+    }
+
+    function makeLine(x1, y1, x2, y2, color, id, dashed) {
+      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+      l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+      l.setAttribute('stroke', color); l.setAttribute('stroke-width', '1.5');
+      if (dashed) l.setAttribute('stroke-dasharray', '5,5');
+      if (id) l.setAttribute('id', id);
+      l.classList.add('connection');
+      if (dashed) l.classList.add('dashed');
+      return l;
+    }
+
+    function makePie(data, size) {
+      if (size === undefined) size = 100;
+      const cx = size / 2, cy = size / 2, r = size / 2 - 4;
+      let total = data.reduce((s, d) => s + d.value, 0), angle = -Math.PI / 2;
+      if (total === 0) total = 1;
+      return data.map(d => {
+        const sa = (d.value / total) * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+        const x2 = cx + r * Math.cos(angle + sa), y2 = cy + r * Math.sin(angle + sa);
+        const la = sa > Math.PI ? 1 : 0;
+        angle += sa;
+        return `<path d=\"M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${la} 1 ${x2} ${y2} Z\" fill=\"${d.color}\" stroke=\"#020617\" stroke-width=\"1\"><title>${d.label}: ${d.value}</title></path>`;
+      }).join('');
+    }
+
+    function addNode(group, x, y, w, h, fill, stroke, label, sublabel, tip, conns, drill) {
+      if (conns === undefined) conns = [];
+      const rect = makeRect(x, y, w, h, fill, stroke, 6, label ? label.replace(/[^a-zA-Z0-9]/g, '_') : '');
+      rect.addEventListener('mouseenter', e => showTooltip(e, label, tip, conns));
+      rect.addEventListener('mouseleave', hideTooltip);
+      rect.addEventListener('click', e => { e.stopPropagation(); if (drill) openDrill(label, drill); highlightNode(rect, conns); });
+      group.appendChild(rect);
+      if (label) group.appendChild(makeText(x + w / 2, y + h / 2 - 4, label));
+      if (sublabel) group.appendChild(makeText(x + w / 2, y + h / 2 + 10, sublabel, 8, '#94a3b8'));
+    }
+
+    function showTooltip(e, title, desc) {
+      document.getElementById('tt-title').textContent = title;
+      document.getElementById('tt-desc').textContent = desc;
+      tooltip.style.display = 'block';
+      tooltip.style.left = e.pageX + 10 + 'px';
+      tooltip.style.top = e.pageY + 10 + 'px';
+    }
+
+    function hideTooltip() { tooltip.style.display = 'none'; }
+
+    function highlightNode(node, conns) {
+      document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight', 'dim'));
+      document.querySelectorAll('.connection').forEach(c => c.classList.remove('highlight', 'dim'));
+      node.classList.add('highlight');
+      conns.forEach(id => { const c = document.getElementById(id); if (c) c.classList.add('highlight'); });
+      document.querySelectorAll('.node').forEach(n => { if (!n.classList.contains('highlight')) n.classList.add('dim'); });
+      document.querySelectorAll('.connection').forEach(c => { if (!c.classList.contains('highlight')) c.classList.add('dim'); });
+    }
+
+    function openDrill(title, data) {
+      document.getElementById('drill-title').textContent = title;
+      document.getElementById('drill-content').innerHTML = data || '<p style=\"color:#94a3b8;font-size:0.75rem;\">No data</p>';
+      drillPanel.classList.add('open');
+    }
+
+    function closeDrill() { drillPanel.classList.remove('open'); }
+    window.closeDrill = closeDrill;
+
+    function clearSVG() { svg.innerHTML = ''; }
+
+    // ===== VIEWS =====
+    __VIEW_DEFINITIONS__
+
+    // ===== TAB HANDLING =====
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentView = tab.dataset.view;
+        subTabContainer.innerHTML = '';
+        svg.innerHTML = '';
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        svg.appendChild(g);
+        views[currentView](g, {});
+      });
+    });
+
+    document.addEventListener('click', e => {
+      if (!drillPanel.contains(e.target) && drillPanel.classList.contains('open')) closeDrill();
+    });
+
+    // Initialize stats
+    document.getElementById('stat-bridge').textContent = ANALYTICS_DATA.summary.bridgeFunctions;
+    document.getElementById('stat-es').textContent = ANALYTICS_DATA.summary.esModules;
+    document.getElementById('stat-exports').textContent = ANALYTICS_DATA.totalExports;
+    document.getElementById('stat-imports').textContent = ANALYTICS_DATA.totalImports;
+    document.getElementById('stat-health').textContent = ANALYTICS_DATA.healthScore + '%';
+
+    views.full();
+  };
+</script>

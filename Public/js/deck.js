@@ -17,6 +17,7 @@ export const setCropState = (state) => { cropState = state; };
 export const setIsCropInitialized = (initialized) => { isCropInitialized = initialized; };
 
 export function openDeckManager() {
+    if (typeof window.hideAllOverlays === 'function') window.hideAllOverlays();
     document.getElementById("deck-manager-overlay").classList.remove("hidden");
     // PILLAR 5: Explicit Scope Sync. Fetch full inventory since it's pruned from 'all'.
     window.syncUI("inventory");
@@ -26,7 +27,8 @@ export function closeDeckManager() {
     document.getElementById("deck-manager-overlay").classList.add("hidden");
 
     // TACTICAL SYNC: Report the highest possible deck rating to the Hall of Fame
-    const rating = calculateDeckRating(window.GetGameState().deck);
+    const gameState = window.GetGameState();
+    const rating = gameState && gameState.deck ? calculateDeckRating(gameState.deck) : "[Z]";
     if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
             type: "update_rating",
@@ -51,6 +53,8 @@ export function renderDeckManager(state) {
     const defEl = document.getElementById("total-def");
 
     if (!invGrid || !deckZone || !selector) return;
+    // PILLAR 5: Guard against uninitialized state (boot before WASM inventory/deck ready)
+    if (!state || !state.inventory || !state.deck) return;
 
     invGrid.innerHTML = "";
     deckZone.innerHTML = "";
@@ -82,7 +86,7 @@ export function renderDeckManager(state) {
         cardEl.className = "card-mini";
         cardEl.style.width = "100%";
         cardEl.style.height = "60px";
-        cardEl.innerHTML = `<span style="font-size: 10px;">${card.name}</span><button onclick="window.RemoveFromDeck(${idx}); window.syncUI('inventory');" style="float: right; padding: 2px 5px; font-size: 9px;">X</button>`;
+        cardEl.innerHTML = `<span style="font-size: 10px;">${card?.name}</span><button onclick="window.RemoveFromDeck(${idx}); window.syncUI('inventory');" style="float: right; padding: 2px 5px; font-size: 9px;">X</button>`;
         
         // Calculate Stats: Attack (Top + Right), Defense (Bottom + Left)
         totalAtk += (card.power[0] + card.power[1]);
@@ -136,14 +140,14 @@ export function renderAvatarGrid(nfts) {
 }
 
 export function applyAvatarFilters() {
-    const search = document.getElementById("avatar-search").value.toLowerCase();
-    const sort = document.getElementById("avatar-sort").value;
+    const search = document.getElementById("avatar-search")?.value.toLowerCase();
+    const sort = document.getElementById("avatar-sort")?.value;
     
     let filtered = userNFTs.filter(nft => {
         // Support filtering for both ServerCard objects and raw metadata
-        let name = nft.name || "";
+        let name = nft?.name || "";
         if (!name && nft.metadata) {
-            try { name = JSON.parse(nft.metadata).name || ""; } catch(e) {}
+            try { name = JSON.parse(nft.metadata)?.name || ""; } catch(e) {}
         }
         return name.toLowerCase().includes(search);
     });
@@ -241,7 +245,7 @@ export function setupCropEvents() {
 
     confirmBtn.onclick = () => {
         if (window.SetAvatar && currentAvatarUrl) {
-            const gloat = document.getElementById("gloat-message-input").value.trim();
+            const gloat = document.getElementById("gloat-message-input")?.value.trim();
             localStorage.setItem("vbabes_gloat_msg", gloat);
 
             const state = window.GetGameState();
@@ -295,8 +299,14 @@ export async function refreshInventory() {
         }
 
         renderAvatarGrid(cards);
-        console.log(`[DECK] Sync Complete. Discovered ${cards.length} tactical assets.`);
+        console.log(`[DECK] Sync Complete. Discovered ${cards?.length ?? 0} tactical assets.`);
     } catch (err) {
         console.error("[DECK] Sync Failed:", err);
     }
 }
+
+// The deck manager's Auto-Build button in index.html calls `renderDeckManager()` bare, and an inline
+// handler resolves that name on `window` — the function is a module export, so the call threw after
+// AutoBuildDeck had already run and the manager never refreshed with the new deck.
+window.renderDeckManager = renderDeckManager;
+

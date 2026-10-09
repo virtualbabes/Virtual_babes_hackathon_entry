@@ -102,6 +102,14 @@ How documentation supports development.
 
 ---
 
+## 9. app-entry-mandate.md
+
+Defines the frontend composition contract.
+
+Single entry point. Single navigation surface. Read-only profile. Protected systems.
+
+---
+
 # Constitutional Principle
 
 These documents collectively define the operating constitution of NFT-Seduction.

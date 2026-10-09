@@ -1,0 +1,118 @@
+/* === Card Titles */
+.titles-container { padding: 8px 0; }
+
+.titles-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(233, 30, 99, 0.1), rgba(156, 39, 176, 0.05));
+    border: 1px solid rgba(233, 30, 99, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.titles-icon { font-size: 32px; }
+
+.titles-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.titles-section h4 { margin: 0 0 12px; }
+
+.titles-player {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.titles-equipped {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 2px solid;
+    border-radius: 8px;
+}
+
+.titles-equipped.rarity-common { border-color: #a19d94; }
+.titles-equipped.rarity-rare { border-color: #3b82f6; }
+.titles-equipped.rarity-epic { border-color: #a855f7; }
+.titles-equipped.rarity-legendary { border-color: #ffc107; }
+
+.titles-equipped-icon { font-size: 24px; }
+
+.titles-equipped-info { flex: 1; }
+
+.titles-equipped-name { display: block; font-size: 12px; font-weight: 700; color: #e5e7eb; }
+
+.titles-equipped-perk { display: block; font-size: 10px; color: #4caf50; }
+
+.titles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.titles-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.titles-card:hover { transform: translateY(-2px); }
+
+.titles-card.rarity-common { border-color: rgba(161, 157, 148, 0.3); }
+.titles-card.rarity-rare { border-color: rgba(59, 130, 246, 0.3); }
+.titles-card.rarity-epic { border-color: rgba(168, 85, 247, 0.3); }
+.titles-card.rarity-legendary { border-color: rgba(255, 193, 7, 0.3); }
+
+.titles-card.equipped {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0;
+}
+
+.titles-card.locked { opacity: 0.4; }
+
+.titles-card-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+.titles-card-name { display: block; font-size: 11px; font-weight: 700; color: #e5e7eb; }
+
+.titles-card-desc { display: block; font-size: 9px; color: #90a4ae; margin-top: 2px; }
+
+.titles-card-perk { display: block; font-size: 9px; color: #4caf50; margin-top: 4px; }
+
+.titles-card-progress { display: block; font-size: 9px; color: #ffc107; margin-top: 4px; }
+
+.titles-card .titles-equip-btn { width: 100%; margin-top: 8px; font-size: 9px; padding: 4px; }
+
+.titles-card-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.titles-slot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.titles-slot-card { font-size: 11px; font-weight: 700; color: #e5e7eb; min-width: 60px; }
+
+.titles-slot-title { font-size: 10px; color: #9c27b0; flex: 1; }
+
+.titles-slot-title.empty { color: #90a4ae; }
+
+.titles-slot-perk { font-size: 9px; color: #4caf50; }

@@ -1,0 +1,301 @@
+// ============================================================================
+// Faucet Dashboard — Dynamic scaling + anti-whale AMM visualizer
+// Neon-glass panel, gold health bar, crimson warnings, SVG bonding curve
+// ============================================================================
+
+.faucet-panel {
+    max-width: 700px;
+    max-height: 85vh;
+    overflow-y: auto;
+
+    h2 { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+    h3 { color: #FF6B35; font-size: 16px; margin: 12px 0 8px; }
+}
+
+.faucet-section {
+    margin-bottom: 20px;
+    padding: 12px;
+    border: 1px solid rgba(255, 107, 53, 0.2);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+// === FAUCET HEALTH BAR ===
+.faucet-health-bar-container {
+    position: relative;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.faucet-health-bar {
+    height: 100%;
+    border-radius: 16px;
+    transition: width 0.6s ease-out, background 0.3s;
+
+    &.healthy {
+        background: linear-gradient(90deg, #10b981, #34d399);
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+    }
+
+    &.warning {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+    }
+
+    &.critical {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+        animation: pulse-critical 1.5s infinite;
+    }
+}
+
+@keyframes pulse-critical {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.faucet-health-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-weight: bold;
+    font-size: 14px;
+    color: #fff;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.faucet-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.faucet-metric {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+
+    .faucet-metric-label {
+        display: block;
+        font-size: 11px;
+        color: #90a4ae;
+    }
+
+    .faucet-metric-value {
+        display: block;
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+    }
+}
+
+// === DYNAMIC SCALING ===
+.scaling-display {
+    text-align: center;
+    padding: 12px;
+}
+
+.scaling-ratio {
+    font-size: 48px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+
+    &.healthy { color: #10b981; text-shadow: 0 0 16px rgba(16, 185, 129, 0.6); }
+    &.warning { color: #f59e0b; text-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
+    &.critical { color: #ef4444; text-shadow: 0 0 16px rgba(239, 68, 68, 0.6); animation: pulse-critical 1.5s infinite; }
+}
+
+.scaling-label {
+    font-size: 12px;
+    color: #90a4ae;
+    margin-top: 4px;
+}
+
+.scaling-warning {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: #f87171;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+// === DRAIN SIMULATOR ===
+.drain-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.drain-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+    outline: none;
+
+    &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #FF6B35;
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(255, 107, 53, 0.5);
+    }
+}
+
+.drain-amount {
+    font-weight: bold;
+    font-size: 14px;
+    color: #FF6B35;
+    min-width: 70px;
+    text-align: right;
+}
+
+.drain-result {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    font-size: 13px;
+
+    strong { color: #FF6B35; }
+}
+
+// === AMM CHART ===
+.amm-entity-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+
+    label { font-size: 12px; color: #90a4ae; }
+}
+
+.glass-select {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 107, 53, 0.3);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 13px;
+}
+
+.amm-chart {
+    width: 100%;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 107, 53, 0.2);
+}
+
+.amm-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.amm-metric {
+    text-align: center;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+
+    .amm-metric-label {
+        display: block;
+        font-size: 10px;
+        color: #90a4ae;
+    }
+
+    .amm-metric-value {
+        display: block;
+        font-size: 13px;
+        font-weight: bold;
+        color: #fff;
+    }
+}
+
+.amm-cap-warning {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: #f87171;
+    font-size: 12px;
+    text-align: center;
+}
+
+// === REWARD STACK ===
+.reward-stack {
+    margin-top: 8px;
+}
+
+.reward-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    font-size: 13px;
+
+    .reward-asset { flex: 1; color: #90a4ae; }
+    .reward-initial { color: #f87777; text-decoration: line-through; font-size: 12px; }
+    .reward-arrow { color: #FF6B35; }
+    .reward-scaled { color: #34d399; font-weight: bold; }
+}
+
+// === MARKET WEATHER ===
+.weather-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.weather-tile {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid;
+    text-align: center;
+
+    &.calm { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+    &.breezy { border-color: #34d399; background: rgba(52, 211, 153, 0.1); }
+    &.stormy { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); }
+    &.blighted { border-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+
+    .weather-region {
+        font-weight: bold;
+        font-size: 14px;
+        color: #fff;
+    }
+
+    .weather-climate {
+        font-size: 12px;
+        color: #90a4ae;
+    }
+
+    .weather-tier {
+        font-size: 11px;
+        color: #f59e0b;
+        margin-top: 4px;
+    }
+}
+
+// === UTILITY ===
+.hidden { display: none !important; }

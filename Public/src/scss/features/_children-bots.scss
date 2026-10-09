@@ -1,0 +1,166 @@
+// ============================================================================
+// Children Bots — Bot cards, skill trees, action queues
+// ============================================================================
+
+/* Tabs */
+.cb-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    background: rgba(var(--theme-accent-rgb), 0.05);
+}
+
+.cb-tab {
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: #90a4ae;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.6;
+    &:hover { opacity: 0.85; border-color: rgba(var(--theme-accent-rgb), 0.3); }
+    &.active {
+        background: rgba(var(--theme-accent-rgb), 0.15);
+        border-color: var(--theme-accent);
+        color: #e0e0e0;
+        opacity: 1;
+        text-shadow: 0 0 8px rgba(var(--theme-accent-rgb), 0.6);
+    }
+}
+
+.cb-panel { padding: 16px; &.hidden { display: none; } }
+
+/* Bot grid */
+.cb-bot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.cb-bot-card {
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    &:hover {
+        transform: translateZ(8px) translateY(-2px);
+        border-color: var(--theme-accent);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px var(--theme-accent-glow);
+    }
+}
+
+.cb-bot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.cb-bot-name { font-size: 14px; font-weight: 700; color: #e0e0e0; }
+.cb-bot-status { font-size: 16px; }
+.cb-bot-level { font-size: 12px; color: #90a4ae; margin-bottom: 2px; }
+.cb-bot-skills { font-size: 11px; color: var(--theme-accent); margin-bottom: 8px; }
+
+.cb-bot-quick-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    color: #90a4ae;
+}
+
+/* Skill tree */
+.cb-skill-tree {
+    position: relative;
+    min-height: 400px;
+    padding: 20px;
+}
+
+.cb-tree-lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.cb-skill-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 2px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 6px;
+    min-width: 100px;
+    transition: all 0.2s ease;
+    &.learned { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+    &.available { border-color: var(--theme-accent); background: rgba(var(--theme-accent-rgb), 0.05); }
+    &.locked { border-color: rgba(100, 100, 120, 0.3); opacity: 0.5; }
+}
+
+.cb-skill-name { font-size: 11px; color: #e0e0e0; font-weight: 600; text-align: center; }
+.cb-train-btn { padding: 4px 8px; font-size: 10px; }
+.cb-learned-badge { font-size: 14px; color: #10b981; }
+.cb-locked-badge { font-size: 12px; }
+
+/* Action queue */
+.cb-queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cb-queue-item {
+    padding: 12px;
+    background: rgba(var(--theme-accent-rgb), 0.05);
+    border: 1px solid rgba(var(--theme-accent-rgb), 0.2);
+    border-radius: 8px;
+    &.queued { opacity: 0.6; }
+}
+
+.cb-queue-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.cb-queue-name { font-size: 13px; font-weight: 600; color: #e0e0e0; }
+.cb-queue-bot { font-size: 11px; color: #90a4ae; }
+
+.cb-queue-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cb-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(var(--theme-accent-rgb), 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.cb-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--theme-accent), #3fb950);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.cb-progress-text { font-size: 11px; color: #90a4ae; min-width: 35px; }
+
+.cb-queue-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cb-time-remaining { font-size: 11px; color: #f59e0b; }
+.cb-cancel-btn { padding: 4px 10px; font-size: 11px; }

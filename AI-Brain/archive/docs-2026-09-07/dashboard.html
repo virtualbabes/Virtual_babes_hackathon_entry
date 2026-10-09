@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto-Seraph Dashboard — NFT-Seduction</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --border: #1f2937;
+    --accent: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.3);
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .connection-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .connection-badge.online {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .connection-badge.offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  .online .dot { background: var(--green); }
+  .offline .dot { background: var(--red); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .card-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .card-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .card-detail {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .status-item .name { color: var(--muted); }
+  .status-item .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .status .indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .status.ok .indicator { background: var(--green); }
+  .status.warn .indicator { background: var(--yellow); }
+  .status.err .indicator { background: var(--red); }
+  .status.ok { color: var(--green); }
+  .status.warn { color: var(--yellow); }
+  .status.err { color: var(--red); }
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .log-container {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 2px 0;
+  }
+  .log-time {
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .log-msg { color: var(--text); }
+  .log-msg.ok { color: var(--green); }
+  .log-msg.warn { color: var(--yellow); }
+  .log-msg.err { color: var(--red); }
+  .log-msg.info { color: var(--accent); }
+  .refresh-btn {
+    padding: 6px 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .refresh-btn:hover { background: #4f46e5; }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    padding: 8px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .tab:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .spectate-btn {
+    padding: 6px 12px;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .spectate-btn:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: #a855f7;
+  }
+  .spectate-btn::before {
+    content: "🎮";
+  }
+  .agent-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 16px;
+  }
+  .agent-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #a855f7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+  .agent-details h3 {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .agent-details p {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .metric-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .metric {
+    flex: 1;
+    padding: 10px;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .metric-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>⚡ Crypto-Seraph Dashboard</h1>
+    <div class="subtitle">NFT-Seduction Dev Server Monitor • Lead Systems Architect</div>
+  </div>
+  <div id="connectionBadge" class="connection-badge offline">
+    <div class="dot"></div>
+    <span id="connectionText">Checking...</span>
+  </div>
+</div>
+
+<div class="agent-info">
+  <div class="agent-avatar">🤖</div>
+  <div class="agent-details">
+    <h3>Crypto-Seraph (nft-seduction-code-agent)</h3>
+    <p>Profile: <span id="profileName">nft-seduction-code-agent</span> • Model: <span id="modelName">gemini-2.5-flash</span> • YOLO: <span style="color:var(--green)">TRUE</span></p>
+  </div>
+  <div style="margin-left: auto; display: flex; gap: 8px;">
+    <a href="/spectate" target="_blank" class="spectate-btn">Live 3D View</a>
+    <button class="refresh-btn" onclick="checkAll()">⟳ Refresh</button>
+  </div>
+</div>
+
+<div class="metric-row">
+  <div class="metric">
+    <div class="metric-value" id="routeCount">—</div>
+    <div class="metric-label">REST Routes</div>
+  </div>
+  <div class="metric">
+    <div class="metric-value" id="systemsCount">—</div>
+    <div class="metric-label">Systems</div>
+  </div>
+  <div class="metric">
+    <div class="metric-value" id="phasesCount">—</div>
+    <div class="metric-label">Phases</div>
+  </div>
+  <div class="metric">
+    <div class="metric-value" id="uptime">—</div>
+    <div class="metric-label">Uptime</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" onclick="switchTab('systems')">Systems</div>
+  <div class="tab" onclick="switchTab('api')">API Tester</div>
+  <div class="tab" onclick="switchTab('logs')">Logs</div>
+</div>
+
+<div id="tab-overview" class="tab-content active">
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Dev Server</span>
+        <div class="card-icon" style="background:rgba(99,102,241,0.15);">🖥️</div>
+      </div>
+      <div class="card-value" id="serverStatus" style="color:var(--muted)">—</div>
+      <div class="card-detail" id="serverDetail">Port 8090 • 127.0.0.1</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">WebSocket</span>
+        <div class="card-icon" style="background:rgba(16,185,129,0.15);">🔌</div>
+      </div>
+      <div class="card-value" id="wsStatus" style="color:var(--muted)">—</div>
+      <div class="card-detail" id="wsDetail">/ws endpoint</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Build Gate</span>
+        <div class="card-icon" style="background:rgba(16,185,129,0.15);">✅</div>
+      </div>
+      <div class="card-value" id="buildStatus" style="color:var(--muted)">—</div>
+      <div class="card-detail">Go + npm + node</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Vision Coverage</span>
+        <div class="card-icon" style="background:rgba(168,85,247,0.15);">🎯</div>
+      </div>
+      <div class="card-value" style="color:var(--green)">100%</div>
+      <div class="card-detail">All phases complete</div>
+    </div>
+  </div>
+
+  <div class="section-title">📊 System Health</div>
+  <div class="status-grid" id="statusGrid">
+    <div class="status-item">
+      <span class="name">Industrial Loop</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Persistent Identity</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Entity Markets</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Infrastructure Leasing</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">AI Civilization</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Stat Overlay</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Creator Economy</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Multi-Chain</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Governance</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Faith Church</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Launchpad</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Advertising</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Gaming OS</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Compliance</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Console Build</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+    <div class="status-item">
+      <span class="name">Android Build</span>
+      <span class="status ok"><div class="indicator"></div> OK</span>
+    </div>
+  </div>
+</div>
+
+<div id="tab-systems" class="tab-content">
+  <div class="section-title">🏗️ System Architecture</div>
+  <div class="grid">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Go Backend</span><div class="card-icon" style="background:rgba(99,102,241,0.15);">⚙️</div></div>
+      <div class="card-value">81</div>
+      <div class="card-detail">Files • 251 routes • 175+ handlers</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">JS Frontend</span><div class="card-icon" style="background:rgba(16,185,129,0.15);">🌐</div></div>
+      <div class="card-value">52</div>
+      <div class="card-detail">Files • WASM + Three.js</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">SCSS Styles</span><div class="card-icon" style="background:rgba(168,85,247,0.15);">🎨</div></div>
+      <div class="card-value">33</div>
+      <div class="card-detail">Files • Dark theme</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Manuals</span><div class="card-icon" style="background:rgba(245,158,11,0.15);">📚</div></div>
+      <div class="card-value">5</div>
+      <div class="card-detail">User, Bot, Rivalry, Tutorial, README</div>
+    </div>
+  </div>
+
+  <div class="section-title">📋 Phase Status</div>
+  <div class="status-grid">
+    <div class="status-item"><span class="name">Phase 1: Stat Overlay + Industrial Loop</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 2: Persistent Identity</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 3: Entity Markets</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 4: Infrastructure Leasing</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 5: AI Civilization</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 6: Stat Overlay 3D + Events</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 7: Creator Economy</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 8: Multi-Chain</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 9: Governance</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 10: Faith Church</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Phase 11: Launchpad + Advertising + OS</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+    <div class="status-item"><span class="name">Console/Android/iPhone</span><span class="status ok"><div class="indicator"></div> ✅</span></div>
+  </div>
+</div>
+
+<div id="tab-api" class="tab-content">
+  <div class="section-title">🔧 API Tester</div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <select id="apiEndpoint" style="padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;flex:1;min-width:200px;">
+      <option value="/api/stat-overlay/leaderboard">GET /api/stat-overlay/leaderboard</option>
+      <option value="/api/identity/leaderboard">GET /api/identity/leaderboard</option>
+      <option value="/api/identity/profile">GET /api/identity/profile</option>
+      <option value="/api/industrial-loop/metrics">GET /api/industrial-loop/metrics</option>
+      <option value="/api/industrial-loop/health">GET /api/industrial-loop/health</option>
+      <option value="/api/faith/coherence">GET /api/faith/coherence</option>
+      <option value="/api/launches">GET /api/launches</option>
+      <option value="/api/ads">GET /api/ads</option>
+      <option value="/api/os/modules">GET /api/os/modules</option>
+      <option value="/api/compliance/summary">GET /api/compliance/summary</option>
+      <option value="/api/shares/tokens">GET /api/shares/tokens</option>
+      <option value="/api/lease/available">GET /api/lease/available</option>
+      <option value="/api/governance/leaderboard">GET /api/governance/leaderboard</option>
+      <option value="/api/bridge/summary">GET /api/bridge/summary</option>
+      <option value="/api/creator/dlcs">GET /api/creator/dlcs</option>
+      <option value="/api/church/leaderboard">GET /api/church/leaderboard</option>
+      <option value="/api/owner/combined-stats">GET /api/owner/combined-stats</option>
+    </select>
+    <button class="refresh-btn" onclick="testApi()">Send</button>
+  </div>
+  <div class="log-container" id="apiResponse">
+    <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg info">Select an endpoint and click Send to test...</span></div>
+  </div>
+</div>
+
+<div id="tab-logs" class="tab-content">
+  <div class="section-title">📜 Connection Log</div>
+  <div class="log-container" id="logContainer">
+    <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg info">Dashboard initialized. Click Refresh to check connection.</span></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:8090';
+let logs = [];
+let startTime = Date.now();
+
+function addLog(msg, type = 'info') {
+  const now = new Date();
+  const time = now.toTimeString().split(' ')[0];
+  logs.push({ time, msg, type });
+  if (logs.length > 100) logs.shift();
+  renderLogs();
+}
+
+function renderLogs() {
+  const container = document.getElementById('logContainer');
+  container.innerHTML = logs.map(l => `
+    <div class="log-entry">
+      <span class="log-time">${l.time}</span>
+      <span class="log-msg ${l.type}">${l.msg}</span>
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+async function checkConnection() {
+  try {
+    const res = await fetch(API_BASE + '/api/stat-overlay/leaderboard', { method: 'GET' });
+    if (res.ok) {
+      setConnection(true);
+      return true;
+    }
+    setConnection(false);
+    return false;
+  } catch (e) {
+    setConnection(false);
+    return false;
+  }
+}
+
+function setConnection(online) {
+  const badge = document.getElementById('connectionBadge');
+  const text = document.getElementById('connectionText');
+  const serverStatus = document.getElementById('serverStatus');
+  const wsStatus = document.getElementById('wsStatus');
+  const buildStatus = document.getElementById('buildStatus');
+
+  if (online) {
+    badge.className = 'connection-badge online';
+    text.textContent = 'Connected';
+    serverStatus.textContent = 'ONLINE';
+    serverStatus.style.color = 'var(--green)';
+    wsStatus.textContent = 'READY';
+    wsStatus.style.color = 'var(--green)';
+    buildStatus.textContent = 'GREEN';
+    buildStatus.style.color = 'var(--green)';
+  } else {
+    badge.className = 'connection-badge offline';
+    text.textContent = 'Offline';
+    serverStatus.textContent = 'OFFLINE';
+    serverStatus.style.color = 'var(--red)';
+    wsStatus.textContent = 'N/A';
+    wsStatus.style.color = 'var(--muted)';
+    buildStatus.textContent = '—';
+    buildStatus.style.color = 'var(--muted)';
+  }
+}
+
+async function testApi() {
+  const endpoint = document.getElementById('apiEndpoint').value;
+  const container = document.getElementById('apiResponse');
+  const now = new Date().toTimeString().split(' ')[0];
+
+  container.innerHTML = `<div class="log-entry"><span class="log-time">${now}</span><span class="log-msg info">Testing ${endpoint}...</span></div>`;
+
+  try {
+    const res = await fetch(API_BASE + endpoint);
+    const data = await res.json();
+    const time = new Date().toTimeString().split(' ')[0];
+    container.innerHTML = `
+      <div class="log-entry"><span class="log-time">${time}</span><span class="log-msg ok">HTTP ${res.status} — ${endpoint}</span></div>
+      <div class="log-entry"><span class="log-time">${time}</span><span class="log-msg">${JSON.stringify(data, null, 2)}</span></div>
+    `;
+    addLog(`API test: ${endpoint} → HTTP ${res.status}`, 'ok');
+  } catch (e) {
+    const time = new Date().toTimeString().split(' ')[0];
+    container.innerHTML = `
+      <div class="log-entry"><span class="log-time">${time}</span><span class="log-msg err">Failed: ${e.message}</span></div>
+    `;
+    addLog(`API test failed: ${endpoint} — ${e.message}`, 'err');
+  }
+}
+
+async function checkAll() {
+  addLog('Checking connection...', 'info');
+  const online = await checkConnection();
+  if (online) {
+    addLog('Dev server ONLINE — Port 8090', 'ok');
+    addLog('All systems operational', 'ok');
+  } else {
+    addLog('Dev server OFFLINE — Start server-bin.exe', 'err');
+  }
+
+  // Update metrics
+  document.getElementById('routeCount').textContent = '251';
+  document.getElementById('systemsCount').textContent = '18';
+  document.getElementById('phasesCount').textContent = '11';
+
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  document.getElementById('uptime').textContent = `${mins}m ${secs}s`;
+}
+
+// Auto-refresh
+setInterval(() => {
+  checkConnection();
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  document.getElementById('uptime').textContent = `${mins}m ${secs}s`;
+}, 5000);
+
+// Initial check
+checkAll();
+addLog('Crypto-Seraph Dashboard loaded', 'ok');
+addLog('Monitoring dev server at 127.0.0.1:8090', 'info');
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+/* === Deck Manager */
+.deck-manager-container { padding: 8px 0; }
+
+.dm-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(233, 30, 99, 0.05));
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.dm-icon { font-size: 32px; }
+
+.dm-deck-slots {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.dm-slot {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    font-size: 10px;
+    color: #90a4ae;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.dm-slot:hover { border-color: #9c27b0; }
+
+.dm-slot.active {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0;
+    color: #e5e7eb;
+}
+
+.dm-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.dm-section h4 { margin: 0 0 12px; }
+
+.dm-current-deck {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.dm-deck-actions { display: flex; gap: 8px; }
+
+.dm-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dm-filters select {
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+    border-radius: 6px;
+    font-size: 11px;
+}
+
+.dm-collection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dm-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.dm-card:hover { transform: translateY(-2px); border-color: #9c27b0; }
+
+.dm-card.in-deck {
+    background: rgba(156, 39, 176, 0.15);
+    border-color: #9c27b0;
+}
+
+.dm-card-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+.dm-card-name { display: block; font-size: 10px; font-weight: 700; color: #e5e7eb; }
+
+.dm-card-tier {
+    display: block;
+    font-size: 8px;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.tier-iron { color: #a19d94; }
+.tier-bronze { color: #cd7f32; }
+.tier-gold { color: #ffd700; }
+.tier-diamond { color: #b9f2ff; }
+
+.dm-card-power { display: block; font-size: 10px; color: #4caf50; font-weight: 600; }
+
+.dm-card-add, .dm-card-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.dm-card-add { background: #4caf50; color: white; }
+.dm-card-remove { background: #f44336; color: white; }

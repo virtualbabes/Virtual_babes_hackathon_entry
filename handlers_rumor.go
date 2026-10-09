@@ -1,4 +1,4 @@
-//go:build !js || !wasm
+//go:build !js && !wasm
 
 package main
 
@@ -35,9 +35,29 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 		return
 	}
 
-	// Cost to spread a rumor: 500 $VBV (in micro-units)
-	const rumorCost = 500 * 1000000
-	if l.playerBalances[spreaderWallet] < rumorCost {
+	l.ensurePlayerStatsMapsInitialized(spreaderWallet)
+	spreaderStats := l.leaderboard[spreaderWallet]
+
+	// PILLAR 3: Career Path influence. 'Gossips' receive tiered discount on manipulation fees.
+	// Tier 3+ (Journeyman+) = 20% discount, lower tiers = no discount.
+	// Base cost: 500 $VBV.
+	const standardRumorCost = 500 * 1000000
+	rumorCost := standardRumorCost
+
+	if spreaderStats.JobRole == "Gossip" && spreaderStats.CareerXP != nil {
+		discount := spreaderStats.CareerXP.GetRumorFeeDiscount()
+		rumorCost = int(float64(standardRumorCost) * discount)
+
+		// PILLAR 13: Task 4201-1C — Add visible buff tag when Gossip ≥ Tier 3 (discount active)
+		if discount < 1.0 {
+			if spreaderStats.ActiveBuffs == nil {
+				spreaderStats.ActiveBuffs = make(map[string]string)
+			}
+			spreaderStats.ActiveBuffs["Gossip_Discount"] = "active"
+		}
+	}
+
+	if l.playerBalances[spreaderWallet] < uint64(rumorCost) {
 		l.sendToClientLocked(env.FromID, Envelope{Type: "admin_notification", Payload: json.RawMessage(`{"text":"❌ Rumor Failed: Insufficient $VBV to spread rumors."}`)})
 		return
 	}
@@ -60,7 +80,7 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 	}
 
 	// INDUSTRIAL LOOP: Fee Redistribution & Spreader Standing
-	l.playerBalances[spreaderWallet] -= rumorCost
+	l.playerBalances[spreaderWallet] -= uint64(rumorCost)
 
 	feeBase := float64(rumorCost) / 1000000.0
 	var governors []*Club
@@ -86,10 +106,102 @@ func (l *Lobby) handleSpreadRumor(env *Envelope) {
 
 	l.applyDynamicScalingLocked()
 
-	l.ensurePlayerStatsMapsInitialized(spreaderWallet)
-	spreaderStats := l.leaderboard[spreaderWallet]
-	spreaderStats.RumorCount++
 	spreaderStats.Reputation = l.CalculateReputation(spreaderStats)
+
+	// PILLAR 3: Underworld Contract Completion (CONTRACT-006).
+	// Objective: Successfully spread a Negative Rumor about a Regional Governor.
+	if spreaderStats.ActiveUnderworldContractID == "CONTRACT-006" && data.Type == "negative" {
+		// Check if the target is a Regional Governor (Owner of a club with 2+ districts)
+		isGov := false
+		for _, club := range l.clubs {
+			if strings.EqualFold(club.OwnerWallet, targetWallet) && l.clubService.IsClubRegionalLocked(l, club) {
+				isGov = true
+				break
+			}
+		}
+
+		if isGov {
+			const rewardMicro = 1500 * 1000000
+			l.playerBalances[spreaderWallet] += rewardMicro
+			spreaderStats.ActiveUnderworldContractID = ""
+			l.logAdminAuditLocked("CONTRACT_COMPLETED", spreaderWallet, "ID: CONTRACT-006, Payout: 1500.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>CONTRACT COMPLETED:</b> Regional Governor defamed. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 3: Justice Mission Completion (MISSION-006).
+	// Objective: Successfully spread a Positive Rumor about a Justice-aligned player.
+	if spreaderStats.ActiveJusticeMissionID == "MISSION-006" && data.Type == "positive" {
+		// Check if the target is a Justice-aligned player
+		targetStats, exists := l.leaderboard[targetWallet]
+		if exists && l.playerService.GetHegemonyPath(targetStats.JobRole) == "JUSTICE" {
+			const rewardMicro = 1500 * 1000000
+			l.playerBalances[spreaderWallet] += rewardMicro
+			spreaderStats.ActiveJusticeMissionID = ""
+			l.logAdminAuditLocked("JUSTICE_MISSION_COMPLETED", spreaderWallet, "ID: MISSION-006, Payout: 1500.00")
+			l.sendToClientLocked(env.FromID, Envelope{
+				Type:    "admin_notification",
+				Payload: json.RawMessage(fmt.Sprintf(`{"text":"💰 <b>MISSION COMPLETED:</b> Justice reputation amplified. Payout: %.2f $VBV."}`, float64(rewardMicro)/1000000.0)),
+			})
+			l.applyDynamicScalingLocked()
+		}
+	}
+
+	// PILLAR 13: Underworld Career #1 — Gossip (Rumor Manipulator).
+	// XP tracking: rumors amplify reputation manipulation; +50 XP per successful rumor.
+	// Phase 4: Scale XP by loyalty/fame multipliers from career state (Task 4301).
+	baseGossipXP := uint64(50)
+	// BOTH bonuses are INTEGER permille. They were floats — `math.Min(0.50, lessons/200.0)` and
+	// `math.Min(0.60, standingTier*0.10)` — composed with a further float into the award, which the
+	// Architecture Ledger prohibits for career XP.
+	loyaltyPermille := 0
+	if spreaderStats.CareerXP != nil {
+		lessonsCompleted := int(0)
+		for _, tier := range spreaderStats.CareerXP.Tiers {
+			lessonsCompleted += tier.LessonsCompleted
+		}
+		// Loyalty: +5 permille per lesson (+5% per 10 lessons), cap at +500 permille (+50%)
+		if lessonsCompleted > 0 {
+			loyaltyPermille = lessonsCompleted * 5
+			if loyaltyPermille > 500 {
+				loyaltyPermille = 500
+			}
+		}
+		// Fame: +100 permille per standing tier (+10%), cap at +600 permille (+60%)
+		famePermille := 0
+		for _, tier := range spreaderStats.CareerXP.Tiers {
+			if tier.LessonsCompleted > 0 && tier.StandingTier > 0 {
+				tierFame := tier.StandingTier * 100
+				if tierFame > famePermille {
+					famePermille = tierFame
+				}
+			}
+		}
+		if famePermille > 600 {
+			famePermille = 600
+		}
+
+		// $VBV-gated multiplier: scale XP by the player's sustained liquidity tier (PILLAR 13), in
+		// INTEGER permille — `GetVBVGatingMultiplier` is the display wrapper over this same gate.
+		vbvPermille := spreaderStats.CareerXP.GetVBVGatingPermille()
+		scaledXP := spreaderStats.CareerXP.ComputeXPWithBonusesPermille(baseGossipXP, loyaltyPermille, famePermille)
+		scaledXP = scaledXP * vbvPermille / 1000
+
+		l.logAdminAuditLocked("CAREER_GOSSIP_XP", spreaderWallet, fmt.Sprintf("+%d XP (base: %d, loyalty: +%d‰, fame: +%d‰, $VBV-gate: ×%d‰)", scaledXP, baseGossipXP, loyaltyPermille, famePermille, vbvPermille))
+		l.trackCareerXPLocked(spreaderWallet, "Gossip", scaledXP)
+
+		if vbvPermille > 1000 {
+			l.logAdminAuditLocked("CAREER_GOSSIP_VBV_GATE", spreaderWallet, fmt.Sprintf("$VBV-gate active: ×%d‰ (AvgSustainedMicro: %d μVBV)", vbvPermille, spreaderStats.CareerXP.AvgSustainedMicro))
+		}
+	} else {
+		l.logAdminAuditLocked("CAREER_GOSSIP_XP_NO_CAREER", spreaderWallet, fmt.Sprintf("+%d XP (no career state)", baseGossipXP))
+		l.trackCareerXPLocked(spreaderWallet, "Gossip", baseGossipXP)
+	}
+
 	l.leaderboard[spreaderWallet] = spreaderStats
 
 	// Refresh target Standing to reflect market volatility

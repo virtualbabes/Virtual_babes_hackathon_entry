@@ -46,6 +46,13 @@ export function triggerMoodMote(gridIndex, mood) {
             life: 0.8, decay: Math.random() * 0.05 + 0.02,
         });
     }
+
+    // PILLAR 5: Visual Hardening.
+    // Ensure particle count stays within bounds during high-frequency catch-up events.
+    if (particles?.length ?? 0 > MAX_PARTICLES) {
+        particles = particles.slice(-MAX_PARTICLES);
+    }
+
     startAnimationLoop();
 }
 
@@ -74,7 +81,7 @@ export function triggerCloakFailureParticles() {
         });
     }
     
-    if (particles.length > MAX_PARTICLES) {
+    if (particles?.length ?? 0 > MAX_PARTICLES) {
         particles = particles.slice(-MAX_PARTICLES);
     }
     
@@ -162,7 +169,7 @@ export function triggerMutationSuccessParticles() {
         });
     }
 
-    if (particles.length > MAX_PARTICLES) particles = particles.slice(-MAX_PARTICLES);
+    if (particles?.length ?? 0 > MAX_PARTICLES) particles = particles.slice(-MAX_PARTICLES);
     startAnimationLoop();
 }
 
@@ -215,7 +222,7 @@ export function triggerCloakDisruptorParticles() {
         });
     }
     
-    if (particles.length > MAX_PARTICLES) {
+    if (particles?.length ?? 0 > MAX_PARTICLES) {
         particles = particles.slice(-MAX_PARTICLES);
     }
     
@@ -226,8 +233,10 @@ export function initParticleSystem() {
     const canvas = document.getElementById("particle-canvas");
     if (!canvas) return;
     const resize = () => {
-        canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = canvas.parentElement.clientHeight;
+        const parent = canvas.parentElement;
+        if (!parent) return; // canvas detached from DOM (overlay torn down) — skip silently
+        canvas.width = parent.clientWidth;
+        canvas.height = parent.clientHeight;
     };
     window.addEventListener('resize', resize);
     resize();
@@ -240,7 +249,7 @@ export function animateParticles() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let i = particles.length - 1; i >= 0; i--) {
+    for (let i = (particles?.length ?? 0) - 1; i >= 0; i--) {
         const p = particles[i];
         
         // PILLAR 5: Visual Hardening. Capture previous state for lightning streaks.
@@ -381,7 +390,7 @@ export function animateParticles() {
         }
     }
 
-    if (particles.length > 0) {
+    if (particles?.length ?? 0 > 0) {
         requestAnimationFrame(animateParticles);
     } else {
         isAnimating = false;
@@ -398,8 +407,43 @@ export function triggerFoundryFusion(type) {
 export function triggerCaptureParticles(idx, owner) {
     startAnimationLoop();
 }
+window.triggerCaptureParticles = triggerCaptureParticles;
 
 export function triggerGlobalKidnapEffect() {
+    startAnimationLoop();
+}
+
+/**
+ * triggerContractCompleteEffect generates a high-intensity emerald and gold flourish.
+ * PILLAR 3: Underworld mission success feedback.
+ */
+export function triggerContractCompleteEffect() {
+    const canvas = document.getElementById("particle-canvas");
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    // Generate 100 high-velocity emerald and gold geometric particles
+    for (let i = 0; i < 100; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 15 + 5;
+        particles.push({
+            x: rect.width / 2,
+            y: rect.height / 2,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: Math.random() * 5 + 2,
+            color: Math.random() > 0.4 ? "#50c878" : "#ffd700", // Emerald or Gold
+            life: 1.2,
+            decay: Math.random() * 0.02 + 0.01,
+            isGeometric: true,
+            sides: Math.random() > 0.5 ? 4 : 6, // Diamonds and Hexagons
+            rotation: Math.random() * Math.PI * 2,
+            spin: (Math.random() - 0.5) * 0.3,
+            glitch: Math.random() > 0.8
+        });
+    }
+
+    if (particles?.length ?? 0 > MAX_PARTICLES) particles = particles.slice(-MAX_PARTICLES);
     startAnimationLoop();
 }
 
@@ -440,7 +484,7 @@ export function triggerMutationScarEffect() {
         });
     }
 
-    if (particles.length > MAX_PARTICLES) {
+    if (particles?.length ?? 0 > MAX_PARTICLES) {
         particles = particles.slice(-MAX_PARTICLES);
     }
 
@@ -450,6 +494,7 @@ export function triggerMutationScarEffect() {
 window.triggerCloakFailureParticles = triggerCloakFailureParticles;
 window.triggerCloakDisruptorParticles = triggerCloakDisruptorParticles;
 window.triggerDistrictStabilizerEffect = triggerDistrictStabilizerEffect;
+window.triggerContractCompleteEffect = triggerContractCompleteEffect;
 window.triggerStaffTrainingEffect = triggerStaffTrainingEffect;
 window.triggerMutationInsuranceEffect = triggerMutationInsuranceEffect;
 window.triggerMutationSuccessParticles = triggerMutationSuccessParticles;

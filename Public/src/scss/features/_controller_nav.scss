@@ -1,0 +1,135 @@
+// ============================================================================
+// Controller Navigation — Universal gamepad support
+// ============================================================================
+
+.controller-hints {
+    display: flex;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-top: 12px;
+    justify-content: center;
+    animation: hints-fade-in 0.5s ease-out;
+}
+
+@keyframes hints-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hint-item {
+    font-size: 10px;
+    color: #90a4ae;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Console-specific hint styles */
+.controller-hints[data-controller="playstation"] .hint-item {
+    border-radius: 50%; /* PS buttons are circular */
+}
+
+.controller-hints[data-controller="nintendo"] .hint-item {
+    border-radius: 50%; /* Nintendo buttons are circular */
+}
+
+/* Controller focus ring enhancement */
+.controller-focus {
+    animation: controller-focus-pulse 1s ease-in-out infinite !important;
+    z-index: 100;
+}
+
+@keyframes controller-focus-pulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--pathway-glow, #00f2fe);
+        transform: scale(1.05);
+    }
+    50% {
+        box-shadow: 0 0 30px var(--pathway-glow, #00f2fe), 0 0 60px var(--pathway-glow, #00f2fe);
+        transform: scale(1.1);
+    }
+}
+
+/* Touch tilt indicator */
+.tilt-indicator {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 20px;
+    color: #00f2fe;
+    font-size: 11px;
+    z-index: 9999;
+    animation: tilt-fade-in 0.3s ease-out;
+}
+
+@keyframes tilt-fade-in {
+    from { opacity: 0; top: -20px; }
+    to { opacity: 1; top: 10px; }
+}
+
+/* Gamepad connection toast */
+.gamepad-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    background: rgba(0, 242, 254, 0.15);
+    border: 1px solid rgba(0, 242, 254, 0.5);
+    border-radius: 8px;
+    color: #00f2fe;
+    font-size: 14px;
+    font-family: 'Orbitron', sans-serif;
+    z-index: 9999;
+    animation: toast-slide-in 0.3s ease-out;
+}
+
+@keyframes toast-slide-in {
+    from { opacity: 0; top: -40px; }
+    to { opacity: 1; top: 20px; }
+}
+
+/* Controller scheme selector in customization */
+.controller-scheme-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.controller-scheme-btn {
+    flex: 1;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    color: #90a4ae;
+    font-size: 10px;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    &.active {
+        background: rgba(0, 242, 254, 0.1);
+        border-color: #00f2fe;
+        color: #00f2fe;
+    }
+
+    .scheme-icon {
+        font-size: 20px;
+        display: block;
+        margin-bottom: 4px;
+    }
+}

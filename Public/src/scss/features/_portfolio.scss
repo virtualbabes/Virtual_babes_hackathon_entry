@@ -1,0 +1,417 @@
+// ============================================================================
+// _portfolio.scss — PORTFOLIO: the read-only analytics surface
+// CONTAINMENT RULE: the hub is a fixed full-viewport shell. The PAGE must never
+// scroll while it is open — only inner panels (.pp-panel) scroll.
+// STRUCTURE: TIER 1 analytics categories (.pp-cat) -> TIER 2 screens (.pp-subtab).
+// All analytics presentational primitives are prefixed .pf-*.
+// ============================================================================
+@import '../base/variables';
+@import '../themes/neon-glass';
+
+.pp-hub {
+    position: fixed;
+    inset: 0;
+    z-index: $z-index-modal;
+    display: none;            // toggled to flex by JS
+    background: rgba(0, 0, 0, 0.78);
+    -webkit-backdrop-filter: blur(8px);
+    overflow: hidden;         // CONTAINS the window — no page scroll
+}
+
+.pp-shell {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    max-width: 1280px;
+    max-height: 92vh;         // never exceeds viewport
+    margin: auto;
+    border-radius: $border-radius-lg;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba($color-neon-purple, 0.35);
+    background: linear-gradient(145deg, rgba($color-dark-grey, 0.96), rgba($color-medium-grey, 0.96));
+    border: 1px solid rgba($color-neon-cyan, 0.25);
+}
+
+// --- Sidebar (category territories) ---
+.pp-sidebar {
+    flex: 0 0 240px;
+    display: flex;
+    flex-direction: column;
+    background: rgba($color-bg-dark, 0.55);
+    border-right: 1px solid rgba($color-neon-cyan, 0.2);
+    overflow-y: auto;         // sidebar scrolls internally if many categories
+}
+
+.pp-sidebar-head {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-md;
+    border-bottom: 1px solid rgba($color-neon-cyan, 0.2);
+    position: relative;
+
+    .pp-avatar {
+        font-size: $font-size-2xl;
+        width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: $border-radius-full;
+        background: rgba($color-neon-purple, 0.15);
+        border: 1px solid rgba($color-neon-purple, 0.4);
+    }
+    .pp-id { flex: 1; min-width: 0; }
+    .pp-id-name { font-weight: bold; color: $color-text-main; font-size: $font-size-sm; }
+    .pp-id-wallet { font-size: $font-size-xs; color: $color-text-muted; font-family: $font-mono; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pp-close {
+        position: absolute; top: $spacing-sm; right: $spacing-sm;
+        background: transparent; border: 1px solid $color-neon-cyan; color: $color-neon-cyan;
+        border-radius: $border-radius-sm; cursor: pointer; padding: 2px 8px;
+        &:hover { background: rgba($color-neon-cyan, 0.15); }
+    }
+}
+
+.pp-cats {
+    display: flex;
+    flex-direction: column;
+    padding: $spacing-sm;
+    gap: $spacing-xs;
+}
+
+.pp-cat {
+    display: flex;
+    align-items: center;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-md;
+    border-radius: $border-radius-sm;
+    border: 1px solid transparent;
+    background: transparent;
+    color: $color-text-secondary;
+    cursor: pointer;
+    text-align: left;
+    transition: all $transition-fast;
+    font-size: $font-size-sm;
+
+    .pp-cat-icon { font-size: $font-size-lg; }
+    &:hover { background: rgba($color-neon-cyan, 0.08); color: $color-text-main; }
+    &.active {
+        background: rgba($color-neon-cyan, 0.15);
+        border-color: rgba($color-neon-cyan, 0.5);
+        color: $color-neon-cyan;
+        box-shadow: 0 0 10px rgba($color-neon-cyan, 0.2);
+    }
+}
+
+// --- Content (right) ---
+.pp-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;        // CONTAINS; inner .pp-panel scrolls
+}
+
+.pp-topbar {
+    display: flex;
+    align-items: center;
+    gap: $spacing-md;
+    padding: $spacing-md $spacing-lg;
+    border-bottom: 1px solid rgba($color-neon-purple, 0.2);
+
+    .pp-region-switch { display: flex; align-items: center; gap: $spacing-xs; }
+    .pp-region-label { font-size: $font-size-xs; color: $color-text-muted; letter-spacing: 1px; }
+    .pp-region-select {
+        @extend .glass-input;
+        font-size: $font-size-sm;
+        max-width: 220px;
+    }
+    .pp-cat-title {
+        margin-left: auto;
+        font-family: $font-heading;
+        color: $color-neon-purple;
+        text-shadow: 0 0 10px rgba($color-neon-purple, 0.4);
+        font-size: $font-size-lg;
+    }
+}
+
+.pp-subtabs {
+    display: flex;
+    gap: $spacing-xs;
+    padding: $spacing-sm $spacing-lg;
+    border-bottom: 1px solid rgba($color-neon-cyan, 0.15);
+    flex-wrap: wrap;
+}
+
+.pp-subtab {
+    padding: $spacing-xs $spacing-md;
+    border-radius: $border-radius-sm;
+    border: 1px solid rgba($color-neon-cyan, 0.25);
+    background: rgba($color-bg-dark, 0.3);
+    color: $color-text-secondary;
+    cursor: pointer;
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all $transition-fast;
+    &:hover { color: $color-text-main; border-color: $color-neon-cyan; }
+    &.active {
+        background: rgba($color-neon-cyan, 0.18);
+        color: $color-neon-cyan;
+        border-color: $color-neon-cyan;
+    }
+}
+
+.pp-panel {
+    flex: 1;
+    overflow-y: auto;          // INNER scroll only — page never scrolls
+    padding: $spacing-lg;
+    min-height: 0;
+}
+
+// --- Shared inner pieces ---
+.pp-loading, .pp-empty, .pp-error, .pp-hint {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    padding: $spacing-lg;
+}
+.pp-error { color: $color-error-red; }
+.pp-hint { font-style: italic; line-height: 1.5; }
+
+.pp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: $spacing-md;
+    margin-bottom: $spacing-md;
+}
+.pp-stat {
+    @include neon-glass-panel;
+    padding: $spacing-md;
+    text-align: center;
+    .pp-stat-label { display: block; font-size: $font-size-xs; color: $color-text-muted; text-transform: uppercase; letter-spacing: 0.5px; }
+    .pp-stat-val { display: block; font-size: $font-size-xl; font-weight: bold; color: $color-neon-cyan; margin-top: $spacing-xs; }
+}
+
+.pp-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: $spacing-md;
+}
+.pp-card {
+    @include neon-glass-panel;
+    padding: $spacing-md;
+    cursor: pointer;
+    border-color: rgba($color-neon-blue, 0.2);
+    transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
+    &:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba($color-neon-blue, 0.25); border-color: $color-neon-blue; }
+    .pp-card-title { font-weight: bold; color: $color-text-main; margin-bottom: $spacing-xs; }
+    .pp-card-sub { font-size: $font-size-xs; color: $color-text-secondary; }
+}
+
+.pp-detail { display: flex; flex-direction: column; gap: $spacing-md; }
+.pp-back {
+    align-self: flex-start;
+    background: transparent; border: 1px solid $color-neon-cyan; color: $color-neon-cyan;
+    border-radius: $border-radius-sm; padding: $spacing-xs $spacing-md; cursor: pointer; font-size: $font-size-xs;
+    &:hover { background: rgba($color-neon-cyan, 0.12); }
+}
+.pp-detail-body { color: $color-text-secondary; font-size: $font-size-sm; line-height: 1.6; }
+
+// --- Responsive: stack sidebar under content on narrow screens, still contained ---
+@media (max-width: 760px) {
+    .pp-shell { flex-direction: column; max-height: 96vh; }
+    .pp-sidebar { flex: 0 0 auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: none; border-bottom: 1px solid rgba($color-neon-cyan, 0.2); }
+    .pp-cats { flex-direction: row; }
+    .pp-cat-label { display: none; } // icon-only when cramped
+}
+
+// --- Lobby category (synergy: players / spectate / replay) ---
+.pp-player-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: $spacing-xs; overflow-y: auto; flex: 1; min-height: 0; }
+.pp-player-item { display: flex; justify-content: space-between; align-items: center; padding: $spacing-sm $spacing-md; border: 1px solid rgba($color-neon-cyan, 0.18); border-radius: $border-radius-sm; background: rgba($color-neon-cyan, 0.03); }
+.pp-player-actions { display: flex; gap: $spacing-xs; }
+.pp-mini-btn {
+    background: transparent; border: 1px solid $color-neon-cyan; color: $color-neon-cyan;
+    border-radius: $border-radius-sm; padding: 2px 10px; font-size: $font-size-xs; cursor: pointer;
+    &:hover { background: rgba($color-neon-cyan, 0.14); }
+}
+.pp-actions { display: flex; flex-direction: column; gap: $spacing-sm; margin-top: $spacing-md; }
+.pp-action-btn {
+    background: rgba($color-neon-cyan, 0.06); border: 1px solid rgba($color-neon-cyan, 0.35); color: $color-text-main;
+    border-radius: $border-radius-sm; padding: $spacing-sm $spacing-md; cursor: pointer; text-align: left; font-size: $font-size-sm;
+    &:hover { background: rgba($color-neon-cyan, 0.16); }
+}
+
+.pp-rm-hint { margin-top: $spacing-xs; opacity: 0.6; font-size: $font-size-xs; }
+
+// Single-Navigation Mandate: always-visible notice that the Player Profile is a
+// READ-ONLY data view whose actions live in the World Dashboard.
+.pp-readonly-note {
+    margin: $spacing-xs 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid rgba($color-neon-cyan, 0.6);
+    background: rgba($color-neon-cyan, 0.06);
+    border-radius: 3px;
+    opacity: 0.85;
+    font-size: $font-size-xs;
+    letter-spacing: 0.02em;
+}
+
+// --- Main screen Column 1 (Arena): lean head + chat title ---
+.arena-side-head { margin: 0 0 $spacing-sm; }
+.chat-title { letter-spacing: 0.08em; }
+
+// Token badges — one accent per settlement token ($VBV live; $NUGGET/$UNIT roadmap)
+.token-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: $border-radius-full;
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    border: 1px solid currentColor;
+}
+.token-vbv { color: $color-neon-cyan; background: rgba($color-neon-cyan, 0.12); }
+.token-nugget { color: $color-gold; background: rgba($color-gold, 0.12); }
+.token-unit { color: $color-neon-purple; background: rgba($color-neon-purple, 0.12); }
+
+// ============================================================================
+// ANALYTICS PRIMITIVES (.pf-*)
+// Presentational only. Every number shown beside them is derived from integer
+// state; bar widths are view-only geometry.
+// ============================================================================
+
+// --- Topbar brand ---
+.pf-brand { display: flex; align-items: baseline; gap: $spacing-xs; }
+.pf-brand-title {
+    font-family: $font-heading;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: $color-neon-cyan;
+    text-shadow: 0 0 12px rgba($color-neon-cyan, 0.45);
+}
+.pf-brand-sub {
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: $color-text-muted;
+}
+
+// --- Section head (used above every analytical block) ---
+.pf-head {
+    display: flex;
+    align-items: baseline;
+    gap: $spacing-sm;
+    margin: $spacing-md 0 $spacing-sm;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba($color-neon-cyan, 0.15);
+    &:first-child { margin-top: 0; }
+}
+.pf-head-title {
+    font-family: $font-heading;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    color: $color-text-main;
+    font-size: $font-size-sm;
+    text-transform: uppercase;
+}
+.pf-head-hint { font-size: $font-size-xs; color: $color-text-muted; font-style: italic; }
+
+// --- KPI sub-caption (pairs with .pp-stat) ---
+.pf-kpi-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+}
+
+// --- Defensive key/value rows (endpoint-shaped payloads) ---
+.pf-rows { display: flex; flex-direction: column; gap: 2px; }
+.pf-row {
+    display: flex;
+    justify-content: space-between;
+    gap: $spacing-md;
+    padding: 5px 10px;
+    border-radius: $border-radius-sm;
+    background: rgba($color-bg-dark, 0.35);
+    font-size: $font-size-xs;
+    &:nth-child(even) { background: rgba($color-bg-dark, 0.55); }
+}
+.pf-row-k { color: $color-text-muted; text-transform: uppercase; letter-spacing: 0.4px; }
+.pf-row-v { color: $color-text-main; font-family: $font-mono; text-align: right; }
+
+// --- Bar analytics (view-only geometry from integer counts) ---
+.pf-bar-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1.2fr) 3fr minmax(80px, auto);
+    align-items: center;
+    gap: $spacing-sm;
+    margin-bottom: 5px;
+    font-size: $font-size-xs;
+}
+.pf-bar-label { color: $color-text-secondary; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-bar-track {
+    height: 8px;
+    border-radius: $border-radius-full;
+    background: rgba($color-neon-cyan, 0.10);
+    overflow: hidden;
+}
+.pf-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: $border-radius-full;
+    background: linear-gradient(90deg, rgba($color-neon-cyan, 0.55), $color-neon-cyan);
+    box-shadow: 0 0 8px rgba($color-neon-cyan, 0.35);
+}
+.pf-bar-val { color: $color-text-main; font-family: $font-mono; text-align: right; }
+
+// --- Analytical table ---
+.pf-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-x: auto;          // wide analytics scroll inside the panel only
+    padding-bottom: 4px;
+}
+.pf-tr {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(104px, 1fr);
+    gap: $spacing-sm;
+    min-width: 100%;
+    padding: 6px 10px;
+    border-radius: $border-radius-sm;
+    background: rgba($color-bg-dark, 0.35);
+    font-size: $font-size-xs;
+}
+.pf-th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: $color-neon-cyan;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba($color-neon-cyan, 0.08);
+}
+.pf-td { color: $color-text-secondary; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-td-strong { color: $color-text-main; font-weight: 600; }
+
+// --- Chips (compact sets such as unlocked achievements, titles) ---
+.pf-chips { display: flex; flex-wrap: wrap; gap: $spacing-xs; }
+.pf-chip {
+    padding: 3px 10px;
+    border-radius: $border-radius-full;
+    border: 1px solid rgba($color-neon-cyan, 0.35);
+    background: rgba($color-neon-cyan, 0.07);
+    color: $color-text-main;
+    font-size: $font-size-xs;
+}
+
+// --- Quoted identity text (gloat message) ---
+.pf-quote {
+    padding: $spacing-sm $spacing-md;
+    border-left: 3px solid rgba($color-neon-purple, 0.6);
+    background: rgba($color-neon-purple, 0.06);
+    border-radius: 3px;
+    color: $color-text-secondary;
+    font-style: italic;
+    font-size: $font-size-sm;
+    line-height: 1.5;
+}

@@ -5,6 +5,7 @@ import { showToast, setTransactionStatus, hideAllOverlays, showMainGameContainer
 import { getNetworkConfig, shortenAddress } from './utils.js';
 import { socket, setNonceResolver } from './network.js';
 import { initAudioContext } from './audio.js';
+const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 export let userAddress = null;
 export let isVerified = false;
@@ -62,15 +63,29 @@ export async function initWalletConnect() {
             disconnectUserWallet();
         });
 
-        // Restore existing session
-        const sessions = signClient.session.getAll();
-        if (sessions.length > 0) {
-            const session = sessions[0];
-            const account = session.namespaces.algorand.accounts[0];
-            const addr = account.split(":")[2];
+        // Restore existing session (defensive: iterate namespaces, validate chain).
+        const sessions = signClient.session.getAll() || [];
+        const appChainIds = [CONFIG.VOI_CHAIN_ID, CONFIG.ALGO_CHAIN_ID];
+        let restoredAddr = null;
+        for (const s of sessions) {
+            if (restoredAddr) break;
+            for (const nsKey in (s?.namespaces || {})) {
+                const ns = s.namespaces[nsKey] || {};
+                for (const acc of (ns.accounts || [])) {
+                    const parts = String(acc).split(":");
+                    const chain = parts.length >= 2 ? parts[0] + ":" + parts[1] : "";
+                    if (chain && appChainIds.includes(chain) && parts.length >= 3) {
+                        restoredAddr = parts[2];
+                        break;
+                    }
+                }
+                if (restoredAddr) break;
+            }
+        }
+        if (restoredAddr) {
             walletProvider = 'walletconnect';
-            console.log("[WC] Session Restored:", addr);
-            updateWalletUI(addr);
+            console.log("[WC] Session Restored:", restoredAddr);
+            updateWalletUI(restoredAddr);
         }
 
         console.log("[WC] Initialization Complete.");
@@ -105,12 +120,14 @@ export async function checkVoiReadiness(address) {
 }
 
 export function openPayoutSettings() {
+    if (typeof window.hideAllOverlays === 'function') window.hideAllOverlays();
     document.getElementById("payout-settings-overlay").classList.remove("hidden");
-    document.getElementById("payout-address-input").value = payoutAddress || "";
+    const payoutInput = document.getElementById("payout-address-input");
+    if (payoutInput) payoutInput.value = payoutAddress || "";
 }
 
 export function savePayoutAddress() {
-    const addr = document.getElementById("payout-address-input").value.trim();
+    const addr = document.getElementById("payout-address-input")?.value.trim();
     if (addr && addr.length === 58) {
         payoutAddress = addr;
         localStorage.setItem("vbabes_payout_address", addr);
@@ -168,6 +185,7 @@ export async function processRewardPayout(payloadStr) {
         showToast("✅ Reward Sent!", "success");
     } catch (err) { showToast("⚠️ Payout Failed: " + err.message, "error"); }
 }
+window.processRewardPayout = processRewardPayout;
 
 export async function handleWalletAction() {
     if (window.userAddress) {
@@ -183,6 +201,7 @@ export function closeWalletSelector() {
 }
 
 export async function connectUserWallet() {
+    if (typeof window.hideAllOverlays === 'function') window.hideAllOverlays();
     document.getElementById("wallet-selector-overlay").classList.remove("hidden");
 }
 
@@ -232,7 +251,7 @@ export async function connectWith(provider) {
                 const session = await approval();
                 wcModal.closeModal();
                 
-                const account = session.namespaces.algorand.accounts[0];
+                const account = session?.namespaces.algorand.accounts[0];
                 address = account.split(":")[2];
                 walletProvider = 'walletconnect';
             }
@@ -257,7 +276,7 @@ export async function disconnectUserWallet() {
     try {
         if (walletProvider === 'walletconnect' && signClient) {
             const sessions = signClient.session.getAll();
-            if (sessions.length > 0) {
+            if (sessions?.length ?? 0 > 0) {
                 await signClient.disconnect({
                     topic: sessions[0].topic,
                     reason: { code: 6000, message: "User disconnected" }
@@ -334,8 +353,8 @@ export function addXChainWallet() {
  * Submits the linked wallet details to the backend for verification.
  */
 export async function submitLinkWallet() {
-    const linkedAddress = document.getElementById("linked-address-input").value.trim();
-    const linkedChain = document.getElementById("linked-chain-select").value;
+    const linkedAddress = document.getElementById("linked-address-input")?.value.trim();
+    const linkedChain = document.getElementById("linked-chain-select")?.value;
 
     if (!linkedAddress) {
         showToast("Please enter an external wallet address.", "error");
@@ -366,8 +385,8 @@ export async function submitLinkWallet() {
         let targetChainId = null;
 
         for (const s of allSessions) {
-            for (const nsKey in s.namespaces) {
-                const ns = s.namespaces[nsKey];
+            for (const nsKey in s?.namespaces) {
+                const ns = s?.namespaces[nsKey];
                 const acc = ns.accounts?.find(a => a.toLowerCase().includes(linkedAddress.toLowerCase()));
                 if (acc) {
                     targetTopic = s.topic;
@@ -423,3 +442,10 @@ export async function submitLinkWallet() {
         setTransactionStatus(null);
     }
 }
+
+// WS consumers (flow-doc §12.3)
+window.onLinkWalletResponse = function (payload) {
+    const ok = !payload || !payload.error;
+    if (window.showToast) window.showToast(ok ? '✅ External wallet linked!' : '❌ Link failed: ' + (payload.error || 'unknown'), ok ? 'success' : 'error');
+    if (ok) { const el = document.getElementById('link-wallet-overlay'); if (el) el.remove(); }
+};

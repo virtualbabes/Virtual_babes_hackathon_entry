@@ -27,7 +27,7 @@ Determine project state in this order:
 1. Repository implementation
 2. Repository Constitution (`.clinerules`)
 3. `AI-Brain/Session-Handoff.md`
-4. `AI-Brain/Docbase-Analysis.md`
+4. `AI-Brain/Docbase-Analysis.md (DOES NOT EXIST - verified 2026-09-20; superseded by AI-Brain/App-Aspect-Index.md and the RAG aspect rows)`
 5. README.md
 6. Current documentation
 7. Read last 50 lines `AI-Brain\A.I_memory.md`
